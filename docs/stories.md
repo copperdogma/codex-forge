@@ -20,6 +20,9 @@ This index tracks stories in `/docs/stories/` for the codex-forge pipeline.
 | 013 | Cost/perf benchmarking and presets | Low | To Do | /docs/stories/story-013-cost-perf.md |
 | 014 | Layout of docs & developer onboarding | Low | To Do | /docs/stories/story-014-docs-onboarding.md |
 | 015 | Modular pipeline & module registry | High | To Do | /docs/stories/story-015-modular-pipeline.md |
+| 016 | Driver DAG & schema compatibility | High | To Do | /docs/stories/story-016-driver-dag-schema.md |
+| 017 | Module UX polish (params & outputs) | Medium | To Do | /docs/stories/story-017-module-ux.md |
+| 018 | Enrichment & alt modules | High | To Do | /docs/stories/story-018-enrichment-alt-mods.md |
 
 ## Notes
 - Status “Done” reflects current working state in codex-forge. “To Do” items are planned next steps aligned with `docs/requirements.md` and `snapshot.md`.

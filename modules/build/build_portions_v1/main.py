@@ -1,6 +1,13 @@
 import argparse
 import json
+import sys
+import pathlib
 from typing import Dict, List
+
+repo_root = pathlib.Path(__file__).resolve().parents[3]
+if str(repo_root) not in sys.path:
+    sys.path.insert(0, str(repo_root))
+
 from utils import read_jsonl, save_json
 
 

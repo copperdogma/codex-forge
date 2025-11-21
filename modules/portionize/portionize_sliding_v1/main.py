@@ -1,9 +1,16 @@
 import argparse
 import json
 import os
+import sys
+import pathlib
 from typing import List, Dict
 from openai import OpenAI
 from tqdm import tqdm
+
+repo_root = pathlib.Path(__file__).resolve().parents[3]
+if str(repo_root) not in sys.path:
+    sys.path.insert(0, str(repo_root))
+
 from utils import read_jsonl, append_jsonl, ensure_dir
 from schemas import PortionHypothesis
 

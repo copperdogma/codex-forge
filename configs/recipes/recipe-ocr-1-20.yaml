@@ -1,0 +1,46 @@
+run_id: deathtrap-ocr-1-20
+input:
+  pdf: input/06 deathtrap dungeon.pdf
+output_dir: output/runs/deathtrap-ocr-1-20
+stages:
+  - stage: extract
+    module: extract_ocr_v1
+    params:
+      start: 1
+      end: 20
+      dpi: 300
+      psm: 4
+      oem: 3
+      lang: eng
+  - stage: clean
+    module: clean_llm_v1
+    params:
+      model: gpt-4.1-mini
+      boost_model: gpt-5
+      min_conf: 0.6
+  - stage: portionize
+    module: portionize_sliding_v1
+    params:
+      window: 8
+      stride: 1
+      model: gpt-4.1-mini
+      boost_model: gpt-5
+      pstart: 1
+      pend: 20
+  - stage: consensus
+    module: consensus_vote_v1
+    params:
+      min_conf: 0.55
+      range_start: 1
+      range_end: 20
+  - stage: dedupe
+    module: dedupe_ids_v1
+  - stage: normalize
+    module: normalize_ids_v1
+  - stage: resolve
+    module: resolve_overlaps_v1
+    params:
+      range_start: 1
+      range_end: 20
+  - stage: build
+    module: build_portions_v1

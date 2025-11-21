@@ -1,0 +1,8 @@
+module_id: consensus_vote_v1
+stage: consensus
+entrypoint: modules/consensus/consensus_vote_v1/main.py
+input_schema: portion_hyp_v1
+output_schema: locked_portion_v1
+default_params:
+  min_conf: 0.55
+notes: Vote + greedy non-overlap with coverage fill.

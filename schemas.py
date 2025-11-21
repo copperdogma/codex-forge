@@ -62,7 +62,37 @@ class PageResult(BaseModel):
     paragraphs: List[Paragraph]
 
 
+class PageDoc(BaseModel):
+    schema_version: str = "page_doc_v1"
+    module_id: Optional[str] = None
+    run_id: Optional[str] = None
+    source: Optional[List[str]] = None
+    created_at: Optional[str] = None
+    page: int
+    image: Optional[str] = None
+    text: str
+    source_path: Optional[str] = None
+
+
+class CleanPage(BaseModel):
+    schema_version: str = "clean_page_v1"
+    module_id: Optional[str] = None
+    run_id: Optional[str] = None
+    source: Optional[List[str]] = None
+    created_at: Optional[str] = None
+    page: int
+    image: Optional[str] = None
+    raw_text: str
+    clean_text: str
+    confidence: float
+
+
 class PortionHypothesis(BaseModel):
+    schema_version: str = "portion_hyp_v1"
+    module_id: Optional[str] = None
+    run_id: Optional[str] = None
+    source: Optional[List[str]] = None
+    created_at: Optional[str] = None
     portion_id: Optional[str] = None
     page_start: int
     page_end: int
@@ -77,6 +107,11 @@ class PortionHypothesis(BaseModel):
 
 
 class LockedPortion(BaseModel):
+    schema_version: str = "locked_portion_v1"
+    module_id: Optional[str] = None
+    run_id: Optional[str] = None
+    source: Optional[List[str]] = None
+    created_at: Optional[str] = None
     portion_id: str
     page_start: int
     page_end: int
@@ -84,3 +119,39 @@ class LockedPortion(BaseModel):
     type: Optional[str] = None
     confidence: float
     source_images: List[str] = Field(default_factory=list)
+
+
+class ResolvedPortion(BaseModel):
+    schema_version: str = "resolved_portion_v1"
+    module_id: Optional[str] = None
+    run_id: Optional[str] = None
+    source: Optional[List[str]] = None
+    created_at: Optional[str] = None
+    portion_id: str
+    page_start: int
+    page_end: int
+    title: Optional[str] = None
+    type: Optional[str] = None
+    confidence: float = 0.0
+    source_images: List[str] = Field(default_factory=list)
+    orig_portion_id: Optional[str] = None
+
+
+class EnrichedPortion(BaseModel):
+    schema_version: str = "enriched_portion_v1"
+    module_id: Optional[str] = None
+    run_id: Optional[str] = None
+    source: Optional[List[str]] = None
+    created_at: Optional[str] = None
+    portion_id: str
+    page_start: int
+    page_end: int
+    title: Optional[str] = None
+    type: Optional[str] = None
+    confidence: float = 0.0
+    source_images: List[str] = Field(default_factory=list)
+    raw_text: Optional[str] = None
+    choices: List[Choice] = Field(default_factory=list)
+    combat: Optional[Combat] = None
+    test_luck: Optional[bool] = None
+    item_effects: List[ItemEffect] = Field(default_factory=list)

@@ -17,7 +17,7 @@ AI-first, modular pipeline for turning scanned books into structured JSON with f
 - `output/`: git-ignored; run artifacts live at `output/runs/<run_id>/`
 - `settings.example.yaml`: sample config
 
-## Quick start
+## Quick start (legacy linear)
 ```bash
 cd codex-forge
 python -m venv .venv && source .venv/bin/activate
@@ -52,6 +52,28 @@ python build_portion_text.py --pages output/runs/<run_id>/pages_clean.jsonl \
   --portions output/runs/<run_id>/portions_resolved.jsonl \
   --out output/runs/<run_id>/portions_final_raw.json
 ```
+
+## Modular driver (WIP)
+- Modules are declared in `modules/registry.yaml`; recipes live in `configs/recipes/`.
+- Driver orchestrates stages, stamps artifacts with schema/module/run IDs, and tracks state in `pipeline_state.json`.
+- Swap modules by changing the recipe, e.g. OCR vs text ingest.
+
+Examples:
+```bash
+# Dry-run OCR recipe
+python driver.py --recipe configs/recipes/recipe-ocr.yaml --dry-run
+
+# Text ingest with mock LLM stages (for tests without API calls)
+python driver.py --recipe configs/recipes/recipe-text.yaml --mock --skip-done
+
+# OCR pages 1–20 real run
+python driver.py --recipe configs/recipes/recipe-ocr-1-20.yaml --force
+
+# Swap modules: edit configs/recipes/*.yaml to choose a different module per stage
+# (e.g., set stage: extract -> module: extract_text_v1 instead of extract_ocr_v1)
+```
+
+Artifacts appear under `output/runs/<run_id>/` as listed in the recipe; use `--skip-done` to resume and `--force` to rerun stages.
 
 ## Output conventions
 - `output/runs/<run_id>/` contains all artifacts: images/, ocr/, pages_raw/clean, hypotheses, locked/normalized/resolved portions, final JSON, `pipeline_state.json`.

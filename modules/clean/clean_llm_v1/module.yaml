@@ -1,0 +1,10 @@
+module_id: clean_llm_v1
+stage: clean
+entrypoint: modules/clean/clean_llm_v1/main.py
+input_schema: page_doc_v1
+output_schema: clean_page_v1
+default_params:
+  model: gpt-4.1-mini
+  boost_model: gpt-5
+  min_conf: 0.6
+notes: Multimodal LLM cleaning.

@@ -1,0 +1,7 @@
+module_id: dedupe_ids_v1
+stage: dedupe
+entrypoint: modules/dedupe/dedupe_ids_v1/main.py
+input_schema: locked_portion_v1
+output_schema: locked_portion_v1
+default_params: {}
+notes: Deduplicate portion_ids by suffixing repeats.

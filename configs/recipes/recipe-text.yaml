@@ -1,0 +1,34 @@
+run_id: deathtrap-text-ingest
+input:
+  text_glob: input/text/**/*.md
+output_dir: output/runs/deathtrap-text-ingest
+stages:
+  - stage: extract
+    module: extract_text_v1
+    params:
+      input_glob: input/text/**/*.md
+  - stage: clean
+    module: clean_llm_v1
+    params:
+      model: gpt-4.1-mini
+      boost_model: gpt-5
+      min_conf: 0.6
+  - stage: portionize
+    module: portionize_sliding_v1
+    params:
+      window: 8
+      stride: 1
+      model: gpt-4.1-mini
+      boost_model: gpt-5
+  - stage: consensus
+    module: consensus_vote_v1
+    params:
+      min_conf: 0.55
+  - stage: dedupe
+    module: dedupe_ids_v1
+  - stage: normalize
+    module: normalize_ids_v1
+  - stage: resolve
+    module: resolve_overlaps_v1
+  - stage: build
+    module: build_portions_v1

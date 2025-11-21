@@ -1,8 +1,15 @@
 import argparse
 import json
+import os
+import sys
+import pathlib
+
+repo_root = pathlib.Path(__file__).resolve().parents[3]
+if str(repo_root) not in sys.path:
+    sys.path.insert(0, str(repo_root))
+
 from utils import ensure_dir, save_jsonl
 from ocr import render_pdf, run_ocr
-import os
 
 
 def main():

@@ -1,0 +1,9 @@
+module_id: extract_text_v1
+stage: extract
+entrypoint: modules/extract/extract_text_v1/main.py
+input_schema: text_source_v1
+output_schema: page_doc_v1
+default_params:
+  input_glob: input/text/**/*.md
+  start_page: 1
+notes: Pure text/Markdown/HTML ingest (no images).
