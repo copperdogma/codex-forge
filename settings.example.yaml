@@ -1,0 +1,17 @@
+model: gpt-4o-mini
+temperature: 0.2
+max_retries: 3
+render:
+  dpi: 300
+ocr:
+  psm: 4        # assume single column of text
+  oem: 3        # default LSTM
+  lang: eng
+paths:
+  tesseract_cmd: null   # override if tesseract binary not on PATH
+  pdf: ../06 deathtrap dungeon.pdf
+  images: ../images      # optional; if present, skip rendering
+  out_dir: output
+range:
+  start_page: 1
+  end_page: null         # null means through last page

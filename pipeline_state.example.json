@@ -1,0 +1,9 @@
+{
+  "images_extracted": false,
+  "ocr_done_pages": [],
+  "clean_done_pages": [],
+  "last_run": null,
+  "notes": "Track which steps are complete so partial re-runs are easy.",
+  "portionize_done_pages": [],
+  "enrich_done_pages": []
+}

@@ -1,0 +1,134 @@
+import argparse
+import json
+import os
+from typing import List, Dict
+from openai import OpenAI
+from tqdm import tqdm
+from utils import read_jsonl, append_jsonl, ensure_dir
+from schemas import PortionHypothesis
+
+SYSTEM_PROMPT = """You segment book pages into logical portions.
+Input: (1) a small ordered batch of pages (text and sometimes images); (2) OPTIONAL prior locked portions that touch these pages.
+Tasks:
+- Propose spans covering the pages in view.
+- If a span clearly continues an earlier portion mentioned in "prior", set continuation_of to that portion_id and explain in notes; otherwise leave null.
+- Portions can start or end mid-page; still report page_start/page_end and add a note.
+- Stay generic; do not assume any series-specific structure.
+- If a numbered adventure section is obvious, set type="section" and portion_id suggestion like "S123".
+- Other portion types examples: front_cover, back_cover, splash, publishing_info, dedication, toc, rules, intro, appendix, illustration_only, ads.
+Output JSON object: { "portions": [ { "portion_id": str|null, "page_start": int, "page_end": int, "title": str|null, "type": str|null, "confidence": float (0-1), "notes": str|null, "continuation_of": str|null, "continuation_confidence": float|null } ] }
+Do not include anything else."""
+
+
+def window_iter(pages: List[Dict], window: int, stride: int):
+    n = len(pages)
+    i = 0
+    while i < n:
+        batch = pages[i:i+window]
+        yield batch
+        i += stride
+
+
+def call_llm(client: OpenAI, model: str, batch: List[Dict], priors: List[Dict]) -> List[Dict]:
+    content = []
+    for p in batch:
+        page_text = p.get("clean_text") or p.get("text") or p.get("raw_text") or ""
+        content.append({"type": "text", "text": f"[PAGE {p['page']}]\n{page_text}"})
+        if p.get("image_b64"):
+            content.append({"type": "image_url", "image_url": {"url": f"data:image/jpeg;base64,{p['image_b64']}"}})
+    if priors:
+        prior_txt = json.dumps(priors, ensure_ascii=False)
+        content.append({"type": "text", "text": "Prior locked portions near these pages:\n" + prior_txt})
+    completion = client.chat.completions.create(
+        model=model,
+        messages=[
+            {"role": "system", "content": SYSTEM_PROMPT},
+            {"role": "user", "content": content}
+        ],
+        response_format={"type": "json_object"}
+    )
+    content = json.loads(completion.choices[0].message.content)
+    # Expect top-level list in key 'portions' or bare list
+    if isinstance(content, list):
+        return content
+    if isinstance(content, dict):
+        for k in ("portions", "spans", "data"):
+            if k in content and isinstance(content[k], list):
+                return content[k]
+    return []
+
+
+def main():
+    parser = argparse.ArgumentParser(description="LLM-driven portion hypotheses over sliding windows.")
+    parser.add_argument("--pages", required=True, help="Path to pages_raw.jsonl or pages_clean.jsonl.")
+    parser.add_argument("--out", required=True, help="Path to window_hypotheses.jsonl (appended).")
+    parser.add_argument("--window", type=int, default=5)
+    parser.add_argument("--stride", type=int, default=1)
+    parser.add_argument("--pstart", type=int, help="First page to include (1-based).")
+    parser.add_argument("--pend", type=int, help="Last page to include (inclusive).")
+    parser.add_argument("--model", default="gpt-5-mini")
+    parser.add_argument("--boost_model", default="gpt-5", help="Optional higher-tier model for retries on empty/low-confidence outputs.")
+    parser.add_argument("--prior", help="Optional portions_locked_normalized.jsonl to give prior spans for continuation hints.")
+    args = parser.parse_args()
+
+    pages = list(read_jsonl(args.pages))
+    if args.pstart or args.pend:
+        ps = args.pstart or pages[0]["page"]
+        pe = args.pend or pages[-1]["page"]
+        pages = [p for p in pages if ps <= p["page"] <= pe]
+    if not pages:
+        raise SystemExit("No pages to process after applying range filter.")
+
+    # Optionally base64 images for multimodal
+    from base64 import b64encode
+    for p in pages:
+        if "image" in p and p["image"] and os.path.exists(p["image"]):
+            if "image_b64" not in p:
+                with open(p["image"], "rb") as f:
+                    p["image_b64"] = b64encode(f.read()).decode("utf-8")
+    client = OpenAI()
+    ensure_dir(args.out.rsplit("/", 1)[0])
+
+    min_page = pages[0]["page"]
+    max_page = pages[-1]["page"]
+
+    # Load prior portions if provided
+    priors_all = []
+    if args.prior:
+        priors_all = list(read_jsonl(args.prior))
+
+    for batch in tqdm(list(window_iter(pages, args.window, args.stride)), desc="Windows"):
+        try:
+            # priors touching these pages
+            batch_pages = set([p["page"] for p in batch])
+            priors = [p for p in priors_all if (p.get("page_start") and p.get("page_end") and
+                                                (set(range(p["page_start"], p["page_end"]+1)) & batch_pages))]
+
+            spans = call_llm(client, args.model, batch, priors)
+            if not spans and args.boost_model:
+                spans = call_llm(client, args.boost_model, batch, priors)
+            # normalize
+            page_nums = [p['page'] for p in batch]
+            for span in spans:
+                if span["page_start"] < min_page or span["page_end"] > max_page:
+                    continue
+                hypo = PortionHypothesis(
+                    portion_id=span.get("portion_id"),
+                    page_start=span["page_start"],
+                    page_end=span["page_end"],
+                    title=span.get("title"),
+                    type=span.get("type"),
+                    confidence=span.get("confidence", 0.5),
+                    notes=span.get("notes"),
+                    continuation_of=span.get("continuation_of"),
+                    continuation_confidence=span.get("continuation_confidence"),
+                    source_window=page_nums,
+                    source_pages=list(range(span["page_start"], span["page_end"] + 1))
+                )
+                append_jsonl(args.out, hypo.dict())
+        except Exception as e:
+            append_jsonl(args.out, {"error": str(e), "batch_pages": [p["page"] for p in batch]})
+
+
+if __name__ == "__main__":
+    main()

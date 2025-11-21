@@ -1,0 +1,17 @@
+model: gpt-4o-mini
+temperature: 0.2
+max_retries: 2
+render:
+  dpi: 200
+ocr:
+  psm: 4
+  oem: 3
+  lang: eng
+paths:
+  tesseract_cmd: null
+  pdf: ../06 deathtrap dungeon.pdf
+  images: ../images
+  out_dir: output
+range:
+  start_page: 1
+  end_page: 1
