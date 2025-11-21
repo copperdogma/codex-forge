@@ -1,0 +1,8 @@
+module_id: merge_portion_hyp_v1
+stage: adapter
+entrypoint: modules/adapter/merge_portion_hyp_v1/main.py
+input_schema: portion_hyp_v1
+output_schema: portion_hyp_v1
+default_params:
+  dedupe_field: portion_id
+notes: Concatenate and de-duplicate portion hypotheses from multiple upstream portionizers.

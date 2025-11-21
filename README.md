@@ -1,4 +1,4 @@
-# codex-forge
+# codex-forge ![Tests](https://github.com/cam/codex-forge/actions/workflows/tests.yml/badge.svg)
 AI-first, modular pipeline for turning scanned books into structured JSON with full traceability.
 
 ## What it does (today)
@@ -73,6 +73,19 @@ python driver.py --recipe configs/recipes/recipe-ocr-1-20.yaml --force
 # (e.g., set stage: extract -> module: extract_text_v1 instead of extract_ocr_v1)
 ```
 
+### DAG recipes (coarse+fine merge example)
+```bash
+# Dry-run DAG OCR with adapter merge
+python driver.py --recipe configs/recipes/recipe-ocr-dag.yaml --dry-run
+
+# Text ingest DAG with mock LLM stages (fast, no API calls)
+python driver.py --recipe configs/recipes/recipe-text-dag.yaml --mock --skip-done
+```
+Key points:
+- Stages have ids and `needs`; driver topo-sorts and validates schemas.
+- Adapter `merge_portion_hyp_v1` dedupes coarse+fine portion hypotheses before consensus.
+- Override per-stage outputs via the recipe `outputs:` map (used in DAG examples).
+
 Artifacts appear under `output/runs/<run_id>/` as listed in the recipe; use `--skip-done` to resume and `--force` to rerun stages.
 
 ## Output conventions
@@ -89,3 +102,7 @@ Artifacts appear under `output/runs/<run_id>/` as listed in the recipe; use `--s
 - Requires Tesseract installed/on PATH.
 - Models configurable; defaults use `gpt-4.1-mini` with `--boost_model gpt-5`.
 - Artifacts are JSON/JSONL; runs are append-only and reproducible via configs.
+- Driver unit tests run in CI via `tests.yml`. Run locally with:
+  ```bash
+  python -m unittest discover -s tests -p "driver_*test.py"
+  ```

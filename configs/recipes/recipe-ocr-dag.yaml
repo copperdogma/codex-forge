@@ -1,0 +1,86 @@
+run_id: deathtrap-ocr-dag
+input:
+  pdf: input/06 deathtrap dungeon.pdf
+output_dir: output/runs/deathtrap-ocr-dag
+# Optional per-stage output overrides (defaults come from driver module map)
+outputs:
+  portionize_coarse: window_hypotheses_coarse.jsonl
+  portionize_fine: window_hypotheses_fine.jsonl
+  consensus_merge: portions_locked_merged.jsonl
+
+stages:
+  - id: extract_ocr
+    stage: extract
+    module: extract_ocr_v1
+    params:
+      dpi: 300
+      psm: 4
+      oem: 3
+      lang: eng
+      end: 20
+
+  - id: clean_pages
+    stage: clean
+    module: clean_llm_v1
+    needs: [extract_ocr]
+    params:
+      model: gpt-4.1-mini
+      boost_model: gpt-5
+      min_conf: 0.6
+
+  - id: portionize_coarse
+    stage: portionize
+    module: portionize_sliding_v1
+    needs: [clean_pages]
+    params:
+      window: 12
+      stride: 4
+      model: gpt-4.1-mini
+      boost_model: gpt-5
+
+  - id: portionize_fine
+    stage: portionize
+    module: portionize_sliding_v1
+    needs: [clean_pages]
+    params:
+      window: 8
+      stride: 1
+      model: gpt-4.1-mini
+      boost_model: gpt-5
+
+  - id: hyp_merge
+    stage: adapter
+    module: merge_portion_hyp_v1
+    needs: [portionize_coarse, portionize_fine]
+    params:
+      dedupe_field: portion_id
+
+  - id: consensus_merge
+    stage: consensus
+    module: consensus_vote_v1
+    needs: [hyp_merge]
+    params:
+      min_conf: 0.55
+
+  - id: dedupe_portions
+    stage: dedupe
+    module: dedupe_ids_v1
+    needs: [consensus_merge]
+
+  - id: normalize_portions
+    stage: normalize
+    module: normalize_ids_v1
+    needs: [dedupe_portions]
+
+  - id: resolve_overlaps
+    stage: resolve
+    module: resolve_overlaps_v1
+    needs: [normalize_portions]
+
+  - id: build_final
+    stage: build
+    module: build_portions_v1
+    needs: [resolve_overlaps, clean_pages]
+    inputs:
+      pages: clean_pages
+      portions: resolve_overlaps
