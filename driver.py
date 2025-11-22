@@ -27,6 +27,14 @@ DEFAULT_OUTPUTS = {
     "enrich": "portions_enriched.jsonl",
 }
 
+def cleanup_artifact(artifact_path: str, force: bool):
+    """
+    Delete existing artifact when forcing a rerun to avoid duplicate appends.
+    """
+    if force and os.path.exists(artifact_path):
+        os.remove(artifact_path)
+        print(f"[force-clean] removed existing {artifact_path}")
+
 def _artifact_name_for_stage(stage_id: str, stage_type: str, outputs_map: Dict[str, str]) -> str:
     return outputs_map.get(stage_id) or DEFAULT_OUTPUTS.get(stage_type, f"{stage_id}.jsonl")
 
@@ -371,8 +379,12 @@ def build_command(entrypoint: str, params: Dict[str, Any], stage_conf: Dict[str,
         cmd += ["--pages", pages_path, "--portions", portions_path, "--out", artifact_path]
         flags_added.update({"--pages", "--portions", "--out"})
     elif stage_conf["stage"] == "enrich":
-        # placeholder; enrichment not implemented
-        pass
+        pages_path = artifact_inputs.get("pages")
+        portions_path = artifact_inputs.get("portions") or artifact_inputs.get("input")
+        if not pages_path or not portions_path:
+            raise SystemExit(f"Stage {stage_conf['id']} missing enrich inputs (pages/portions)")
+        cmd += ["--pages", pages_path, "--portions", portions_path, "--out", artifact_path]
+        flags_added.update({"--pages", "--portions", "--out"})
 
     # Additional params from recipe (skip flags already added)
     # Additional params from recipe (skip flags already added)
@@ -405,9 +417,12 @@ def stamp_artifact(artifact_path: str, schema_name: str, module_id: str, run_id:
     rows = []
     for row in read_jsonl(artifact_path):
         row.setdefault("schema_version", schema_name)
-        row.setdefault("module_id", module_id)
-        row.setdefault("run_id", run_id)
-        row.setdefault("created_at", datetime.utcnow().isoformat() + "Z")
+        if not row.get("module_id"):
+            row["module_id"] = module_id
+        if not row.get("run_id"):
+            row["run_id"] = run_id
+        if not row.get("created_at"):
+            row["created_at"] = datetime.utcnow().isoformat() + "Z"
         rows.append(model_cls(**row).dict())
     save_jsonl(artifact_path, rows)
     print(f"[stamp] {artifact_path} stamped with {schema_name} ({len(rows)} rows)")
@@ -579,7 +594,7 @@ def main():
         # Input resolution
         artifact_inputs: Dict[str, str] = {}
         needs = node.get("needs", [])
-        if stage in {"clean", "portionize", "consensus", "dedupe", "normalize", "resolve", "build", "adapter"}:
+        if stage in {"clean", "portionize", "consensus", "dedupe", "normalize", "resolve", "build", "enrich", "adapter"}:
             # adapters fall-through below
             if stage == "build":
                 inputs_map = node.get("inputs", {}) or {}
@@ -596,6 +611,23 @@ def main():
                 artifact_inputs["portions"] = artifact_index[portions_from]["path"]
                 # Schema checks
                 pages_schema = artifact_index[pages_from].get("schema")
+                portions_schema = artifact_index[portions_from].get("schema")
+                if node.get("input_schema") and portions_schema and node["input_schema"] != portions_schema:
+                    raise SystemExit(f"Schema mismatch: {stage_id} expects {node['input_schema']} got {portions_schema} from {portions_from}")
+            elif stage == "enrich":
+                inputs_map = node.get("inputs", {}) or {}
+                pages_from = inputs_map.get("pages")
+                portions_from = inputs_map.get("portions") or (needs[0] if needs else None)
+                if not pages_from:
+                    # heuristic: pick nearest clean stage
+                    for dep in needs:
+                        if (artifact_index[dep].get("schema") or "").endswith("page_v1"):
+                            pages_from = dep
+                            break
+                if not pages_from or not portions_from:
+                    raise SystemExit(f"Stage {stage_id} requires pages+portions inputs; specify via inputs map")
+                artifact_inputs["pages"] = artifact_index[pages_from]["path"]
+                artifact_inputs["portions"] = artifact_index[portions_from]["path"]
                 portions_schema = artifact_index[portions_from].get("schema")
                 if node.get("input_schema") and portions_schema and node["input_schema"] != portions_schema:
                     raise SystemExit(f"Schema mismatch: {stage_id} expects {node['input_schema']} got {portions_schema} from {portions_from}")
@@ -649,6 +681,8 @@ def main():
             print(f"[dry-run] {stage_id} -> {' '.join(cmd)}")
             artifact_index[stage_id] = {"path": artifact_path, "schema": out_schema}
             continue
+
+        cleanup_artifact(artifact_path, args.force)
 
         logger.log(stage_id, "running", artifact=artifact_path, module_id=module_id, message="started")
 

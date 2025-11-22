@@ -1,10 +1,13 @@
+import json
 import os
 import sys
+import tempfile
 import unittest
 
 sys.path.append(os.path.dirname(os.path.dirname(__file__)))
 
-from driver import build_plan, validate_plan_schemas
+from driver import build_plan, validate_plan_schemas, stamp_artifact
+from driver import cleanup_artifact
 
 
 class DriverPlanTests(unittest.TestCase):
@@ -121,6 +124,42 @@ class DriverPlanTests(unittest.TestCase):
         }
         plan = build_plan(recipe, self.registry)
         validate_plan_schemas(plan)  # should not raise
+
+    def test_stamp_artifact_backfills_metadata(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            path = os.path.join(tmp, "locked.jsonl")
+            rows = [{
+                "portion_id": "P001",
+                "page_start": 1,
+                "page_end": 1,
+                "confidence": 0.5,
+                "source_images": [],
+            }]
+            with open(path, "w", encoding="utf-8") as f:
+                for r in rows:
+                    f.write(json.dumps(r) + "\n")
+
+            stamp_artifact(path, "locked_portion_v1", "mod_a", "run_a")
+
+            with open(path, "r", encoding="utf-8") as f:
+                stamped = [json.loads(line) for line in f if line.strip()]
+            self.assertEqual(len(stamped), 1)
+            row = stamped[0]
+            self.assertEqual(row["module_id"], "mod_a")
+            self.assertEqual(row["run_id"], "run_a")
+            self.assertEqual(row["schema_version"], "locked_portion_v1")
+            self.assertIn("created_at", row)
+
+    def test_cleanup_artifact_removes_on_force(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            path = os.path.join(tmp, "out.jsonl")
+            with open(path, "w", encoding="utf-8") as f:
+                f.write("old\n")
+            self.assertTrue(os.path.exists(path))
+            cleanup_artifact(path, force=True)
+            self.assertFalse(os.path.exists(path))
+            # no-op when file missing
+            cleanup_artifact(path, force=True)
 
 
 if __name__ == "__main__":

@@ -1,0 +1,21 @@
+module_id: consensus_spanfill_v1
+stage: consensus
+entrypoint: modules/consensus/consensus_spanfill_v1/main.py
+input_schema: portion_hyp_v1
+output_schema: locked_portion_v1
+default_params:
+  min_conf: 0.5
+param_schema:
+  properties:
+    min_conf:
+      type: number
+      minimum: 0
+      maximum: 1
+    range_start:
+      type: integer
+      minimum: 1
+    range_end:
+      type: integer
+      minimum: 1
+  required: [min_conf]
+notes: Greedy span fill consensus prioritizing high-confidence, shorter spans; fills gaps with best covering hypothesis or placeholder.
