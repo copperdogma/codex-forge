@@ -495,8 +495,13 @@ def main():
             # adapters fall-through below
             if stage == "build":
                 inputs_map = node.get("inputs", {}) or {}
-                pages_from = inputs_map.get("pages") or (needs[0] if needs else None)
-                portions_from = inputs_map.get("portions") or (needs[1] if len(needs) > 1 else None)
+                pages_from = inputs_map.get("pages")
+                portions_from = inputs_map.get("portions")
+                # Default resolution for single-branch recipes: assume first upstream clean and resolve
+                if not pages_from:
+                    pages_from = needs[0] if needs else None
+                if not portions_from:
+                    portions_from = needs[1] if len(needs) > 1 else (needs[0] if needs else None)
                 if not pages_from or not portions_from:
                     raise SystemExit(f"Stage {stage_id} requires pages+portions inputs; specify via inputs map")
                 artifact_inputs["pages"] = artifact_index[pages_from]["path"]

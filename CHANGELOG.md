@@ -9,6 +9,17 @@
 - `python driver.py --recipe configs/recipes/recipe-text.yaml --force` (passes; stamps/validates).
 - `python driver.py --recipe configs/recipes/recipe-ocr-1-20.yaml --skip-done` (passes; stamps/validates).
 
+## [2025-11-21] - Legacy cleanup and DAG-style recipes
+
+### Changed
+- Removed legacy `run_pipeline.py`, `llm_clean.py`, and `validate.py` now that plugins/driver supersede them.
+- Converted core recipes to DAG-style ids/needs/inputs so driver runs without legacy assumptions.
+- README now points to modular driver only (legacy quickstart removed).
+
+### Tested
+- `python driver.py --recipe configs/recipes/recipe-text.yaml --force`
+- `python driver.py --recipe configs/recipes/recipe-ocr-1-20.yaml --force`
+
 ## [2025-11-21] - Added modular pipeline story
 
 ### Added

@@ -9,7 +9,7 @@ repo_root = pathlib.Path(__file__).resolve().parents[3]
 if str(repo_root) not in sys.path:
     sys.path.insert(0, str(repo_root))
 
-from utils import ensure_dir, save_jsonl
+from utils import ensure_dir, save_jsonl, ProgressLogger
 
 
 def read_files(paths: List[str]) -> List[dict]:
@@ -33,7 +33,12 @@ def main():
     parser.add_argument("--outdir", required=True, help="Output dir for pages_raw.jsonl")
     parser.add_argument("--start_page", "--start-page", dest="start_page", type=int, default=1,
                         help="Starting page number")
+    parser.add_argument("--progress-file", help="Path to pipeline_events.jsonl")
+    parser.add_argument("--state-file", help="Path to pipeline_state.json")
+    parser.add_argument("--run-id", help="Run identifier for logging")
     args = parser.parse_args()
+
+    logger = ProgressLogger(state_path=args.state_file, progress_path=args.progress_file, run_id=args.run_id)
 
     paths = glob.glob(args.input_glob, recursive=True)
     if not paths:
@@ -50,8 +55,13 @@ def main():
             "image": None,
             "text": text
         })
+        logger.log("extract", "running", current=offset + 1, total=len(paths),
+                   message=f"Read {os.path.basename(path)}",
+                   artifact=os.path.join(args.outdir, "pages_raw.jsonl"))
 
     save_jsonl(os.path.join(args.outdir, "pages_raw.jsonl"), pages)
+    logger.log("extract", "done", current=len(paths), total=len(paths),
+               message="Text ingest complete", artifact=os.path.join(args.outdir, "pages_raw.jsonl"))
     print(f"Wrote {len(pages)} pages to {os.path.join(args.outdir, 'pages_raw.jsonl')}")
 
 

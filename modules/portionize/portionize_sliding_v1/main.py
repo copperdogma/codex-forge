@@ -11,7 +11,7 @@ repo_root = pathlib.Path(__file__).resolve().parents[3]
 if str(repo_root) not in sys.path:
     sys.path.insert(0, str(repo_root))
 
-from utils import read_jsonl, append_jsonl, ensure_dir
+from utils import read_jsonl, append_jsonl, ensure_dir, ProgressLogger
 from schemas import PortionHypothesis
 
 SYSTEM_PROMPT = """You segment book pages into logical portions.
@@ -76,6 +76,9 @@ def main():
     parser.add_argument("--model", default="gpt-5-mini")
     parser.add_argument("--boost_model", default="gpt-5", help="Optional higher-tier model for retries on empty/low-confidence outputs.")
     parser.add_argument("--prior", help="Optional portions_locked_normalized.jsonl to give prior spans for continuation hints.")
+    parser.add_argument("--progress-file", help="Path to pipeline_events.jsonl")
+    parser.add_argument("--state-file", help="Path to pipeline_state.json")
+    parser.add_argument("--run-id", help="Run identifier for logging")
     args = parser.parse_args()
 
     pages = list(read_jsonl(args.pages))
@@ -94,6 +97,7 @@ def main():
                 with open(p["image"], "rb") as f:
                     p["image_b64"] = b64encode(f.read()).decode("utf-8")
     client = OpenAI()
+    logger = ProgressLogger(state_path=args.state_file, progress_path=args.progress_file, run_id=args.run_id)
     ensure_dir(args.out.rsplit("/", 1)[0])
 
     min_page = pages[0]["page"]
@@ -104,7 +108,9 @@ def main():
     if args.prior:
         priors_all = list(read_jsonl(args.prior))
 
-    for batch in tqdm(list(window_iter(pages, args.window, args.stride)), desc="Windows"):
+    windows = list(window_iter(pages, args.window, args.stride))
+    total = len(windows)
+    for idx, batch in enumerate(tqdm(windows, desc="Windows"), start=1):
         try:
             # priors touching these pages
             batch_pages = set([p["page"] for p in batch])
@@ -133,8 +139,16 @@ def main():
                     source_pages=list(range(span["page_start"], span["page_end"] + 1))
                 )
                 append_jsonl(args.out, hypo.dict())
+            logger.log("portionize", "running", current=idx, total=total,
+                       message=f"Window {idx}/{total} pages {min(batch_pages)}-{max(batch_pages)}",
+                       artifact=args.out)
         except Exception as e:
             append_jsonl(args.out, {"error": str(e), "batch_pages": [p["page"] for p in batch]})
+            logger.log("portionize", "running", current=idx, total=total,
+                       message=f"Error on window {idx}: {e}", artifact=args.out)
+
+    logger.log("portionize", "done", current=total, total=total,
+               message="Portionize complete", artifact=args.out)
 
 
 if __name__ == "__main__":

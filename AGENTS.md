@@ -10,25 +10,20 @@ This repo processes scanned (or text) books into structured JSON, using modular 
 - Preserve non-ASCII only if the file already contains it.
 
 ## Repo Map (high level)
-- CLI stages: `pages_dump.py`, `clean_pages.py`, `portionize.py`, `consensus.py`, `dedupe_portions.py`, `normalize_portions.py`, `resolve_overlaps.py`, `build_portion_text.py`, `extract_text.py`, `validate_artifact.py`.
-- Schemas: `schemas.py`
+- Modules live under `modules/<stage>/<module_id>/` with `module.yaml` + `main.py` (no registry file).
+- Driver: `driver.py` (executes recipes, stamps/validates artifacts).
+- Schemas: `schemas.py`; validator: `validate_artifact.py`.
 - Settings samples: `settings.example.yaml`, `settings.smoke.yaml`
 - Docs: `README.md`, `snapshot.md`, `docs/stories/` (story tracker in `docs/stories.md`)
-- New modular scaffolding: `modules/registry.yaml`, recipes in `configs/recipes/`
 - Inputs: `input/` (PDF, images, text); Outputs: `output/` (git-ignored)
 
-## Current Pipeline (legacy linear)
-1) `pages_dump.py` — PDF→images→OCR (`pages_raw.jsonl`)
-2) `clean_pages.py` — multimodal LLM cleaning (`pages_clean.jsonl`)
-3) `portionize.py` — sliding-window portion hypotheses (`window_hypotheses.jsonl`)
-4) `consensus.py` → `dedupe_portions.py` → `normalize_portions.py` → `resolve_overlaps.py`
-5) `build_portion_text.py` — assembles `portions_final_raw.json`
+## Current Pipeline (modules + driver)
+- Use `driver.py` with recipes in `configs/recipes/` (DAG-style ids/needs). Examples: `recipe-ocr.yaml`, `recipe-text.yaml`, `recipe-ocr-1-20.yaml`.
+- Legacy linear scripts were removed; use modules only.
 
-## Modular Plan (story 015, WIP)
-- Registry: `modules/registry.yaml` enumerates modules (extract/clean/portionize/consensus/resolve/build/enrich placeholder).
-- Recipes: `configs/recipes/recipe-ocr.yaml`, `recipe-text.yaml` show module selection per stage.
-- New extractor: `extract_text.py` ingests text/MD/HTML via glob into `pages_raw.jsonl`.
-- Validator: `validate_artifact.py --schema <name> --file <artifact.jsonl>` (portion_hyp_v1, locked_portion_v1 currently).
+## Modular Plan (story 015)
+- Modules scanned from `modules/`; recipes select module ids per stage.
+- Validator: `validate_artifact.py --schema <name> --file <artifact.jsonl>` (page_doc, clean_page, portion_hyp, locked_portion, resolved_portion, enriched_portion).
 
 ## Key Files/Paths
 - Artifacts live under `output/runs/<run_id>/`.
@@ -46,11 +41,12 @@ This repo processes scanned (or text) books into structured JSON, using modular 
 - List files: `ls`, `rg --files`
 - View docs: `sed -n '1,120p' docs/stories/story-015-modular-pipeline.md`
 - Run validator: `python validate_artifact.py --schema portion_hyp_v1 --file output/...jsonl`
+- Dry-run a DAG recipe: `python driver.py --recipe configs/recipes/recipe-ocr-dag.yaml --dry-run`
 
 ## Open Questions / WIP
-- Driver to execute recipes and stamp metadata is TBD.
-- Enrichment stage not implemented; placeholder in registry.
-- Schema metadata only attached to portion hypothesis/locked portions so far.
+- Enrichment stage not implemented (Story 018).
+- Shared helpers (`utils.py`, `ocr.py`) still at repo root; modules bootstrap sys.path for now.
+- DAG/schema/adapter improvements tracked in Story 016/017.
 
 ## Etiquette
 - Update the relevant story work log for any change or investigation.

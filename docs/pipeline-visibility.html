@@ -1,0 +1,548 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Pipeline Visibility — codex-forge</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600&family=IBM+Plex+Mono:wght@400;600&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --bg: #0c0f14;
+      --panel: #131821;
+      --panel-2: #182030;
+      --accent: #4ad7b2;
+      --accent-2: #f5a524;
+      --text: #f4f7fb;
+      --muted: #8ea0b8;
+      --danger: #ff6b6b;
+      --grid: 280px;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      font-family: "Space Grotesk", "Helvetica Neue", Arial, sans-serif;
+      background: radial-gradient(120% 120% at 20% 20%, rgba(74,215,178,0.08), transparent),
+                  radial-gradient(120% 120% at 80% 0%, rgba(245,165,36,0.08), transparent),
+                  var(--bg);
+      color: var(--text);
+      min-height: 100vh;
+      padding: 20px 32px 40px;
+    }
+    header {
+      display: flex;
+      gap: 16px;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 18px;
+    }
+    h1 {
+      margin: 0;
+      font-size: 26px;
+      letter-spacing: -0.01em;
+    }
+    .pill {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      padding: 8px 12px;
+      background: rgba(255,255,255,0.05);
+      border: 1px solid rgba(255,255,255,0.06);
+      border-radius: 999px;
+      font-size: 13px;
+      color: var(--muted);
+    }
+    .pill strong { color: var(--text); font-weight: 600; }
+
+    .controls {
+      background: var(--panel);
+      border: 1px solid rgba(255,255,255,0.05);
+      border-radius: 14px;
+      padding: 14px 16px;
+      display: grid;
+      grid-template-columns: 2fr 1fr 1fr auto;
+      gap: 12px;
+      align-items: center;
+      box-shadow: 0 18px 40px rgba(0,0,0,0.25);
+    }
+    .controls label { font-size: 12px; text-transform: uppercase; color: var(--muted); letter-spacing: 0.05em; }
+    .controls input, .controls select {
+      width: 100%;
+      padding: 10px 12px;
+      border-radius: 10px;
+      border: 1px solid rgba(255,255,255,0.07);
+      background: var(--panel-2);
+      color: var(--text);
+      font-family: "Space Grotesk", sans-serif;
+    }
+    .controls button {
+      padding: 10px 14px;
+      border-radius: 10px;
+      border: none;
+      background: linear-gradient(135deg, var(--accent), #2ebd9c);
+      color: #041115;
+      font-weight: 700;
+      cursor: pointer;
+      letter-spacing: 0.01em;
+    }
+    .controls button.secondary {
+      background: rgba(255,255,255,0.08);
+      color: var(--text);
+      border: 1px solid rgba(255,255,255,0.08);
+    }
+
+    .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(var(--grid), 1fr)); gap: 14px; margin-top: 16px; }
+    .card {
+      background: var(--panel);
+      border: 1px solid rgba(255,255,255,0.06);
+      border-radius: 14px;
+      padding: 14px;
+      box-shadow: 0 14px 30px rgba(0,0,0,0.2);
+    }
+    .card h3 { margin: 0 0 6px; font-size: 16px; letter-spacing: -0.01em; }
+    .meta { display: flex; gap: 10px; flex-wrap: wrap; font-size: 12px; color: var(--muted); }
+    .progress-bar {
+      position: relative;
+      height: 10px;
+      width: 100%;
+      background: rgba(255,255,255,0.05);
+      border-radius: 999px;
+      overflow: hidden;
+      margin: 10px 0;
+    }
+    .progress-bar span {
+      position: absolute;
+      left: 0; top: 0; bottom: 0;
+      background: linear-gradient(90deg, var(--accent), #6cf0ca);
+      border-radius: 999px;
+    }
+    .status { font-size: 13px; font-weight: 600; }
+    .status.running { color: var(--accent); }
+    .status.done { color: #8fe3ff; }
+    .status.failed { color: var(--danger); }
+    .status.skipped { color: var(--muted); }
+    .chips { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 8px; }
+    .chip {
+      padding: 6px 8px;
+      border-radius: 10px;
+      border: 1px solid rgba(255,255,255,0.08);
+      font-size: 12px;
+      color: var(--muted);
+    }
+    .chip strong { color: var(--text); }
+    .timeline { margin-top: 18px; }
+    .timeline ul { list-style: none; padding: 0; margin: 0; }
+    .timeline li { padding: 10px 12px; border-bottom: 1px solid rgba(255,255,255,0.06); display: grid; grid-template-columns: 160px 90px 1fr; gap: 10px; align-items: center; }
+    .mono { font-family: "IBM Plex Mono", monospace; font-size: 12px; color: var(--muted); }
+    .badge {
+      display: inline-flex;
+      align-items: center;
+      padding: 4px 8px;
+      border-radius: 8px;
+      font-size: 11px;
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+    }
+    .badge.success { background: rgba(106, 255, 215, 0.16); color: #7bf3cc; border: 1px solid rgba(106,255,215,0.3); }
+    .badge.warn { background: rgba(245,165,36,0.14); color: #f5c36a; border: 1px solid rgba(245,165,36,0.3); }
+    .badge.danger { background: rgba(255,107,107,0.18); color: #ff9f9f; border: 1px solid rgba(255,107,107,0.3); }
+    .badge.muted { background: rgba(255,255,255,0.08); color: var(--muted); border: 1px solid rgba(255,255,255,0.08); }
+    .footer { margin-top: 16px; color: var(--muted); font-size: 12px; }
+    .artifact-actions { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 8px; }
+    .btn-small {
+      padding: 6px 10px;
+      border-radius: 8px;
+      border: 1px solid rgba(255,255,255,0.08);
+      background: rgba(255,255,255,0.05);
+      color: var(--text);
+      cursor: pointer;
+      font-size: 12px;
+    }
+    .metrics { margin-top: 6px; font-size: 12px; color: var(--muted); }
+    pre {
+      background: #0d1219;
+      border: 1px solid rgba(255,255,255,0.06);
+      border-radius: 12px;
+      padding: 12px;
+      overflow: auto;
+      font-family: "IBM Plex Mono", monospace;
+      font-size: 12px;
+      max-height: 260px;
+    }
+    @media (max-width: 900px) {
+      .controls { grid-template-columns: 1fr; }
+      .timeline li { grid-template-columns: 120px 70px 1fr; }
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <div>
+      <h1>Pipeline Visibility</h1>
+      <div class="pill">Live view of <strong>pipeline_state.json</strong> + events</div>
+    </div>
+    <div class="pill mono" id="last-refresh">—</div>
+  </header>
+
+  <section class="controls">
+    <div>
+      <label for="run-select">Run</label>
+      <select id="run-select"></select>
+    </div>
+    <div>
+      <label for="manual-run">Manual Run ID</label>
+      <input id="manual-run" placeholder="e.g., deathtrap-text-ingest" />
+    </div>
+    <div>
+      <label for="refresh-ms">Refresh (ms)</label>
+      <input type="number" id="refresh-ms" value="4000" min="1000" step="500" />
+    </div>
+    <div style="display:flex; gap:8px;">
+      <button id="load-btn">Load</button>
+      <button class="secondary" id="toggle-auto">Pause Auto</button>
+    </div>
+  </section>
+
+  <section class="grid" id="summary-grid"></section>
+  <section class="grid" id="stage-grid"></section>
+
+  <section class="card timeline">
+    <h3>Recent Events</h3>
+    <ul id="timeline-list"></ul>
+  </section>
+
+  <section class="card" id="artifact-panel" style="display:none; margin-top:14px;">
+    <h3>Artifact Inspector</h3>
+    <div class="meta" id="artifact-meta"></div>
+    <pre id="artifact-preview"></pre>
+  </section>
+
+  <div class="footer">
+    Serve this file from the repo root (e.g., <code>python -m http.server 8000</code>) then open <code>/docs/pipeline-visibility.html</code>.
+    The viewer polls <code>pipeline_state.json</code> and <code>pipeline_events.jsonl</code> inside <code>output/runs/&lt;run_id&gt;/</code>.
+  </div>
+
+  <script>
+    const ROOT = window.location.pathname.includes("/docs/") ? ".." : ".";
+    const runSelect = document.getElementById("run-select");
+    const manualRun = document.getElementById("manual-run");
+    const loadBtn = document.getElementById("load-btn");
+    const toggleAuto = document.getElementById("toggle-auto");
+    const refreshInput = document.getElementById("refresh-ms");
+    const lastRefresh = document.getElementById("last-refresh");
+    const summaryGrid = document.getElementById("summary-grid");
+    const stageGrid = document.getElementById("stage-grid");
+    const timelineList = document.getElementById("timeline-list");
+    const artifactPanel = document.getElementById("artifact-panel");
+    const artifactMeta = document.getElementById("artifact-meta");
+    const artifactPreview = document.getElementById("artifact-preview");
+
+    let currentRun = null;
+    let autoTimer = null;
+    const artifactCache = {};
+
+    const statusDescriptors = {
+      "running": { text: "Running", class: "running" },
+      "done": { text: "Done", class: "done" },
+      "failed": { text: "Failed", class: "failed" },
+      "skipped": { text: "Skipped", class: "skipped" },
+      "queued": { text: "Queued", class: "muted" }
+    };
+
+    function parseJSONL(text) {
+      return text.split("\n").filter(Boolean).map(line => {
+        try { return JSON.parse(line); } catch { return null; }
+      }).filter(Boolean);
+    }
+
+    async function fetchJSON(path) {
+      const res = await fetch(path + "?t=" + Date.now());
+      if (!res.ok) throw new Error(`Fetch failed: ${path}`);
+      return res.json();
+    }
+    async function fetchJSONL(path) {
+      const res = await fetch(path + "?t=" + Date.now());
+      if (!res.ok) throw new Error(`Fetch failed: ${path}`);
+      const text = await res.text();
+      return parseJSONL(text);
+    }
+
+    async function loadManifest() {
+      const manifestPath = `${ROOT}/output/run_manifest.jsonl`;
+      try {
+        const res = await fetch(manifestPath);
+        if (!res.ok) throw new Error();
+        const lines = parseJSONL(await res.text());
+        runSelect.innerHTML = "";
+        lines.slice(-50).reverse().forEach(row => {
+          const opt = document.createElement("option");
+          opt.value = row.run_id;
+          opt.textContent = `${row.run_id} — ${row.input?.pdf || row.path}`;
+          runSelect.appendChild(opt);
+        });
+        if (!currentRun && lines.length) {
+          currentRun = lines[lines.length - 1].run_id;
+          runSelect.value = currentRun;
+        }
+      } catch {
+        runSelect.innerHTML = "";
+        const opt = document.createElement("option");
+        opt.value = "";
+        opt.textContent = "No manifest found (add run manually)";
+        runSelect.appendChild(opt);
+      }
+    }
+
+    function percentText(p) {
+      if (p === null || p === undefined) return "—";
+      return `${p}%`;
+    }
+
+    function summariseStages(stages) {
+      const entries = Object.entries(stages || {});
+      const done = entries.filter(([, s]) => s.status === "done").length;
+      const failed = entries.filter(([, s]) => s.status === "failed").length;
+      const running = entries.filter(([, s]) => s.status === "running").length;
+      const percents = entries.map(([, s]) => (s.progress && s.progress.percent != null ? s.progress.percent : (s.status === "done" ? 100 : 0)));
+      const avg = percents.length ? Math.round(percents.reduce((a, b) => a + b, 0) / percents.length) : 0;
+      return { done, failed, running, avg, total: entries.length };
+    }
+
+    function badge(status) {
+      const span = document.createElement("span");
+      const desc = statusDescriptors[status] || { text: status || "unknown", class: "muted" };
+      span.className = `badge ${desc.class}`;
+      span.textContent = desc.text.toUpperCase();
+      return span;
+    }
+
+    async function loadRun(runId) {
+      if (!runId) return;
+      currentRun = runId;
+      const base = `${ROOT}/output/runs/${runId}`;
+      try {
+        const [state, events] = await Promise.all([
+          fetchJSON(`${base}/pipeline_state.json`),
+          fetchJSONL(`${base}/pipeline_events.jsonl`).catch(() => [])
+        ]);
+        render(state, events, base);
+        lastRefresh.textContent = `Updated ${new Date().toLocaleTimeString()}`;
+      } catch (e) {
+        stageGrid.innerHTML = "";
+        summaryGrid.innerHTML = "";
+        timelineList.innerHTML = `<li class="mono">Unable to load run "${runId}". Check that output/runs/${runId}/pipeline_state.json exists.</li>`;
+      }
+    }
+
+    function render(state, events, base) {
+      const stages = state.stages || {};
+      const stats = summariseStages(stages);
+
+      summaryGrid.innerHTML = "";
+      summaryGrid.appendChild(makeStatCard("Overall Progress", `${stats.avg}%`, [
+        `${stats.done}/${stats.total} done`,
+        `${stats.running} running`,
+        `${stats.failed} failed`
+      ]));
+      summaryGrid.appendChild(makeStatCard("Run", state.run_id || currentRun || "n/a", [
+        state.updated_at ? `updated ${state.updated_at}` : "live",
+        base.replace(`${ROOT}/`, "")
+      ]));
+      summaryGrid.appendChild(makeStatCard("Artifacts", "", [
+        "Click any stage to open artifacts",
+        "Auto-refresh uses pipeline_events.jsonl"
+      ]));
+
+      renderStages(stages, events, base);
+      renderTimeline(events);
+    }
+
+    function makeStatCard(title, value, lines) {
+      const card = document.createElement("div");
+      card.className = "card";
+      card.innerHTML = `<h3>${title}</h3><div class="status done" style="font-size:24px;">${value}</div>`;
+      if (lines?.length) {
+        const ul = document.createElement("div");
+        ul.className = "meta";
+        lines.forEach(l => {
+          const span = document.createElement("span");
+          span.textContent = l;
+          ul.appendChild(span);
+        });
+        card.appendChild(ul);
+      }
+      return card;
+    }
+
+    function renderStages(stages, events, base) {
+      stageGrid.innerHTML = "";
+      const ordered = Object.keys(stages).sort();
+      ordered.forEach(stage => {
+        const info = stages[stage];
+        const card = document.createElement("div");
+        card.className = "card";
+        const status = info.status || "queued";
+        const prog = info.progress || {};
+        card.innerHTML = `
+          <h3>${stage}</h3>
+          <div class="status ${statusDescriptors[status]?.class || ""}">${status.toUpperCase()}</div>
+          <div class="progress-bar"><span style="width:${Math.min(100, prog.percent || (status === "done" ? 100 : 0))}%"></span></div>
+          <div class="meta">
+            <span>${prog.current ?? "—"} / ${prog.total ?? "?"}</span>
+            <span>${percentText(prog.percent)}</span>
+            <span>${info.updated_at || ""}</span>
+          </div>
+        `;
+
+        const chips = document.createElement("div");
+        chips.className = "chips";
+        if (info.artifact) {
+          const name = info.artifact.split("/").slice(-1)[0];
+          const artChip = document.createElement("div");
+          artChip.className = "chip";
+          artChip.innerHTML = `<strong>Artifact</strong> ${name}`;
+          chips.appendChild(artChip);
+        }
+        if (info.module_id) {
+          const mod = document.createElement("div");
+          mod.className = "chip";
+          mod.innerHTML = `<strong>Module</strong> ${info.module_id}`;
+          chips.appendChild(mod);
+        }
+        if (info.schema_version) {
+          const sch = document.createElement("div");
+          sch.className = "chip";
+          sch.innerHTML = `<strong>Schema</strong> ${info.schema_version}`;
+          chips.appendChild(sch);
+        }
+        card.appendChild(chips);
+
+        const actions = document.createElement("div");
+        actions.className = "artifact-actions";
+        if (info.artifact) {
+          const open = document.createElement("a");
+          open.href = `${ROOT}/${info.artifact}`;
+          open.target = "_blank";
+          open.className = "btn-small";
+          open.textContent = "Open artifact";
+          actions.appendChild(open);
+
+          const metricsBtn = document.createElement("button");
+          metricsBtn.className = "btn-small";
+          metricsBtn.textContent = "Load metrics";
+          metricsBtn.onclick = () => loadMetrics(stage, `${ROOT}/${info.artifact}`);
+          actions.appendChild(metricsBtn);
+        }
+        const history = events.filter(e => e.stage === stage);
+        if (history.length) {
+          const last = history[history.length - 1];
+          const hint = document.createElement("div");
+          hint.className = "metrics";
+          hint.textContent = `${history.length} events | last: ${last.status} @ ${last.timestamp}`;
+          actions.appendChild(hint);
+        }
+        card.appendChild(actions);
+        stageGrid.appendChild(card);
+      });
+    }
+
+    function renderTimeline(events) {
+      timelineList.innerHTML = "";
+      const recent = events.slice(-80).reverse();
+      if (!recent.length) {
+        timelineList.innerHTML = `<li class="mono">No events yet for this run.</li>`;
+        return;
+      }
+      recent.forEach(evt => {
+        const li = document.createElement("li");
+        const badgeEl = badge(evt.status);
+        const stage = document.createElement("div");
+        stage.innerHTML = `<strong>${evt.stage}</strong><br><span class="mono">${evt.timestamp}</span>`;
+        const prog = evt.percent != null ? `${evt.current || "?"}/${evt.total || "?"} (${evt.percent}%)` : "";
+        const msg = document.createElement("div");
+        msg.innerHTML = `<div class="mono">${prog}</div><div>${evt.message || ""}</div>`;
+        const col1 = document.createElement("div");
+        col1.appendChild(stage);
+        const col2 = document.createElement("div");
+        col2.appendChild(badgeEl);
+        li.appendChild(stage);
+        li.appendChild(col2);
+        li.appendChild(msg);
+        timelineList.appendChild(li);
+      });
+    }
+
+    async function loadMetrics(stage, artifactPath) {
+      artifactMeta.innerHTML = "";
+      artifactPreview.textContent = "Loading…";
+      artifactPanel.style.display = "block";
+
+      if (artifactCache[artifactPath]) {
+        renderMetrics(stage, artifactPath, artifactCache[artifactPath]);
+        return;
+      }
+
+      try {
+        const res = await fetch(artifactPath + "?t=" + Date.now());
+        if (!res.ok) throw new Error("Unable to fetch artifact");
+        const text = await res.text();
+        let rows = [];
+        if (artifactPath.endsWith(".jsonl")) {
+          rows = parseJSONL(text);
+        } else if (artifactPath.endsWith(".json")) {
+          rows = Object.values(JSON.parse(text));
+        }
+        const confidences = rows.map(r => r.confidence).filter(v => v !== undefined && v !== null);
+        const avg = confidences.length ? (confidences.reduce((a,b)=>a+b,0)/confidences.length).toFixed(3) : "n/a";
+        const min = confidences.length ? Math.min(...confidences).toFixed(3) : "n/a";
+        const max = confidences.length ? Math.max(...confidences).toFixed(3) : "n/a";
+        const sample = rows.slice(0, 3);
+        const metrics = { count: rows.length, avg, min, max, sample };
+        artifactCache[artifactPath] = metrics;
+        renderMetrics(stage, artifactPath, metrics);
+      } catch (e) {
+        artifactPreview.textContent = `Failed to load artifact: ${e.message}`;
+      }
+    }
+
+    function renderMetrics(stage, artifactPath, metrics) {
+      artifactMeta.innerHTML = `
+        <div class="chip"><strong>Stage</strong> ${stage}</div>
+        <div class="chip"><strong>Records</strong> ${metrics.count}</div>
+        <div class="chip"><strong>Confidence</strong> avg ${metrics.avg}, min ${metrics.min}, max ${metrics.max}</div>
+        <div class="chip"><strong>Path</strong> ${artifactPath}</div>
+      `;
+      artifactPreview.textContent = JSON.stringify(metrics.sample, null, 2);
+    }
+
+    function startAuto() {
+      stopAuto();
+      const ms = Number(refreshInput.value) || 4000;
+      autoTimer = setInterval(() => {
+        if (currentRun) loadRun(currentRun);
+      }, ms);
+      toggleAuto.textContent = "Pause Auto";
+    }
+    function stopAuto() {
+      if (autoTimer) clearInterval(autoTimer);
+      autoTimer = null;
+      toggleAuto.textContent = "Resume Auto";
+    }
+
+    loadBtn.onclick = () => {
+      const chosen = manualRun.value || runSelect.value;
+      loadRun(chosen);
+      startAuto();
+    };
+    toggleAuto.onclick = () => {
+      if (autoTimer) stopAuto(); else startAuto();
+    };
+
+    loadManifest().then(() => {
+      if (currentRun) loadRun(currentRun);
+      startAuto();
+    });
+  </script>
+</body>
+</html>

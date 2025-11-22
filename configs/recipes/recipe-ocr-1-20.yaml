@@ -3,7 +3,8 @@ input:
   pdf: input/06 deathtrap dungeon.pdf
 output_dir: output/runs/deathtrap-ocr-1-20
 stages:
-  - stage: extract
+  - id: extract_ocr
+    stage: extract
     module: extract_ocr_v1
     params:
       start: 1
@@ -12,14 +13,18 @@ stages:
       psm: 4
       oem: 3
       lang: eng
-  - stage: clean
+  - id: clean_pages
+    stage: clean
     module: clean_llm_v1
+    needs: [extract_ocr]
     params:
       model: gpt-4.1-mini
       boost_model: gpt-5
       min_conf: 0.6
-  - stage: portionize
+  - id: portionize_fine
+    stage: portionize
     module: portionize_sliding_v1
+    needs: [clean_pages]
     params:
       window: 8
       stride: 1
@@ -27,20 +32,33 @@ stages:
       boost_model: gpt-5
       pstart: 1
       pend: 20
-  - stage: consensus
+  - id: consensus_main
+    stage: consensus
     module: consensus_vote_v1
+    needs: [portionize_fine]
     params:
       min_conf: 0.55
       range_start: 1
       range_end: 20
-  - stage: dedupe
+  - id: dedupe_main
+    stage: dedupe
     module: dedupe_ids_v1
-  - stage: normalize
+    needs: [consensus_main]
+  - id: normalize_main
+    stage: normalize
     module: normalize_ids_v1
-  - stage: resolve
+    needs: [dedupe_main]
+  - id: resolve_main
+    stage: resolve
     module: resolve_overlaps_v1
+    needs: [normalize_main]
     params:
       range_start: 1
       range_end: 20
-  - stage: build
+  - id: build_main
+    stage: build
     module: build_portions_v1
+    needs: [clean_pages, resolve_main]
+    inputs:
+      pages: clean_pages
+      portions: resolve_main

@@ -8,7 +8,7 @@ repo_root = pathlib.Path(__file__).resolve().parents[3]
 if str(repo_root) not in sys.path:
     sys.path.insert(0, str(repo_root))
 
-from utils import read_jsonl, save_jsonl
+from utils import read_jsonl, save_jsonl, ProgressLogger
 from schemas import LockedPortion
 
 
@@ -101,14 +101,23 @@ def main():
     parser.add_argument("--min_conf", type=float, default=0.6)
     parser.add_argument("--range_start", type=int, help="Force coverage start page")
     parser.add_argument("--range_end", type=int, help="Force coverage end page (inclusive)")
+    parser.add_argument("--progress-file", help="Path to pipeline_events.jsonl")
+    parser.add_argument("--state-file", help="Path to pipeline_state.json")
+    parser.add_argument("--run-id", help="Run identifier for logging")
     args = parser.parse_args()
+
+    logger = ProgressLogger(state_path=args.state_file, progress_path=args.progress_file, run_id=args.run_id)
 
     hypos = [h for h in read_jsonl(args.hypotheses) if "error" not in h]
     forced = None
     if args.range_start and args.range_end:
         forced = (args.range_start, args.range_end)
+    logger.log("consensus", "running", current=0, total=len(hypos),
+               message="Computing votes", artifact=args.out)
     locked = vote_portions(hypos, min_conf=args.min_conf, forced_range=forced)
     save_jsonl(args.out, locked)
+    logger.log("consensus", "done", current=len(hypos), total=len(hypos),
+               message=f"Locked {len(locked)} portions", artifact=args.out)
     print(f"Locked {len(locked)} portions → {args.out}")
 
 

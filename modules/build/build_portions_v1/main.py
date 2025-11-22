@@ -8,7 +8,7 @@ repo_root = pathlib.Path(__file__).resolve().parents[3]
 if str(repo_root) not in sys.path:
     sys.path.insert(0, str(repo_root))
 
-from utils import read_jsonl, save_json
+from utils import read_jsonl, save_json, ProgressLogger
 
 
 def load_pages(path: str) -> Dict[int, Dict]:
@@ -23,11 +23,17 @@ def main():
     parser.add_argument("--pages", required=True, help="pages_raw.jsonl")
     parser.add_argument("--portions", required=True, help="portions_resolved.jsonl")
     parser.add_argument("--out", required=True, help="output JSON file")
+    parser.add_argument("--progress-file", help="Path to pipeline_events.jsonl")
+    parser.add_argument("--state-file", help="Path to pipeline_state.json")
+    parser.add_argument("--run-id", help="Run identifier for logging")
     args = parser.parse_args()
 
+    logger = ProgressLogger(state_path=args.state_file, progress_path=args.progress_file, run_id=args.run_id)
     pages = load_pages(args.pages)
     portions = list(read_jsonl(args.portions))
 
+    logger.log("build", "running", current=0, total=len(portions),
+               message="Assembling portions", artifact=args.out)
     assembled = {}
     for p in portions:
         span_pages = [i for i in range(p["page_start"], p["page_end"] + 1)]
@@ -54,6 +60,8 @@ def main():
         }
 
     save_json(args.out, assembled)
+    logger.log("build", "done", current=len(portions), total=len(portions),
+               message=f"Build complete ({len(assembled)} portions)", artifact=args.out)
     print(f"Wrote {len(assembled)} portions → {args.out}")
 
 

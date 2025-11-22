@@ -7,7 +7,7 @@ repo_root = pathlib.Path(__file__).resolve().parents[3]
 if str(repo_root) not in sys.path:
     sys.path.insert(0, str(repo_root))
 
-from utils import read_jsonl, save_jsonl
+from utils import read_jsonl, save_jsonl, ProgressLogger
 
 
 def pages_set(p):
@@ -93,14 +93,23 @@ def main():
     parser.add_argument("--out", required=True)
     parser.add_argument("--range_start", type=int)
     parser.add_argument("--range_end", type=int)
+    parser.add_argument("--progress-file", help="Path to pipeline_events.jsonl")
+    parser.add_argument("--state-file", help="Path to pipeline_state.json")
+    parser.add_argument("--run-id", help="Run identifier for logging")
     args = parser.parse_args()
 
+    logger = ProgressLogger(state_path=args.state_file, progress_path=args.progress_file, run_id=args.run_id)
+
     portions = list(read_jsonl(args.input))
+    logger.log("resolve", "running", current=0, total=len(portions),
+               message="Resolving overlaps", artifact=args.out)
     forced = None
     if args.range_start and args.range_end:
         forced = (args.range_start, args.range_end)
     cleaned = resolve(portions, forced_range=forced)
     save_jsonl(args.out, cleaned)
+    logger.log("resolve", "done", current=len(portions), total=len(portions),
+               message=f"Resolved → {len(cleaned)} rows", artifact=args.out)
     print(f"Wrote {len(cleaned)} non-overlapping portions to {args.out}")
 
 
