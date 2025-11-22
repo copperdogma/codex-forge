@@ -2,8 +2,25 @@ import json
 import os
 import yaml
 from datetime import datetime
-from typing import Any, Dict, Optional
+from typing import Any, Dict, Optional, Tuple
 from pathlib import Path
+
+# Progress event schema constants for lightweight validation/testing
+PROGRESS_EVENT_SCHEMA: Dict[str, Tuple[type, ...]] = {
+    "timestamp": (str,),
+    "run_id": (str, type(None)),
+    "stage": (str,),
+    "status": (str,),
+    "current": (int, type(None)),
+    "total": (int, type(None)),
+    "percent": (float, int, type(None)),
+    "message": (str, type(None)),
+    "artifact": (str, type(None)),
+    "module_id": (str, type(None)),
+    "schema_version": (str, type(None)),
+    "extra": (dict,),
+}
+PROGRESS_STATUS_VALUES = {"running", "done", "failed", "skipped", "queued"}
 
 
 def load_settings(path: str) -> Dict[str, Any]:
@@ -43,6 +60,32 @@ def read_jsonl(path: str):
 
 def _utc() -> str:
     return datetime.utcnow().isoformat() + "Z"
+
+
+def _type_ok(val: Any, allowed: Tuple[type, ...]) -> bool:
+    if val is None:
+        return type(None) in allowed
+    for typ in allowed:
+        if typ is float and isinstance(val, (int, float)) and not isinstance(val, bool):
+            return True
+        if typ is int and isinstance(val, int) and not isinstance(val, bool):
+            return True
+        if isinstance(val, typ):
+            return True
+    return False
+
+
+def validate_progress_event(event: Dict[str, Any]):
+    """Lightweight runtime guard to keep progress events well-shaped."""
+    missing = [k for k in PROGRESS_EVENT_SCHEMA if k not in event]
+    if missing:
+        raise ValueError(f"Missing progress event fields: {missing}")
+    if event.get("status") not in PROGRESS_STATUS_VALUES:
+        raise ValueError(f"Invalid progress status: {event.get('status')}")
+    for key, allowed in PROGRESS_EVENT_SCHEMA.items():
+        if not _type_ok(event.get(key), allowed):
+            expected = ", ".join([t.__name__ if t is not type(None) else "None" for t in allowed])
+            raise ValueError(f"Field '{key}' expected types [{expected}], got {type(event.get(key)).__name__}")
 
 
 class ProgressLogger:
@@ -85,6 +128,8 @@ class ProgressLogger:
             "schema_version": schema_version,
             "extra": extra or {},
         }
+
+        validate_progress_event(event)
 
         if self.progress_path:
             append_jsonl(self.progress_path, event)

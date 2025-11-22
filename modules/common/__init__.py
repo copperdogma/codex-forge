@@ -6,6 +6,9 @@ from .utils import (
     append_jsonl,
     read_jsonl,
     ProgressLogger,
+    PROGRESS_EVENT_SCHEMA,
+    PROGRESS_STATUS_VALUES,
+    validate_progress_event,
 )
 from .ocr import render_pdf, run_ocr
 
@@ -17,6 +20,9 @@ __all__ = [
     "append_jsonl",
     "read_jsonl",
     "ProgressLogger",
+    "PROGRESS_EVENT_SCHEMA",
+    "PROGRESS_STATUS_VALUES",
+    "validate_progress_event",
     "render_pdf",
     "run_ocr",
 ]

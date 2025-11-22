@@ -72,6 +72,11 @@ Artifacts appear under `output/runs/<run_id>/` as listed in the recipe; use `--s
 - `output/runs/<run_id>/` contains all artifacts: images/, ocr/, pages_raw/clean, hypotheses, locked/normalized/resolved portions, final JSON, `pipeline_state.json`.
 - `output/run_manifest.jsonl` lists runs (id, path, date, notes).
 
+## Pipeline visibility dashboard
+- Serve from repo root: `python -m http.server 8000` then open `http://localhost:8000/docs/pipeline-visibility.html`.
+- The page polls `output/run_manifest.jsonl` for run ids, then reads `output/runs/<run_id>/pipeline_state.json` and `pipeline_events.jsonl` for live progress, artifacts, and confidence stats.
+- A ready-to-use fixture run lives at `output/runs/dashboard-fixture` (listed in the manifest) so you can smoke the dashboard without running the pipeline.
+
 ## Roadmap (high level)
 - Enrichment (choices, cross-refs, combat/items/endings)
 - Turn-to validator (CYOA), layout-preserving extractor, image cropper/mapper

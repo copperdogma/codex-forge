@@ -4,8 +4,8 @@
 - DONE: 016 Driver DAG & schema compatibility — unlocks arbitrary workflows, coarse+fine branches, safer schema wiring.
 - DONE: 020 Module encapsulation & shared common
 - DONE: 017 Module UX polish (params & outputs) — catches bad configs early; allows custom outputs for varied runs.
-- 018 Enrichment & alternate modules — delivers gameplay semantics and demonstrates swap breadth.
-- 019 Pipeline visibility dashboard — live stage/state view + artifact inspection for ops.
+- DONE: 018 Enrichment & alternate modules — delivers gameplay semantics and demonstrates swap breadth.
+- DONE: 019 Pipeline visibility dashboard — live stage/state view + artifact inspection for ops.
 - 006 Enrichment pass (choices/combat/items/endings) — core value for gamebooks; builds on 018 modules.
 - 007 Turn-to validator — sanity for CYOA cross-refs once enriched data exists.
 - 008 Image cropper/mapper — maps images to portions; leverage existing source_images.
@@ -36,9 +36,10 @@ This index tracks stories in `/docs/stories/` for the codex-forge pipeline.
 | 015 | Modular pipeline & module registry | High | Done | /docs/stories/story-015-modular-pipeline.md |
 | 016 | Driver DAG & schema compatibility | High | Done | /docs/stories/story-016-driver-dag-schema.md |
 | 017 | Module UX polish (params & outputs) | Medium | Done | /docs/stories/story-017-module-ux.md |
-| 018 | Enrichment & alt modules | High | To Do | /docs/stories/story-018-enrichment-alt-mods.md |
+| 018 | Enrichment & alt modules | High | Done | /docs/stories/story-018-enrichment-alt-mods.md |
 | 019 | Pipeline visibility dashboard | Medium | In Progress | /docs/stories/story-019-pipeline-visibility.md |
 | 020 | Module encapsulation & shared common | Medium | To Do | /docs/stories/story-020-module-encapsulation.md |
+| 021 | Dashboard UI polish (highlighting & pane) | Medium | To Do | /docs/stories/story-021-dashboard-ui-polish.md |
 
 ## Notes
 - Status “Done” reflects current working state in codex-forge. “To Do” items are planned next steps aligned with `docs/requirements.md` and `snapshot.md`.

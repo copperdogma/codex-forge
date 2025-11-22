@@ -7,7 +7,7 @@ import unittest
 sys.path.append(os.path.dirname(os.path.dirname(__file__)))
 
 from driver import build_plan, validate_plan_schemas, stamp_artifact
-from driver import cleanup_artifact
+from driver import cleanup_artifact, build_command
 
 
 class DriverPlanTests(unittest.TestCase):
@@ -160,6 +160,38 @@ class DriverPlanTests(unittest.TestCase):
             self.assertFalse(os.path.exists(path))
             # no-op when file missing
             cleanup_artifact(path, force=True)
+
+    def test_build_command_injects_state_and_progress_flags(self):
+        stage_conf = {
+            "id": "portionize_main",
+            "stage": "portionize",
+            "module": "m_portion",
+            "artifact_name": "window_hypotheses.jsonl",
+            "params": {},
+            "needs": ["clean_pages"],
+            "inputs": {},
+        }
+        recipe_input = {"pdf": "input/file.pdf"}
+        run_dir = "/tmp/run"
+        artifact_inputs = {"pages": "/tmp/run/pages_clean.jsonl"}
+        artifact_path, cmd, _cwd = build_command(
+            entrypoint="modules/portionize/portionize_sliding_v1/main.py",
+            params={},
+            stage_conf=stage_conf,
+            run_dir=run_dir,
+            recipe_input=recipe_input,
+            state_path="/tmp/run/pipeline_state.json",
+            progress_path="/tmp/run/pipeline_events.jsonl",
+            run_id="test-run",
+            artifact_inputs=artifact_inputs,
+        )
+        self.assertEqual(artifact_path, os.path.join(run_dir, stage_conf["artifact_name"]))
+        self.assertIn("--state-file", cmd)
+        self.assertIn("/tmp/run/pipeline_state.json", cmd)
+        self.assertIn("--progress-file", cmd)
+        self.assertIn("/tmp/run/pipeline_events.jsonl", cmd)
+        self.assertIn("--run-id", cmd)
+        self.assertIn("test-run", cmd)
 
 
 if __name__ == "__main__":

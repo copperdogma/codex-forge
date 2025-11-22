@@ -39,6 +39,21 @@
 - Portionize fine params cleaned up (removed unsupported `min_conf`), OCR recipe simplified (no `images` flag, end page capped).
 - Resume skips now verify artifact schema_version; multi-input consensus uses deduped merge helper.
 
+## [2025-11-22] - Pipeline visibility dashboard & progress logging
+
+### Added
+- Progress event schema validation and append-only logger with tests; driver/module commands now inject `--state-file/--progress-file/--run-id` by default.
+- Dashboard fixture run (`output/runs/dashboard-fixture`) plus README note on serving `docs/pipeline-visibility.html` via `python -m http.server`.
+- New dashboard UI features: run selector, auto-refresh, stage cards, event timeline, artifact pane/new-tab viewer, metrics loader.
+
+### Changed
+- Story 019 marked complete; follow-on UI polish tracked in new Story 021 (highlighting/pane sizing).
+- `docs/stories.md` updated with Story 021; story log entries added for work performed.
+
+### Tested
+- `python -m pytest tests/progress_logger_test.py`
+- `python -m pytest tests/driver_plan_test.py`
+
 ### Tested
 - `python -m unittest discover -s tests -p 'driver_*test.py'` (passes; 9 tests).
 - `python driver.py --recipe configs/recipes/recipe-text-dag.yaml --force` (passes; artifacts stamped/validated).

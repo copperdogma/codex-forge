@@ -7,6 +7,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600&family=IBM+Plex+Mono:wght@400;600&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/highlight.js@11.9.0/styles/atom-one-dark.min.css">
   <style>
     :root {
       --bg: #0c0f14;
@@ -168,8 +169,16 @@
       overflow: auto;
       font-family: "IBM Plex Mono", monospace;
       font-size: 12px;
-      max-height: 260px;
+      max-height: 320px;
     }
+    .layout { display: grid; grid-template-columns: 1fr 0 0; gap: 0; transition: grid-template-columns 0.2s ease; }
+    #split-handle { width: 0; cursor: col-resize; background: rgba(255,255,255,0.06); }
+    #pane-col { overflow: auto; display: flex; flex-direction: column; }
+    #artifact-preview { flex: 1; }
+    .pane-header { display: flex; justify-content: space-between; align-items: center; gap: 8px; }
+    .pane-actions { display: flex; gap: 6px; }
+    pre code.hljs { display: block; }
+    @media (max-width: 1100px) { .layout { grid-template-columns: 1fr 0 0; } #pane-col { position: sticky; top: 10px; } }
     @media (max-width: 900px) {
       .controls { grid-template-columns: 1fr; }
       .timeline li { grid-template-columns: 120px 70px 1fr; }
@@ -204,25 +213,36 @@
     </div>
   </section>
 
-  <section class="grid" id="summary-grid"></section>
-  <section class="grid" id="stage-grid"></section>
-
-  <section class="card timeline">
-    <h3>Recent Events</h3>
-    <ul id="timeline-list"></ul>
-  </section>
-
-  <section class="card" id="artifact-panel" style="display:none; margin-top:14px;">
-    <h3>Artifact Inspector</h3>
-    <div class="meta" id="artifact-meta"></div>
-    <pre id="artifact-preview"></pre>
-  </section>
+  <div class="layout" id="layout">
+    <div id="main-col">
+      <section class="grid" id="summary-grid"></section>
+      <section class="grid" id="stage-grid"></section>
+      <section class="card timeline">
+        <h3>Recent Events</h3>
+        <ul id="timeline-list"></ul>
+      </section>
+    </div>
+    <div id="split-handle" title="Drag to resize"></div>
+    <aside class="card" id="pane-col" style="display:none;">
+      <div class="pane-header">
+        <h3>Artifact Pane</h3>
+        <div class="pane-actions">
+          <button class="btn-small" id="pane-open-tab">Open in new tab</button>
+          <button class="btn-small" id="pane-close">Close</button>
+        </div>
+      </div>
+      <div class="meta" id="artifact-meta"></div>
+      <pre id="artifact-preview"></pre>
+    </aside>
+  </div>
 
   <div class="footer">
     Serve this file from the repo root (e.g., <code>python -m http.server 8000</code>) then open <code>/docs/pipeline-visibility.html</code>.
     The viewer polls <code>pipeline_state.json</code> and <code>pipeline_events.jsonl</code> inside <code>output/runs/&lt;run_id&gt;/</code>.
   </div>
 
+  <script src="https://cdn.jsdelivr.net/npm/highlight.js@11.9.0/lib/highlight.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/highlight.js@11.9.0/lib/languages/json.min.js"></script>
   <script>
     const ROOT = window.location.pathname.includes("/docs/") ? ".." : ".";
     const runSelect = document.getElementById("run-select");
@@ -234,9 +254,14 @@
     const summaryGrid = document.getElementById("summary-grid");
     const stageGrid = document.getElementById("stage-grid");
     const timelineList = document.getElementById("timeline-list");
-    const artifactPanel = document.getElementById("artifact-panel");
+    const layout = document.getElementById("layout");
+    const mainCol = document.getElementById("main-col");
+    const splitHandle = document.getElementById("split-handle");
+    const artifactPanel = document.getElementById("pane-col");
     const artifactMeta = document.getElementById("artifact-meta");
     const artifactPreview = document.getElementById("artifact-preview");
+    const paneClose = document.getElementById("pane-close");
+    const paneOpenTab = document.getElementById("pane-open-tab");
 
     let currentRun = null;
     let autoTimer = null;
@@ -249,6 +274,53 @@
       "skipped": { text: "Skipped", class: "skipped" },
       "queued": { text: "Queued", class: "muted" }
     };
+
+    function escapeHtml(str) {
+      return str.replace(/[&<>'"]/g, c => ({"&": "&amp;", "<": "&lt;", ">": "&gt;", "'": "&#39;", '"': "&quot;"}[c]));
+    }
+
+    function renderPretty(text, lang = "json") {
+      const code = document.createElement("code");
+      code.className = `language-${lang}`;
+      code.textContent = text; // safer than innerHTML
+      artifactPreview.innerHTML = "";
+      const pre = document.createElement("pre");
+      pre.appendChild(code);
+      artifactPreview.appendChild(pre);
+      if (window.hljs) {
+        try { hljs.highlightElement(code); } catch (e) { /* no-op */ }
+      }
+    }
+
+    function openPane() {
+      artifactPanel.style.display = "block";
+      layout.style.gridTemplateColumns = "1fr 6px min(45vw, 640px)";
+      splitHandle.style.width = "6px";
+    }
+
+    function closePane() {
+      artifactPanel.style.display = "none";
+      layout.style.gridTemplateColumns = "1fr 0 0";
+      splitHandle.style.width = "0";
+    }
+
+    paneClose.onclick = () => closePane();
+    paneOpenTab.onclick = () => {
+      const path = paneOpenTab.dataset.path;
+      const stage = paneOpenTab.dataset.stage;
+      if (path) openArtifactTab(stage || "", path);
+    };
+
+    let dragging = false;
+    splitHandle.addEventListener("mousedown", () => { dragging = true; });
+    window.addEventListener("mouseup", () => { dragging = false; });
+    window.addEventListener("mousemove", (e) => {
+      if (!dragging) return;
+      const total = layout.getBoundingClientRect();
+      const mainWidth = e.clientX - total.left;
+      const paneWidth = Math.max(280, total.width - mainWidth - 6);
+      layout.style.gridTemplateColumns = `${Math.max(320, mainWidth)}px 6px ${paneWidth}px`;
+    });
 
     function parseJSONL(text) {
       return text.split("\n").filter(Boolean).map(line => {
@@ -421,12 +493,17 @@
         const actions = document.createElement("div");
         actions.className = "artifact-actions";
         if (info.artifact) {
-          const open = document.createElement("a");
-          open.href = `${ROOT}/${info.artifact}`;
-          open.target = "_blank";
+          const open = document.createElement("button");
           open.className = "btn-small";
-          open.textContent = "Open artifact";
+          open.textContent = "Open artifact (new tab)";
+          open.onclick = () => openArtifactTab(stage, `${ROOT}/${info.artifact}`);
           actions.appendChild(open);
+
+          const viewBtn = document.createElement("button");
+          viewBtn.className = "btn-small";
+          viewBtn.textContent = "View in pane";
+          viewBtn.onclick = () => viewArtifact(stage, `${ROOT}/${info.artifact}`);
+          actions.appendChild(viewBtn);
 
           const metricsBtn = document.createElement("button");
           metricsBtn.className = "btn-small";
@@ -502,6 +579,75 @@
         artifactCache[artifactPath] = metrics;
         renderMetrics(stage, artifactPath, metrics);
       } catch (e) {
+        artifactPreview.textContent = `Failed to load artifact: ${e.message}`;
+      }
+    }
+
+    async function openArtifactTab(stage, artifactPath) {
+      try {
+        const res = await fetch(artifactPath + "?t=" + Date.now());
+        if (!res.ok) throw new Error("Unable to fetch artifact");
+        const text = await res.text();
+        const pretty = formatMaybeJSON(text, artifactPath);
+        const html = `<!DOCTYPE html><html><head><link rel=\"stylesheet\" href=\"https://cdn.jsdelivr.net/npm/highlight.js@11.9.0/styles/atom-one-dark.min.css\"><script src=\"https://cdn.jsdelivr.net/npm/highlight.js@11.9.0/lib/highlight.min.js\"><\/script><script src=\"https://cdn.jsdelivr.net/npm/highlight.js@11.9.0/lib/languages/json.min.js\"><\/script></head><body style=\"margin:0;background:#0d1219;color:#e5e9f0;\"><pre><code class=\"language-json\">${escapeHtml(pretty)}</code></pre><script>window.hljs&&hljs.highlightAll();<\/script></body></html>`;
+        const blob = new Blob([html], { type: "text/html;charset=utf-8" });
+        const url = URL.createObjectURL(blob);
+        window.open(url, "_blank");
+      } catch (e) {
+        alert(`Failed to open artifact: ${e.message}`);
+      }
+    }
+
+    function formatMaybeJSON(text, artifactPath) {
+      try {
+        if (artifactPath.endsWith(".jsonl")) {
+          const rows = parseJSONL(text);
+          return JSON.stringify(rows, null, 2);
+        }
+        if (artifactPath.endsWith(".json")) {
+          return JSON.stringify(JSON.parse(text), null, 2);
+        }
+      } catch (e) {
+        // fall through to raw text
+      }
+      return text;
+    }
+
+    async function viewArtifact(stage, artifactPath) {
+      openPane();
+      artifactPanel.scrollIntoView({ behavior: "smooth", block: "start" });
+      artifactMeta.innerHTML = `<div class="chip"><strong>Stage</strong> ${stage}</div><div class="chip"><strong>Path</strong> ${artifactPath}</div>`;
+      artifactPreview.textContent = "Loading artifact…";
+      paneOpenTab.dataset.path = artifactPath;
+      paneOpenTab.dataset.stage = stage;
+
+      try {
+        const res = await fetch(artifactPath + "?t=" + Date.now());
+        if (!res.ok) throw new Error("Unable to fetch artifact");
+        const text = await res.text();
+        let parsed;
+        if (artifactPath.endsWith(".jsonl")) {
+          parsed = parseJSONL(text);
+        } else if (artifactPath.endsWith(".json")) {
+          parsed = JSON.parse(text);
+        } else {
+          parsed = text;
+        }
+
+        const MAX_ROWS = 200;
+        let displayVal = parsed;
+        let clipped = false;
+        if (Array.isArray(parsed) && parsed.length > MAX_ROWS) {
+          displayVal = parsed.slice(0, MAX_ROWS);
+          clipped = true;
+        }
+        const pretty = typeof displayVal === "string" ? displayVal : JSON.stringify(displayVal, null, 2);
+        renderPretty(pretty, "json");
+        if (clipped) {
+          artifactPreview.innerHTML += `<div class="mono">… clipped to first ${MAX_ROWS} records …</div>`;
+        }
+      } catch (e) {
+        artifactPanel.style.display = "block";
         artifactPreview.textContent = `Failed to load artifact: ${e.message}`;
       }
     }
