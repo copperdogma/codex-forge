@@ -1,18 +1,12 @@
 import argparse
 import json
 import os
-import sys
-import pathlib
 from base64 import b64encode
 from typing import List, Dict
 from openai import OpenAI
 from tqdm import tqdm
 
-repo_root = pathlib.Path(__file__).resolve().parents[3]
-if str(repo_root) not in sys.path:
-    sys.path.insert(0, str(repo_root))
-
-from utils import read_jsonl, save_jsonl, ProgressLogger
+from modules.common.utils import read_jsonl, save_jsonl, ProgressLogger
 
 
 CLEAN_PROMPT = """You are cleaning OCR text for a scanned book page.

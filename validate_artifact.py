@@ -1,7 +1,8 @@
 import argparse
 from typing import Dict, Type
-from utils import read_jsonl
 from pydantic import BaseModel, ValidationError
+
+from modules.common.utils import read_jsonl
 from schemas import PortionHypothesis, LockedPortion, ResolvedPortion, EnrichedPortion, PageDoc, CleanPage
 
 

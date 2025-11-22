@@ -1,14 +1,8 @@
 import argparse
-import sys
-import pathlib
 from collections import defaultdict, Counter
 from typing import List, Dict, Tuple
 
-repo_root = pathlib.Path(__file__).resolve().parents[3]
-if str(repo_root) not in sys.path:
-    sys.path.insert(0, str(repo_root))
-
-from utils import read_jsonl, save_jsonl, ProgressLogger
+from modules.common.utils import read_jsonl, save_jsonl, ProgressLogger
 from schemas import LockedPortion
 
 

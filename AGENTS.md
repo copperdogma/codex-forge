@@ -45,7 +45,7 @@ This repo processes scanned (or text) books into structured JSON, using modular 
 
 ## Open Questions / WIP
 - Enrichment stage not implemented (Story 018).
-- Shared helpers (`utils.py`, `ocr.py`) still at repo root; modules bootstrap sys.path for now.
+- Shared helpers now live under `modules/common` (utils, ocr); module mains should import from `modules.common.*` without mutating `sys.path`.
 - DAG/schema/adapter improvements tracked in Story 016/017.
 
 ## Etiquette

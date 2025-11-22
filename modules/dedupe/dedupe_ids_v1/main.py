@@ -1,14 +1,8 @@
 import argparse
-import sys
-import pathlib
 from typing import Dict, List
 from collections import defaultdict
 
-repo_root = pathlib.Path(__file__).resolve().parents[3]
-if str(repo_root) not in sys.path:
-    sys.path.insert(0, str(repo_root))
-
-from utils import read_jsonl, save_jsonl, ProgressLogger
+from modules.common.utils import read_jsonl, save_jsonl, ProgressLogger
 
 
 def dedupe(portions: List[Dict]) -> List[Dict]:

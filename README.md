@@ -16,6 +16,7 @@ AI-first, modular pipeline for turning scanned books into structured JSON with f
 - `snapshot.md`: current status and pipeline notes
 - `output/`: git-ignored; run artifacts live at `output/runs/<run_id>/`
 - `settings.example.yaml`: sample config
+- Shared helpers for module entrypoints live in `modules/common/` (utils, OCR helpers).
 
 ## Modular driver (current)
 - Modules live under `modules/<stage>/<module_id>/`; recipes live in `configs/recipes/`.

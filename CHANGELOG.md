@@ -43,3 +43,19 @@
 - `python -m unittest discover -s tests -p 'driver_*test.py'` (passes; 9 tests).
 - `python driver.py --recipe configs/recipes/recipe-text-dag.yaml --force` (passes; artifacts stamped/validated).
 - `python driver.py --recipe configs/recipes/recipe-ocr-dag.yaml --skip-done` (passes; OCR pages 1–20 end-to-end).
+
+## [2025-11-22] - Shared common package and module import cleanup
+
+### Added
+- Introduced `modules/common` package consolidating shared helpers (utils, ocr) with explicit public surface.
+- Driver now executes module entrypoints via `python -m modules.<...>.main`, enabling package-relative imports without sys.path tweaks.
+
+### Fixed/Changed
+- All module mains import from `modules.common.*` and no longer mutate `sys.path`.
+- Driver skips None-valued params when building CLI flags to avoid invalid arguments.
+- Documentation updated (AGENTS, README, story log) to reflect common package usage.
+
+### Tested
+- `python -m compileall modules/common driver.py validate_artifact.py`
+- `python driver.py --recipe configs/recipes/recipe-text.yaml --mock --force`
+- `python driver.py --recipe configs/recipes/recipe-ocr.yaml --mock --force`

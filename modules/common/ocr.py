@@ -3,7 +3,7 @@ from typing import List, Tuple, Optional
 from pdf2image import convert_from_path
 import pytesseract
 from PIL import Image
-from utils import ensure_dir
+from .utils import ensure_dir
 
 
 def render_pdf(pdf_path: str, out_dir: str, dpi: int = 300,

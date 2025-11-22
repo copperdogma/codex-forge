@@ -1,15 +1,9 @@
 import argparse
 import glob
 import os
-import sys
-import pathlib
 from typing import List
 
-repo_root = pathlib.Path(__file__).resolve().parents[3]
-if str(repo_root) not in sys.path:
-    sys.path.insert(0, str(repo_root))
-
-from utils import ensure_dir, save_jsonl, ProgressLogger
+from modules.common.utils import ensure_dir, save_jsonl, ProgressLogger
 
 
 def read_files(paths: List[str]) -> List[dict]:

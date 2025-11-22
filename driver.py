@@ -8,9 +8,9 @@ from typing import Any, Dict, List, Optional, Set, Tuple
 
 import yaml
 
-from utils import ensure_dir, ProgressLogger, append_jsonl
+from modules.common.utils import ensure_dir, ProgressLogger, append_jsonl
 from validate_artifact import SCHEMA_MAP
-from utils import read_jsonl, save_jsonl
+from modules.common.utils import read_jsonl, save_jsonl
 
 
 DEFAULT_OUTPUTS = {
@@ -212,10 +212,17 @@ def build_command(entrypoint: str, params: Dict[str, Any], stage_conf: Dict[str,
     """
     script, func = (entrypoint.split(":") + [None])[:2]
     script_path = os.path.join(os.getcwd(), script)
+    module_name = None
+    if script.endswith(".py") and script.startswith("modules/"):
+        module_name = script[:-3].replace("/", ".")
+
     artifact_name = stage_conf["artifact_name"]
     artifact_path = os.path.join(run_dir, artifact_name)
 
-    cmd = [sys.executable, script_path]
+    if module_name:
+        cmd = [sys.executable, "-m", module_name]
+    else:
+        cmd = [sys.executable, script_path]
 
     flags_added = set()
 
@@ -294,6 +301,8 @@ def build_command(entrypoint: str, params: Dict[str, Any], stage_conf: Dict[str,
     for key, val in (params or {}).items():
         flag = f"--{key}"
         if flag in seen_flags:
+            continue
+        if val is None:
             continue
         if isinstance(val, bool):
             if val:
