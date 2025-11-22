@@ -1,4 +1,4 @@
-# codex-forge ![Tests](https://github.com/cam/codex-forge/actions/workflows/tests.yml/badge.svg)
+# codex-forge
 AI-first, modular pipeline for turning scanned books into structured JSON with full traceability.
 
 ## What it does (today)
