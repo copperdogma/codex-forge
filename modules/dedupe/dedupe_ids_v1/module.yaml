@@ -4,4 +4,8 @@ entrypoint: modules/dedupe/dedupe_ids_v1/main.py
 input_schema: locked_portion_v1
 output_schema: locked_portion_v1
 default_params: {}
+param_schema:
+  properties:
+    # no tunables today; keep placeholder for future switches
+  required: []
 notes: Deduplicate portion_ids by suffixing repeats.

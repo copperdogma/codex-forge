@@ -21,6 +21,10 @@ class DriverPlanTests(unittest.TestCase):
                         "input_schema": "s_portion", "output_schema": "s_portion"},
             "m_consensus": {"module_id": "m_consensus", "stage": "consensus", "entrypoint": "consensus.py",
                             "input_schema": "s_portion", "output_schema": "locked"},
+            "m_param": {"module_id": "m_param", "stage": "extract", "entrypoint": "param.py",
+                        "param_schema": {"properties": {"start": {"type": "integer", "minimum": 1},
+                                                        "lang": {"type": "string"}},
+                                         "required": ["start"]}},
         }
 
     def test_cycle_detection(self):
@@ -32,6 +36,44 @@ class DriverPlanTests(unittest.TestCase):
         }
         with self.assertRaises(SystemExit):
             build_plan(recipe, self.registry)
+
+    def test_param_validation_unknown_param(self):
+        recipe = {
+            "stages": [
+                {"id": "a", "stage": "extract", "module": "m_param", "params": {"bogus": 1}},
+            ]
+        }
+        with self.assertRaises(SystemExit):
+            build_plan(recipe, self.registry)
+
+    def test_param_validation_type_mismatch(self):
+        recipe = {
+            "stages": [
+                {"id": "a", "stage": "extract", "module": "m_param", "params": {"start": "one"}},
+            ]
+        }
+        with self.assertRaises(SystemExit):
+            build_plan(recipe, self.registry)
+
+    def test_stage_out_overrides_outputs_map(self):
+        recipe = {
+            "outputs": {"a": "from_outputs.jsonl"},
+            "stages": [
+                {"id": "a", "stage": "portionize", "module": "m_portion", "out": "from_stage.jsonl"},
+            ]
+        }
+        plan = build_plan(recipe, self.registry)
+        self.assertEqual(plan["nodes"]["a"]["artifact_name"], "from_stage.jsonl")
+
+    def test_outputs_map_used_when_no_stage_out(self):
+        recipe = {
+            "outputs": {"a": "from_outputs.jsonl"},
+            "stages": [
+                {"id": "a", "stage": "portionize", "module": "m_portion"},
+            ]
+        }
+        plan = build_plan(recipe, self.registry)
+        self.assertEqual(plan["nodes"]["a"]["artifact_name"], "from_outputs.jsonl")
 
     def test_schema_mismatch(self):
         recipe = {

@@ -59,3 +59,15 @@
 - `python -m compileall modules/common driver.py validate_artifact.py`
 - `python driver.py --recipe configs/recipes/recipe-text.yaml --mock --force`
 - `python driver.py --recipe configs/recipes/recipe-ocr.yaml --mock --force`
+
+## [2025-11-22] - Param schemas and stage output overrides
+
+### Added
+- JSON-Schema-lite `param_schema` support in `driver.py` with fail-fast validation (type/enum/range/pattern, required/unknown detection, schema defaults).
+- Stage-level `out:` override for artifact filenames (higher precedence than recipe `outputs:`) wired through resume/skip-done.
+- `param_schema` definitions added to key modules (OCR/text extract, clean, portionize, adapter merge, consensus vote).
+- `param_schema` placeholders added for dedupe/normalize/resolve/build to block typos and allow future tunables.
+- Added doc snippets for `out:` usage and a multi-stage custom-output smoke test verifying downstream propagation.
+
+### Tested
+- `python -m pytest tests/driver_plan_test.py tests/driver_integration_test.py` (13 total; includes param validation errors, out precedence, resume honors custom out, multi-stage custom outputs).

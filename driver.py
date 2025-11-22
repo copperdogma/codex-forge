@@ -1,6 +1,7 @@
 import argparse
 import json
 import os
+import re
 import subprocess
 import sys
 from datetime import datetime
@@ -28,6 +29,83 @@ DEFAULT_OUTPUTS = {
 
 def _artifact_name_for_stage(stage_id: str, stage_type: str, outputs_map: Dict[str, str]) -> str:
     return outputs_map.get(stage_id) or DEFAULT_OUTPUTS.get(stage_type, f"{stage_id}.jsonl")
+
+
+def _normalize_param_schema(schema: Any) -> Tuple[Dict[str, Dict[str, Any]], Set[str]]:
+    """
+    Accept either JSON-Schema-lite {"properties": {...}, "required": [...]} or a direct mapping of param -> spec.
+    Returns (properties_map, required_set).
+    """
+    if not schema:
+        return {}, set()
+    if isinstance(schema, dict) and "properties" in schema:
+        props = schema.get("properties") or {}
+        required = set(schema.get("required") or [])
+    elif isinstance(schema, dict):
+        props = schema
+        required = {k for k, v in props.items() if isinstance(v, dict) and v.get("required")}
+    else:
+        raise SystemExit(f"param_schema must be a mapping, got {type(schema)}")
+    return props, required
+
+
+def _type_matches(val: Any, expected: str) -> bool:
+    if expected == "string":
+        return isinstance(val, str)
+    if expected == "boolean":
+        return isinstance(val, bool)
+    if expected == "integer":
+        return isinstance(val, int) and not isinstance(val, bool)
+    if expected == "number":
+        return isinstance(val, (int, float)) and not isinstance(val, bool)
+    return True
+
+
+def _validate_params(params: Dict[str, Any], schema: Any, stage_id: str, module_id: str) -> None:
+    props, required = _normalize_param_schema(schema)
+    if not props:
+        return
+
+    allowed = set(props.keys())
+    for key in params.keys():
+        if key not in allowed:
+            raise SystemExit(f"Unknown param '{key}' for stage '{stage_id}' (module {module_id})")
+
+    missing = [k for k in required if params.get(k) is None]
+    if missing:
+        raise SystemExit(f"Missing required params {missing} for stage '{stage_id}' (module {module_id})")
+
+    for key, spec in props.items():
+        if not isinstance(spec, dict):
+            continue
+        val = params.get(key)
+        if val is None:
+            continue
+        expected_type = spec.get("type")
+        if expected_type and not _type_matches(val, expected_type):
+            raise SystemExit(f"Param '{key}' on stage '{stage_id}' (module {module_id}) expected type {expected_type}, got {type(val).__name__}")
+        if "enum" in spec and val not in spec["enum"]:
+            raise SystemExit(f"Param '{key}' on stage '{stage_id}' (module {module_id}) must be one of {spec['enum']}, got {val}")
+        if expected_type in {"number", "integer"}:
+            if "minimum" in spec and val < spec["minimum"]:
+                raise SystemExit(f"Param '{key}' on stage '{stage_id}' (module {module_id}) must be >= {spec['minimum']}")
+            if "maximum" in spec and val > spec["maximum"]:
+                raise SystemExit(f"Param '{key}' on stage '{stage_id}' (module {module_id}) must be <= {spec['maximum']}")
+        if expected_type == "string" and "pattern" in spec:
+            if not re.fullmatch(spec["pattern"], str(val)):
+                raise SystemExit(f"Param '{key}' on stage '{stage_id}' (module {module_id}) failed pattern {spec['pattern']}")
+
+
+def _merge_params(defaults: Dict[str, Any], overrides: Dict[str, Any], schema: Any) -> Dict[str, Any]:
+    params = dict(defaults or {})
+    props, _ = _normalize_param_schema(schema)
+    # apply schema defaults if provided
+    for key, spec in props.items():
+        if isinstance(spec, dict) and "default" in spec and key not in params:
+            params[key] = spec["default"]
+    if overrides:
+        params.update(overrides)
+    return params
 
 
 def _is_dag_recipe(stages: List[Dict[str, Any]]) -> bool:
@@ -83,8 +161,9 @@ def build_plan(recipe: Dict[str, Any], registry: Dict[str, Any]) -> Dict[str, An
             needs = [prior_id] if prior_id else []
         needs = [n for n in needs if n]  # drop Nones
         inputs = conf.get("inputs", {})
-        params = {**entry.get("default_params", {}), **(conf.get("params") or {})}
-        artifact_name = _artifact_name_for_stage(stage_id, stage_type, outputs_map)
+        params = _merge_params(entry.get("default_params", {}), conf.get("params") or {}, entry.get("param_schema"))
+        _validate_params(params, entry.get("param_schema"), stage_id, module_id)
+        artifact_name = conf.get("out") or _artifact_name_for_stage(stage_id, stage_type, outputs_map)
         nodes[stage_id] = {
             "id": stage_id,
             "stage": stage_type,

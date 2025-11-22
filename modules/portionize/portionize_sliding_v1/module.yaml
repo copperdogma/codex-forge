@@ -8,4 +8,25 @@ default_params:
   stride: 1
   model: gpt-4.1-mini
   boost_model: gpt-5
+param_schema:
+  properties:
+    window:
+      type: integer
+      minimum: 1
+    stride:
+      type: integer
+      minimum: 1
+    pstart:
+      type: integer
+      minimum: 1
+    pend:
+      type: integer
+      minimum: 1
+    model:
+      type: string
+    boost_model:
+      type: string
+    prior:
+      type: string
+  required: [window, stride, model]
 notes: Sliding-window portionizer with priors.

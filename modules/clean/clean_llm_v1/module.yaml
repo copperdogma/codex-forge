@@ -7,4 +7,15 @@ default_params:
   model: gpt-4.1-mini
   boost_model: gpt-5
   min_conf: 0.6
+param_schema:
+  properties:
+    model:
+      type: string
+    boost_model:
+      type: string
+    min_conf:
+      type: number
+      minimum: 0
+      maximum: 1
+  required: [model, min_conf]
 notes: Multimodal LLM cleaning.

@@ -4,4 +4,13 @@ entrypoint: modules/resolve/resolve_overlaps_v1/main.py
 input_schema: locked_portion_v1
 output_schema: resolved_portion_v1
 default_params: {}
+param_schema:
+  properties:
+    range_start:
+      type: integer
+      minimum: 1
+    range_end:
+      type: integer
+      minimum: 1
+  required: []
 notes: Greedy resolve with coverage fill.

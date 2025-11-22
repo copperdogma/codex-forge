@@ -2,8 +2,8 @@
 
 ## Recommended Order (next up)
 - DONE: 016 Driver DAG & schema compatibility — unlocks arbitrary workflows, coarse+fine branches, safer schema wiring.
-- 020 Module encapsulation & shared common
-- 017 Module UX polish (params & outputs) — catches bad configs early; allows custom outputs for varied runs.
+- DONE: 020 Module encapsulation & shared common
+- DONE: 017 Module UX polish (params & outputs) — catches bad configs early; allows custom outputs for varied runs.
 - 018 Enrichment & alternate modules — delivers gameplay semantics and demonstrates swap breadth.
 - 019 Pipeline visibility dashboard — live stage/state view + artifact inspection for ops.
 - 006 Enrichment pass (choices/combat/items/endings) — core value for gamebooks; builds on 018 modules.
@@ -35,7 +35,7 @@ This index tracks stories in `/docs/stories/` for the codex-forge pipeline.
 | 014 | Layout of docs & developer onboarding | Low | To Do | /docs/stories/story-014-docs-onboarding.md |
 | 015 | Modular pipeline & module registry | High | Done | /docs/stories/story-015-modular-pipeline.md |
 | 016 | Driver DAG & schema compatibility | High | Done | /docs/stories/story-016-driver-dag-schema.md |
-| 017 | Module UX polish (params & outputs) | Medium | To Do | /docs/stories/story-017-module-ux.md |
+| 017 | Module UX polish (params & outputs) | Medium | Done | /docs/stories/story-017-module-ux.md |
 | 018 | Enrichment & alt modules | High | To Do | /docs/stories/story-018-enrichment-alt-mods.md |
 | 019 | Pipeline visibility dashboard | Medium | In Progress | /docs/stories/story-019-pipeline-visibility.md |
 | 020 | Module encapsulation & shared common | Medium | To Do | /docs/stories/story-020-module-encapsulation.md |

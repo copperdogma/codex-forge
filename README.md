@@ -49,7 +49,22 @@ python driver.py --recipe configs/recipes/recipe-text-dag.yaml --mock --skip-don
 Key points:
 - Stages have ids and `needs`; driver topo-sorts and validates schemas.
 - Adapter `merge_portion_hyp_v1` dedupes coarse+fine portion hypotheses before consensus.
-- Override per-stage outputs via the recipe `outputs:` map (used in DAG examples).
+- Override per-stage outputs via either a stage-level `out:` key (highest precedence) or the recipe-level `outputs:` map.
+
+### Parameter validation & output overrides
+- Each module can declare `param_schema` (JSON-Schema-lite) in its `module.yaml` to type-check params before the run. Supported fields per param: `type` (`string|number|integer|boolean`), `enum`, `minimum`/`maximum`, `pattern`, `default`; mark required via a top-level `required` list or `required: true` on the property.
+- Driver merges `default_params` + recipe `params`, applies schema defaults, and fails fast on missing/unknown/invalid params with a message that includes the stage id and module id.
+- Example: `Param 'min_conf' on stage 'clean_pages' (module clean_llm_v1) expected type number, got str`.
+- Set custom filenames per stage with `out:` inside the stage config; this overrides recipe `outputs:` and the built-in defaults, and the resolved name is used for resume/skip-done and downstream inputs.
+- Example snippet with stage-level `out`:
+  ```yaml
+  stages:
+    - id: clean_pages
+      stage: clean
+      module: clean_llm_v1
+      needs: [extract_text]
+      out: pages_clean_custom.jsonl
+  ```
 
 Artifacts appear under `output/runs/<run_id>/` as listed in the recipe; use `--skip-done` to resume and `--force` to rerun stages.
 

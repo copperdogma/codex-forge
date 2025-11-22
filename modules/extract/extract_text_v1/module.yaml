@@ -6,4 +6,12 @@ output_schema: page_doc_v1
 default_params:
   input_glob: input/text/**/*.md
   start_page: 1
+param_schema:
+  properties:
+    input_glob:
+      type: string
+    start_page:
+      type: integer
+      minimum: 1
+  required: [input_glob]
 notes: Pure text/Markdown/HTML ingest (no images).

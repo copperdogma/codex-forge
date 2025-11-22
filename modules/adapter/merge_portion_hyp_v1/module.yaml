@@ -5,4 +5,8 @@ input_schema: portion_hyp_v1
 output_schema: portion_hyp_v1
 default_params:
   dedupe_field: portion_id
+param_schema:
+  properties:
+    dedupe_field:
+      type: string
 notes: Concatenate and de-duplicate portion hypotheses from multiple upstream portionizers.

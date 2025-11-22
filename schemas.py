@@ -1,5 +1,5 @@
 from typing import List, Optional, Dict
-from pydantic import BaseModel, Field, validator
+from pydantic import BaseModel, Field, field_validator, model_validator
 
 
 class Choice(BaseModel):
@@ -20,17 +20,17 @@ class ItemEffect(BaseModel):
     add_item: Optional[str] = None
     use_item: Optional[str] = None
 
-    @validator("description", always=True)
-    def default_desc(cls, v, values):
-        if v:
-            return v
+    @model_validator(mode="after")
+    def default_desc(self):
+        if self.description:
+            return self
         parts = []
         for key in ("delta_gold", "delta_provisions", "add_item", "use_item"):
-            if values.get(key) is not None:
-                parts.append(f"{key}:{values.get(key)}")
-        if parts:
-            return "; ".join(parts)
-        return "effect"
+            val = getattr(self, key)
+            if val is not None:
+                parts.append(f"{key}:{val}")
+        self.description = "; ".join(parts) if parts else "effect"
+        return self
 
 
 class Paragraph(BaseModel):
@@ -43,13 +43,13 @@ class Paragraph(BaseModel):
     test_luck: Optional[bool] = None
     item_effects: List[ItemEffect] = Field(default_factory=list)
 
-    @validator("id")
+    @field_validator("id")
     def id_is_numeric(cls, v):
         if not v.isdigit():
             raise ValueError("id must be numeric string")
         return v
 
-    @validator("item_effects", pre=True, always=True)
+    @field_validator("item_effects", mode="before")
     def item_effects_default(cls, v):
         if v is None:
             return []

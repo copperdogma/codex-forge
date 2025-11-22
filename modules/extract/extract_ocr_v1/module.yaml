@@ -10,4 +10,27 @@ default_params:
   psm: 4
   oem: 3
   lang: eng
+param_schema:
+  properties:
+    start:
+      type: integer
+      minimum: 1
+    end:
+      type: integer
+      minimum: 1
+    dpi:
+      type: integer
+      minimum: 72
+      maximum: 1200
+    psm:
+      type: integer
+      minimum: 0
+      maximum: 13
+    oem:
+      type: integer
+      minimum: 0
+      maximum: 3
+    lang:
+      type: string
+  required: [start, dpi, psm, oem, lang]
 notes: PDF→images→pytesseract OCR.

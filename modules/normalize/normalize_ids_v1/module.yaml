@@ -4,4 +4,8 @@ entrypoint: modules/normalize/normalize_ids_v1/main.py
 input_schema: locked_portion_v1
 output_schema: locked_portion_v1
 default_params: {}
+param_schema:
+  properties:
+    # no tunables; reserved for future knobs like section prefix
+  required: []
 notes: Normalize portion ids/types (stub).
