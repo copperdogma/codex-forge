@@ -117,3 +117,18 @@
 ### Tested
 - `python driver.py --recipe configs/recipes/recipe-ocr-enrich-sections-noconsensus.yaml --registry modules --force` (full run, 0 missing targets).
 - `pytest tests/assert_section_targets_test.py`
+
+## [2025-11-23] - Instrumentation & dashboard surfacing
+
+### Added
+- Instrumentation schemas (`instrumentation_call_v1`, `_stage_v1`, `_run_v1`) and validation hook in `validate_artifact.py`.
+- Driver `--instrument`/`--price-table` flags with per-stage wall/CPU timing, sink-based LLM usage aggregation, cost estimation via `configs/pricing.default.yaml`, and reports (`instrumentation.json` + markdown).
+- Module helper `log_llm_usage` for modules to append per-call token/model data to the driver-provided sink.
+- Dashboard now shows instrumentation summaries (run totals, top models, per-stage cost/time chips) and newest-first run ordering/auto-select logic.
+
+### Changed
+- Story 022 marked Done; README updated with instrumentation enablement notes.
+
+### Tested
+- `python -m pytest -q tests/test_instrumentation_schema.py`
+- `python driver.py --recipe configs/recipes/recipe-text.yaml --instrument --mock --force`

@@ -4,14 +4,20 @@ import os
 import re
 import subprocess
 import sys
+import time
 from datetime import datetime
 from typing import Any, Dict, List, Optional, Set, Tuple
 
+try:
+    import resource
+except ImportError:  # pragma: no cover - resource not on Windows
+    resource = None
+
 import yaml
 
-from modules.common.utils import ensure_dir, ProgressLogger, append_jsonl
+from modules.common.utils import ensure_dir, ProgressLogger, append_jsonl, read_jsonl, save_json
 from validate_artifact import SCHEMA_MAP
-from modules.common.utils import read_jsonl, save_jsonl
+from modules.common.utils import save_jsonl
 
 
 DEFAULT_OUTPUTS = {
@@ -37,6 +43,71 @@ def cleanup_artifact(artifact_path: str, force: bool):
 
 def _artifact_name_for_stage(stage_id: str, stage_type: str, outputs_map: Dict[str, str]) -> str:
     return outputs_map.get(stage_id) or DEFAULT_OUTPUTS.get(stage_type, f"{stage_id}.jsonl")
+
+
+def _load_pricing(path: str) -> Dict[str, Any]:
+    with open(path, "r", encoding="utf-8") as f:
+        data = yaml.safe_load(f) or {}
+    models = data.get("models", {})
+    default = data.get("default", {})
+    currency = data.get("currency", "USD")
+    return {"models": models, "default": default, "currency": currency, "source": path}
+
+
+def _calc_cost(model: str, prompt_tokens: int, completion_tokens: int, pricing: Dict[str, Any]) -> float:
+    if not pricing:
+        return 0.0
+    models = pricing.get("models", {})
+    default = pricing.get("default", {})
+    entry = models.get(model) or default
+    if not entry:
+        return 0.0
+    prompt_rate = entry.get("prompt_per_1k", 0) / 1000
+    completion_rate = entry.get("completion_per_1k", 0) / 1000
+    return round(prompt_tokens * prompt_rate + completion_tokens * completion_rate, 6)
+
+
+def _get_cpu_times():
+    if not resource:
+        return None
+    usage = resource.getrusage(resource.RUSAGE_CHILDREN)
+    return usage.ru_utime, usage.ru_stime
+
+
+def _render_instrumentation_md(run_data: Dict[str, Any], path: str):
+    lines = []
+    lines.append(f"# Instrumentation Report — {run_data.get('run_id')}")
+    lines.append("")
+    totals = run_data.get("totals", {})
+    currency = (run_data.get("pricing") or {}).get("currency", "USD")
+    lines.append(f"- Run started: {run_data.get('started_at')}")
+    lines.append(f"- Run ended: {run_data.get('ended_at')}")
+    lines.append(f"- Wall time: {totals.get('wall_seconds') or run_data.get('wall_seconds') or 'n/a'} seconds")
+    lines.append(f"- Total cost: {totals.get('cost', 0):.6f} {currency}")
+    lines.append("")
+    lines.append("## Per-model cost")
+    per_model = totals.get("per_model", {})
+    if per_model:
+        lines.append("| model | prompt_tokens | completion_tokens | cost |")
+        lines.append("|---|---:|---:|---:|")
+        for model, stats in per_model.items():
+            lines.append(f"| {model} | {stats.get('prompt_tokens',0)} | {stats.get('completion_tokens',0)} | {stats.get('cost',0):.6f} |")
+    else:
+        lines.append("_no LLM calls recorded_")
+    lines.append("")
+    lines.append("## Stage timings")
+    lines.append("| stage | status | wall_s | user_s | sys_s | cost | calls |")
+    lines.append("|---|---|---:|---:|---:|---:|---:|")
+    for st in run_data.get("stages", []):
+        lt = st.get("llm_totals", {})
+        lines.append(
+            f"| {st.get('id')} | {st.get('status')} | {st.get('wall_seconds') or 0:.3f} | "
+            f"{st.get('cpu_user_seconds') or 0:.3f} | {st.get('cpu_system_seconds') or 0:.3f} | "
+            f"{lt.get('cost',0):.6f} | {lt.get('calls',0)} |"
+        )
+    lines.append("")
+    with open(path, "w", encoding="utf-8") as f:
+        f.write("\n".join(lines))
 
 
 def _normalize_param_schema(schema: Any) -> Tuple[Dict[str, Dict[str, Any]], Set[str]]:
@@ -509,7 +580,7 @@ def mock_consensus(run_dir: str, outputs: Dict[str, str], module_id: str, run_id
     return out_path
 
 
-def register_run(run_id: str, run_dir: str, recipe: Dict[str, Any]):
+def register_run(run_id: str, run_dir: str, recipe: Dict[str, Any], instrumentation: Optional[Dict[str, str]] = None):
     if not run_id:
         return
     manifest_path = os.path.join("output", "run_manifest.jsonl")
@@ -529,8 +600,10 @@ def register_run(run_id: str, run_dir: str, recipe: Dict[str, Any]):
         "path": run_dir,
         "created_at": datetime.utcnow().isoformat() + "Z",
         "recipe": recipe.get("name") or os.path.basename(recipe.get("recipe_path", "")) or None,
-        "input": recipe.get("input", {})
+        "input": recipe.get("input", {}),
     }
+    if instrumentation:
+        entry["instrumentation"] = instrumentation
     append_jsonl(manifest_path, entry)
 
 
@@ -544,16 +617,30 @@ def main():
     parser.add_argument("--force", action="store_true", help="Run stages even if artifacts already exist (overwrites)")
     parser.add_argument("--mock", action="store_true", help="Use mock implementations for LLM stages to avoid API calls")
     parser.add_argument("--dump-plan", action="store_true", help="Print resolved DAG plan and exit")
+    parser.add_argument("--instrument", action="store_true", help="Enable instrumentation (timing/cost)")
+    parser.add_argument("--price-table", help="Path to model pricing YAML (prompt_per_1k/completion_per_1k)")
     args = parser.parse_args()
 
     registry = load_registry(args.registry)["modules"]
     recipe = load_recipe(args.recipe)
     recipe["recipe_path"] = args.recipe
 
+    instr_conf = recipe.get("instrumentation", {}) or {}
+    instrument_enabled = bool(instr_conf.get("enabled") or args.instrument)
+    price_table_path = args.price_table or instr_conf.get("price_table")
+    if instrument_enabled and not price_table_path:
+        price_table_path = "configs/pricing.default.yaml"
+    pricing = _load_pricing(price_table_path) if (instrument_enabled and price_table_path) else None
+
     run_id = recipe.get("run_id")
     run_dir = recipe.get("output_dir", os.path.join("output", "runs", run_id))
     ensure_dir(run_dir)
-    register_run(run_id, run_dir, recipe)
+    instrumentation_paths = None
+    instr_json_path = os.path.join(run_dir, "instrumentation.json")
+    instr_md_path = os.path.join(run_dir, "instrumentation.md")
+    if instrument_enabled:
+        instrumentation_paths = {"json": instr_json_path, "md": instr_md_path}
+    register_run(run_id, run_dir, recipe, instrumentation=instrumentation_paths)
 
     state_path = os.path.join(run_dir, "pipeline_state.json")
     progress_path = os.path.join(run_dir, "pipeline_events.jsonl")
@@ -565,7 +652,122 @@ def main():
         print(json.dumps({"topo": plan["topo"], "nodes": plan["nodes"]}, indent=2))
         return
 
+    run_started_at = datetime.utcnow().isoformat() + "Z"
+    run_wall_start = time.perf_counter()
+    run_cpu_start = _get_cpu_times()
+
     artifact_index: Dict[str, Dict[str, str]] = {}
+
+    sink_path = os.path.join(run_dir, "instrumentation_calls.jsonl") if instrument_enabled else None
+    if instrument_enabled and args.force and sink_path and os.path.exists(sink_path):
+        os.remove(sink_path)
+    sink_offset = 0
+    stage_call_map: Dict[str, List[Dict[str, Any]]] = {}
+
+    run_totals = {"calls": 0, "prompt_tokens": 0, "completion_tokens": 0, "cost": 0.0, "per_model": {}, "wall_seconds": 0.0}
+    instrumentation_run = None
+    if instrument_enabled:
+        instrumentation_run = {
+            "schema_version": "instrumentation_run_v1",
+            "run_id": run_id,
+            "recipe_name": recipe.get("name"),
+            "recipe_path": recipe.get("recipe_path"),
+            "started_at": run_started_at,
+            "pricing": pricing,
+            "stages": [],
+            "totals": run_totals,
+            "env": {"python_version": sys.version, "platform": sys.platform},
+        }
+
+    def ingest_sink_events():
+        nonlocal sink_offset
+        if not instrument_enabled or not sink_path or not os.path.exists(sink_path):
+            return
+        with open(sink_path, "r", encoding="utf-8") as f:
+            f.seek(sink_offset)
+            data = f.read()
+            sink_offset = f.tell()
+        if not data:
+            return
+        for line in data.splitlines():
+            if not line.strip():
+                continue
+            try:
+                ev = json.loads(line)
+            except Exception:
+                continue
+            sid = ev.get("stage_id")
+            if sid:
+                stage_call_map.setdefault(sid, []).append(ev)
+
+    def record_stage_instrumentation(stage_id: str, module_id: str, status: str, artifact_path: str,
+                                     schema_version: str, stage_started_at: str,
+                                     stage_wall_start: float, stage_cpu_start):
+        if not instrument_enabled:
+            return
+        ingest_sink_events()
+        ended_at = datetime.utcnow().isoformat() + "Z"
+        wall_seconds = round(time.perf_counter() - stage_wall_start, 6)
+        cpu_user = cpu_sys = None
+        end_cpu = _get_cpu_times()
+        if stage_cpu_start and end_cpu:
+            cpu_user = round(end_cpu[0] - stage_cpu_start[0], 6)
+            cpu_sys = round(end_cpu[1] - stage_cpu_start[1], 6)
+        calls = stage_call_map.pop(stage_id, [])
+        call_total = len(calls)
+        prompt_tokens = sum(int(c.get("prompt_tokens", 0)) for c in calls)
+        completion_tokens = sum(int(c.get("completion_tokens", 0)) for c in calls)
+        cost_total = 0.0
+        per_model: Dict[str, Dict[str, Any]] = {}
+        for c in calls:
+            model = c.get("model") or "unknown"
+            ev_cost = c.get("cost")
+            if ev_cost is None:
+                ev_cost = _calc_cost(model, int(c.get("prompt_tokens", 0)), int(c.get("completion_tokens", 0)), pricing)
+            cost_total += ev_cost
+            pm = per_model.setdefault(model, {"calls": 0, "prompt_tokens": 0, "completion_tokens": 0, "cost": 0.0})
+            pm["calls"] += 1
+            pm["prompt_tokens"] += int(c.get("prompt_tokens", 0))
+            pm["completion_tokens"] += int(c.get("completion_tokens", 0))
+            pm["cost"] += ev_cost
+        llm_totals = {
+            "calls": call_total,
+            "prompt_tokens": prompt_tokens,
+            "completion_tokens": completion_tokens,
+            "cost": round(cost_total, 6),
+        }
+        stage_entry = {
+            "schema_version": "instrumentation_stage_v1",
+            "id": stage_id,
+            "stage": plan["nodes"][stage_id]["stage"],
+            "module_id": module_id,
+            "status": status,
+            "artifact": artifact_path,
+            "schema_version_output": schema_version,
+            "started_at": stage_started_at,
+            "ended_at": ended_at,
+            "wall_seconds": wall_seconds,
+            "cpu_user_seconds": cpu_user,
+            "cpu_system_seconds": cpu_sys,
+            "llm_calls": calls,
+            "llm_totals": llm_totals,
+            "extra": {},
+        }
+        instrumentation_run["stages"].append(stage_entry)
+        run_totals["calls"] += call_total
+        run_totals["prompt_tokens"] += prompt_tokens
+        run_totals["completion_tokens"] += completion_tokens
+        run_totals["cost"] = round(run_totals["cost"] + cost_total, 6)
+        for model, stats in per_model.items():
+            agg = run_totals["per_model"].setdefault(model, {"calls": 0, "prompt_tokens": 0, "completion_tokens": 0, "cost": 0.0})
+            agg["calls"] += stats["calls"]
+            agg["prompt_tokens"] += stats["prompt_tokens"]
+            agg["completion_tokens"] += stats["completion_tokens"]
+            agg["cost"] = round(agg["cost"] + stats["cost"], 6)
+        run_totals["wall_seconds"] = round(time.perf_counter() - run_wall_start, 6)
+        instrumentation_run["totals"] = run_totals
+        save_json(instr_json_path, instrumentation_run)
+        _render_instrumentation_md(instrumentation_run, instr_md_path)
 
     for stage_id in plan["topo"]:
         node = plan["nodes"][stage_id]
@@ -573,6 +775,9 @@ def main():
         module_id = node["module"]
         entrypoint = node["entrypoint"]
         out_schema = node.get("output_schema")
+        stage_started_at = datetime.utcnow().isoformat() + "Z"
+        stage_wall_start = time.perf_counter()
+        stage_cpu_start = _get_cpu_times()
 
         # Skip if already done and skip-done requested (state + artifact exists)
         if args.skip_done and os.path.exists(state_path):
@@ -591,6 +796,8 @@ def main():
                         logger.log(stage_id, "skipped", artifact=st.get("artifact"), module_id=module_id,
                                    message="Skipped due to --skip-done")
                         artifact_index[stage_id] = {"path": st.get("artifact"), "schema": st.get("schema_version")}
+                        record_stage_instrumentation(stage_id, module_id, "skipped", st.get("artifact"), st.get("schema_version"),
+                                                     stage_started_at, stage_wall_start, stage_cpu_start)
                         continue
                     else:
                         print(f"[redo] {stage_id} redo due to schema mismatch or unreadable artifact")
@@ -713,6 +920,8 @@ def main():
             artifact_path = mock_clean(run_dir, mock_outputs, module_id, run_id)
             update_state(state_path, progress_path, stage_id, "done", artifact_path, run_id, module_id, out_schema)
             artifact_index[stage_id] = {"path": artifact_path, "schema": out_schema}
+            record_stage_instrumentation(stage_id, module_id, "done", artifact_path, out_schema,
+                                         stage_started_at, stage_wall_start, stage_cpu_start)
             continue
         if args.mock and stage == "portionize":
             upstream = needs[0] if needs else None
@@ -725,6 +934,8 @@ def main():
             artifact_path = mock_portionize(run_dir, mock_outputs, module_id, run_id)
             update_state(state_path, progress_path, stage_id, "done", artifact_path, run_id, module_id, out_schema)
             artifact_index[stage_id] = {"path": artifact_path, "schema": out_schema}
+            record_stage_instrumentation(stage_id, module_id, "done", artifact_path, out_schema,
+                                         stage_started_at, stage_wall_start, stage_cpu_start)
             continue
         if args.mock and stage == "consensus":
             upstream = needs[0] if needs else None
@@ -737,12 +948,22 @@ def main():
             artifact_path = mock_consensus(run_dir, mock_outputs, module_id, run_id)
             update_state(state_path, progress_path, stage_id, "done", artifact_path, run_id, module_id, out_schema)
             artifact_index[stage_id] = {"path": artifact_path, "schema": out_schema}
+            record_stage_instrumentation(stage_id, module_id, "done", artifact_path, out_schema,
+                                         stage_started_at, stage_wall_start, stage_cpu_start)
             continue
 
         print(f"[run] {stage_id} ({module_id})")
-        result = subprocess.run(cmd, cwd=cwd)
+        env = os.environ.copy()
+        if instrument_enabled:
+            env["INSTRUMENT_SINK"] = sink_path
+            env["INSTRUMENT_STAGE"] = stage_id
+            env["RUN_ID"] = run_id or ""
+            env["INSTRUMENT_ENABLED"] = "1"
+        result = subprocess.run(cmd, cwd=cwd, env=env)
         if result.returncode != 0:
             update_state(state_path, progress_path, stage_id, "failed", artifact_path, run_id, module_id, out_schema)
+            record_stage_instrumentation(stage_id, module_id, "failed", artifact_path, out_schema,
+                                         stage_started_at, stage_wall_start, stage_cpu_start)
             raise SystemExit(f"Stage {stage_id} failed with code {result.returncode}")
         # Stamp and validate if schema known
         if out_schema:
@@ -761,9 +982,24 @@ def main():
                             print(f"[validate error] {artifact_path} row {total}: {e}")
                     if errors:
                         update_state(state_path, progress_path, stage_id, "failed", artifact_path, run_id, module_id, out_schema)
+                        record_stage_instrumentation(stage_id, module_id, "failed", artifact_path, out_schema,
+                                                     stage_started_at, stage_wall_start, stage_cpu_start)
                         raise SystemExit(f"Validation failed for {artifact_path}: {errors} errors")
         update_state(state_path, progress_path, stage_id, "done", artifact_path, run_id, module_id, out_schema)
         artifact_index[stage_id] = {"path": artifact_path, "schema": out_schema}
+        record_stage_instrumentation(stage_id, module_id, "done", artifact_path, out_schema,
+                                     stage_started_at, stage_wall_start, stage_cpu_start)
+
+    if instrument_enabled and instrumentation_run:
+        instrumentation_run["ended_at"] = datetime.utcnow().isoformat() + "Z"
+        instrumentation_run["wall_seconds"] = round(time.perf_counter() - run_wall_start, 6)
+        if run_cpu_start:
+            end_cpu_run = _get_cpu_times()
+            if end_cpu_run:
+                instrumentation_run["cpu_user_seconds"] = round(end_cpu_run[0] - run_cpu_start[0], 6)
+                instrumentation_run["cpu_system_seconds"] = round(end_cpu_run[1] - run_cpu_start[1], 6)
+        save_json(instr_json_path, instrumentation_run)
+        _render_instrumentation_md(instrumentation_run, instr_md_path)
 
     print("Recipe complete.")
 

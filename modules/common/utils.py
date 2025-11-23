@@ -165,3 +165,34 @@ class ProgressLogger:
                 json.dump(state, f, indent=2)
 
         return event
+
+
+def log_llm_usage(model: str, prompt_tokens: int, completion_tokens: int, *,
+                  cached: bool = False, provider: str = "openai", request_ms: float = None,
+                  request_id: str = None, cost: float = None, stage_id: str = None,
+                  run_id: str = None, sink_env: str = "INSTRUMENT_SINK"):
+    """
+    Append a lightweight LLM usage event to the instrumentation sink if enabled.
+    No-op when sink env var is unset.
+    """
+    sink = os.getenv(sink_env)
+    if not sink:
+        return None
+    if prompt_tokens is None or completion_tokens is None:
+        raise ValueError("prompt_tokens and completion_tokens are required")
+    event = {
+        "schema_version": "instrumentation_call_v1",
+        "model": model,
+        "provider": provider,
+        "prompt_tokens": int(prompt_tokens),
+        "completion_tokens": int(completion_tokens),
+        "cached": bool(cached),
+        "request_ms": request_ms,
+        "request_id": request_id,
+        "cost": cost,
+        "stage_id": stage_id or os.getenv("INSTRUMENT_STAGE"),
+        "run_id": run_id or os.getenv("RUN_ID"),
+        "created_at": _utc(),
+    }
+    append_jsonl(sink, event)
+    return event

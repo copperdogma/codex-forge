@@ -1,4 +1,4 @@
-from typing import List, Optional, Dict
+from typing import Any, Dict, List, Optional
 from pydantic import BaseModel, Field, field_validator, model_validator
 
 
@@ -157,3 +157,64 @@ class EnrichedPortion(BaseModel):
     test_luck: Optional[bool] = None
     item_effects: List[ItemEffect] = Field(default_factory=list)
     targets: List[str] = Field(default_factory=list)
+
+
+class LLMCallUsage(BaseModel):
+    schema_version: str = "instrumentation_call_v1"
+    model: str
+    provider: str = "openai"
+    prompt_tokens: int
+    completion_tokens: int
+    cached: bool = False
+    request_ms: Optional[float] = None
+    request_id: Optional[str] = None
+    cost: Optional[float] = None
+    stage_id: Optional[str] = None
+    run_id: Optional[str] = None
+    created_at: Optional[str] = None
+
+    @field_validator("prompt_tokens", "completion_tokens")
+    def non_negative_tokens(cls, v):
+        if v < 0:
+            raise ValueError("token counts must be non-negative")
+        return v
+
+    @field_validator("request_ms")
+    def non_negative_latency(cls, v):
+        if v is not None and v < 0:
+            raise ValueError("request_ms must be non-negative")
+        return v
+
+
+class StageInstrumentation(BaseModel):
+    schema_version: str = "instrumentation_stage_v1"
+    id: str
+    stage: str
+    module_id: Optional[str] = None
+    status: str
+    artifact: Optional[str] = None
+    schema_version_output: Optional[str] = None
+    started_at: Optional[str] = None
+    ended_at: Optional[str] = None
+    wall_seconds: Optional[float] = None
+    cpu_user_seconds: Optional[float] = None
+    cpu_system_seconds: Optional[float] = None
+    llm_calls: List[LLMCallUsage] = Field(default_factory=list)
+    llm_totals: Dict[str, Any] = Field(default_factory=dict)
+    extra: Dict[str, Any] = Field(default_factory=dict)
+
+
+class RunInstrumentation(BaseModel):
+    schema_version: str = "instrumentation_run_v1"
+    run_id: str
+    recipe_name: Optional[str] = None
+    recipe_path: Optional[str] = None
+    started_at: Optional[str] = None
+    ended_at: Optional[str] = None
+    wall_seconds: Optional[float] = None
+    cpu_user_seconds: Optional[float] = None
+    cpu_system_seconds: Optional[float] = None
+    stages: List[StageInstrumentation] = Field(default_factory=list)
+    totals: Dict[str, Any] = Field(default_factory=dict)
+    pricing: Dict[str, Any] = Field(default_factory=dict)
+    env: Dict[str, Any] = Field(default_factory=dict)

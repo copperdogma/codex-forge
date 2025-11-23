@@ -1,0 +1,18 @@
+currency: USD
+updated_at: 2025-11-22
+models:
+  gpt-4.1:
+    prompt_per_1k: 0.005
+    completion_per_1k: 0.015
+  gpt-4.1-mini:
+    prompt_per_1k: 0.00015
+    completion_per_1k: 0.0006
+  gpt-4o:
+    prompt_per_1k: 0.0005
+    completion_per_1k: 0.0015
+  gpt-4o-mini:
+    prompt_per_1k: 0.00005
+    completion_per_1k: 0.00015
+default:
+  prompt_per_1k: 0.002
+  completion_per_1k: 0.004

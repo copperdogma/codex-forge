@@ -3,7 +3,17 @@ from typing import Dict, Type
 from pydantic import BaseModel, ValidationError
 
 from modules.common.utils import read_jsonl
-from schemas import PortionHypothesis, LockedPortion, ResolvedPortion, EnrichedPortion, PageDoc, CleanPage
+from schemas import (
+    PortionHypothesis,
+    LockedPortion,
+    ResolvedPortion,
+    EnrichedPortion,
+    PageDoc,
+    CleanPage,
+    RunInstrumentation,
+    StageInstrumentation,
+    LLMCallUsage,
+)
 
 
 SCHEMA_MAP: Dict[str, Type[BaseModel]] = {
@@ -13,6 +23,9 @@ SCHEMA_MAP: Dict[str, Type[BaseModel]] = {
     "locked_portion_v1": LockedPortion,
     "resolved_portion_v1": ResolvedPortion,
     "enriched_portion_v1": EnrichedPortion,
+    "instrumentation_run_v1": RunInstrumentation,
+    "instrumentation_stage_v1": StageInstrumentation,
+    "instrumentation_call_v1": LLMCallUsage,
 }
 
 

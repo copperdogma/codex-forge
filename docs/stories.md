@@ -2,17 +2,20 @@
 
 ## Recommended Order (next up)
 - DONE: 016 Driver DAG & schema compatibility — unlocks arbitrary workflows, coarse+fine branches, safer schema wiring.
-- DONE: 020 Module encapsulation & shared common
 - DONE: 017 Module UX polish (params & outputs) — catches bad configs early; allows custom outputs for varied runs.
 - DONE: 018 Enrichment & alternate modules — delivers gameplay semantics and demonstrates swap breadth.
 - DONE: 019 Pipeline visibility dashboard — live stage/state view + artifact inspection for ops.
 - DONE: 006 Enrichment pass (choices/combat/items/endings) — core value for gamebooks; builds on 018 modules.
 - DONE: 007 Turn-to validator — sanity for CYOA cross-refs once enriched data exists.
-- 008 Image cropper/mapper — maps images to portions; leverage existing source_images.
-- 010 Coarse+fine portionizer & continuation merge — complements DAG work; improves coverage quality.
-- 012 Automation wrapper (driver snapshots) — operational convenience after DAG/UX solid.
-- 013 Cost/perf benchmarking — tune presets after pipeline variants stabilize.
+- 022 Pipeline instrumentation (timing & cost) — measure LLM/local time and API spend; add estimates.
+- 023 Consolidate section target adapters — simplify map/backfill into one guard.
+- 010 Coarse+fine portionizer & continuation merge — improves coverage quality for long spans.
+- 008 Image cropper/mapper — map images to portions; leverage source_images.
+- 012 Automation wrapper (driver snapshots) — run configs + snapshot for reproducibility.
+- 013 Cost/perf benchmarking — tune presets after instrumentation lands.
 - 014 Docs & onboarding — clean handoff after structural changes settle.
+- 021 Dashboard UI polish (highlighting & pane) — follow-up UI tweaks after visibility foundation.
+- 011 AI planner to assemble pipelines — optional; depends on stabilized modules/recipes.
 
 This index tracks stories in `/docs/stories/` for the codex-forge pipeline.
 
@@ -40,7 +43,7 @@ This index tracks stories in `/docs/stories/` for the codex-forge pipeline.
 | 019 | Pipeline visibility dashboard | Medium | Done | /docs/stories/story-019-pipeline-visibility.md |
 | 020 | Module encapsulation & shared common | Medium | To Do | /docs/stories/story-020-module-encapsulation.md |
 | 021 | Dashboard UI polish (highlighting & pane) | Medium | To Do | /docs/stories/story-021-dashboard-ui-polish.md |
-| 022 | Pipeline instrumentation (timing & cost) | High | To Do | /docs/stories/story-022-instrumentation.md |
+| 022 | Pipeline instrumentation (timing & cost) | High | Done | /docs/stories/story-022-instrumentation.md |
 | 023 | Consolidate section target adapters | Medium | To Do | /docs/stories/story-023-section-target-guard.md |
 
 ## Notes
