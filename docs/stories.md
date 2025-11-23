@@ -7,7 +7,7 @@
 - DONE: 019 Pipeline visibility dashboard — live stage/state view + artifact inspection for ops.
 - DONE: 006 Enrichment pass (choices/combat/items/endings) — core value for gamebooks; builds on 018 modules.
 - DONE: 007 Turn-to validator — sanity for CYOA cross-refs once enriched data exists.
-- 022 Pipeline instrumentation (timing & cost) — measure LLM/local time and API spend; add estimates.
+- DONE: 022 Pipeline instrumentation (timing & cost) — measure LLM/local time and API spend; add estimates.
 - 023 Consolidate section target adapters — simplify map/backfill into one guard.
 - 010 Coarse+fine portionizer & continuation merge — improves coverage quality for long spans.
 - 008 Image cropper/mapper — map images to portions; leverage source_images.
@@ -45,6 +45,7 @@ This index tracks stories in `/docs/stories/` for the codex-forge pipeline.
 | 021 | Dashboard UI polish (highlighting & pane) | Medium | To Do | /docs/stories/story-021-dashboard-ui-polish.md |
 | 022 | Pipeline instrumentation (timing & cost) | High | Done | /docs/stories/story-022-instrumentation.md |
 | 023 | Consolidate section target adapters | Medium | To Do | /docs/stories/story-023-section-target-guard.md |
+| 099 | Remove dev-only backcompat disclaimer | Low | To Do | /docs/stories/story-099-remove-dev-backcompat-note.md |
 
 ## Notes
 - Status “Done” reflects current working state in codex-forge. “To Do” items are planned next steps aligned with `docs/requirements.md` and `snapshot.md`.

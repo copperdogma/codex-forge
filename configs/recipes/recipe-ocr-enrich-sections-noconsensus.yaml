@@ -5,9 +5,8 @@ output_dir: output/runs/ocr-enrich-sections-noconsensus
 outputs:
   portionize_sections: portions_sections.jsonl
   enrich_main: portions_enriched.jsonl
-  map_targets: portions_enriched_mapped.jsonl
-  backfill: portions_enriched_backfill.jsonl
-  validate_targets: section_target_report.json
+  guard: portions_enriched_guard.jsonl
+  section_report: section_target_report.json
 
 stages:
   - id: extract_ocr
@@ -45,22 +44,10 @@ stages:
     params:
       max_chars: 2000
 
-  - id: map_targets
+  - id: guard
     stage: adapter
-    module: map_targets_v1
+    module: section_target_guard_v1
     needs: [enrich_main]
-    out: portions_enriched_mapped.jsonl
-
-  - id: backfill
-    stage: adapter
-    module: backfill_missing_sections_v1
-    needs: [map_targets]
-    inputs:
-      enriched: map_targets
-    out: portions_enriched_backfill.jsonl
-
-  - id: validate_targets
-    stage: adapter
-    module: assert_section_targets_v1
-    needs: [backfill]
-    out: section_target_report.json
+    params:
+      report: output/runs/ocr-enrich-sections-noconsensus/section_target_report.json
+    out: portions_enriched_guard.jsonl

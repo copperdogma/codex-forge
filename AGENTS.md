@@ -4,6 +4,7 @@ This repo processes scanned (or text) books into structured JSON, using modular 
 
 ## Prime Directives
 - **Do NOT run `git commit`, `git push`, or modify remotes unless the user explicitly requests it.**
+- System is in active development (not production); do not preserve backward compatibility or keep legacy shims unless explicitly requested.
 - AI-first: the AI owns implementation and self-verification; humans provide requirements and oversight. Do not report work “done” without testing/validation against requirements and story acceptance criteria.
 - Keep artifacts append-only; never rewrite user data or outputs in `output/` or `input/`.
 - Default to `workspace-write` safe commands; avoid destructive ops (`rm -rf`, `git reset --hard`).
@@ -42,7 +43,8 @@ This repo processes scanned (or text) books into structured JSON, using modular 
 - View docs: `sed -n '1,120p' docs/stories/story-015-modular-pipeline.md`
 - Run validator: `python validate_artifact.py --schema portion_hyp_v1 --file output/...jsonl`
 - Dry-run a DAG recipe: `python driver.py --recipe configs/recipes/recipe-ocr-dag.yaml --dry-run`
-- Section coverage check (fails on missing targets): `python modules/validate/assert_section_targets_v1.py --inputs output/runs/ocr-enrich-sections-merged/portions_enriched_backfill.jsonl --out /tmp/section_report.json`
+- Section coverage check (map + backfill + fail on missing): `python modules/adapter/section_target_guard_v1/main.py --inputs output/runs/ocr-enrich-sections-noconsensus/portions_enriched.jsonl --out /tmp/portions_enriched_guard.jsonl --report /tmp/section_target_report.json`
+- Legacy map/backfill adapters are obsolete; use `section_target_guard_v1` (no backward compatibility maintained).
 
 ## Open Questions / WIP
 - Enrichment stage not implemented (Story 018).

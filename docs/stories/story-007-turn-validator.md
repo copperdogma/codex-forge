@@ -19,6 +19,10 @@
 
 ## Work Log
 ### 20251123-1505 — Completed turn-to validation via section pipeline
-- **Result:** Section pipeline now extracts targets (`section_enrich_v1`), maps them (`map_targets_v1`), backfills missing sections (`backfill_missing_sections_v1`), and enforces coverage via `modules/validate/assert_section_targets_v1.py` (fails on missing targets; `--allow-missing` to soften). Reporting CLIs (`report_missing_targets.py`, `report_targets.py`) emit JSON stats. Full run on the book produced zero missing targets.
-- **Notes:** Validation is configurable per recipe by including/excluding the adapter or using `--allow-missing`.
-- **Next:** None; story considered complete. Future consolidation tracked in Story 023 (merge map/backfill into one adapter).
+- **Result:** Section pipeline now extracts targets (`section_enrich_v1`), guards them via `section_target_guard_v1` (maps + backfills + coverage report/exit), and can be double-checked with `modules/validate/assert_section_targets_v1.py` if desired. Reporting CLIs (`report_missing_targets.py`, `report_targets.py`) emit JSON stats. Full run on the book produced zero missing targets.
+- **Notes:** Validation is configurable per recipe by including/excluding the validator or using `--allow-missing`. Guard adapter is the primary path; legacy map/backfill chain is superseded.
+- **Next:** None; story considered complete. Future consolidation is already delivered via Story 023.
+### 20251123-1407 — Supersession note
+- **Result:** Documented that `section_target_guard_v1` now replaces the map_targets/backfill chain for target coverage.
+- **Notes:** Keep `assert_section_targets_v1` as an optional extra guard; primary path is guard adapter.
+- **Next:** None.

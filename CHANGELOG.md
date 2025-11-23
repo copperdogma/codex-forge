@@ -101,6 +101,21 @@
 - `python driver.py --recipe configs/recipes/recipe-text-enrich-alt.yaml --registry modules` (passes; enriched output with choices).
 - `python driver.py --recipe configs/recipes/recipe-ocr-enrich-alt.yaml --registry modules` (passes; intro pages enriched with images).
 - `python -m pytest tests/driver_plan_test.py` (11 tests, includes stamp backfill and cleanup helpers; existing pydantic warning).
+## [2025-11-23] - Section target guard, portionizer fixes, doc cleanup
+
+### Added
+- Consolidated adapter `section_target_guard_v1` (maps targets, backfills, coverage report/exit) with module manifest and unit tests.
+- Story 099 to track removal of the dev-only backcompat disclaimer when production-ready.
+
+### Changed
+- Updated section recipes to use the guard adapter and emit coverage reports; legacy map/backfill path marked obsolete in docs.
+- Portionizer `portionize_sections_v1` now captures multi-number headers/inline ids and dedupes per page to reduce duplicate portions while keeping coverage.
+- AGENTS and story logs refreshed to reflect guard as the canonical path; legacy mentions updated.
+
+### Tested
+- `python driver.py --recipe configs/recipes/recipe-ocr-enrich-sections-noconsensus.yaml --force` (0 missing targets; guard passes, 400 sections/384 targets).
+- `python -m pytest` (all suites; existing pydantic deprecation warning only).
+
 ## [2025-11-23] - Section coverage pipeline and validator guard
 
 ### Added

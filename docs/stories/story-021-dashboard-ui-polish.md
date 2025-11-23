@@ -16,6 +16,9 @@
 - [ ] Confirm drag handle + close/open-tab buttons still work after layout tweaks; enforce sensible default width.
 - [ ] Cross-browser smoke on dashboard-fixture (Chrome + Safari/Firefox) and log console results.
 - [ ] Update story log/README snippet if invocation changes.
+- [ ] Resolve persistent run-sort/auto-select bug: dropdown should order runs newest-first and auto-select the latest on load.
+- [ ] Apply general UI polish per latest feedback (layout/spacing/visual tweaks).
+- [ ] Order stage cards in execution order instead of current arbitrary ordering.
 
 ## Notes
 - Target file: `docs/pipeline-visibility.html`; fixture run: `output/runs/dashboard-fixture`.
@@ -25,3 +28,6 @@
 ### 20251122-2335 — Story stubbed for UI polish
 - **Result:** Created story to track fixing syntax highlighting and pane sizing in the pipeline dashboard.
 - **Next:** Investigate highlight.js init and pane layout; run dashboard against `dashboard-fixture`.
+### 20251123-1111 — Added new polish tasks
+- **Result:** Logged issues: run dropdown ordering/auto-select bug, general UI polish, and ordering stage cards by execution.
+- **Next:** Prioritize fixing run sorting/auto-select and stage ordering before visual tweaks.

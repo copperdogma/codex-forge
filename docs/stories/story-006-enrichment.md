@@ -111,7 +111,11 @@
 ### 20251123-1045 — Planned integration path for section coverage
 - **Result:** Reviewed merged no-consensus artifacts and identified remaining gaps: pipeline not yet wired into a single recipe/run target and no automated guardrail to fail on missing section targets.
 - **Notes:** Next steps captured as new tasks above; evidence-driven approach will reuse existing merged outputs and validate via `report_targets.py`/`report_missing_targets.py` before changing code.
-- **Next:** Build reusable recipe wrapper for portionize_sections_v1 → section_enrich_v1 → map_targets_v1 → backfill_missing_sections_v1 (no consensus/dedupe) and add validation step/CI check.
+- **Next:** Build reusable recipe wrapper for portionize_sections_v1 → section_enrich_v1 → section_target_guard_v1 (replaces map/backfill) and add validation step/CI check.
+### 20251123-1406 — Superseded map/backfill by guard adapter
+- **Result:** Document note: `section_target_guard_v1` now replaces the map_targets/backfill chain; use guard adapter going forward.
+- **Notes:** Legacy adapters left for history; current recipes updated under Story 023.
+- **Next:** None for this story (Done).
 ### 20251123-1125 — Added no-consensus recipe and target validation guard
 - **Result:** Added reusable recipe `configs/recipes/recipe-ocr-enrich-sections-noconsensus.yaml` (portionize_sections → section_enrich → map_targets → backfill → assert_section_targets_v1) plus validation module `modules/validate/assert_section_targets_v1.py` (fails on missing targets, writes summary JSON). Updated AGENTS safe commands with the validation invocation.
 - **Notes:** Ran `assert_section_targets_v1` on existing merged artifact `output/runs/ocr-enrich-sections-merged/portions_enriched_backfill.jsonl` → missing_count=0. Did not rerun full recipe yet (prior full run timed out) to avoid redundant long/LLM work.
