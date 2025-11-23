@@ -37,7 +37,7 @@ This index tracks stories in `/docs/stories/` for the codex-forge pipeline.
 | 016 | Driver DAG & schema compatibility | High | Done | /docs/stories/story-016-driver-dag-schema.md |
 | 017 | Module UX polish (params & outputs) | Medium | Done | /docs/stories/story-017-module-ux.md |
 | 018 | Enrichment & alt modules | High | Done | /docs/stories/story-018-enrichment-alt-mods.md |
-| 019 | Pipeline visibility dashboard | Medium | In Progress | /docs/stories/story-019-pipeline-visibility.md |
+| 019 | Pipeline visibility dashboard | Medium | Done | /docs/stories/story-019-pipeline-visibility.md |
 | 020 | Module encapsulation & shared common | Medium | To Do | /docs/stories/story-020-module-encapsulation.md |
 | 021 | Dashboard UI polish (highlighting & pane) | Medium | To Do | /docs/stories/story-021-dashboard-ui-polish.md |
 | 022 | Pipeline instrumentation (timing & cost) | High | To Do | /docs/stories/story-022-instrumentation.md |

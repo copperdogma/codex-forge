@@ -111,6 +111,7 @@
 ### Changed
 - Pruned obsolete/failed recipe variants to reduce config clutter.
 - AGENTS safe command updated with section target validation usage.
+- Story index now marks pipeline visibility (019) and enrichment (006) as Done.
 
 ### Tested
 - `python driver.py --recipe configs/recipes/recipe-ocr-enrich-sections-noconsensus.yaml --registry modules --force` (full run, 0 missing targets).
