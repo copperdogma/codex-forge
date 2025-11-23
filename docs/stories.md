@@ -6,7 +6,7 @@
 - DONE: 017 Module UX polish (params & outputs) — catches bad configs early; allows custom outputs for varied runs.
 - DONE: 018 Enrichment & alternate modules — delivers gameplay semantics and demonstrates swap breadth.
 - DONE: 019 Pipeline visibility dashboard — live stage/state view + artifact inspection for ops.
-- 006 Enrichment pass (choices/combat/items/endings) — core value for gamebooks; builds on 018 modules.
+- DONE: 006 Enrichment pass (choices/combat/items/endings) — core value for gamebooks; builds on 018 modules.
 - 007 Turn-to validator — sanity for CYOA cross-refs once enriched data exists.
 - 008 Image cropper/mapper — maps images to portions; leverage existing source_images.
 - 010 Coarse+fine portionizer & continuation merge — complements DAG work; improves coverage quality.
@@ -24,7 +24,7 @@ This index tracks stories in `/docs/stories/` for the codex-forge pipeline.
 | 003 | Portionization with priors & overlaps | High | Done | /docs/stories/story-003-portionization-priors.md |
 | 004 | Consensus/dedupe/normalize/resolve pipeline | High | Done | /docs/stories/story-004-consensus-resolve.md |
 | 005 | Final assembly (portions_final_raw.json) | High | Done | /docs/stories/story-005-final-assembly.md |
-| 006 | Enrichment pass (choices/combat/items/endings) | High | To Do | /docs/stories/story-006-enrichment.md |
+| 006 | Enrichment pass (choices/combat/items/endings) | High | Done | /docs/stories/story-006-enrichment.md |
 | 007 | Turn-to validator (CYOA cross-refs) | Medium | To Do | /docs/stories/story-007-turn-validator.md |
 | 008 | Image cropper/mapper | Medium | To Do | /docs/stories/story-008-image-cropper.md |
 | 009 | Layout-preserving extractor | Medium | To Do | /docs/stories/story-009-layout-preserve.md |
@@ -40,6 +40,8 @@ This index tracks stories in `/docs/stories/` for the codex-forge pipeline.
 | 019 | Pipeline visibility dashboard | Medium | In Progress | /docs/stories/story-019-pipeline-visibility.md |
 | 020 | Module encapsulation & shared common | Medium | To Do | /docs/stories/story-020-module-encapsulation.md |
 | 021 | Dashboard UI polish (highlighting & pane) | Medium | To Do | /docs/stories/story-021-dashboard-ui-polish.md |
+| 022 | Pipeline instrumentation (timing & cost) | High | To Do | /docs/stories/story-022-instrumentation.md |
+| 023 | Consolidate section target adapters | Medium | To Do | /docs/stories/story-023-section-target-guard.md |
 
 ## Notes
 - Status “Done” reflects current working state in codex-forge. “To Do” items are planned next steps aligned with `docs/requirements.md` and `snapshot.md`.

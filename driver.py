@@ -350,6 +350,12 @@ def build_command(entrypoint: str, params: Dict[str, Any], stage_conf: Dict[str,
         cmd += ["--hypotheses", hyp_path]
         cmd += ["--out", artifact_path]
         flags_added.update({"--hypotheses", "--out"})
+    elif stage_conf["stage"] in {"app", "export"}:
+        in_path = artifact_inputs.get("input")
+        if not in_path:
+            raise SystemExit(f"Stage {stage_conf['id']} missing input")
+        cmd += ["--input", in_path, "--out", artifact_path]
+        flags_added.update({"--input", "--out"})
     elif stage_conf["stage"] == "dedupe":
         in_path = artifact_inputs.get("input")
         if not in_path:
@@ -594,7 +600,7 @@ def main():
         # Input resolution
         artifact_inputs: Dict[str, str] = {}
         needs = node.get("needs", [])
-        if stage in {"clean", "portionize", "consensus", "dedupe", "normalize", "resolve", "build", "enrich", "adapter"}:
+        if stage in {"clean", "portionize", "consensus", "dedupe", "normalize", "resolve", "build", "enrich", "adapter", "export", "app"}:
             # adapters fall-through below
             if stage == "build":
                 inputs_map = node.get("inputs", {}) or {}
@@ -653,6 +659,15 @@ def main():
                 source_schema = artifact_inputs.get("merged_schema") or (artifact_index[needs[0]].get("schema") if needs else None)
                 if expected_schema and source_schema and expected_schema != source_schema:
                     raise SystemExit(f"Schema mismatch: {stage_id} expects {expected_schema} got {source_schema}")
+            elif stage in {"app", "export"}:
+                origin = needs[0] if needs else None
+                if not origin:
+                    raise SystemExit(f"Stage {stage_id} missing upstream input")
+                artifact_inputs["input"] = artifact_index[origin]["path"]
+                producer_schema = artifact_index[origin].get("schema")
+                expected_schema = node.get("input_schema")
+                if expected_schema and producer_schema and expected_schema != producer_schema:
+                    raise SystemExit(f"Schema mismatch: {stage_id} expects {expected_schema} got {producer_schema} from {origin}")
             elif stage == "adapter":
                 if not needs:
                     raise SystemExit(f"Stage {stage_id} missing adapter inputs")

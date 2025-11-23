@@ -1,0 +1,13 @@
+module_id: assert_section_targets_v1
+stage: adapter
+entrypoint: modules/validate/assert_section_targets_v1.py
+input_schema: enriched_portion_v1
+output_schema: null
+default_params:
+  allow-missing: false
+param_schema:
+  properties:
+    allow-missing:
+      type: boolean
+  required: []
+notes: Validate that all targets exist as section_ids/portion_ids; fails run when missing unless allow-missing is true.

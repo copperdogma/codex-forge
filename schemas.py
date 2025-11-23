@@ -144,6 +144,7 @@ class EnrichedPortion(BaseModel):
     source: Optional[List[str]] = None
     created_at: Optional[str] = None
     portion_id: str
+    section_id: Optional[str] = None
     page_start: int
     page_end: int
     title: Optional[str] = None
@@ -155,3 +156,4 @@ class EnrichedPortion(BaseModel):
     combat: Optional[Combat] = None
     test_luck: Optional[bool] = None
     item_effects: List[ItemEffect] = Field(default_factory=list)
+    targets: List[str] = Field(default_factory=list)

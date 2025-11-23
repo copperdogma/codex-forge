@@ -101,3 +101,17 @@
 - `python driver.py --recipe configs/recipes/recipe-text-enrich-alt.yaml --registry modules` (passes; enriched output with choices).
 - `python driver.py --recipe configs/recipes/recipe-ocr-enrich-alt.yaml --registry modules` (passes; intro pages enriched with images).
 - `python -m pytest tests/driver_plan_test.py` (11 tests, includes stamp backfill and cleanup helpers; existing pydantic warning).
+## [2025-11-23] - Section coverage pipeline and validator guard
+
+### Added
+- No-consensus section recipe `configs/recipes/recipe-ocr-enrich-sections-noconsensus.yaml` (full book) plus chunked variants; full run produced `portions_enriched_backfill.jsonl` with zero missing targets.
+- Validation guard module `modules/validate/assert_section_targets_v1.py` and unit test `tests/assert_section_targets_test.py` covering pass/fail paths.
+- Story 023 to consolidate section target adapters; Story 006 marked Done in story index.
+
+### Changed
+- Pruned obsolete/failed recipe variants to reduce config clutter.
+- AGENTS safe command updated with section target validation usage.
+
+### Tested
+- `python driver.py --recipe configs/recipes/recipe-ocr-enrich-sections-noconsensus.yaml --registry modules --force` (full run, 0 missing targets).
+- `pytest tests/assert_section_targets_test.py`

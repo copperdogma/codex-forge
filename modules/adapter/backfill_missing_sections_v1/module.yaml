@@ -1,0 +1,8 @@
+module_id: backfill_missing_sections_v1
+stage: adapter
+entrypoint: modules/adapter/backfill_missing_sections_v1.py
+input_schema: enriched_portion_v1
+output_schema: enriched_portion_v1
+default_params: {}
+param_schema: {}
+notes: Append stubs for targets missing in section_id/portion_id to ensure full coverage.

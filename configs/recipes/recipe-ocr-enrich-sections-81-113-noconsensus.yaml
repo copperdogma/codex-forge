@@ -1,0 +1,52 @@
+run_id: ocr-enrich-sections-81-113-noconsensus
+input:
+  pdf: input/06 deathtrap dungeon.pdf
+output_dir: output/runs/ocr-enrich-sections-81-113-noconsensus
+outputs:
+  portionize_sections: portions_sections.jsonl
+  enrich_main: portions_enriched.jsonl
+
+stages:
+  - id: extract_ocr
+    stage: extract
+    module: extract_ocr_v1
+    params:
+      dpi: 200
+      psm: 4
+      oem: 3
+      lang: eng
+      start: 81
+      end: 113
+
+  - id: clean_pages
+    stage: clean
+    module: clean_llm_v1
+    needs: [extract_ocr]
+    params:
+      model: gpt-4.1-mini
+      min_conf: 0.5
+
+  - id: portionize_sections
+    stage: portionize
+    module: portionize_sections_v1
+    needs: [clean_pages]
+    params:
+      confidence: 0.7
+      max_section_len: 3000
+
+  - id: enrich_main
+    stage: enrich
+    module: section_enrich_v1
+    needs: [portionize_sections, clean_pages]
+    inputs:
+      pages: clean_pages
+      portions: portionize_sections
+    params:
+      max_chars: 2000
+
+  - id: map_targets
+    stage: adapter
+    module: map_targets_v1
+    needs: [enrich_main]
+    params: {}
+    out: portions_enriched_mapped.jsonl

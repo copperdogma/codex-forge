@@ -42,6 +42,7 @@ This repo processes scanned (or text) books into structured JSON, using modular 
 - View docs: `sed -n '1,120p' docs/stories/story-015-modular-pipeline.md`
 - Run validator: `python validate_artifact.py --schema portion_hyp_v1 --file output/...jsonl`
 - Dry-run a DAG recipe: `python driver.py --recipe configs/recipes/recipe-ocr-dag.yaml --dry-run`
+- Section coverage check (fails on missing targets): `python modules/validate/assert_section_targets_v1.py --inputs output/runs/ocr-enrich-sections-merged/portions_enriched_backfill.jsonl --out /tmp/section_report.json`
 
 ## Open Questions / WIP
 - Enrichment stage not implemented (Story 018).
@@ -51,3 +52,4 @@ This repo processes scanned (or text) books into structured JSON, using modular 
 ## Etiquette
 - Update the relevant story work log for any change or investigation.
 - Keep responses concise; cite file paths when referencing changes.
+- **Debugging discipline:** when diagnosing issues, inspect the actual data/artifacts at each stage before changing code. Prefer evidence-driven plans (e.g., grep/rg on outputs, view JSONL samples) over guess-and-edit loops. Document what was observed and the decision that follows.
