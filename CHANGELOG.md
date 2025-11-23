@@ -107,6 +107,7 @@
 - No-consensus section recipe `configs/recipes/recipe-ocr-enrich-sections-noconsensus.yaml` (full book) plus chunked variants; full run produced `portions_enriched_backfill.jsonl` with zero missing targets.
 - Validation guard module `modules/validate/assert_section_targets_v1.py` and unit test `tests/assert_section_targets_test.py` covering pass/fail paths.
 - Story 023 to consolidate section target adapters; Story 006 marked Done in story index.
+- Story 007 marked Done (turn-to validation delivered via section target guard/reporting tools).
 
 ### Changed
 - Pruned obsolete/failed recipe variants to reduce config clutter.

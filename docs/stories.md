@@ -7,7 +7,7 @@
 - DONE: 018 Enrichment & alternate modules — delivers gameplay semantics and demonstrates swap breadth.
 - DONE: 019 Pipeline visibility dashboard — live stage/state view + artifact inspection for ops.
 - DONE: 006 Enrichment pass (choices/combat/items/endings) — core value for gamebooks; builds on 018 modules.
-- 007 Turn-to validator — sanity for CYOA cross-refs once enriched data exists.
+- DONE: 007 Turn-to validator — sanity for CYOA cross-refs once enriched data exists.
 - 008 Image cropper/mapper — maps images to portions; leverage existing source_images.
 - 010 Coarse+fine portionizer & continuation merge — complements DAG work; improves coverage quality.
 - 012 Automation wrapper (driver snapshots) — operational convenience after DAG/UX solid.
@@ -25,7 +25,7 @@ This index tracks stories in `/docs/stories/` for the codex-forge pipeline.
 | 004 | Consensus/dedupe/normalize/resolve pipeline | High | Done | /docs/stories/story-004-consensus-resolve.md |
 | 005 | Final assembly (portions_final_raw.json) | High | Done | /docs/stories/story-005-final-assembly.md |
 | 006 | Enrichment pass (choices/combat/items/endings) | High | Done | /docs/stories/story-006-enrichment.md |
-| 007 | Turn-to validator (CYOA cross-refs) | Medium | To Do | /docs/stories/story-007-turn-validator.md |
+| 007 | Turn-to validator (CYOA cross-refs) | Medium | Done | /docs/stories/story-007-turn-validator.md |
 | 008 | Image cropper/mapper | Medium | To Do | /docs/stories/story-008-image-cropper.md |
 | 009 | Layout-preserving extractor | Medium | To Do | /docs/stories/story-009-layout-preserve.md |
 | 010 | Coarse+fine portionizer & continuation merge | Medium | To Do | /docs/stories/story-010-coarse-fine-merge.md |
