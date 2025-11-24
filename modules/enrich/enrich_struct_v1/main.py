@@ -7,7 +7,7 @@ from typing import Dict, List, Optional
 from openai import OpenAI
 from tqdm import tqdm
 
-from modules.common.utils import read_jsonl, append_jsonl, ensure_dir, ProgressLogger
+from modules.common.utils import read_jsonl, append_jsonl, ensure_dir, ProgressLogger, log_llm_usage
 from schemas import EnrichedPortion
 
 SYSTEM_PROMPT = """You extract structured adventure mechanics from a portion of text.
@@ -56,6 +56,18 @@ def call_llm(client: OpenAI, model: str, prompt_text: str, images: List[Dict]) -
             {"role": "user", "content": content}
         ],
         response_format={"type": "json_object"}
+    )
+    usage = getattr(completion, "usage", None)
+    pt = getattr(usage, "prompt_tokens", None)
+    ct = getattr(usage, "completion_tokens", None)
+    if pt is None or ct is None:
+        pt = pt or 0
+        ct = ct or 0
+    log_llm_usage(
+        model=model,
+        prompt_tokens=pt,
+        completion_tokens=ct,
+        request_ms=None,
     )
     return json.loads(completion.choices[0].message.content)
 

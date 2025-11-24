@@ -12,7 +12,7 @@
 - DONE: 010 Coarse+fine portionizer & continuation merge — improves coverage quality for long spans.
 - DONE: 008 Image cropper/mapper — map images to portions; leverage source_images.
 - DONE: 012 Automation wrapper (driver snapshots) — run configs + snapshot for reproducibility.
-- 013 Cost/perf benchmarking — tune presets after instrumentation lands.
+- DONE: 013 Cost/perf benchmarking — tune presets after instrumentation lands.
 - 014 Docs & onboarding — clean handoff after structural changes settle.
 - 021 Dashboard UI polish (highlighting & pane) — follow-up UI tweaks after visibility foundation.
 - 011 AI planner to assemble pipelines — optional; depends on stabilized modules/recipes.
@@ -34,7 +34,7 @@ This index tracks stories in `/docs/stories/` for the codex-forge pipeline.
 | 010 | Coarse+fine portionizer & continuation merge | Medium | Done | /docs/stories/story-010-coarse-fine-merge.md |
 | 011 | AI planner to assemble pipelines | Medium | To Do | /docs/stories/story-011-ai-planner.md |
 | 012 | Automation wrapper (single driver + config snapshots) | Medium | Done | /docs/stories/story-012-driver-automation.md |
-| 013 | Cost/perf benchmarking and presets | Low | To Do | /docs/stories/story-013-cost-perf.md |
+| 013 | Cost/perf benchmarking and presets | Low | Done | /docs/stories/story-013-cost-perf.md |
 | 014 | Layout of docs & developer onboarding | Low | To Do | /docs/stories/story-014-docs-onboarding.md |
 | 015 | Modular pipeline & module registry | High | Done | /docs/stories/story-015-modular-pipeline.md |
 | 016 | Driver DAG & schema compatibility | High | Done | /docs/stories/story-016-driver-dag-schema.md |

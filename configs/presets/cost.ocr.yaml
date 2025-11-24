@@ -1,0 +1,8 @@
+model: gpt-4.1-mini
+temperature: 0.2
+max_tokens: 400
+max_retries: 3
+portionize:
+  window: 8
+  stride: 1
+notes: "Cost/low model OCR preset; ~13–18s/page, ~$0.0011/page (bench-cost-perf-ocr-20251124c)."

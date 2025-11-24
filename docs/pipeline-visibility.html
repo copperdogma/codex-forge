@@ -435,8 +435,8 @@
     async function loadRun(runId) {
       if (!runId) return;
       currentRun = runId;
-      const base = `${ROOT}/output/runs/${runId}`;
       const meta = runMeta[runId] || {};
+      const base = meta.path ? `${ROOT}/${meta.path}` : `${ROOT}/output/runs/${runId}`;
       try {
         const instPath = meta.instrumentation?.json
           ? `${ROOT}/${meta.instrumentation.json}`
@@ -588,17 +588,17 @@
           chips.appendChild(sch);
         }
         const inst = instMap[stage];
-        if (inst) {
-          const costChip = document.createElement("div");
-          costChip.className = "chip";
-          costChip.innerHTML = `<strong>Cost</strong> ${(inst.llm_totals?.cost || 0).toFixed(4)}`;
-          chips.appendChild(costChip);
-          if (inst.wall_seconds != null) {
+        const costVal = inst?.llm_totals?.cost || 0;
+        const costChip = document.createElement("div");
+        costChip.className = "chip";
+        costChip.title = costVal === 0 ? "No LLM calls recorded for this stage (non-LLM step or module emitted no usage)" : "";
+        costChip.innerHTML = `<strong>Cost</strong> ${costVal.toFixed(4)}`;
+        chips.appendChild(costChip);
+        if (inst && inst.wall_seconds != null) {
             const timeChip = document.createElement("div");
             timeChip.className = "chip";
             timeChip.innerHTML = `<strong>Wall</strong> ${inst.wall_seconds.toFixed(2)}s`;
             chips.appendChild(timeChip);
-          }
         }
         card.appendChild(chips);
 

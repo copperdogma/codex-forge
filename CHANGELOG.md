@@ -183,3 +183,16 @@
 
 ### Tested
 - `python -m pytest` (all suites; 34 passed, pre-existing pydantic warning).
+## [2025-11-24] - Cost/perf benchmarks, presets, and instrumentation UX
+
+### Added
+- Bench harness writes per-session `bench_metrics.csv/jsonl` and `metadata.json` under `output/runs/bench-*`; presets in `configs/presets/` (speed text, cost OCR, balanced OCR, quality OCR) with usage examples in README.
+- Story 013 completed with benchmark summary tables (OCR vs text, gpt-4.1-mini/4.1/5) and work log updates.
+- Dashboard regression test for nested run paths (`tests/test_pipeline_visibility_path.py`); stage cards now always show cost chips (tooltip on zero-cost stages).
+
+### Fixed
+- Dashboard run loader honors manifest path for nested run dirs; zero-cost stages now display cost chips with explanatory tooltip.
+- LLM modules (clean, portionize coarse/sliding, enrich) emit instrumentation events even when usage tokens missing (zero-fill), preventing missing stage cost data.
+
+### Documentation
+- README documents presets, benchmark artifact locations, and cost/perf usage examples.

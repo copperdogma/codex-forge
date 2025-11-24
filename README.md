@@ -103,6 +103,21 @@ Artifacts appear under `output/runs/<run_id>/` as listed in the recipe; use `--s
 - Outputs land beside artifacts: `instrumentation.json` (machine-readable), `instrumentation.md` (summary tables), and raw `instrumentation_calls.jsonl` when present. Manifest entries link to the reports.
 - Modules can emit call-level usage via `modules.common.utils.log_llm_usage(...)`; the driver aggregates tokens/costs per stage and per model.
 
+### Cost/perf presets and benchmarks
+- Preset settings live in `configs/presets/`:
+  - `speed.text.yaml` (text recipe, gpt-4.1-mini, ~8s/page, ~$0.00013/page)
+  - `cost.ocr.yaml` (OCR, gpt-4.1-mini, ~13–18s/page, ~$0.0011/page)
+  - `balanced.ocr.yaml` (OCR, gpt-4.1, ~16–34s/page, ~$0.014–0.026/page)
+  - `quality.ocr.yaml` (OCR, gpt-5, ~70–100s/page, ~$0.015–0.020/page)
+- Use with the driver by passing `--settings`, e.g.:
+  ```bash
+  python driver.py --recipe configs/recipes/recipe-text.yaml --settings configs/presets/speed.text.yaml --instrument
+  python driver.py --recipe configs/recipes/recipe-ocr.yaml  --settings configs/presets/cost.ocr.yaml --instrument
+  ```
+- Bench sessions write metrics to `output/runs/bench-*/bench_metrics.csv` and `metadata.json` (slices, models, price table, runs). Example sessions:
+  - `output/runs/bench-cost-perf-ocr-20251124c/bench_metrics.csv`
+  - `output/runs/bench-cost-perf-text-20251124e/bench_metrics.csv`
+
 ## Pipeline visibility dashboard
 - Serve from repo root: `python -m http.server 8000` then open `http://localhost:8000/docs/pipeline-visibility.html`.
 - The page polls `output/run_manifest.jsonl` for run ids, then reads `output/runs/<run_id>/pipeline_state.json` and `pipeline_events.jsonl` for live progress, artifacts, and confidence stats.

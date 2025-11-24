@@ -1,0 +1,8 @@
+model: gpt-4.1
+temperature: 0.3
+max_tokens: 450
+max_retries: 3
+portionize:
+  window: 8
+  stride: 1
+notes: "Balanced OCR preset; ~16–34s/page, ~$0.014–0.026/page (bench-cost-perf-ocr-20251124c)."
