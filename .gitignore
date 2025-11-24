@@ -1,5 +1,6 @@
 input/
 output/
+models/
 **/__pycache__/
 .venv/
 .cursor/
