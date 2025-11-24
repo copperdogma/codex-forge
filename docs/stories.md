@@ -10,8 +10,8 @@
 - DONE: 022 Pipeline instrumentation (timing & cost) — measure LLM/local time and API spend; add estimates.
 - DONE: 023 Consolidate section target adapters — simplify map/backfill into one guard.
 - DONE: 010 Coarse+fine portionizer & continuation merge — improves coverage quality for long spans.
-- 008 Image cropper/mapper — map images to portions; leverage source_images.
-- 012 Automation wrapper (driver snapshots) — run configs + snapshot for reproducibility.
+- DONE: 008 Image cropper/mapper — map images to portions; leverage source_images.
+- DONE: 012 Automation wrapper (driver snapshots) — run configs + snapshot for reproducibility.
 - 013 Cost/perf benchmarking — tune presets after instrumentation lands.
 - 014 Docs & onboarding — clean handoff after structural changes settle.
 - 021 Dashboard UI polish (highlighting & pane) — follow-up UI tweaks after visibility foundation.
@@ -29,11 +29,11 @@ This index tracks stories in `/docs/stories/` for the codex-forge pipeline.
 | 005 | Final assembly (portions_final_raw.json) | High | Done | /docs/stories/story-005-final-assembly.md |
 | 006 | Enrichment pass (choices/combat/items/endings) | High | Done | /docs/stories/story-006-enrichment.md |
 | 007 | Turn-to validator (CYOA cross-refs) | Medium | Done | /docs/stories/story-007-turn-validator.md |
-| 008 | Image cropper/mapper | Medium | To Do | /docs/stories/story-008-image-cropper.md |
+| 008 | Image cropper/mapper | Medium | Done | /docs/stories/story-008-image-cropper.md |
 | 009 | Layout-preserving extractor | Medium | To Do | /docs/stories/story-009-layout-preserve.md |
 | 010 | Coarse+fine portionizer & continuation merge | Medium | Done | /docs/stories/story-010-coarse-fine-merge.md |
 | 011 | AI planner to assemble pipelines | Medium | To Do | /docs/stories/story-011-ai-planner.md |
-| 012 | Automation wrapper (single driver + config snapshots) | Medium | To Do | /docs/stories/story-012-driver-automation.md |
+| 012 | Automation wrapper (single driver + config snapshots) | Medium | Done | /docs/stories/story-012-driver-automation.md |
 | 013 | Cost/perf benchmarking and presets | Low | To Do | /docs/stories/story-013-cost-perf.md |
 | 014 | Layout of docs & developer onboarding | Low | To Do | /docs/stories/story-014-docs-onboarding.md |
 | 015 | Modular pipeline & module registry | High | Done | /docs/stories/story-015-modular-pipeline.md |

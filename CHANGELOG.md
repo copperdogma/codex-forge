@@ -170,3 +170,16 @@
 
 ### Changed
 - Tuned CV detector parameters and documented manual validation results (Micro P=0.75 / R=0.95 / F1=0.84 on current GT); story-008 marked Done.
+
+## [2025-11-24] - Driver snapshots & manifest links
+
+### Added
+- Driver now snapshots recipe, resolved plan, registry subset, optional settings/pricing, and instrumentation config into `snapshots/` per run, recording relative paths in `output/run_manifest.jsonl`.
+- Integration tests cover snapshot creation, settings relpaths for out-of-repo runs, and pricing/instrumentation snapshot capture.
+- README now documents snapshot bundle contents for reproducibility.
+
+### Changed
+- Snapshot/manifest side effects are skipped on `--dump-plan`; run directory creation deferred until execution.
+
+### Tested
+- `python -m pytest` (all suites; 34 passed, pre-existing pydantic warning).

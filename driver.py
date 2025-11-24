@@ -5,6 +5,7 @@ import re
 import subprocess
 import sys
 import time
+import shutil
 from datetime import datetime
 from typing import Any, Dict, List, Optional, Set, Tuple
 
@@ -110,6 +111,77 @@ def _render_instrumentation_md(run_data: Dict[str, Any], path: str):
     with open(path, "w", encoding="utf-8") as f:
         f.write("\n".join(lines))
 
+
+def _subset_registry_for_plan(plan: Dict[str, Any], registry: Dict[str, Any]) -> Dict[str, Any]:
+    used = {node["module"] for node in plan.get("nodes", {}).values()}
+    return {mid: registry.get(mid) for mid in sorted(used) if mid in registry}
+
+
+def snapshot_run_config(run_dir: str, recipe: Dict[str, Any], plan: Dict[str, Any], registry: Dict[str, Any],
+                        registry_source: Optional[str] = None, settings_path: Optional[str] = None,
+                        pricing_path: Optional[str] = None, instrumentation_conf: Optional[Dict[str, Any]] = None) -> Dict[str, str]:
+    """
+    Persist the runnable configuration for reproducibility:
+    - recipe (as loaded by driver)
+    - resolved plan (nodes + topo)
+    - registry subset for modules used in the plan
+    - optional settings file (if provided and exists)
+    - optional pricing table used for instrumentation
+    - optional instrumentation config blob
+    Returns mapping of snapshot name -> absolute path.
+    """
+    snap_dir = os.path.join(run_dir, "snapshots")
+    ensure_dir(snap_dir)
+
+    recipe_path = os.path.join(snap_dir, "recipe.yaml")
+    with open(recipe_path, "w", encoding="utf-8") as f:
+        yaml.safe_dump(recipe, f, sort_keys=False)
+
+    plan_path = os.path.join(snap_dir, "plan.json")
+    save_json(plan_path, plan)
+
+    registry_payload = {
+        "source": registry_source,
+        "modules": _subset_registry_for_plan(plan, registry),
+    }
+    registry_path = os.path.join(snap_dir, "registry.json")
+    save_json(registry_path, registry_payload)
+
+    settings_snapshot = None
+    if settings_path:
+        if os.path.exists(settings_path):
+            ext = os.path.splitext(settings_path)[1] or ".yaml"
+            settings_snapshot = os.path.join(snap_dir, f"settings{ext}")
+            shutil.copyfile(settings_path, settings_snapshot)
+        else:
+            print(f"[warn] settings path not found for snapshot: {settings_path}")
+
+    pricing_snapshot = None
+    if pricing_path:
+        if os.path.exists(pricing_path):
+            ext = os.path.splitext(pricing_path)[1] or ".yaml"
+            pricing_snapshot = os.path.join(snap_dir, f"pricing{ext}")
+            shutil.copyfile(pricing_path, pricing_snapshot)
+        else:
+            print(f"[warn] pricing table not found for snapshot: {pricing_path}")
+
+    instrumentation_snapshot = None
+    if instrumentation_conf:
+        instrumentation_snapshot = os.path.join(snap_dir, "instrumentation.json")
+        save_json(instrumentation_snapshot, instrumentation_conf)
+
+    snapshots = {
+        "recipe": recipe_path,
+        "plan": plan_path,
+        "registry": registry_path,
+    }
+    if settings_snapshot:
+        snapshots["settings"] = settings_snapshot
+    if pricing_snapshot:
+        snapshots["pricing"] = pricing_snapshot
+    if instrumentation_snapshot:
+        snapshots["instrumentation"] = instrumentation_snapshot
+    return snapshots
 
 def _normalize_param_schema(schema: Any) -> Tuple[Dict[str, Dict[str, Any]], Set[str]]:
     """
@@ -581,7 +653,8 @@ def mock_consensus(run_dir: str, outputs: Dict[str, str], module_id: str, run_id
     return out_path
 
 
-def register_run(run_id: str, run_dir: str, recipe: Dict[str, Any], instrumentation: Optional[Dict[str, str]] = None):
+def register_run(run_id: str, run_dir: str, recipe: Dict[str, Any], instrumentation: Optional[Dict[str, str]] = None,
+                 snapshots: Optional[Dict[str, str]] = None):
     if not run_id:
         return
     manifest_path = os.path.join("output", "run_manifest.jsonl")
@@ -596,6 +669,14 @@ def register_run(run_id: str, run_dir: str, recipe: Dict[str, Any], instrumentat
             existing = set()
     if run_id in existing:
         return
+    def _rel(path: Optional[str]) -> Optional[str]:
+        if not path:
+            return None
+        try:
+            return os.path.relpath(path)
+        except Exception:
+            return path
+
     entry = {
         "run_id": run_id,
         "path": run_dir,
@@ -604,7 +685,9 @@ def register_run(run_id: str, run_dir: str, recipe: Dict[str, Any], instrumentat
         "input": recipe.get("input", {}),
     }
     if instrumentation:
-        entry["instrumentation"] = instrumentation
+        entry["instrumentation"] = {k: _rel(v) for k, v in instrumentation.items()}
+    if snapshots:
+        entry["snapshots"] = {k: _rel(v) for k, v in snapshots.items()}
     append_jsonl(manifest_path, entry)
 
 
@@ -620,6 +703,7 @@ def main():
     parser.add_argument("--dump-plan", action="store_true", help="Print resolved DAG plan and exit")
     parser.add_argument("--instrument", action="store_true", help="Enable instrumentation (timing/cost)")
     parser.add_argument("--price-table", help="Path to model pricing YAML (prompt_per_1k/completion_per_1k)")
+    parser.add_argument("--settings", help="Optional settings YAML to snapshot for reproducibility")
     args = parser.parse_args()
 
     registry = load_registry(args.registry)["modules"]
@@ -635,23 +719,37 @@ def main():
 
     run_id = recipe.get("run_id")
     run_dir = recipe.get("output_dir", os.path.join("output", "runs", run_id))
-    ensure_dir(run_dir)
     instrumentation_paths = None
     instr_json_path = os.path.join(run_dir, "instrumentation.json")
     instr_md_path = os.path.join(run_dir, "instrumentation.md")
     if instrument_enabled:
         instrumentation_paths = {"json": instr_json_path, "md": instr_md_path}
-    register_run(run_id, run_dir, recipe, instrumentation=instrumentation_paths)
 
+    plan = build_plan(recipe, registry)
+    validate_plan_schemas(plan)
+
+    if args.dump_plan:
+        print(json.dumps({"topo": plan["topo"], "nodes": plan["nodes"]}, indent=2))
+        return
+
+    ensure_dir(run_dir)
     state_path = os.path.join(run_dir, "pipeline_state.json")
     progress_path = os.path.join(run_dir, "pipeline_events.jsonl")
     logger = ProgressLogger(state_path=state_path, progress_path=progress_path, run_id=run_id)
 
-    plan = build_plan(recipe, registry)
-    validate_plan_schemas(plan)
-    if args.dump_plan:
-        print(json.dumps({"topo": plan["topo"], "nodes": plan["nodes"]}, indent=2))
-        return
+    settings_path = args.settings or recipe.get("settings") or recipe.get("settings_path")
+    snapshots = snapshot_run_config(
+        run_dir,
+        recipe,
+        plan,
+        registry,
+        registry_source=args.registry,
+        settings_path=settings_path,
+        pricing_path=price_table_path,
+        instrumentation_conf=instr_conf if instrument_enabled or instr_conf else None,
+    )
+
+    register_run(run_id, run_dir, recipe, instrumentation=instrumentation_paths, snapshots=snapshots)
 
     run_started_at = datetime.utcnow().isoformat() + "Z"
     run_wall_start = time.perf_counter()
@@ -808,7 +906,7 @@ def main():
         # Input resolution
         artifact_inputs: Dict[str, str] = {}
         needs = node.get("needs", [])
-    if stage in {"clean", "portionize", "consensus", "dedupe", "normalize", "resolve", "build", "enrich", "adapter", "export", "app"}:
+        if stage in {"clean", "portionize", "consensus", "dedupe", "normalize", "resolve", "build", "enrich", "adapter", "export", "app"}:
             # adapters fall-through below
             if stage == "build":
                 inputs_map = node.get("inputs", {}) or {}
