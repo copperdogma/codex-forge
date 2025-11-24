@@ -45,6 +45,7 @@ This index tracks stories in `/docs/stories/` for the codex-forge pipeline.
 | 021 | Dashboard UI polish (highlighting & pane) | Medium | To Do | /docs/stories/story-021-dashboard-ui-polish.md |
 | 022 | Pipeline instrumentation (timing & cost) | High | Done | /docs/stories/story-022-instrumentation.md |
 | 023 | Consolidate section target adapters | Medium | Done | /docs/stories/story-023-section-target-guard.md |
+| 024 | Image cropper follow-up | Medium | To Do | /docs/stories/story-024-image-cropper-followup.md |
 | 099 | Remove dev-only backcompat disclaimer | Low | To Do | /docs/stories/story-099-remove-dev-backcompat-note.md |
 
 ## Notes

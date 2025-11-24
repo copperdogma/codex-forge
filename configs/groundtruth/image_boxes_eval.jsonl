@@ -1,0 +1,12 @@
+{"page": 1, "image": "img-000.jpg", "width": 1350, "height": 1069, "boxes": [{"x0": 0, "y0": 0, "x1": 1350, "y1": 1069, "section_id": null}]}
+{"page": 3, "image": "img-008.jpg", "width": 1277, "height": 1080, "boxes": [{"x0": 783, "y0": 166, "x1": 1160, "y1": 547, "section_id": null}, {"x0": 724, "y0": 568, "x1": 1223, "y1": 809, "section_id": null}]}
+{"page": 11, "image": "img-023.jpg", "width": 642, "height": 539, "boxes": [{"x0": 0, "y0": 0, "x1": 642, "y1": 539, "section_id": null}]}
+{"page": 14, "image": "img-034.jpg", "width": 1274, "height": 1068, "boxes": [{"x0": 88, "y0": 82, "x1": 592, "y1": 890, "section_id": null}]}
+{"page": 17, "image": "img-038.jpg", "width": 1278, "height": 1064, "boxes": [{"x0": 118, "y0": 562, "x1": 568, "y1": 769, "section_id": null}]}
+{"page": 18, "image": "img-040.jpg", "width": 1280, "height": 1074, "boxes": [{"x0": 85, "y0": 380, "x1": 611, "y1": 572, "section_id": null}, {"x0": 820, "y0": 380, "x1": 1090, "y1": 530, "section_id": null}]}
+{"page": 63, "image": "img-208.jpg", "width": 1276, "height": 1071, "boxes": [{"x0": 98, "y0": 96, "x1": 594, "y1": 892, "section_id": null}, {"x0": 800, "y0": 600, "x1": 1065, "y1": 740, "section_id": null}]}
+{"page": 88, "image": "img-270.jpg", "width": 637, "height": 537, "boxes": [{"x0": 45, "y0": 49, "x1": 290, "y1": 416, "section_id": null}]}
+{"page": 91, "image": "img-277.jpg", "width": 637, "height": 537, "boxes": [{"x0": 20, "y0": 40, "x1": 320, "y1": 446, "section_id": null}, {"x0": 396, "y0": 179, "x1": 536, "y1": 322, "section_id": null}]}
+{"page": 98, "image": "img-293.jpg", "width": 637, "height": 537, "boxes": [{"x0": 40, "y0": 48, "x1": 298, "y1": 452, "section_id": null}, {"x0": 380, "y0": 240, "x1": 561, "y1": 451, "section_id": null}]}
+{"page": 105, "image": "img-310.jpg", "width": 637, "height": 537, "boxes": [{"x0": 32, "y0": 264, "x1": 296, "y1": 360, "section_id": null}, {"x0": 356, "y0": 43, "x1": 581, "y1": 144, "section_id": null}]}
+{"page": 110, "image": "img-324.jpg", "width": 637, "height": 537, "boxes": [{"x0": 89, "y0": 157, "x1": 230, "y1": 300, "section_id": null}, {"x0": 344, "y0": 385, "x1": 605, "y1": 476, "section_id": null}]}

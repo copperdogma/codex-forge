@@ -22,6 +22,7 @@ from modules.common.utils import save_jsonl
 
 DEFAULT_OUTPUTS = {
     "extract": "pages_raw.jsonl",
+    "image_crop": "image_crops.jsonl",
     "clean": "pages_clean.jsonl",
     "portionize": "window_hypotheses.jsonl",
     "adapter": "adapter_out.jsonl",
@@ -807,7 +808,7 @@ def main():
         # Input resolution
         artifact_inputs: Dict[str, str] = {}
         needs = node.get("needs", [])
-        if stage in {"clean", "portionize", "consensus", "dedupe", "normalize", "resolve", "build", "enrich", "adapter", "export", "app"}:
+    if stage in {"clean", "portionize", "consensus", "dedupe", "normalize", "resolve", "build", "enrich", "adapter", "export", "app"}:
             # adapters fall-through below
             if stage == "build":
                 inputs_map = node.get("inputs", {}) or {}
@@ -885,12 +886,13 @@ def main():
                     if expected_schema and producer_schema and expected_schema != producer_schema:
                         raise SystemExit(f"Schema mismatch: {stage_id} expects {expected_schema} got {producer_schema} from {dep}")
             else:
-                origin = needs[0] if needs else None
+                inputs_map = node.get("inputs", {}) or {}
+                origin = inputs_map.get("pages") or (needs[0] if needs else None)
                 if not origin:
                     raise SystemExit(f"Stage {stage_id} missing upstream input")
                 key = "pages" if stage in {"clean", "portionize"} else "input"
-                artifact_inputs[key] = artifact_index[origin]["path"]
-                producer_schema = artifact_index[origin].get("schema")
+                artifact_inputs[key] = artifact_index[origin]["path"] if origin in artifact_index else origin
+                producer_schema = artifact_index[origin].get("schema") if origin in artifact_index else None
                 expected_schema = node.get("input_schema")
                 if expected_schema and producer_schema and expected_schema != producer_schema:
                     raise SystemExit(f"Schema mismatch: {stage_id} expects {expected_schema} got {producer_schema} from {origin}")

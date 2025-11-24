@@ -160,3 +160,13 @@
 - DAG recipes now use the new coarse/merge modules; uncovered threshold tightened to 0.5 to reduce noise.
 - Schemas plus consensus/resolve/build stages now preserve `continuation_of`/`continuation_confidence` through final artifacts.
 - README and story notes updated with merge rules, smoke recipe, and regression command.
+## [2025-11-24] - Image cropper baseline & GT
+
+### Added
+- `image_crop_v1` schema and validation mapping; contour-based cropper module `modules/extract/image_crop_cv_v1` with tuned defaults (min_area_ratio=0.005, max_area_ratio=0.99, blur=3, topk=5).
+- Sample recipe `configs/recipes/recipe-image-crop.yaml`; helper scripts `scripts/annotate_gt.py` (GT/overlays) and `scripts/build_ft_vision_boxes.py` (vision FT data prep).
+- 12-page GT set with overlays in `configs/groundtruth/` and `output/overlays-ft/`; follow-up story doc `story-024-image-cropper-followup.md`.
+- Manual validation script `scripts/tests/test_image_crop_cv.sh` and README section documenting how to run/validate the cropper.
+
+### Changed
+- Tuned CV detector parameters and documented manual validation results (Micro P=0.75 / R=0.95 / F1=0.84 on current GT); story-008 marked Done.

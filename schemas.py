@@ -74,6 +74,26 @@ class PageDoc(BaseModel):
     source_path: Optional[str] = None
 
 
+class BoundingBox(BaseModel):
+    x0: int
+    y0: int
+    x1: int
+    y1: int
+    section_id: Optional[str] = None
+
+
+class ImageCrop(BaseModel):
+    schema_version: str = "image_crop_v1"
+    module_id: Optional[str] = None
+    run_id: Optional[str] = None
+    source: Optional[List[str]] = None
+    created_at: Optional[str] = None
+    page: int
+    image: str
+    boxes: List[BoundingBox]
+    crops: List[str]
+
+
 class CleanPage(BaseModel):
     schema_version: str = "clean_page_v1"
     module_id: Optional[str] = None
