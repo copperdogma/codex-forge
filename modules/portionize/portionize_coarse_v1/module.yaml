@@ -1,0 +1,32 @@
+module_id: portionize_coarse_v1
+stage: portionize
+entrypoint: modules/portionize/portionize_coarse_v1/main.py
+input_schema: clean_page_v1
+output_schema: portion_hyp_v1
+default_params:
+  window: 16
+  stride: 6
+  model: gpt-4.1-mini
+  boost_model: gpt-5
+param_schema:
+  properties:
+    window:
+      type: integer
+      minimum: 2
+    stride:
+      type: integer
+      minimum: 1
+    pstart:
+      type: integer
+      minimum: 1
+    pend:
+      type: integer
+      minimum: 1
+    model:
+      type: string
+    boost_model:
+      type: string
+    prior:
+      type: string
+  required: [window, stride, model]
+notes: Coarse large-window portionizer tuned for long spans/chapters; emits portion_hyp_v1.

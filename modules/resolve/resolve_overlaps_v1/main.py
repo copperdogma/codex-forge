@@ -61,7 +61,9 @@ def resolve(portions: List[Dict], forced_range=None) -> List[Dict]:
                             **best,
                             "page_start": page,
                             "page_end": page,
-                            "portion_id": best.get("portion_id", f"FILL_{page}")
+                            "portion_id": best.get("portion_id", f"FILL_{page}"),
+                            "continuation_of": best.get("continuation_of"),
+                            "continuation_confidence": best.get("continuation_confidence"),
                         })
                         occupied.add(page)
                     else:
@@ -74,6 +76,8 @@ def resolve(portions: List[Dict], forced_range=None) -> List[Dict]:
                             "confidence": 0.0,
                             "source_images": [],
                             "orig_portion_id": None,
+                            "continuation_of": None,
+                            "continuation_confidence": None,
                         })
                         occupied.add(page)
 

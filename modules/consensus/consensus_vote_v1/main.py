@@ -21,6 +21,8 @@ def vote_portions(hypotheses: List[Dict], min_conf: float = 0.6, forced_range=No
     for key, items in span_votes.items():
         votes = len(items)
         best_conf = max(i.get("confidence", 0) for i in items)
+        # pick representative with highest confidence for metadata propagation
+        rep = max(items, key=lambda i: i.get("confidence", 0))
         candidates.append((votes, best_conf, key, items))
     candidates.sort(key=lambda x: (-x[0], -x[1], x[2][1]-x[2][0]))
 
@@ -32,6 +34,7 @@ def vote_portions(hypotheses: List[Dict], min_conf: float = 0.6, forced_range=No
         span_pages = set(range(ps, pe+1))
         if occupied & span_pages:
             continue
+        rep = max(items, key=lambda i: i.get("confidence", 0))
         locked.append(LockedPortion(
             portion_id=items[0].get("portion_id") or f"P{next_portion_idx:03d}",
             page_start=ps,
@@ -39,7 +42,9 @@ def vote_portions(hypotheses: List[Dict], min_conf: float = 0.6, forced_range=No
             title=title,
             type=typ,
             confidence=conf,
-            source_images=[]
+            source_images=[],
+            continuation_of=rep.get("continuation_of"),
+            continuation_confidence=rep.get("continuation_confidence")
         ).dict())
         occupied |= span_pages
         next_portion_idx += 1
@@ -81,7 +86,9 @@ def vote_portions(hypotheses: List[Dict], min_conf: float = 0.6, forced_range=No
                         title=best.get("title"),
                         type=best.get("type"),
                         confidence=best.get("confidence", 0.0),
-                        source_images=[]
+                        source_images=[],
+                        continuation_of=best.get("continuation_of"),
+                        continuation_confidence=best.get("continuation_confidence")
                     ).dict())
                     occupied |= set(range(ps, pe+1))
                     next_portion_idx += 1

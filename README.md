@@ -45,6 +45,15 @@ python driver.py --recipe configs/recipes/recipe-ocr-dag.yaml --dry-run
 
 # Text ingest DAG with mock LLM stages (fast, no API calls)
 python driver.py --recipe configs/recipes/recipe-text-dag.yaml --mock --skip-done
+
+# Quick smoke: coarse+fine+continuation on first 10 pages (manual)
+python driver.py --recipe configs/recipes/recipe-ocr-coarse-fine-smoke.yaml --force
+
+# Continuation regression check (after a run)
+python scripts/regression/check_continuation_propagation.py \
+  --hypotheses output/runs/deathtrap-ocr-dag/adapter_out.jsonl \
+  --locked output/runs/deathtrap-ocr-dag/portions_locked_merged.jsonl \
+  --resolved output/runs/deathtrap-ocr-dag/portions_resolved.jsonl
 ```
 Key points:
 - Stages have ids and `needs`; driver topo-sorts and validates schemas.

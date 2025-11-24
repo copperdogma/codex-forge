@@ -25,11 +25,9 @@ stages:
 
   - id: portionize_coarse
     stage: portionize
-    module: portionize_sliding_v1
+    module: portionize_coarse_v1
     needs: [clean_pages]
     params:
-      window: 10
-      stride: 3
       model: gpt-4.1-mini
       boost_model: gpt-5
 
@@ -45,10 +43,10 @@ stages:
 
   - id: hyp_merge
     stage: adapter
-    module: merge_portion_hyp_v1
+    module: merge_coarse_fine_v1
     needs: [portionize_coarse, portionize_fine]
     params:
-      dedupe_field: portion_id
+      uncovered_threshold: 0.4
 
   - id: consensus_merge
     stage: consensus

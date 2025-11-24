@@ -8,8 +8,8 @@
 - DONE: 006 Enrichment pass (choices/combat/items/endings) — core value for gamebooks; builds on 018 modules.
 - DONE: 007 Turn-to validator — sanity for CYOA cross-refs once enriched data exists.
 - DONE: 022 Pipeline instrumentation (timing & cost) — measure LLM/local time and API spend; add estimates.
-- 023 Consolidate section target adapters — simplify map/backfill into one guard.
-- 010 Coarse+fine portionizer & continuation merge — improves coverage quality for long spans.
+- DONE: 023 Consolidate section target adapters — simplify map/backfill into one guard.
+- DONE: 010 Coarse+fine portionizer & continuation merge — improves coverage quality for long spans.
 - 008 Image cropper/mapper — map images to portions; leverage source_images.
 - 012 Automation wrapper (driver snapshots) — run configs + snapshot for reproducibility.
 - 013 Cost/perf benchmarking — tune presets after instrumentation lands.
@@ -31,7 +31,7 @@ This index tracks stories in `/docs/stories/` for the codex-forge pipeline.
 | 007 | Turn-to validator (CYOA cross-refs) | Medium | Done | /docs/stories/story-007-turn-validator.md |
 | 008 | Image cropper/mapper | Medium | To Do | /docs/stories/story-008-image-cropper.md |
 | 009 | Layout-preserving extractor | Medium | To Do | /docs/stories/story-009-layout-preserve.md |
-| 010 | Coarse+fine portionizer & continuation merge | Medium | To Do | /docs/stories/story-010-coarse-fine-merge.md |
+| 010 | Coarse+fine portionizer & continuation merge | Medium | Done | /docs/stories/story-010-coarse-fine-merge.md |
 | 011 | AI planner to assemble pipelines | Medium | To Do | /docs/stories/story-011-ai-planner.md |
 | 012 | Automation wrapper (single driver + config snapshots) | Medium | To Do | /docs/stories/story-012-driver-automation.md |
 | 013 | Cost/perf benchmarking and presets | Low | To Do | /docs/stories/story-013-cost-perf.md |
@@ -44,7 +44,7 @@ This index tracks stories in `/docs/stories/` for the codex-forge pipeline.
 | 020 | Module encapsulation & shared common | Medium | To Do | /docs/stories/story-020-module-encapsulation.md |
 | 021 | Dashboard UI polish (highlighting & pane) | Medium | To Do | /docs/stories/story-021-dashboard-ui-polish.md |
 | 022 | Pipeline instrumentation (timing & cost) | High | Done | /docs/stories/story-022-instrumentation.md |
-| 023 | Consolidate section target adapters | Medium | To Do | /docs/stories/story-023-section-target-guard.md |
+| 023 | Consolidate section target adapters | Medium | Done | /docs/stories/story-023-section-target-guard.md |
 | 099 | Remove dev-only backcompat disclaimer | Low | To Do | /docs/stories/story-099-remove-dev-backcompat-note.md |
 
 ## Notes

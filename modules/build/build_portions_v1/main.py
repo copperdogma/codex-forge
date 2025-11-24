@@ -49,6 +49,8 @@ def main():
             "type": p.get("type"),
             "confidence": p.get("confidence", 0),
             "orig_portion_id": p.get("orig_portion_id"),
+            "continuation_of": p.get("continuation_of"),
+            "continuation_confidence": p.get("continuation_confidence"),
             "source_images": images,
             "raw_text": "\n\n".join(texts),
         }

@@ -1,8 +1,7 @@
-run_id: deathtrap-ocr-dag
+run_id: deathtrap-ocr-coarse-fine-smoke
 input:
   pdf: input/06 deathtrap dungeon.pdf
-output_dir: output/runs/deathtrap-ocr-dag
-# Optional per-stage output overrides (defaults come from driver module map)
+output_dir: output/runs/deathtrap-ocr-coarse-fine-smoke
 outputs:
   portionize_coarse: window_hypotheses_coarse.jsonl
   portionize_fine: window_hypotheses_fine.jsonl
@@ -17,7 +16,7 @@ stages:
       psm: 4
       oem: 3
       lang: eng
-      end: 20
+      end: 10  # quick smoke subset
 
   - id: clean_pages
     stage: clean
@@ -35,6 +34,8 @@ stages:
     params:
       model: gpt-4.1-mini
       boost_model: gpt-5
+      window: 12
+      stride: 4
 
   - id: portionize_fine
     stage: portionize
@@ -51,7 +52,7 @@ stages:
     module: merge_coarse_fine_v1
     needs: [portionize_coarse, portionize_fine]
     params:
-      uncovered_threshold: 0.4
+      uncovered_threshold: 0.5
 
   - id: consensus_merge
     stage: consensus

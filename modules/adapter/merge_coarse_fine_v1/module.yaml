@@ -1,0 +1,25 @@
+module_id: merge_coarse_fine_v1
+stage: adapter
+entrypoint: modules/adapter/merge_coarse_fine_v1/main.py
+input_schema: portion_hyp_v1
+output_schema: portion_hyp_v1
+default_params:
+  uncovered_threshold: 0.4
+  continuation_gap: 1
+  title_sim_threshold: 0.55
+param_schema:
+  properties:
+    inputs:
+      type: array
+    uncovered_threshold:
+      type: number
+      minimum: 0.0
+      maximum: 1.0
+    continuation_gap:
+      type: integer
+      minimum: 0
+    title_sim_threshold:
+      type: number
+      minimum: 0.0
+      maximum: 1.0
+notes: Merge coarse and fine portion hypotheses; prefer fine coverage, backfill with coarse; add continuation links.

@@ -147,3 +147,16 @@
 ### Tested
 - `python -m pytest -q tests/test_instrumentation_schema.py`
 - `python driver.py --recipe configs/recipes/recipe-text.yaml --instrument --mock --force`
+
+## [2025-11-24] - Coarse+fine merge, continuation propagation, and smoke/regression
+
+### Added
+- Coarse portionizer module `portionize_coarse_v1` and merge adapter `merge_coarse_fine_v1` with continuation-aware heuristics and duplicate-span collapse.
+- Smoke recipe `configs/recipes/recipe-ocr-coarse-fine-smoke.yaml` for 10-page coarse+fine validation.
+- Regression helper `scripts/regression/check_continuation_propagation.py` to ensure continuation metadata survives to locked/resolved outputs.
+- Unit tests for merge heuristics `tests/test_merge_coarse_fine_v1.py`.
+
+### Changed
+- DAG recipes now use the new coarse/merge modules; uncovered threshold tightened to 0.5 to reduce noise.
+- Schemas plus consensus/resolve/build stages now preserve `continuation_of`/`continuation_confidence` through final artifacts.
+- README and story notes updated with merge rules, smoke recipe, and regression command.

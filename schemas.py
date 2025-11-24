@@ -119,6 +119,8 @@ class LockedPortion(BaseModel):
     type: Optional[str] = None
     confidence: float
     source_images: List[str] = Field(default_factory=list)
+    continuation_of: Optional[str] = None
+    continuation_confidence: Optional[float] = None
 
 
 class ResolvedPortion(BaseModel):
@@ -135,6 +137,8 @@ class ResolvedPortion(BaseModel):
     confidence: float = 0.0
     source_images: List[str] = Field(default_factory=list)
     orig_portion_id: Optional[str] = None
+    continuation_of: Optional[str] = None
+    continuation_confidence: Optional[float] = None
 
 
 class EnrichedPortion(BaseModel):
@@ -152,6 +156,8 @@ class EnrichedPortion(BaseModel):
     confidence: float = 0.0
     source_images: List[str] = Field(default_factory=list)
     raw_text: Optional[str] = None
+    continuation_of: Optional[str] = None
+    continuation_confidence: Optional[float] = None
     choices: List[Choice] = Field(default_factory=list)
     combat: Optional[Combat] = None
     test_luck: Optional[bool] = None
