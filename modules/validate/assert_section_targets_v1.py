@@ -4,11 +4,7 @@ import os
 import sys
 from typing import Set
 
-ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", ".."))
-if ROOT not in sys.path:
-    sys.path.insert(0, ROOT)
-
-from modules.common.utils import read_jsonl, ensure_dir  # noqa: E402
+from modules.common.utils import read_jsonl, ensure_dir
 
 
 def collect_ids_and_targets(paths: list[str]) -> tuple[Set[str], Set[str]]:

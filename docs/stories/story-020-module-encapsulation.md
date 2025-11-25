@@ -1,6 +1,6 @@
 # Story: Module encapsulation & shared common
 
-**Status**: To Do
+**Status**: Done
 
 ---
 
@@ -16,6 +16,9 @@
 - [x] Adjust driver/recipes if needed for new package layout; ensure stamping/validation unaffected.
 - [x] Update AGENTS/README to reflect common package usage.
 - [x] Run existing smokes (text mock CI, local text/OCR samples) to verify no regressions (text mock and OCR mock runs completed; full OCR LLM run still optional).
+- [x] (Optional) Run full OCR LLM clean with extended timeout to validate non-mock path.
+- [x] Remove remaining sys.path bootstraps/root inserts in module mains (export: merge_enriched_appdata, merge_sections; validate: report_missing_targets, report_targets, validate_app_data_v1; enrich: section_enrich_v1/main.py; adapter: remap_enriched_ids_v1, section_target_guard_v1/main.py, backfill_missing_sections_v1, map_targets_v1/main.py; portionize: portionize_sections_v1/main.py, portionize_numbered_v1/main.py) by relying on package imports (`modules.common.*`) and `python -m` execution.
+- [x] Re-run text + OCR mock smokes after cleanup; optionally schedule full OCR LLM run if needed for acceptance.
 
 ## Notes
 - Keep backward compatibility with current artifacts; focus on imports/packaging only.
@@ -53,3 +56,59 @@
 - **Result:** Success; ran `python driver.py --recipe configs/recipes/recipe-ocr.yaml --mock --force` to validate end-to-end flow with new packaging/imports. All stages ran, artifacts stamped: 113 pages -> final portions under `output/runs/deathtrap-ocr-full/`.
 - **Notes:** Mock run confirms driver/module import wiring without sys.path hacks. Full LLM clean remains optional (cost/time).
 - **Next:** If desired, schedule full LLM clean with longer timeout; otherwise story can proceed to review.
+
+### 20251124-1144 — Checklist audit and status update
+- **Result:** Success; verified story tasks/acceptance alignment and added explicit optional task for full OCR LLM clean. Status set to In Review to reflect completed mocks and import cleanup.
+- **Notes:** No additional execution today; pending optional full LLM clean if needed.
+- **Next:** Decide whether to run full OCR LLM clean with higher timeout or close story as-is.
+
+### 20251124-1205 — Code audit vs story acceptance
+- **Result:** Partial; sys.path bootstraps still present in several module mains (export: merge_enriched_appdata, merge_sections; validate: report_missing_targets, report_targets, validate_app_data_v1; enrich: section_enrich_v1/main.py; adapter: remap_enriched_ids_v1, section_target_guard_v1/main.py, backfill_missing_sections_v1, map_targets_v1/main.py; portionize: portionize_sections_v1/main.py, portionize_numbered_v1/main.py), so acceptance criterion “no sys.path bootstraps in module mains” not yet met.
+- **Notes:** modules/common still present and used; driver/package execution intact. No smokes run today; only static audit (rg for sys.path).
+- **Next:** Remove bootstraps by converting those modules to package-safe imports, then rerun text + OCR mock smokes; decide on full OCR LLM run after cleanup.
+
+### 20251124-1220 — Removed remaining sys.path bootstraps
+- **Result:** Success; removed ROOT/sys.path inserts from export/validate/enrich/adapter/portionize modules (merge_enriched_appdata, merge_sections, report_missing_targets, report_targets, validate_app_data_v1, assert_section_targets_v1, section_enrich_v1, remap_enriched_ids_v1, section_target_guard_v1/main.py, backfill_missing_sections_v1, map_targets_v1/main.py, portionize_sections_v1/main.py, portionize_numbered_v1/main.py). Imports now rely on package layout (`modules.common.*`).
+- **Notes:** `rg "sys.path" modules` now returns no results.
+- **Next:** Rerun smokes to confirm runtime behavior without bootstraps.
+
+### 20251124-1223 — Text mock smoke after cleanup
+- **Result:** Success; `python driver.py --recipe configs/recipes/recipe-text.yaml --mock --force` passed, artifacts stamped in `output/runs/deathtrap-text-ingest/`.
+- **Notes:** Confirms package execution for text path post-cleanup.
+- **Next:** Run OCR mock smoke to validate larger flow.
+
+### 20251124-1254 — OCR mock smoke after cleanup
+- **Result:** Success; `python driver.py --recipe configs/recipes/recipe-ocr.yaml --mock --force` completed end-to-end (113 pages) with artifacts under `output/runs/deathtrap-ocr-full/`.
+- **Notes:** Validates import/runtime without sys.path hacks across OCR pipeline. Full LLM OCR run remains optional for acceptance.
+- **Next:** Decide whether to run full OCR LLM clean with extended timeout; otherwise story ready for review.
+
+### 20251124-1312 — Minor tidy: removed unused imports
+- **Result:** Success; dropped unused `os` imports from portionize section/numbered mains.
+- **Notes:** No behavior change; preserves package import pattern.
+- **Next:** Optional full OCR LLM run still open; otherwise handoff for review.
+
+### 20251124-1402 — Full OCR LLM run attempt (timed out)
+- **Result:** Failure (timeout); started `python driver.py --recipe configs/recipes/recipe-ocr.yaml --force` without `--mock` and let it run for 30 minutes. Cleaning stage completed (113/113 pages). Window generation progressed to ~32% before global timeout (exit 124) halted run; downstream stages not reached.
+- **Notes:** Progress logs show ~15–20s per window; estimated total runtime > 45 minutes. Partial artifacts exist under `output/runs/deathtrap-ocr-full/` from this attempt (pages_clean etc.), but final outputs incomplete.
+- **Next:** If full non-mock validation is required, rerun with higher timeout (45–60 min) or split recipe to resume windows/LLM stages; consider using smaller page subset to bound time/cost.
+
+### 20251124-1540 — Full OCR LLM completed via staged run
+- **Result:** Success; resumed non-mock OCR by running stages manually on existing cleaned pages. Steps:
+  - portionize_sliding_v1 over cleaned pages → `output/runs/deathtrap-ocr-full-llm/window_hypotheses.jsonl` (113 windows, ~35 min, gpt-4.1-mini).
+  - consensus_vote_v1 → `portions_locked.jsonl` (99 spans).
+  - dedupe_ids_v1 → `portions_locked_dedup.jsonl` (99).
+  - normalize_ids_v1 → `portions_locked_normalized.jsonl` (99).
+  - resolve_overlaps_v1 → `portions_resolved.jsonl` (386 portions).
+  - build_portions_v1 → `portions_final_raw.json` (386 portions).
+- **Notes:** Outputs live under `output/runs/deathtrap-ocr-full-llm/`; pages source reused from previous clean stage (`deathtrap-ocr-full`). Pipeline_state in original run remains with partial portionize; new run dir is clean for final artifacts.
+- **Next:** Ready for review; optional re-run not needed unless different models/settings desired.
+
+### 20251124-1615 — Driver resume flags + runtime note
+- **Result:** Success; added `--start-from`/`--end-at` support to `driver.py` (preloads artifacts from pipeline_state, skips upstream stages, allows bounded reruns) and documented usage in README with OCR runtime expectations (~35–40 min for portionize on 113p).
+- **Notes:** Helps avoid manual staging for long non-mock runs; resume example added.
+- **Next:** Story ready for final review; no further action pending.
+
+### 20251124-1750 — Dashboard elapsed UX + full run resume
+- **Result:** Success; pipeline-visibility UI now shows elapsed time per stage (live for running, final for done) using event timestamps; stages without start events display “<1s” instead of 0.00s. Resumed `deathtrap-ocr-full` via `python driver.py --recipe configs/recipes/recipe-ocr.yaml --skip-done --start-from portionize_fine --force`, completing portionize→build; pipeline_state now shows all stages done. Final artifacts: `output/runs/deathtrap-ocr-full/portions_final_raw.json` (105 portions).
+- **Notes:** Elapsed uses `pipeline_events.jsonl`; fallback to stage updated_at if no events. Resume run took ~36 minutes for portionize.
+- **Next:** Ready for review; monitor dashboard to confirm elapsed now reflects completed stages.

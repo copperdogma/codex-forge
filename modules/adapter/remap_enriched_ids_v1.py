@@ -1,14 +1,8 @@
 import argparse
-import os
-import sys
 import re
 from typing import Dict, Any, List, Set
 
-ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", ".."))
-if ROOT not in sys.path:
-    sys.path.insert(0, ROOT)
-
-from modules.common.utils import read_jsonl, save_jsonl  # noqa: E402
+from modules.common.utils import read_jsonl, save_jsonl
 
 
 def detect_id(raw_text: str) -> str:

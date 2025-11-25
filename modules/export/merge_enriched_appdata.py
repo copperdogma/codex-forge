@@ -1,16 +1,10 @@
 import argparse
 import json
-import os
-import sys
 from pathlib import Path
 from typing import Dict, Any, List, Set
 
-ROOT = Path(__file__).resolve().parents[2]
-if str(ROOT) not in sys.path:
-    sys.path.insert(0, str(ROOT))
-
-from modules.common.utils import read_jsonl, ensure_dir  # noqa: E402
-from modules.build.build_appdata_v1.main import convert_row  # noqa: E402
+from modules.common.utils import read_jsonl, ensure_dir
+from modules.build.build_appdata_v1.main import convert_row
 
 
 def load_enriched(paths: List[str], rekey_by_page: bool = False, dedupe: bool = False) -> List[Dict[str, Any]]:

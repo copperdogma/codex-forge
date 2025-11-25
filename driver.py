@@ -56,6 +56,26 @@ def _load_pricing(path: str) -> Dict[str, Any]:
     return {"models": models, "default": default, "currency": currency, "source": path}
 
 
+def _preload_artifacts_from_state(state_path: str) -> Dict[str, Dict[str, str]]:
+    """
+    Load artifacts from an existing pipeline_state so upstream stages can be skipped
+    via --start-from/--end-at while still resolving inputs.
+    """
+    if not os.path.exists(state_path):
+        return {}
+    try:
+        with open(state_path, "r", encoding="utf-8") as f:
+            state = json.load(f)
+    except Exception:
+        return {}
+    artifacts: Dict[str, Dict[str, str]] = {}
+    for sid, st in (state.get("stages") or {}).items():
+        art = st.get("artifact")
+        if st.get("status") == "done" and art and os.path.exists(art):
+            artifacts[sid] = {"path": art, "schema": st.get("schema_version")}
+    return artifacts
+
+
 def _calc_cost(model: str, prompt_tokens: int, completion_tokens: int, pricing: Dict[str, Any]) -> float:
     if not pricing:
         return 0.0
@@ -704,6 +724,8 @@ def main():
     parser.add_argument("--instrument", action="store_true", help="Enable instrumentation (timing/cost)")
     parser.add_argument("--price-table", help="Path to model pricing YAML (prompt_per_1k/completion_per_1k)")
     parser.add_argument("--settings", help="Optional settings YAML to snapshot for reproducibility")
+    parser.add_argument("--start-from", dest="start_from", help="Start executing at this stage id (requires upstream artifacts present in state)")
+    parser.add_argument("--end-at", dest="end_at", help="Stop after executing this stage id (inclusive)")
     args = parser.parse_args()
 
     registry = load_registry(args.registry)["modules"]
@@ -727,6 +749,15 @@ def main():
 
     plan = build_plan(recipe, registry)
     validate_plan_schemas(plan)
+    if args.start_from and args.start_from not in plan["topo"]:
+        raise SystemExit(f"--start-from {args.start_from} not found in recipe stages")
+    if args.end_at and args.end_at not in plan["topo"]:
+        raise SystemExit(f"--end-at {args.end_at} not found in recipe stages")
+    if args.start_from and args.end_at:
+        start_idx = plan["topo"].index(args.start_from)
+        end_idx = plan["topo"].index(args.end_at)
+        if start_idx > end_idx:
+            raise SystemExit("--start-from must precede or equal --end-at")
 
     if args.dump_plan:
         print(json.dumps({"topo": plan["topo"], "nodes": plan["nodes"]}, indent=2))
@@ -755,7 +786,7 @@ def main():
     run_wall_start = time.perf_counter()
     run_cpu_start = _get_cpu_times()
 
-    artifact_index: Dict[str, Dict[str, str]] = {}
+    artifact_index: Dict[str, Dict[str, str]] = _preload_artifacts_from_state(state_path)
 
     sink_path = os.path.join(run_dir, "instrumentation_calls.jsonl") if instrument_enabled else None
     if instrument_enabled and args.force and sink_path and os.path.exists(sink_path):
@@ -868,7 +899,16 @@ def main():
         save_json(instr_json_path, instrumentation_run)
         _render_instrumentation_md(instrumentation_run, instr_md_path)
 
+    start_gate_reached = not bool(args.start_from)
     for stage_id in plan["topo"]:
+        if args.start_from and not start_gate_reached:
+            if stage_id == args.start_from:
+                start_gate_reached = True
+            else:
+                if stage_id not in artifact_index:
+                    raise SystemExit(f"--start-from {args.start_from} provided, but upstream stage {stage_id} has no cached artifact in {state_path}")
+                print(f"[skip-start] {stage_id} skipped due to --start-from (artifact reused)")
+                continue
         node = plan["nodes"][stage_id]
         stage = node["stage"]
         module_id = node["module"]
@@ -1089,6 +1129,10 @@ def main():
         artifact_index[stage_id] = {"path": artifact_path, "schema": out_schema}
         record_stage_instrumentation(stage_id, module_id, "done", artifact_path, out_schema,
                                      stage_started_at, stage_wall_start, stage_cpu_start)
+
+        if args.end_at and stage_id == args.end_at:
+            print(f"[end-at] stopping after {stage_id} per --end-at")
+            break
 
     if instrument_enabled and instrumentation_run:
         instrumentation_run["ended_at"] = datetime.utcnow().isoformat() + "Z"

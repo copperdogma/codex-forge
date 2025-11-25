@@ -1,16 +1,8 @@
 import argparse
 import json
-import os
-import sys
 from typing import List, Set, Tuple, Dict, Any
 
-ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", ".."))
-if ROOT not in sys.path:
-    sys.path.insert(0, ROOT)
-if os.getcwd() not in sys.path:
-    sys.path.insert(0, os.getcwd())
-
-from modules.common.utils import read_jsonl, append_jsonl, ensure_dir  # noqa: E402
+from modules.common.utils import read_jsonl, append_jsonl, ensure_dir
 
 
 def collect_ids_and_targets(paths: List[str]) -> Tuple[Set[str], Set[str]]:

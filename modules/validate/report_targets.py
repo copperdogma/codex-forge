@@ -1,14 +1,8 @@
 import argparse
 import json
-import os
-import sys
 from typing import Set, List
 
-ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", ".."))
-if ROOT not in sys.path:
-    sys.path.insert(0, ROOT)
-
-from modules.common.utils import read_jsonl  # noqa: E402
+from modules.common.utils import read_jsonl
 
 
 def main():

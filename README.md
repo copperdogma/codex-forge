@@ -35,9 +35,14 @@ python driver.py --recipe configs/recipes/recipe-text.yaml --mock --skip-done
 # OCR pages 1–20 real run
 python driver.py --recipe configs/recipes/recipe-ocr-1-20.yaml --force
 
+# Resume long OCR run from portionize onward (reuses cached clean pages)
+python driver.py --recipe configs/recipes/recipe-ocr.yaml --skip-done --start-from portionize_fine
+
 # Swap modules: edit configs/recipes/*.yaml to choose a different module per stage
 # (e.g., set stage: extract -> module: extract_text_v1 instead of extract_ocr_v1)
 ```
+
+Runtime note: full non-mock OCR on the 113-page sample typically takes ~35–40 minutes for the portionize/LLM window stage (gpt-4.1-mini + boost gpt-5). Use `--skip-done` with `--start-from/--end-at` to resume or scope reruns without re-cleaning pages.
 
 ### DAG recipes (coarse+fine merge example)
 ```bash

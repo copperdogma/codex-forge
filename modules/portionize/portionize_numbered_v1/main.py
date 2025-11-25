@@ -1,16 +1,8 @@
 import argparse
-import os
-import sys
 import re
 from typing import List, Dict
 
-ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", ".."))
-if ROOT not in sys.path:
-    sys.path.insert(0, ROOT)
-if os.getcwd() not in sys.path:
-    sys.path.insert(0, os.getcwd())
-
-from modules.common.utils import read_jsonl, save_jsonl  # noqa: E402
+from modules.common.utils import read_jsonl, save_jsonl
 
 HEADING_RE = re.compile(r"(?m)^(?P<num>\d{1,4})\b[ \t\.:)]")
 INLINE_RE = re.compile(r"\n(?P<num>\d{1,4})\b[ \t\.:)]")

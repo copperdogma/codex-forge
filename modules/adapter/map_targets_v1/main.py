@@ -1,15 +1,8 @@
 import argparse
 import os
-import sys
 from typing import Dict, Any
 
-ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", ".."))
-if ROOT not in sys.path:
-    sys.path.insert(0, ROOT)
-if os.getcwd() not in sys.path:
-    sys.path.insert(0, os.getcwd())
-
-from modules.common.utils import read_jsonl, append_jsonl, ensure_dir  # noqa: E402
+from modules.common.utils import read_jsonl, append_jsonl, ensure_dir
 
 
 def main():

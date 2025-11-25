@@ -16,6 +16,7 @@
 - 014 Docs & onboarding — clean handoff after structural changes settle.
 - 021 Dashboard UI polish (highlighting & pane) — follow-up UI tweaks after visibility foundation.
 - 011 AI planner to assemble pipelines — optional; depends on stabilized modules/recipes.
+- ~~020 Module encapsulation & shared common~~
 
 This index tracks stories in `/docs/stories/` for the codex-forge pipeline.
 

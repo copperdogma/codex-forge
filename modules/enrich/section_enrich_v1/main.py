@@ -1,15 +1,10 @@
 import argparse
 import os
-import sys
 import re
 from typing import List, Dict, Any
 
-ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", ".."))
-if ROOT not in sys.path:
-    sys.path.insert(0, ROOT)
-
-from modules.common.utils import read_jsonl, append_jsonl, ensure_dir  # noqa: E402
-from schemas import EnrichedPortion  # noqa: E402
+from modules.common.utils import read_jsonl, append_jsonl, ensure_dir
+from schemas import EnrichedPortion
 
 SECTION_RE = re.compile(r"^\s*(\d{1,4})\b")
 TARGET_RE = re.compile(r"\b(?:turn|go)\s+to\s+(\d{1,4})\b", re.IGNORECASE)

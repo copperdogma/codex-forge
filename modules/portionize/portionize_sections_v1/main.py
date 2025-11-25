@@ -1,16 +1,8 @@
 import argparse
-import os
-import sys
 import re
 from typing import List, Dict, Tuple
 
-ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", ".."))
-if ROOT not in sys.path:
-    sys.path.insert(0, ROOT)
-if os.getcwd() not in sys.path:
-    sys.path.insert(0, os.getcwd())
-
-from modules.common.utils import read_jsonl, save_jsonl  # noqa: E402
+from modules.common.utils import read_jsonl, save_jsonl
 
 ANCHOR_RE = re.compile(r"(?m)^\s*(\d{1,4})\b")
 INLINE_RE = re.compile(r"\b(?:Section|Paragraph|Turn to|Go to)\s+(\d{1,4})\b", re.IGNORECASE)

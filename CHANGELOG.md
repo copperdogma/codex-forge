@@ -1,3 +1,17 @@
+## [2025-11-25] - Stage elapsed UX and resumable long runs
+
+### Added
+- Pipeline visibility dashboard now shows per-stage elapsed time (live for running, final for done) using progress/event timestamps with `<1s` handling and fallbacks.
+- Driver supports `--start-from/--end-at` to resume or bound runs while reusing cached artifacts.
+
+### Fixed/Changed
+- Removed remaining `sys.path` bootstraps and unused imports in module mains; all shared helpers imported from `modules.common.*`.
+- Resume example and runtime note for long OCR runs added to README; story 020 marked done.
+
+### Tested
+- `python driver.py --recipe configs/recipes/recipe-text.yaml --mock --force`
+- `python driver.py --recipe configs/recipes/recipe-ocr.yaml --skip-done --start-from portionize_fine --force`
+
 ## [2025-11-21] - Pluginized modules and validated pipelines
 
 ### Added

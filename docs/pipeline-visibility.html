@@ -101,6 +101,9 @@
       padding: 14px;
       box-shadow: 0 14px 30px rgba(0,0,0,0.2);
     }
+    .card-header { display: flex; justify-content: space-between; align-items: center; gap: 8px; }
+    .elapsed { font-size: 12px; color: var(--muted); }
+    .elapsed.running { color: var(--accent); }
     .card h3 { margin: 0 0 6px; font-size: 16px; letter-spacing: -0.01em; }
     .meta { display: flex; gap: 10px; flex-wrap: wrap; font-size: 12px; color: var(--muted); }
     .progress-bar {
@@ -414,6 +417,36 @@
       return `${p}%`;
     }
 
+    function formatDuration(seconds) {
+      if (seconds == null || isNaN(seconds) || seconds < 0) return "—";
+      if (seconds < 1) return "<1s";
+      const s = Math.floor(seconds % 60);
+      const m = Math.floor((seconds / 60) % 60);
+      const h = Math.floor(seconds / 3600);
+      if (h) return `${h}h ${m.toString().padStart(2,"0")}m`;
+      return `${m}:${s.toString().padStart(2,"0")}s`;
+    }
+
+    function computeStageDurations(events, stages) {
+      const map = {};
+      events.forEach(evt => {
+        const ts = parseTimestamp(evt.timestamp);
+        if (!ts || !evt.stage) return;
+        const entry = map[evt.stage] || { start: null, end: null, lastStatus: evt.status };
+        if (entry.start === null || ts < entry.start) entry.start = ts;
+        if (entry.end === null || ts > entry.end) entry.end = ts;
+        entry.lastStatus = evt.status || entry.lastStatus;
+        map[evt.stage] = entry;
+      });
+      // fallbacks from state updated_at when no events
+      Object.entries(stages || {}).forEach(([stage, info]) => {
+        if (map[stage]) return;
+        const ts = parseTimestamp(info.updated_at);
+        if (ts) map[stage] = { start: ts, end: ts, lastStatus: info.status };
+      });
+      return map;
+    }
+
     function summariseStages(stages) {
       const entries = Object.entries(stages || {});
       const done = entries.filter(([, s]) => s.status === "done").length;
@@ -521,7 +554,8 @@
       if (links.children.length) inst.appendChild(links);
       summaryGrid.appendChild(inst);
 
-      renderStages(stages, events, base, instrumentation);
+      const durations = computeStageDurations(events, stages);
+      renderStages(stages, events, base, instrumentation, durations);
       renderTimeline(events);
     }
 
@@ -542,7 +576,7 @@
       return card;
     }
 
-    function renderStages(stages, events, base, instrumentation) {
+    function renderStages(stages, events, base, instrumentation, durations) {
       stageGrid.innerHTML = "";
       const instMap = {};
       if (instrumentation?.stages) {
@@ -555,8 +589,20 @@
         card.className = "card";
         const status = info.status || "queued";
         const prog = info.progress || {};
+        const timing = durations?.[stage] || {};
+        let elapsedText = "—";
+        if (timing.start) {
+          if (status === "running") {
+            elapsedText = `▶ ${formatDuration((Date.now() - timing.start) / 1000)}`;
+          } else if (timing.end) {
+            elapsedText = `⏱ ${formatDuration((timing.end - timing.start) / 1000)}`;
+          }
+        }
         card.innerHTML = `
-          <h3>${stage}</h3>
+          <div class="card-header">
+            <h3>${stage}</h3>
+            <div class="elapsed ${status === "running" ? "running" : ""}">${elapsedText}</div>
+          </div>
           <div class="status ${statusDescriptors[status]?.class || ""}">${status.toUpperCase()}</div>
           <div class="progress-bar"><span style="width:${Math.min(100, prog.percent || (status === "done" ? 100 : 0))}%"></span></div>
           <div class="meta">
