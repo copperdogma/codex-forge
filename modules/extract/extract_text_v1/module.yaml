@@ -14,4 +14,4 @@ param_schema:
       type: integer
       minimum: 1
   required: [input_glob]
-notes: Pure text/Markdown/HTML ingest (no images).
+notes: "Import: ingest plain text/Markdown/HTML files and emit per-page docs (no images)."

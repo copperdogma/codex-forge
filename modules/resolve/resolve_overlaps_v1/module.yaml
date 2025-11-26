@@ -13,4 +13,4 @@ param_schema:
       type: integer
       minimum: 1
   required: []
-notes: Greedy resolve with coverage fill.
+notes: "Resolve: merge overlapping portions greedily to produce single-coverage spans."

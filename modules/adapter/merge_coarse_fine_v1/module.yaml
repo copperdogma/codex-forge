@@ -22,4 +22,4 @@ param_schema:
       type: number
       minimum: 0.0
       maximum: 1.0
-notes: Merge coarse and fine portion hypotheses; prefer fine coverage, backfill with coarse; add continuation links.
+notes: "Adapter: merge coarse and fine portion hypotheses—prefer fine coverage, backfill with coarse, add continuation links."

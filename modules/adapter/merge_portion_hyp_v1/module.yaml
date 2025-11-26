@@ -9,4 +9,4 @@ param_schema:
   properties:
     dedupe_field:
       type: string
-notes: Concatenate and de-duplicate portion hypotheses from multiple upstream portionizers.
+notes: "Adapter: concatenate and de-duplicate portion hypotheses from multiple upstream portionizers."

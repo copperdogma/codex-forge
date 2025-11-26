@@ -8,4 +8,4 @@ param_schema:
   properties:
     # no tunables; reserved for future knobs like section prefix
   required: []
-notes: Normalize portion ids/types (stub).
+notes: "Normalize: standardize portion ids/types and stub any missing fields for downstream stages."

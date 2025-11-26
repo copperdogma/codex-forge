@@ -22,4 +22,4 @@ param_schema:
       type: integer
       minimum: 1
   required: [group_size, confidence]
-notes: Deterministic page-group portionizer (no LLM); useful as a low-cost alternate module.
+notes: "Portionize: deterministically group pages into portions without LLM calls (low-cost path)."

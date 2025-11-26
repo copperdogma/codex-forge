@@ -1,3 +1,19 @@
+## [2025-11-26] - Dashboard stage help, metrics, and artifact links
+
+### Added
+- Pipeline visibility dashboard now shows per-stage help tooltips sourced from module notes and recipe descriptions; module notes rewritten verb-first for AI/human clarity.
+- Artifacts summary card links directly to input PDF and detected final JSON output; stage ordering follows execution.
+- New story 025 (module pruning & registry hygiene) added to track module audit.
+
+### Fixed/Changed
+- Load Metrics no longer errors; renders confidence stats with sample preview. Artifacts open with pretty-printed JSON in pane/new-tab, and anchor links render correctly.
+- Run dropdown auto-sorts newest-first; dashboard filters to meaningful stage cards.
+
+### Tested
+- `python -m pytest tests/test_pipeline_visibility_path.py tests/progress_logger_test.py`
+- `python driver.py --recipe /tmp/recipe-ocr-1-5.yaml --mock --instrument`
+- `python driver.py --recipe /tmp/recipe-ocr-6-10.yaml --mock --instrument`
+
 ## [2025-11-25] - Stage elapsed UX and resumable long runs
 
 ### Added

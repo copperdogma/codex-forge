@@ -12,4 +12,4 @@ param_schema:
   allow-missing:
     type: boolean
     description: Exit 0 even when some targets are missing.
-notes: Consolidated adapter that maps targets to known sections, backfills missing targets as stubs, emits coverage report, and fails on missing by default.
+notes: "Adapter: map targets to known sections, backfill missing ones as stubs, emit a coverage report, and fail on missing by default."

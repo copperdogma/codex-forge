@@ -24,4 +24,4 @@ param_schema:
     include_images:
       type: boolean
   required: [model, text_field, max_chars]
-notes: LLM-driven enrichment extracting choices/combat/items from resolved portions into enriched_portion_v1.
+notes: "Enrich: LLM extracts structured choices, combat, and items from resolved portions into enriched_portion_v1."

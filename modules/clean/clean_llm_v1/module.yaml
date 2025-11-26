@@ -18,4 +18,4 @@ param_schema:
       minimum: 0
       maximum: 1
   required: [model, min_conf]
-notes: Multimodal LLM cleaning.
+notes: "Clean: multimodal LLM fixes OCR errors and normalizes per-page text while keeping layout."

@@ -18,4 +18,4 @@ param_schema:
       type: integer
       minimum: 1
   required: [min_conf]
-notes: Vote + greedy non-overlap with coverage fill.
+notes: "Consensus: vote and greedy selection to pick best non-overlapping portions and fill gaps."

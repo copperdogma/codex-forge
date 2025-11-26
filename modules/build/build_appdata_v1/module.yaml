@@ -14,4 +14,4 @@ param_schema:
     run_id:
       type: string
   required: []
-notes: Merge enriched portions into app-facing data.json (graph nodes with choices/combat/items).
+notes: "Build: merge enriched portions into app-facing data.json (graph nodes with choices, combat, and items)."

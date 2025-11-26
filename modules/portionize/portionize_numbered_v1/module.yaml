@@ -16,4 +16,4 @@ param_schema:
       minimum: 0
       maximum: 1
   required: []
-notes: Split clean pages into numbered sections using leading numeric headings; portion_id set to the detected number.
+notes: "Portionize: split cleaned pages into numbered sections using leading numeric headings; portion_id set to that number."

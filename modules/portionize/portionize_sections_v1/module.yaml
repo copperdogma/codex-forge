@@ -19,4 +19,4 @@ param_schema:
     max_section_len:
       type: integer
   required: []
-notes: Section finder that emits portions for any numeric anchor; aligns portion_id to section number.
+notes: "Portionize: detect numbered section anchors and emit portion hypotheses aligned to those numbers."

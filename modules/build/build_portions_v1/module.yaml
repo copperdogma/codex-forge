@@ -13,4 +13,4 @@ param_schema:
     out:
       type: string
   required: []
-notes: Assemble per-portion raw text with page markers.
+notes: "Build: assemble final portions with raw text and page markers into JSON for export."

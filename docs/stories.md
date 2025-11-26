@@ -13,8 +13,8 @@
 - DONE: 008 Image cropper/mapper — map images to portions; leverage source_images.
 - DONE: 012 Automation wrapper (driver snapshots) — run configs + snapshot for reproducibility.
 - DONE: 013 Cost/perf benchmarking — tune presets after instrumentation lands.
-- 014 Docs & onboarding — clean handoff after structural changes settle.
 - 021 Dashboard UI polish (highlighting & pane) — follow-up UI tweaks after visibility foundation.
+- 025 Module pruning & registry hygiene — audit/remove redundant modules and mark experimental variants.
 - 011 AI planner to assemble pipelines — optional; depends on stabilized modules/recipes.
 - ~~020 Module encapsulation & shared common~~
 
@@ -36,17 +36,17 @@ This index tracks stories in `/docs/stories/` for the codex-forge pipeline.
 | 011 | AI planner to assemble pipelines | Medium | To Do | /docs/stories/story-011-ai-planner.md |
 | 012 | Automation wrapper (single driver + config snapshots) | Medium | Done | /docs/stories/story-012-driver-automation.md |
 | 013 | Cost/perf benchmarking and presets | Low | Done | /docs/stories/story-013-cost-perf.md |
-| 014 | Layout of docs & developer onboarding | Low | To Do | /docs/stories/story-014-docs-onboarding.md |
 | 015 | Modular pipeline & module registry | High | Done | /docs/stories/story-015-modular-pipeline.md |
 | 016 | Driver DAG & schema compatibility | High | Done | /docs/stories/story-016-driver-dag-schema.md |
 | 017 | Module UX polish (params & outputs) | Medium | Done | /docs/stories/story-017-module-ux.md |
 | 018 | Enrichment & alt modules | High | Done | /docs/stories/story-018-enrichment-alt-mods.md |
 | 019 | Pipeline visibility dashboard | Medium | Done | /docs/stories/story-019-pipeline-visibility.md |
-| 020 | Module encapsulation & shared common | Medium | To Do | /docs/stories/story-020-module-encapsulation.md |
-| 021 | Dashboard UI polish (highlighting & pane) | Medium | To Do | /docs/stories/story-021-dashboard-ui-polish.md |
+| 020 | Module encapsulation & shared common | Medium | Done | /docs/stories/story-020-module-encapsulation.md |
+| 021 | Dashboard UI polish (highlighting & pane) | Medium | In Progress | /docs/stories/story-021-dashboard-ui-polish.md |
 | 022 | Pipeline instrumentation (timing & cost) | High | Done | /docs/stories/story-022-instrumentation.md |
 | 023 | Consolidate section target adapters | Medium | Done | /docs/stories/story-023-section-target-guard.md |
 | 024 | Image cropper follow-up | Medium | To Do | /docs/stories/story-024-image-cropper-followup.md |
+| 025 | Module pruning & registry hygiene | Medium | To Do | /docs/stories/story-025-module-prune.md |
 | 099 | Remove dev-only backcompat disclaimer | Low | To Do | /docs/stories/story-099-remove-dev-backcompat-note.md |
 
 ## Notes

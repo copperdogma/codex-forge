@@ -21,4 +21,4 @@ param_schema:
       type: integer
       minimum: 1
   required: [min_area_ratio, max_area_ratio, blur]
-notes: Heuristic contour-based illustration detector and cropper (OpenCV). Produces boxes and cropped image paths.
+notes: "Detect: find illustration regions via OpenCV contours, output crop boxes and cropped image paths."

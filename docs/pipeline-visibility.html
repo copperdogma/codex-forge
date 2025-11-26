@@ -135,6 +135,14 @@
       box-shadow: 0 14px 30px rgba(0, 0, 0, 0.2);
     }
 
+    .stage-card {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+      position: relative;
+      padding-bottom: 42px;
+    }
+
     .card-header {
       display: flex;
       justify-content: space-between;
@@ -329,6 +337,64 @@
       margin-top: 6px;
       font-size: 12px;
       color: var(--muted);
+    }
+
+    .stage-help {
+      /* removed absolute positioning */
+      width: 18px;
+      height: 18px;
+      border-radius: 999px;
+      border: 1px solid rgba(255, 255, 255, 0.12);
+      background: rgba(255, 255, 255, 0.05);
+      color: var(--text);
+      font-weight: 700;
+      font-family: "Space Grotesk", sans-serif;
+      cursor: help;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      transition: transform 0.15s ease, background 0.15s ease, border-color 0.15s ease, opacity 0.15s ease;
+      font-size: 10px;
+      margin-left: 8px;
+      /* Spacing from title */
+      opacity: 0.4;
+      position: relative;
+      /* For tooltip positioning context */
+    }
+
+    .stage-help:hover,
+    .stage-help:focus {
+      outline: none;
+      background: var(--panel-2);
+      border-color: rgba(255, 255, 255, 0.22);
+      transform: translateY(-1px);
+      opacity: 1;
+    }
+
+    .stage-help-tooltip {
+      display: none;
+      position: absolute;
+      right: 0;
+      bottom: 100%;
+      margin-bottom: 8px;
+      width: max-content;
+      max-width: 400px;
+      background: var(--panel-2);
+      border: 1px solid rgba(255, 255, 255, 0.12);
+      border-radius: 10px;
+      padding: 10px 12px;
+      color: var(--text);
+      font-size: 12px;
+      text-align: left;
+      box-shadow: 0 12px 28px rgba(0, 0, 0, 0.35);
+      white-space: normal;
+      line-height: 1.5;
+      z-index: 100;
+    }
+
+    .stage-help:hover .stage-help-tooltip,
+    .stage-help:focus .stage-help-tooltip {
+      display: block;
     }
 
     pre {
@@ -801,6 +867,9 @@
     function render(state, events, base, instrumentation) {
       const stages = state.stages || {};
       const stats = summariseStages(stages);
+      const meta = runMeta[state.run_id || currentRun] || {};
+      const pdfPath = meta.input?.pdf ? `${ROOT}/${meta.input.pdf}` : null;
+      const finalArtifact = findFinalArtifact(stages);
 
       summaryGrid.innerHTML = "";
       summaryGrid.appendChild(makeStatCard("Overall Progress", `${stats.avg}%`, [
@@ -813,8 +882,9 @@
         base.replace(`${ROOT}/`, "")
       ]));
       summaryGrid.appendChild(makeStatCard("Artifacts", "", [
-        "Click any stage to open artifacts",
-        "Auto-refresh uses pipeline_events.jsonl"
+        pdfPath ? `<a href="${pdfPath}" target="_blank">Input PDF</a>` : "Input PDF unknown",
+        finalArtifact ? `<a href="${ROOT}/${finalArtifact}" target="_blank">Final JSON</a>` : "Final artifact not detected",
+        "Click any stage to open artifacts"
       ]));
 
       // Debug Card
@@ -822,7 +892,6 @@
       debugCard.className = "card";
       debugCard.innerHTML = `<h3>Debug Info</h3><button class="btn-small" onclick="const el=document.getElementById('debug-details'); el.style.display=el.style.display==='none'?'block':'none'">Toggle Details</button><div id="debug-details" style="display:none; margin-top:10px; font-family:monospace; font-size:10px; white-space:pre-wrap;"></div>`;
       summaryGrid.appendChild(debugCard);
-      const meta = runMeta[state.run_id || currentRun] || {};
       const inst = document.createElement("div");
       inst.className = "card";
       inst.innerHTML = `<h3>Instrumentation</h3>`;
@@ -883,7 +952,16 @@
         ul.className = "meta";
         lines.forEach(l => {
           const span = document.createElement("span");
-          span.textContent = l;
+          const content = (typeof l === "string") ? l : (l?.html ?? l);
+          if (typeof content === "string" && content.includes("<")) {
+            span.innerHTML = content;
+            span.querySelectorAll("a").forEach(a => {
+              if (!a.target) a.target = "_blank";
+              a.rel = "noreferrer noopener";
+            });
+          } else {
+            span.textContent = content ?? "";
+          }
           ul.appendChild(span);
         });
         card.appendChild(ul);
@@ -897,7 +975,8 @@
       if (instrumentation?.stages) {
         instrumentation.stages.forEach(s => { if (s.id) instMap[s.id] = s; });
       }
-      const ordered = Object.keys(stages).sort((a, b) => {
+      const stageEntries = Object.entries(stages || {}).filter(([_, info]) => info?.module_id || info?.description);
+      const ordered = stageEntries.map(([k]) => k).sort((a, b) => {
         const startA = durations?.[a]?.start || 0;
         const startB = durations?.[b]?.start || 0;
         if (startA !== startB) return startA - startB;
@@ -919,7 +998,7 @@
         const dur = durations[stage];
         const info = stages[stage];
         const card = document.createElement("div");
-        card.className = "card";
+        card.className = "card stage-card";
         const status = info.status || "queued";
         const prog = info.progress || {};
 
@@ -962,6 +1041,9 @@
           chips.appendChild(sch);
         }
         const inst = instMap[stage];
+        const description = info.description || inst?.description || (info.module_id
+          ? `Stage ${stage} runs module ${info.module_id} (description not recorded yet).`
+          : "Description not recorded for this stage yet.");
         const costVal = inst?.llm_totals?.cost || 0;
         const costChip = document.createElement("div");
         costChip.className = "chip";
@@ -1002,8 +1084,30 @@
           const last = history[history.length - 1];
           const hint = document.createElement("div");
           hint.className = "metrics";
-          hint.textContent = `${history.length} events | last: ${last.status} @ ${last.timestamp}`;
+          // Trim milliseconds: "2025-11-26T15:45:01.123456Z" -> "2025-11-26T15:45:01Z"
+          const cleanTs = (last.timestamp || "").replace(/\.\d+Z$/, "Z");
+          hint.textContent = `${history.length} events | last: ${last.status} @ ${cleanTs}`;
           actions.appendChild(hint);
+        }
+
+        if (description) {
+          const help = document.createElement("button");
+          help.className = "stage-help";
+          help.type = "button";
+          help.setAttribute("aria-label", `What ${stage} does`);
+          help.textContent = "?";
+          const tip = document.createElement("div");
+          tip.className = "stage-help-tooltip";
+          tip.textContent = description;
+          help.appendChild(tip);
+
+          // Append to stage name container
+          const header = card.querySelector(".stage-header");
+          const nameEl = header ? header.querySelector(".stage-name") : null;
+          if (nameEl) {
+            // Insert after the stage name
+            nameEl.after(help);
+          }
         }
         card.appendChild(actions);
         stageGrid.appendChild(card);
@@ -1176,7 +1280,25 @@
         <div class="chip"><strong>Confidence</strong> avg ${metrics.avg}, min ${metrics.min}, max ${metrics.max}</div>
         <div class="chip"><strong>Path</strong> ${artifactPath}</div>
       `;
-      renderPretty(JSON.stringify(metrics.sample, null, 2), "json");
+      const sample = metrics.sample ?? [];
+      const preview = {
+        sample: sample,
+        note: sample.length === metrics.count ? "full dataset preview" : `showing ${sample.length} of ${metrics.count} records`
+      };
+      renderPretty(JSON.stringify(preview, null, 2), "json");
+    }
+
+    function findFinalArtifact(stages) {
+      if (!stages) return null;
+      const entries = Object.entries(stages);
+      // Prefer explicit build* stages
+      const buildStage = entries.find(([k]) => k.startsWith("build"));
+      if (buildStage && buildStage[1].artifact) return buildStage[1].artifact;
+      // Otherwise pick last done stage with an artifact
+      const doneWithArtifact = entries
+        .filter(([, v]) => v.artifact)
+        .sort((a, b) => parseTimestamp(b[1].updated_at) - parseTimestamp(a[1].updated_at));
+      return doneWithArtifact.length ? doneWithArtifact[0][1].artifact : null;
     }
 
     function startAuto() {

@@ -8,4 +8,4 @@ param_schema:
   properties:
     # no tunables today; keep placeholder for future switches
   required: []
-notes: Deduplicate portion_ids by suffixing repeats.
+notes: "Dedupe: ensure portion_id uniqueness by suffixing any duplicates."

@@ -16,4 +16,4 @@ param_schema:
     max_chars:
       type: integer
   required: []
-notes: "Heuristic section enricher: adds section_id (numeric heading) and targets (turn-to numbers) without LLM calls."
+notes: "Enrich: heuristic (no LLM) adds section_id from numeric headings and links targets (turn-to numbers)."

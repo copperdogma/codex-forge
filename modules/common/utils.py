@@ -18,6 +18,7 @@ PROGRESS_EVENT_SCHEMA: Dict[str, Tuple[type, ...]] = {
     "artifact": (str, type(None)),
     "module_id": (str, type(None)),
     "schema_version": (str, type(None)),
+    "stage_description": (str, type(None)),
     "extra": (dict,),
 }
 PROGRESS_STATUS_VALUES = {"running", "done", "failed", "skipped", "queued"}
@@ -108,7 +109,8 @@ class ProgressLogger:
 
     def log(self, stage: str, status: str, current: Optional[int] = None, total: Optional[int] = None,
             message: Optional[str] = None, artifact: Optional[str] = None, module_id: Optional[str] = None,
-            schema_version: Optional[str] = None, extra: Optional[Dict[str, Any]] = None):
+            schema_version: Optional[str] = None, stage_description: Optional[str] = None,
+            extra: Optional[Dict[str, Any]] = None):
         now = _utc()
         percent = None
         if current is not None and total:
@@ -126,6 +128,7 @@ class ProgressLogger:
             "artifact": artifact,
             "module_id": module_id,
             "schema_version": schema_version,
+            "stage_description": stage_description,
             "extra": extra or {},
         }
 
@@ -152,6 +155,7 @@ class ProgressLogger:
                 "updated_at": now,
                 "module_id": module_id or stage_state.get("module_id"),
                 "schema_version": schema_version or stage_state.get("schema_version"),
+                "description": stage_description or stage_state.get("description"),
                 "progress": {
                     "current": current,
                     "total": total,

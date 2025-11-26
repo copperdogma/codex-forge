@@ -33,4 +33,4 @@ param_schema:
     lang:
       type: string
   required: [start, dpi, psm, oem, lang]
-notes: PDF→images→pytesseract OCR.
+notes: "Import: render PDF pages to images, then extract text from those images with pytesseract OCR."

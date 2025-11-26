@@ -336,6 +336,7 @@ def build_plan(recipe: Dict[str, Any], registry: Dict[str, Any]) -> Dict[str, An
         params = _merge_params(entry.get("default_params", {}), conf.get("params") or {}, entry.get("param_schema"))
         _validate_params(params, entry.get("param_schema"), stage_id, module_id)
         artifact_name = conf.get("out") or _artifact_name_for_stage(stage_id, stage_type, outputs_map)
+        description = conf.get("description") or entry.get("notes") or entry.get("description")
         nodes[stage_id] = {
             "id": stage_id,
             "stage": stage_type,
@@ -347,6 +348,7 @@ def build_plan(recipe: Dict[str, Any], registry: Dict[str, Any]) -> Dict[str, An
             "entrypoint": entry["entrypoint"],
             "input_schema": entry.get("input_schema"),
             "output_schema": entry.get("output_schema"),
+            "description": description,
         }
         prior_id = stage_id if linear else prior_id
 
@@ -450,9 +452,10 @@ def load_recipe(path: str) -> Dict[str, Any]:
 
 
 def update_state(state_path: str, progress_path: str, stage_name: str, status: str, artifact: str, run_id: str = None,
-                 module_id: str = None, schema_version: str = None):
+                 module_id: str = None, schema_version: str = None, stage_description: str = None):
     logger = ProgressLogger(state_path=state_path, progress_path=progress_path, run_id=run_id)
-    return logger.log(stage_name, status, artifact=artifact, module_id=module_id, schema_version=schema_version)
+    return logger.log(stage_name, status, artifact=artifact, module_id=module_id,
+                      schema_version=schema_version, stage_description=stage_description)
 
 
 def build_command(entrypoint: str, params: Dict[str, Any], stage_conf: Dict[str, Any], run_dir: str,
@@ -871,6 +874,7 @@ def main():
             "id": stage_id,
             "stage": plan["nodes"][stage_id]["stage"],
             "module_id": module_id,
+            "description": plan["nodes"][stage_id].get("description"),
             "status": status,
             "artifact": artifact_path,
             "schema_version_output": schema_version,
@@ -914,6 +918,7 @@ def main():
         module_id = node["module"]
         entrypoint = node["entrypoint"]
         out_schema = node.get("output_schema")
+        stage_description = node.get("description")
         stage_started_at = datetime.utcnow().isoformat() + "Z"
         stage_wall_start = time.perf_counter()
         stage_cpu_start = _get_cpu_times()
@@ -933,7 +938,7 @@ def main():
                     if schema_ok:
                         print(f"[skip] {stage_id} already done per state and artifact present")
                         logger.log(stage_id, "skipped", artifact=st.get("artifact"), module_id=module_id,
-                                   message="Skipped due to --skip-done")
+                                   message="Skipped due to --skip-done", stage_description=stage_description)
                         artifact_index[stage_id] = {"path": st.get("artifact"), "schema": st.get("schema_version")}
                         record_stage_instrumentation(stage_id, module_id, "skipped", st.get("artifact"), st.get("schema_version"),
                                                      stage_started_at, stage_wall_start, stage_cpu_start)
@@ -1046,7 +1051,8 @@ def main():
 
         cleanup_artifact(artifact_path, args.force)
 
-        logger.log(stage_id, "running", artifact=artifact_path, module_id=module_id, message="started")
+        logger.log(stage_id, "running", artifact=artifact_path, module_id=module_id,
+                   message="started", stage_description=stage_description)
 
         # Mock shortcuts for expensive stages
         if args.mock and stage == "clean":
@@ -1058,7 +1064,8 @@ def main():
                 "clean": node["artifact_name"],
             }
             artifact_path = mock_clean(run_dir, mock_outputs, module_id, run_id)
-            update_state(state_path, progress_path, stage_id, "done", artifact_path, run_id, module_id, out_schema)
+            update_state(state_path, progress_path, stage_id, "done", artifact_path, run_id, module_id, out_schema,
+                         stage_description=stage_description)
             artifact_index[stage_id] = {"path": artifact_path, "schema": out_schema}
             record_stage_instrumentation(stage_id, module_id, "done", artifact_path, out_schema,
                                          stage_started_at, stage_wall_start, stage_cpu_start)
@@ -1072,7 +1079,8 @@ def main():
                 "portionize": node["artifact_name"],
             }
             artifact_path = mock_portionize(run_dir, mock_outputs, module_id, run_id)
-            update_state(state_path, progress_path, stage_id, "done", artifact_path, run_id, module_id, out_schema)
+            update_state(state_path, progress_path, stage_id, "done", artifact_path, run_id, module_id, out_schema,
+                         stage_description=stage_description)
             artifact_index[stage_id] = {"path": artifact_path, "schema": out_schema}
             record_stage_instrumentation(stage_id, module_id, "done", artifact_path, out_schema,
                                          stage_started_at, stage_wall_start, stage_cpu_start)
@@ -1086,7 +1094,8 @@ def main():
                 "consensus": node["artifact_name"],
             }
             artifact_path = mock_consensus(run_dir, mock_outputs, module_id, run_id)
-            update_state(state_path, progress_path, stage_id, "done", artifact_path, run_id, module_id, out_schema)
+            update_state(state_path, progress_path, stage_id, "done", artifact_path, run_id, module_id, out_schema,
+                         stage_description=stage_description)
             artifact_index[stage_id] = {"path": artifact_path, "schema": out_schema}
             record_stage_instrumentation(stage_id, module_id, "done", artifact_path, out_schema,
                                          stage_started_at, stage_wall_start, stage_cpu_start)
@@ -1101,7 +1110,8 @@ def main():
             env["INSTRUMENT_ENABLED"] = "1"
         result = subprocess.run(cmd, cwd=cwd, env=env)
         if result.returncode != 0:
-            update_state(state_path, progress_path, stage_id, "failed", artifact_path, run_id, module_id, out_schema)
+            update_state(state_path, progress_path, stage_id, "failed", artifact_path, run_id, module_id, out_schema,
+                         stage_description=stage_description)
             record_stage_instrumentation(stage_id, module_id, "failed", artifact_path, out_schema,
                                          stage_started_at, stage_wall_start, stage_cpu_start)
             raise SystemExit(f"Stage {stage_id} failed with code {result.returncode}")
@@ -1121,11 +1131,13 @@ def main():
                             errors += 1
                             print(f"[validate error] {artifact_path} row {total}: {e}")
                     if errors:
-                        update_state(state_path, progress_path, stage_id, "failed", artifact_path, run_id, module_id, out_schema)
+                        update_state(state_path, progress_path, stage_id, "failed", artifact_path, run_id, module_id, out_schema,
+                                     stage_description=stage_description)
                         record_stage_instrumentation(stage_id, module_id, "failed", artifact_path, out_schema,
                                                      stage_started_at, stage_wall_start, stage_cpu_start)
                         raise SystemExit(f"Validation failed for {artifact_path}: {errors} errors")
-        update_state(state_path, progress_path, stage_id, "done", artifact_path, run_id, module_id, out_schema)
+        update_state(state_path, progress_path, stage_id, "done", artifact_path, run_id, module_id, out_schema,
+                     stage_description=stage_description)
         artifact_index[stage_id] = {"path": artifact_path, "schema": out_schema}
         record_stage_instrumentation(stage_id, module_id, "done", artifact_path, out_schema,
                                      stage_started_at, stage_wall_start, stage_cpu_start)
