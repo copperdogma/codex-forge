@@ -72,3 +72,7 @@
 - **Result:** Added `cleanup_artifact` helper called when `--force` is used; removes existing stage output before rerun to avoid append duplicates. Unit test added in `tests/driver_plan_test.py`; all tests in file now 11/11 passing.
 - **Notes:** Pydantic deprecation warning remains (existing).
 - **Next:** If more rigorous validation needed for enrichment outputs, add validator tests; otherwise story looks complete.
+### 20251126-1127 — Note: alt enrichment modules pruned
+- **Result:** Documentation update.
+- **Notes:** `enrich_struct_v1`, `portionize_page_v1`, `consensus_spanfill_v1`, and related alt recipes were removed in Story 025. Core pipeline remains; reintroduce via new story if enrichment alt path is needed again.
+- **Next:** Consider new enrichment design if requirements return; otherwise treat this story as historical context.

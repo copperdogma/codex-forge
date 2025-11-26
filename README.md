@@ -62,24 +62,10 @@ python scripts/regression/check_continuation_propagation.py \
   --resolved output/runs/deathtrap-ocr-dag/portions_resolved.jsonl
 ```
 
-### Image cropper (story-008)
-- Input schema: `page_doc_v1` (fields: page, image, text)
-- Module: `modules/extract/image_crop_cv_v1` (contour-based detector/cropper)
-- Tuned defaults: `min_area_ratio=0.005`, `max_area_ratio=0.99`, `blur=3`, `topk=5`
-- Sample recipe: `configs/recipes/recipe-image-crop.yaml`
-- Example command:
-  ```bash
-  PYTHONPATH=. python modules/extract/image_crop_cv_v1/main.py \
-    --pages output/runs/image-crop-demo/pages.jsonl \
-    --out output/runs/image-crop-demo/image_crops.jsonl \
-    --crop-dir output/runs/image-crop-demo/crops \
-    --min-area-ratio 0.005 --max-area-ratio 0.99 --blur 3 --topk 5
-  ```
-- Manual validation: compare `image_crops.jsonl` vs GT `configs/groundtruth/image_boxes_eval.jsonl` using `scripts/spikes/eval_detection.py --iou 0.5`. Current tuned CV metrics on the 12-page GT: Micro P=0.75 / R=0.95 / F1=0.84.
 Key points:
 - Stages have ids and `needs`; driver topo-sorts and validates schemas.
-- Adapter `merge_portion_hyp_v1` dedupes coarse+fine portion hypotheses before consensus.
 - Override per-stage outputs via either a stage-level `out:` key (highest precedence) or the recipe-level `outputs:` map.
+- Removed (Story 025): image_crop_cv_v1, portionize_page_v1, portionize_numbered_v1, merge_portion_hyp_v1, consensus_spanfill_v1, enrich_struct_v1, build_appdata_v1; demo/alt recipes using them were deleted.
 
 ### Parameter validation & output overrides
 - Each module can declare `param_schema` (JSON-Schema-lite) in its `module.yaml` to type-check params before the run. Supported fields per param: `type` (`string|number|integer|boolean`), `enum`, `minimum`/`maximum`, `pattern`, `default`; mark required via a top-level `required` list or `required: true` on the property.

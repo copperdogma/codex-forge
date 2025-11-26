@@ -46,7 +46,7 @@ This index tracks stories in `/docs/stories/` for the codex-forge pipeline.
 | 022 | Pipeline instrumentation (timing & cost) | High | Done | /docs/stories/story-022-instrumentation.md |
 | 023 | Consolidate section target adapters | Medium | Done | /docs/stories/story-023-section-target-guard.md |
 | 024 | Image cropper follow-up | Medium | To Do | /docs/stories/story-024-image-cropper-followup.md |
-| 025 | Module pruning & registry hygiene | Medium | To Do | /docs/stories/story-025-module-prune.md |
+| 025 | Module pruning & registry hygiene | Medium | Done | /docs/stories/story-025-module-prune.md |
 | 026 | Onward to the Unknown — Arthur L'Heureux pilot | Medium | To Do | /docs/stories/story-026-onward-unknown-arthur-lheureux.md |
 | 099 | Remove dev-only backcompat disclaimer | Low | To Do | /docs/stories/story-099-remove-dev-backcompat-note.md |
 

@@ -226,3 +226,11 @@
 
 ### Documentation
 - README documents presets, benchmark artifact locations, and cost/perf usage examples.
+## [2025-11-26] - Module registry prune (story 025)
+
+### Removed
+- Deleted unused modules: portionize_numbered_v1, merge_portion_hyp_v1, image_crop_cv_v1, portionize_page_v1, consensus_spanfill_v1, enrich_struct_v1, build_appdata_v1.
+- Removed legacy/demo recipes relying on those modules: recipe-image-crop.yaml, recipe-ocr-enrich-{alt,app}.yaml, recipe-text-enrich-{alt,app}.yaml.
+
+### Planned follow-ups
+- Tag remaining experimental modules (section stack, coarse/merge) in manifests and rerun OCR/text smoke recipes.

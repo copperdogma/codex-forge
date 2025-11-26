@@ -5,4 +5,4 @@ input_schema: enriched_portion_v1
 output_schema: enriched_portion_v1
 default_params: {}
 param_schema: {}
-notes: "Adapter: annotate each target with a hit flag when it matches a known section_id; leave data otherwise unchanged."
+notes: "Status: experimental. Adapter: annotate each target with a hit flag when it matches a known section_id; leave data otherwise unchanged."

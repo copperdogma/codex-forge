@@ -5,4 +5,4 @@ input_schema: enriched_portion_v1
 output_schema: enriched_portion_v1
 default_params: {}
 param_schema: {}
-notes: "Adapter: append stub targets for any missing section_id/portion_id to ensure full coverage."
+notes: "Status: experimental. Adapter: append stub targets for any missing section_id/portion_id to ensure full coverage."

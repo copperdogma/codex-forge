@@ -10,4 +10,4 @@ param_schema:
     allow-missing:
       type: boolean
   required: []
-notes: "Validate: ensure every target exists as a section_id or portion_id; fail the run unless allow-missing is set."
+notes: "Status: experimental. Validate: ensure every target exists as a section_id or portion_id; fail the run unless allow-missing is set."

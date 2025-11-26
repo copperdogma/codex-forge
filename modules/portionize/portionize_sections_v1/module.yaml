@@ -19,4 +19,4 @@ param_schema:
     max_section_len:
       type: integer
   required: []
-notes: "Portionize: detect numbered section anchors and emit portion hypotheses aligned to those numbers."
+notes: "Status: experimental. Portionize: detect numbered section anchors and emit portion hypotheses aligned to those numbers."

@@ -132,3 +132,7 @@
 - **Result:** Added `tests/assert_section_targets_test.py` to cover pass/fail paths of `assert_section_targets_v1` without external artifacts. Both tests pass locally via `pytest tests/assert_section_targets_test.py`.
 - **Notes:** Test constructs small JSONL fixtures in tmpdir and asserts exit code/report content. Keeps regression safety without GH Actions.
 - **Next:** Fold into default test suite (plain `pytest`) if desired.
+### 20251126-1125 — Note: enrichment alt modules removed in Story 025
+- **Result:** Documentation update.
+- **Notes:** `enrich_struct_v1`, `portionize_page_v1`, `consensus_spanfill_v1`, `build_appdata_v1`, and related alt recipes were pruned under Story 025 (module registry hygiene). Section stack and core pipeline remain; use current recipes under `configs/recipes` for enrichment work.
+- **Next:** If enrichment is revisited, reintroduce modules via new stories with clearer ownership/coverage.

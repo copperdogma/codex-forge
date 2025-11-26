@@ -160,3 +160,7 @@
 - **Next:** Lock CV params, update recipe defaults (done), and document manual validation.
 - **Result:** Clarified tasks: manual validation accepted, no CI requirement; added note about manual validation to tasks/notes.
 - **Next:** Define a concise manual validation checklist alongside CV baseline results when ready.
+### 20251126-1126 — Note: CV cropper removed in Story 025
+- **Result:** Documentation update.
+- **Notes:** `image_crop_cv_v1` and demo recipes were pruned under Story 025 to slim the registry. Historical metrics remain here for reference; cropper would need reintroduction via a new story if needed.
+- **Next:** If image cropping is revived, reopen this story or a follow-up with a new module/recipe plan.
