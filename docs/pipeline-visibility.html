@@ -1,12 +1,15 @@
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Pipeline Visibility — codex-forge</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600&family=IBM+Plex+Mono:wght@400;600&display=swap" rel="stylesheet">
+  <link
+    href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600&family=IBM+Plex+Mono:wght@400;600&display=swap"
+    rel="stylesheet">
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/highlight.js@11.9.0/styles/atom-one-dark.min.css">
   <style>
     :root {
@@ -20,17 +23,25 @@
       --danger: #ff6b6b;
       --grid: 280px;
     }
-    * { box-sizing: border-box; }
+
+    * {
+      box-sizing: border-box;
+    }
+
     body {
       margin: 0;
       font-family: "Space Grotesk", "Helvetica Neue", Arial, sans-serif;
-      background: radial-gradient(120% 120% at 20% 20%, rgba(74,215,178,0.08), transparent),
-                  radial-gradient(120% 120% at 80% 0%, rgba(245,165,36,0.08), transparent),
-                  var(--bg);
+      background: radial-gradient(120% 120% at 20% 20%, rgba(74, 215, 178, 0.08), transparent),
+        radial-gradient(120% 120% at 80% 0%, rgba(245, 165, 36, 0.08), transparent),
+        var(--bg);
       color: var(--text);
-      min-height: 100vh;
-      padding: 20px 32px 40px;
+      height: 100vh;
+      display: flex;
+      flex-direction: column;
+      padding: 20px 32px 0;
+      /* remove bottom padding, let footer handle it */
     }
+
     header {
       display: flex;
       gap: 16px;
@@ -38,45 +49,60 @@
       justify-content: space-between;
       margin-bottom: 18px;
     }
+
     h1 {
       margin: 0;
       font-size: 26px;
       letter-spacing: -0.01em;
     }
+
     .pill {
       display: inline-flex;
       align-items: center;
       gap: 8px;
       padding: 8px 12px;
-      background: rgba(255,255,255,0.05);
-      border: 1px solid rgba(255,255,255,0.06);
+      background: rgba(255, 255, 255, 0.05);
+      border: 1px solid rgba(255, 255, 255, 0.06);
       border-radius: 999px;
       font-size: 13px;
       color: var(--muted);
     }
-    .pill strong { color: var(--text); font-weight: 600; }
+
+    .pill strong {
+      color: var(--text);
+      font-weight: 600;
+    }
 
     .controls {
       background: var(--panel);
-      border: 1px solid rgba(255,255,255,0.05);
+      border: 1px solid rgba(255, 255, 255, 0.05);
       border-radius: 14px;
       padding: 14px 16px;
       display: grid;
       grid-template-columns: 2fr 1fr 1fr auto;
       gap: 12px;
       align-items: center;
-      box-shadow: 0 18px 40px rgba(0,0,0,0.25);
+      box-shadow: 0 18px 40px rgba(0, 0, 0, 0.25);
     }
-    .controls label { font-size: 12px; text-transform: uppercase; color: var(--muted); letter-spacing: 0.05em; }
-    .controls input, .controls select {
+
+    .controls label {
+      font-size: 12px;
+      text-transform: uppercase;
+      color: var(--muted);
+      letter-spacing: 0.05em;
+    }
+
+    .controls input,
+    .controls select {
       width: 100%;
       padding: 10px 12px;
       border-radius: 10px;
-      border: 1px solid rgba(255,255,255,0.07);
+      border: 1px solid rgba(255, 255, 255, 0.07);
       background: var(--panel-2);
       color: var(--text);
       font-family: "Space Grotesk", sans-serif;
     }
+
     .controls button {
       padding: 10px 14px;
       border-radius: 10px;
@@ -87,58 +113,160 @@
       cursor: pointer;
       letter-spacing: 0.01em;
     }
+
     .controls button.secondary {
-      background: rgba(255,255,255,0.08);
+      background: rgba(255, 255, 255, 0.08);
       color: var(--text);
-      border: 1px solid rgba(255,255,255,0.08);
+      border: 1px solid rgba(255, 255, 255, 0.08);
     }
 
-    .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(var(--grid), 1fr)); gap: 14px; margin-top: 16px; }
+    .grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(var(--grid), 1fr));
+      gap: 14px;
+      margin-top: 16px;
+    }
+
     .card {
       background: var(--panel);
-      border: 1px solid rgba(255,255,255,0.06);
+      border: 1px solid rgba(255, 255, 255, 0.06);
       border-radius: 14px;
       padding: 14px;
-      box-shadow: 0 14px 30px rgba(0,0,0,0.2);
+      box-shadow: 0 14px 30px rgba(0, 0, 0, 0.2);
     }
-    .card-header { display: flex; justify-content: space-between; align-items: center; gap: 8px; }
-    .elapsed { font-size: 12px; color: var(--muted); }
-    .elapsed.running { color: var(--accent); }
-    .card h3 { margin: 0 0 6px; font-size: 16px; letter-spacing: -0.01em; }
-    .meta { display: flex; gap: 10px; flex-wrap: wrap; font-size: 12px; color: var(--muted); }
+
+    .card-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .stage-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 6px;
+    }
+
+    .stage-name {
+      font-weight: 600;
+      font-size: 15px;
+    }
+
+    .stage-time {
+      font-size: 12px;
+      color: var(--muted);
+      font-family: "IBM Plex Mono", monospace;
+    }
+
+    .elapsed {
+      font-size: 12px;
+      color: var(--muted);
+    }
+
+    .elapsed.running {
+      color: var(--accent);
+    }
+
+    .card h3 {
+      margin: 0 0 6px;
+      font-size: 16px;
+      letter-spacing: -0.01em;
+    }
+
+    .meta {
+      display: flex;
+      gap: 10px;
+      flex-wrap: wrap;
+      font-size: 12px;
+      color: var(--muted);
+    }
+
     .progress-bar {
       position: relative;
       height: 10px;
       width: 100%;
-      background: rgba(255,255,255,0.05);
+      background: rgba(255, 255, 255, 0.05);
       border-radius: 999px;
       overflow: hidden;
       margin: 10px 0;
     }
+
     .progress-bar span {
       position: absolute;
-      left: 0; top: 0; bottom: 0;
+      left: 0;
+      top: 0;
+      bottom: 0;
       background: linear-gradient(90deg, var(--accent), #6cf0ca);
       border-radius: 999px;
     }
-    .status { font-size: 13px; font-weight: 600; }
-    .status.running { color: var(--accent); }
-    .status.done { color: #8fe3ff; }
-    .status.failed { color: var(--danger); }
-    .status.skipped { color: var(--muted); }
-    .chips { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 8px; }
+
+    .status {
+      font-size: 13px;
+      font-weight: 600;
+    }
+
+    .status.running {
+      color: var(--accent);
+    }
+
+    .status.done {
+      color: #8fe3ff;
+    }
+
+    .status.failed {
+      color: var(--danger);
+    }
+
+    .status.skipped {
+      color: var(--muted);
+    }
+
+    .chips {
+      display: flex;
+      gap: 8px;
+      flex-wrap: wrap;
+      margin-top: 8px;
+    }
+
     .chip {
       padding: 6px 8px;
       border-radius: 10px;
-      border: 1px solid rgba(255,255,255,0.08);
+      border: 1px solid rgba(255, 255, 255, 0.08);
       font-size: 12px;
       color: var(--muted);
     }
-    .chip strong { color: var(--text); }
-    .timeline { margin-top: 18px; }
-    .timeline ul { list-style: none; padding: 0; margin: 0; }
-    .timeline li { padding: 10px 12px; border-bottom: 1px solid rgba(255,255,255,0.06); display: grid; grid-template-columns: 160px 90px 1fr; gap: 10px; align-items: center; }
-    .mono { font-family: "IBM Plex Mono", monospace; font-size: 12px; color: var(--muted); }
+
+    .chip strong {
+      color: var(--text);
+    }
+
+    .timeline {
+      margin-top: 18px;
+    }
+
+    .timeline ul {
+      list-style: none;
+      padding: 0;
+      margin: 0;
+    }
+
+    .timeline li {
+      padding: 10px 12px;
+      border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+      display: grid;
+      grid-template-columns: 160px 90px 1fr;
+      gap: 10px;
+      align-items: center;
+    }
+
+    .mono {
+      font-family: "IBM Plex Mono", monospace;
+      font-size: 12px;
+      color: var(--muted);
+    }
+
     .badge {
       display: inline-flex;
       align-items: center;
@@ -148,25 +276,64 @@
       text-transform: uppercase;
       letter-spacing: 0.04em;
     }
-    .badge.success { background: rgba(106, 255, 215, 0.16); color: #7bf3cc; border: 1px solid rgba(106,255,215,0.3); }
-    .badge.warn { background: rgba(245,165,36,0.14); color: #f5c36a; border: 1px solid rgba(245,165,36,0.3); }
-    .badge.danger { background: rgba(255,107,107,0.18); color: #ff9f9f; border: 1px solid rgba(255,107,107,0.3); }
-    .badge.muted { background: rgba(255,255,255,0.08); color: var(--muted); border: 1px solid rgba(255,255,255,0.08); }
-    .footer { margin-top: 16px; color: var(--muted); font-size: 12px; }
-    .artifact-actions { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 8px; }
+
+    .badge.success {
+      background: rgba(106, 255, 215, 0.16);
+      color: #7bf3cc;
+      border: 1px solid rgba(106, 255, 215, 0.3);
+    }
+
+    .badge.warn {
+      background: rgba(245, 165, 36, 0.14);
+      color: #f5c36a;
+      border: 1px solid rgba(245, 165, 36, 0.3);
+    }
+
+    .badge.danger {
+      background: rgba(255, 107, 107, 0.18);
+      color: #ff9f9f;
+      border: 1px solid rgba(255, 107, 107, 0.3);
+    }
+
+    .badge.muted {
+      background: rgba(255, 255, 255, 0.08);
+      color: var(--muted);
+      border: 1px solid rgba(255, 255, 255, 0.08);
+    }
+
+    .footer {
+      margin-top: auto;
+      padding-bottom: 20px;
+      color: var(--muted);
+      font-size: 12px;
+    }
+
+    .artifact-actions {
+      display: flex;
+      gap: 8px;
+      flex-wrap: wrap;
+      margin-top: 8px;
+    }
+
     .btn-small {
       padding: 6px 10px;
       border-radius: 8px;
-      border: 1px solid rgba(255,255,255,0.08);
-      background: rgba(255,255,255,0.05);
+      border: 1px solid rgba(255, 255, 255, 0.08);
+      background: rgba(255, 255, 255, 0.05);
       color: var(--text);
       cursor: pointer;
       font-size: 12px;
     }
-    .metrics { margin-top: 6px; font-size: 12px; color: var(--muted); }
+
+    .metrics {
+      margin-top: 6px;
+      font-size: 12px;
+      color: var(--muted);
+    }
+
     pre {
       background: #0d1219;
-      border: 1px solid rgba(255,255,255,0.06);
+      border: 1px solid rgba(255, 255, 255, 0.06);
       border-radius: 12px;
       padding: 12px;
       overflow: auto;
@@ -174,25 +341,82 @@
       font-size: 12px;
       max-height: 320px;
     }
-    .layout { display: grid; grid-template-columns: 1fr 0 0; gap: 0; transition: grid-template-columns 0.2s ease; }
-    #split-handle { width: 0; cursor: col-resize; background: rgba(255,255,255,0.06); }
-    #pane-col { overflow: auto; display: flex; flex-direction: column; }
-    #artifact-preview { flex: 1; }
-    .pane-header { display: flex; justify-content: space-between; align-items: center; gap: 8px; }
-    .pane-actions { display: flex; gap: 6px; }
-    pre code.hljs { display: block; }
-    @media (max-width: 1100px) { .layout { grid-template-columns: 1fr 0 0; } #pane-col { position: sticky; top: 10px; } }
+
+    .layout {
+      display: grid;
+      grid-template-columns: 1fr 0 0;
+      gap: 0;
+      transition: grid-template-columns 0.2s ease;
+      flex: 1;
+      min-height: 0;
+      margin-bottom: 16px;
+    }
+
+    #split-handle {
+      width: 0;
+      cursor: col-resize;
+      background: rgba(255, 255, 255, 0.06);
+    }
+
+    #pane-col {
+      overflow: hidden;
+      display: flex;
+      flex-direction: column;
+      height: 100%;
+    }
+
+    #artifact-preview {
+      flex: 1;
+      overflow: auto;
+      margin: 0;
+      border-radius: 0 0 14px 14px;
+      border-top: none;
+    }
+
+    .pane-header {
+      padding-bottom: 10px;
+      border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+      margin-bottom: 10px;
+    }
+
+    .pane-actions {
+      display: flex;
+      gap: 6px;
+    }
+
+    pre code.hljs {
+      display: block;
+    }
+
+    @media (max-width: 1100px) {
+      .layout {
+        grid-template-columns: 1fr 0 0;
+      }
+
+      #pane-col {
+        position: sticky;
+        top: 10px;
+      }
+    }
+
     @media (max-width: 900px) {
-      .controls { grid-template-columns: 1fr; }
-      .timeline li { grid-template-columns: 120px 70px 1fr; }
+      .controls {
+        grid-template-columns: 1fr;
+      }
+
+      .timeline li {
+        grid-template-columns: 120px 70px 1fr;
+      }
     }
   </style>
 </head>
+
 <body>
   <header>
     <div>
       <h1>Pipeline Visibility</h1>
       <div class="pill">Live view of <strong>pipeline_state.json</strong> + events</div>
+      <div class="pill" style="font-size:10px; opacity:0.5;">v12-debug</div>
     </div>
     <div class="pill mono" id="last-refresh">—</div>
   </header>
@@ -240,8 +464,10 @@
   </div>
 
   <div class="footer">
-    Serve this file from the repo root (e.g., <code>python -m http.server 8000</code>) then open <code>/docs/pipeline-visibility.html</code>.
-    The viewer polls <code>pipeline_state.json</code> and <code>pipeline_events.jsonl</code> inside <code>output/runs/&lt;run_id&gt;/</code>.
+    Serve this file from the repo root (e.g., <code>python -m http.server 8000</code>) then open
+    <code>/docs/pipeline-visibility.html</code>.
+    The viewer polls <code>pipeline_state.json</code> and <code>pipeline_events.jsonl</code> inside
+    <code>output/runs/&lt;run_id&gt;/</code>.
   </div>
 
   <script src="https://cdn.jsdelivr.net/npm/highlight.js@11.9.0/lib/highlight.min.js"></script>
@@ -282,7 +508,7 @@
     };
 
     function escapeHtml(str) {
-      return str.replace(/[&<>'"]/g, c => ({"&": "&amp;", "<": "&lt;", ">": "&gt;", "'": "&#39;", '"': "&quot;"}[c]));
+      return str.replace(/[&<>'"]/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", "'": "&#39;", '"': "&quot;" }[c]));
     }
 
     function renderPretty(text, lang = "json") {
@@ -294,7 +520,10 @@
       pre.appendChild(code);
       artifactPreview.appendChild(pre);
       if (window.hljs) {
-        try { hljs.highlightElement(code); } catch (e) { /* no-op */ }
+        // small delay to ensure DOM is ready if needed, though usually immediate is fine
+        requestAnimationFrame(() => {
+          try { hljs.highlightElement(code); } catch (e) { console.error(e); }
+        });
       }
     }
 
@@ -365,6 +594,18 @@
         const candidates = lines.slice(-150); // last N entries
 
         async function resolveTs(row) {
+          // Try to parse timestamp from run_id (e.g. ...20251124e)
+          const dateMatch = row.run_id.match(/(\d{8})([a-z]?)$/);
+          if (dateMatch) {
+            const dStr = dateMatch[1];
+            const suffix = dateMatch[2] || "";
+            // approximate time: date + suffix offset
+            const y = dStr.slice(0, 4), m = dStr.slice(4, 6), d = dStr.slice(6, 8);
+            let ts = new Date(`${y}-${m}-${d}T00:00:00Z`).getTime();
+            if (suffix) ts += (suffix.charCodeAt(0) - 96) * 1000; // a=1s, b=2s...
+            return ts;
+          }
+
           const direct = parseTimestamp(row.created_at || row.updated_at || "");
           if (direct) return direct;
           if (!row.path) return 0;
@@ -423,26 +664,94 @@
       const s = Math.floor(seconds % 60);
       const m = Math.floor((seconds / 60) % 60);
       const h = Math.floor(seconds / 3600);
-      if (h) return `${h}h ${m.toString().padStart(2,"0")}m`;
-      return `${m}:${s.toString().padStart(2,"0")}s`;
+      if (h) return `${h}h ${m.toString().padStart(2, "0")}m`;
+      return `${m}:${s.toString().padStart(2, "0")}s`;
     }
 
     function computeStageDurations(events, stages) {
       const map = {};
+      const byStage = {};
+
+      // Group events by stage
+      const MIN_VALID_TS = new Date("2025-01-01").getTime();
       events.forEach(evt => {
+        if (!evt.stage) return;
         const ts = parseTimestamp(evt.timestamp);
-        if (!ts || !evt.stage) return;
-        const entry = map[evt.stage] || { start: null, end: null, lastStatus: evt.status };
-        if (entry.start === null || ts < entry.start) entry.start = ts;
-        if (entry.end === null || ts > entry.end) entry.end = ts;
-        entry.lastStatus = evt.status || entry.lastStatus;
-        map[evt.stage] = entry;
+        if (!ts || ts < MIN_VALID_TS) return;
+
+        if (!byStage[evt.stage]) byStage[evt.stage] = [];
+        byStage[evt.stage].push(evt);
       });
+
+      Object.keys(byStage).forEach(stage => {
+        const stageEvents = byStage[stage];
+        // Sort by timestamp string
+        stageEvents.sort((a, b) => (a.timestamp || "").localeCompare(b.timestamp || ""));
+
+        let totalDuration = 0;
+        let runCount = 0;
+        let sessionStart = null;
+        let lastTs = 0;
+        const GAP_THRESHOLD = 15 * 60 * 1000; // 15 mins
+
+        stageEvents.forEach((evt, idx) => {
+          const ts = parseTimestamp(evt.timestamp);
+          if (!ts) return;
+
+          let isNewSession = false;
+          if (lastTs && (ts - lastTs > GAP_THRESHOLD)) {
+            isNewSession = true;
+          }
+
+          if (isNewSession) {
+            // End previous session
+            if (sessionStart !== null) {
+              totalDuration += (lastTs - sessionStart);
+              runCount++;
+              sessionStart = null;
+            }
+          }
+
+          // Start new session if needed
+          if (sessionStart === null) {
+            sessionStart = ts;
+          }
+
+          // If this is the last event, close the session
+          if (idx === stageEvents.length - 1) {
+            if (sessionStart !== null) {
+              totalDuration += (ts - sessionStart);
+              runCount++;
+            }
+          }
+
+          lastTs = ts;
+        });
+
+        // If totalDuration is 0 but we have events, maybe it was instantaneous?
+        // Or maybe we just have one event?
+        // If we have >0 events, runCount should be at least 1.
+        if (runCount === 0 && stageEvents.length > 0) runCount = 1;
+
+        map[stage] = {
+          totalDuration,
+          runCount,
+          lastStatus: stageEvents[stageEvents.length - 1].status,
+          // Keep start/end for compatibility if needed, but UI should use totalDuration
+          start: stageEvents[0] ? parseTimestamp(stageEvents[0].timestamp) : null,
+          end: stageEvents[stageEvents.length - 1] ? parseTimestamp(stageEvents[stageEvents.length - 1].timestamp) : null
+        };
+
+        if (stage === "build") {
+          console.log("Build map entry:", map[stage]);
+        }
+      });
+
       // fallbacks from state updated_at when no events
       Object.entries(stages || {}).forEach(([stage, info]) => {
         if (map[stage]) return;
         const ts = parseTimestamp(info.updated_at);
-        if (ts) map[stage] = { start: ts, end: ts, lastStatus: info.status };
+        if (ts) map[stage] = { totalDuration: 0, runCount: 1, lastStatus: info.status, start: ts, end: ts };
       });
       return map;
     }
@@ -507,6 +816,12 @@
         "Click any stage to open artifacts",
         "Auto-refresh uses pipeline_events.jsonl"
       ]));
+
+      // Debug Card
+      const debugCard = document.createElement("div");
+      debugCard.className = "card";
+      debugCard.innerHTML = `<h3>Debug Info</h3><button class="btn-small" onclick="const el=document.getElementById('debug-details'); el.style.display=el.style.display==='none'?'block':'none'">Toggle Details</button><div id="debug-details" style="display:none; margin-top:10px; font-family:monospace; font-size:10px; white-space:pre-wrap;"></div>`;
+      summaryGrid.appendChild(debugCard);
       const meta = runMeta[state.run_id || currentRun] || {};
       const inst = document.createElement("div");
       inst.className = "card";
@@ -542,7 +857,7 @@
         if (models.length) {
           const top = document.createElement("div");
           top.className = "meta";
-          top.innerHTML = `<span>Top models:</span>${models.map(([m,v]) => `<span>${m}: ${(v.cost||0).toFixed(4)}</span>`).join("")}`;
+          top.innerHTML = `<span>Top models:</span>${models.map(([m, v]) => `<span>${m}: ${(v.cost || 0).toFixed(4)}</span>`).join("")}`;
           inst.appendChild(top);
         }
       } else {
@@ -582,35 +897,48 @@
       if (instrumentation?.stages) {
         instrumentation.stages.forEach(s => { if (s.id) instMap[s.id] = s; });
       }
-      const ordered = Object.keys(stages).sort();
+      const ordered = Object.keys(stages).sort((a, b) => {
+        const startA = durations?.[a]?.start || 0;
+        const startB = durations?.[b]?.start || 0;
+        if (startA !== startB) return startA - startB;
+        return a.localeCompare(b);
+      });
+      console.log('Ordered stages:', ordered);
+
+      const debugDetails = document.getElementById('debug-details');
+      if (debugDetails) {
+        debugDetails.textContent = ordered.map(s => {
+          const d = durations[s];
+          const durSec = d ? (d.totalDuration / 1000).toFixed(1) : "N/A";
+          return `${s.padEnd(20)}: ${durSec}s (${d?.runCount || 0} runs)`;
+        }).join('\n');
+      }
+
       ordered.forEach(stage => {
+        console.log(`Rendering stage: ${stage}`, stages[stage], durations[stage]);
+        const dur = durations[stage];
         const info = stages[stage];
         const card = document.createElement("div");
         card.className = "card";
         const status = info.status || "queued";
         const prog = info.progress || {};
-        const timing = durations?.[stage] || {};
-        let elapsedText = "—";
-        if (timing.start) {
-          if (status === "running") {
-            elapsedText = `▶ ${formatDuration((Date.now() - timing.start) / 1000)}`;
-          } else if (timing.end) {
-            elapsedText = `⏱ ${formatDuration((timing.end - timing.start) / 1000)}`;
-          }
-        }
+
+        const elapsed = dur ? formatDuration(dur.totalDuration / 1000) : "—";
+        const runCountText = (dur && dur.runCount > 1) ? ` • ${dur.runCount} RUNS` : "";
+
         card.innerHTML = `
-          <div class="card-header">
-            <h3>${stage}</h3>
-            <div class="elapsed ${status === "running" ? "running" : ""}">${elapsedText}</div>
-          </div>
-          <div class="status ${statusDescriptors[status]?.class || ""}">${status.toUpperCase()}</div>
-          <div class="progress-bar"><span style="width:${Math.min(100, prog.percent || (status === "done" ? 100 : 0))}%"></span></div>
-          <div class="meta">
-            <span>${prog.current ?? "—"} / ${prog.total ?? "?"}</span>
-            <span>${percentText(prog.percent)}</span>
-            <span>${info.updated_at || ""}</span>
-          </div>
-        `;
+      <div class="stage-header">
+        <span class="stage-name">${stage}</span>
+        <span class="stage-time" style="margin-left:auto;">⏱ ${elapsed}</span>
+      </div>
+      <div class="status ${statusDescriptors[status]?.class || ""}">${status.toUpperCase()}${runCountText}</div>
+      <div class="progress-bar"><span style="width:${Math.min(100, prog.percent || (status === "done" ? 100 : 0))}%"></span></div>
+      <div class="meta">
+        <span>${prog.current ?? "—"} / ${prog.total ?? "?"}</span>
+        <span>${percentText(prog.percent)}</span>
+        <span>${info.updated_at || ""}</span>
+      </div>
+    `;
 
         const chips = document.createElement("div");
         chips.className = "chips";
@@ -641,10 +969,10 @@
         costChip.innerHTML = `<strong>Cost</strong> ${costVal.toFixed(4)}`;
         chips.appendChild(costChip);
         if (inst && inst.wall_seconds != null) {
-            const timeChip = document.createElement("div");
-            timeChip.className = "chip";
-            timeChip.innerHTML = `<strong>Wall</strong> ${inst.wall_seconds.toFixed(2)}s`;
-            chips.appendChild(timeChip);
+          const timeChip = document.createElement("div");
+          timeChip.className = "chip";
+          timeChip.innerHTML = `<strong>Wall</strong> ${inst.wall_seconds.toFixed(2)}s`;
+          chips.appendChild(timeChip);
         }
         card.appendChild(chips);
 
@@ -731,7 +1059,7 @@
           rows = Object.values(JSON.parse(text));
         }
         const confidences = rows.map(r => r.confidence).filter(v => v !== undefined && v !== null);
-        const avg = confidences.length ? (confidences.reduce((a,b)=>a+b,0)/confidences.length).toFixed(3) : "n/a";
+        const avg = confidences.length ? (confidences.reduce((a, b) => a + b, 0) / confidences.length).toFixed(3) : "n/a";
         const min = confidences.length ? Math.min(...confidences).toFixed(3) : "n/a";
         const max = confidences.length ? Math.max(...confidences).toFixed(3) : "n/a";
         const sample = rows.slice(0, 3);
@@ -749,7 +1077,15 @@
         if (!res.ok) throw new Error("Unable to fetch artifact");
         const text = await res.text();
         const pretty = formatMaybeJSON(text, artifactPath);
-        const html = `<!DOCTYPE html><html><head><link rel=\"stylesheet\" href=\"https://cdn.jsdelivr.net/npm/highlight.js@11.9.0/styles/atom-one-dark.min.css\"><script src=\"https://cdn.jsdelivr.net/npm/highlight.js@11.9.0/lib/highlight.min.js\"><\/script><script src=\"https://cdn.jsdelivr.net/npm/highlight.js@11.9.0/lib/languages/json.min.js\"><\/script></head><body style=\"margin:0;background:#0d1219;color:#e5e9f0;\"><pre><code class=\"language-json\">${escapeHtml(pretty)}</code></pre><script>window.hljs&&hljs.highlightAll();<\/script></body></html>`;
+        const html = `<!DOCTYPE html><html><head><link rel=\"stylesheet\" href=\"https://cdn.jsdelivr.net/npm/highlight.js@11.9.0/styles/atom-one-dark.min.css\"><script src=\"https://cdn.jsdelivr.net/npm/highlight.js@11.9.0/lib/highlight.min.js\"><\/script><script src=\"https://cdn.jsdelivr.net/npm/highlight.js@11.9.0/lib/languages/json.min.js\"><\/script></head><body style=\"margin:0;background:#0d1219;color:#e5e9f0;\"><pre><code class=\"language-json\">${escapeHtml(pretty)}</code></pre><script>
+        window.onload = function() {
+            if (window.hljs) { hljs.highlightAll(); }
+            else { 
+                // retry if script not loaded yet
+                setTimeout(() => { if (window.hljs) hljs.highlightAll(); }, 500);
+            }
+        };
+        <\/script></body></html>`;
         const blob = new Blob([html], { type: "text/html;charset=utf-8" });
         const url = URL.createObjectURL(blob);
         window.open(url, "_blank");
@@ -878,4 +1214,5 @@
     });
   </script>
 </body>
+
 </html>
