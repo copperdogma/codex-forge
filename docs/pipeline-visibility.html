@@ -573,6 +573,15 @@
       "queued": { text: "Queued", class: "muted" }
     };
 
+    function artifactUrl(artifact, base) {
+      if (!artifact) return null;
+      if (/^https?:\/\//.test(artifact)) return artifact;          // absolute
+      if (artifact.startsWith(ROOT + "/")) return artifact;        // already rooted
+      if (artifact.startsWith("output/")) return `${ROOT}/${artifact}`; // repo-relative
+      if (base) return `${base}/${artifact}`;                      // relative to run base
+      return `${ROOT}/${artifact}`;
+    }
+
     function escapeHtml(str) {
       return str.replace(/[&<>'"]/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", "'": "&#39;", '"': "&quot;" }[c]));
     }
@@ -868,7 +877,30 @@
       const stages = state.stages || {};
       const stats = summariseStages(stages);
       const meta = runMeta[state.run_id || currentRun] || {};
-      const pdfPath = meta.input?.pdf ? `${ROOT}/${meta.input.pdf}` : null;
+      // Resolve input artifact (pdf, images_dir, etc.)
+      const inputMeta = meta.input || {};
+      let inputPath = null;
+      let inputLabel = "Input";
+      const toAbs = (p) => {
+        if (!p) return null;
+        if (/^https?:\/\//.test(p)) return p;
+        if (p.startsWith(ROOT + "/")) return p;
+        return `${ROOT}/${p}`;
+      };
+      if (inputMeta.pdf) {
+        inputPath = toAbs(inputMeta.pdf);
+        inputLabel = "Input PDF";
+      } else if (inputMeta.images_dir) {
+        inputPath = toAbs(inputMeta.images_dir);
+        inputLabel = "Input images";
+      } else if (inputMeta.images) {
+        const p = Array.isArray(inputMeta.images) ? inputMeta.images[0] : inputMeta.images;
+        inputPath = toAbs(p);
+        inputLabel = "Input images";
+      } else if (inputMeta.text_glob) {
+        inputPath = toAbs(inputMeta.text_glob);
+        inputLabel = "Input text";
+      }
       const finalArtifact = findFinalArtifact(stages);
 
       summaryGrid.innerHTML = "";
@@ -882,8 +914,12 @@
         base.replace(`${ROOT}/`, "")
       ]));
       summaryGrid.appendChild(makeStatCard("Artifacts", "", [
-        pdfPath ? `<a href="${pdfPath}" target="_blank">Input PDF</a>` : "Input PDF unknown",
-        finalArtifact ? `<a href="${ROOT}/${finalArtifact}" target="_blank">Final JSON</a>` : "Final artifact not detected",
+        inputPath
+          ? `<button class="btn-small" onclick="window.open('${inputPath}', '_blank')">${inputLabel}</button>`
+          : "Input artifact unknown",
+        finalArtifact
+          ? `<button class="btn-small" onclick="openArtifactTab('final', '${ROOT}/${finalArtifact}')">Final JSON</button>`
+          : "Final artifact not detected",
         "Click any stage to open artifacts"
       ]));
 
@@ -1291,10 +1327,12 @@
     function findFinalArtifact(stages) {
       if (!stages) return null;
       const entries = Object.entries(stages);
-      // Prefer explicit build* stages
-      const buildStage = entries.find(([k]) => k.startsWith("build"));
-      if (buildStage && buildStage[1].artifact) return buildStage[1].artifact;
-      // Otherwise pick last done stage with an artifact
+      // Prefer confirm/dispatch outputs first
+      const preferredOrder = ["confirm_plan", "dispatch", "dispatch_hint", "gap_analysis", "zoom_refine", "overview_plan"];
+      for (const id of preferredOrder) {
+        if (stages[id]?.artifact) return stages[id].artifact;
+      }
+      // Otherwise pick most recent done stage with an artifact
       const doneWithArtifact = entries
         .filter(([, v]) => v.artifact)
         .sort((a, b) => parseTimestamp(b[1].updated_at) - parseTimestamp(a[1].updated_at));

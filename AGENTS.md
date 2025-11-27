@@ -55,3 +55,4 @@ This repo processes scanned (or text) books into structured JSON, using modular 
 - Update the relevant story work log for any change or investigation.
 - Keep responses concise; cite file paths when referencing changes.
 - **Debugging discipline:** when diagnosing issues, inspect the actual data/artifacts at each stage before changing code. Prefer evidence-driven plans (e.g., grep/rg on outputs, view JSONL samples) over guess-and-edit loops. Document what was observed and the decision that follows.
+- **Reuse working patterns first:** before inventing a new solution, look for an existing working pattern in this repo (code, UX, helper). Read it, understand it, and adapt with minimal changes.

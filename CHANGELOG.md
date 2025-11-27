@@ -1,3 +1,14 @@
+## [2025-11-27] - Intake dashboard fixes and reuse guidance
+
+### Added
+- AGENTS guide now reminds agents to reuse existing working patterns before inventing new solutions.
+
+### Fixed/Changed
+- Pipeline visibility Artifacts card now uses the same in-browser viewer as stage buttons for Final JSON and styles both input/final links as buttons; input link now adapts to pdf/images/text inputs instead of showing “Input PDF unknown.”
+
+### Tested
+- Manual dashboard reload and artifact open on intake runs (`intake-onward`, `intake-deathtrap`).
+
 ## [2025-11-26] - Dashboard stage help, metrics, and artifact links
 
 ### Added
