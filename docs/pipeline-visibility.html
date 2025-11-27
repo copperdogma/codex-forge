@@ -11,6 +11,9 @@
     href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600&family=IBM+Plex+Mono:wght@400;600&display=swap"
     rel="stylesheet">
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/highlight.js@11.9.0/styles/atom-one-dark.min.css">
+  <script src="https://cdn.jsdelivr.net/npm/highlight.js@11.9.0/lib/highlight.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/highlight.js@11.9.0/lib/languages/json.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/highlight.js@11.9.0/lib/languages/markdown.min.js"></script>
   <style>
     :root {
       --bg: #0c0f14;
@@ -35,11 +38,10 @@
         radial-gradient(120% 120% at 80% 0%, rgba(245, 165, 36, 0.08), transparent),
         var(--bg);
       color: var(--text);
-      height: 100vh;
+      min-height: 100vh;
       display: flex;
       flex-direction: column;
       padding: 20px 32px 0;
-      /* remove bottom padding, let footer handle it */
     }
 
     header {
@@ -81,7 +83,7 @@
       display: grid;
       grid-template-columns: 2fr 1fr 1fr auto;
       gap: 12px;
-      align-items: center;
+      align-items: end;
       box-shadow: 0 18px 40px rgba(0, 0, 0, 0.25);
     }
 
@@ -133,6 +135,9 @@
       border-radius: 14px;
       padding: 14px;
       box-shadow: 0 14px 30px rgba(0, 0, 0, 0.2);
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
     }
 
     .stage-card {
@@ -178,7 +183,7 @@
     }
 
     .card h3 {
-      margin: 0 0 6px;
+      margin: 0;
       font-size: 16px;
       letter-spacing: -0.01em;
     }
@@ -397,6 +402,12 @@
       display: block;
     }
 
+    /* Fix for left-most tooltips getting cut off */
+    .stage-card:nth-child(3n+1) .stage-help-tooltip {
+      left: 0;
+      right: auto;
+    }
+
     pre {
       background: #0d1219;
       border: 1px solid rgba(255, 255, 255, 0.06);
@@ -405,7 +416,7 @@
       overflow: auto;
       font-family: "IBM Plex Mono", monospace;
       font-size: 12px;
-      max-height: 320px;
+      /* removed max-height to let flex container handle scrolling */
     }
 
     .layout {
@@ -429,6 +440,7 @@
       display: flex;
       flex-direction: column;
       height: 100%;
+      max-height: 100%;
     }
 
     #artifact-preview {
@@ -437,6 +449,7 @@
       margin: 0;
       border-radius: 0 0 14px 14px;
       border-top: none;
+      height: 100%;
     }
 
     .pane-header {
@@ -561,6 +574,7 @@
     let currentRun = null;
     let userSelectedRun = false;
     let autoTimer = null;
+    let liveTimer = null;
     const artifactCache = {};
     const instCache = {};
     const runMeta = {};
@@ -615,6 +629,9 @@
     }
 
     paneClose.onclick = () => closePane();
+    document.addEventListener("keydown", (e) => {
+      if (e.key === "Escape") closePane();
+    });
     paneOpenTab.onclick = () => {
       const path = paneOpenTab.dataset.path;
       const stage = paneOpenTab.dataset.stage;
@@ -907,7 +924,8 @@
       summaryGrid.appendChild(makeStatCard("Overall Progress", `${stats.avg}%`, [
         `${stats.done}/${stats.total} done`,
         `${stats.running} running`,
-        `${stats.failed} failed`
+        `${stats.failed} failed`,
+        getRunDurationHtml(state, events)
       ]));
       summaryGrid.appendChild(makeStatCard("Run", state.run_id || currentRun || "n/a", [
         state.updated_at ? `updated ${state.updated_at}` : "live",
@@ -934,18 +952,18 @@
       const links = document.createElement("div");
       links.className = "meta";
       if (meta.instrumentation?.json) {
-        const a = document.createElement("a");
-        a.href = `${ROOT}/${meta.instrumentation.json}`;
-        a.target = "_blank";
-        a.textContent = "JSON report";
-        links.appendChild(a);
+        const btn = document.createElement("button");
+        btn.className = "btn-small";
+        btn.onclick = () => window.open(`${ROOT}/${meta.instrumentation.json}`, '_blank');
+        btn.textContent = "JSON report";
+        links.appendChild(btn);
       }
       if (meta.instrumentation?.md) {
-        const a = document.createElement("a");
-        a.href = `${ROOT}/${meta.instrumentation.md}`;
-        a.target = "_blank";
-        a.textContent = "Markdown summary";
-        links.appendChild(a);
+        const btn = document.createElement("button");
+        btn.className = "btn-small";
+        btn.onclick = () => openArtifactTab("Instrumentation", `${ROOT}/${meta.instrumentation.md}`);
+        btn.textContent = "Markdown summary";
+        links.appendChild(btn);
       }
       if (instrumentation) {
         const totals = instrumentation.totals || {};
@@ -1193,9 +1211,10 @@
         if (!res.ok) throw new Error("Unable to fetch artifact");
         const text = await res.text();
         let rows = [];
-        if (artifactPath.endsWith(".jsonl")) {
+        const lowerPath = artifactPath.toLowerCase();
+        if (lowerPath.endsWith(".jsonl")) {
           rows = parseJSONL(text);
-        } else if (artifactPath.endsWith(".json")) {
+        } else if (lowerPath.endsWith(".json")) {
           rows = Object.values(JSON.parse(text));
         }
         const confidences = rows.map(r => r.confidence).filter(v => v !== undefined && v !== null);
@@ -1216,19 +1235,44 @@
         const res = await fetch(artifactPath + "?t=" + Date.now());
         if (!res.ok) throw new Error("Unable to fetch artifact");
         const text = await res.text();
+
         const pretty = formatMaybeJSON(text, artifactPath);
-        const html = `<!DOCTYPE html><html><head><link rel=\"stylesheet\" href=\"https://cdn.jsdelivr.net/npm/highlight.js@11.9.0/styles/atom-one-dark.min.css\"><script src=\"https://cdn.jsdelivr.net/npm/highlight.js@11.9.0/lib/highlight.min.js\"><\/script><script src=\"https://cdn.jsdelivr.net/npm/highlight.js@11.9.0/lib/languages/json.min.js\"><\/script></head><body style=\"margin:0;background:#0d1219;color:#e5e9f0;\"><pre><code class=\"language-json\">${escapeHtml(pretty)}</code></pre><script>
-        window.onload = function() {
-            if (window.hljs) { hljs.highlightAll(); }
-            else { 
-                // retry if script not loaded yet
-                setTimeout(() => { if (window.hljs) hljs.highlightAll(); }, 500);
+        const isMd = artifactPath.toLowerCase().endsWith(".md");
+        const isJson = artifactPath.toLowerCase().endsWith(".json") || artifactPath.toLowerCase().endsWith(".jsonl");
+
+        let highlightedCode = "";
+        if (window.hljs) {
+          if (isJson) {
+            try {
+              highlightedCode = hljs.highlight(pretty, { language: 'json' }).value;
+            } catch (e) {
+              console.warn("Highlight error", e);
+              highlightedCode = escapeHtml(pretty);
             }
-        };
-        <\/script></body></html>`;
-        const blob = new Blob([html], { type: "text/html;charset=utf-8" });
-        const url = URL.createObjectURL(blob);
-        window.open(url, "_blank");
+          } else if (isMd) {
+            try {
+              highlightedCode = hljs.highlight(pretty, { language: 'markdown' }).value;
+            } catch (e) {
+              highlightedCode = escapeHtml(pretty);
+            }
+          } else {
+            highlightedCode = escapeHtml(pretty);
+          }
+        } else {
+          highlightedCode = escapeHtml(pretty);
+        }
+
+        const win = window.open("", "_blank");
+        if (!win) {
+          alert("Please allow popups to view artifacts in a new tab.");
+          return;
+        }
+
+        const html = `<!DOCTYPE html><html><head><title>${stage} artifact</title><link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/highlight.js@11.9.0/styles/atom-one-dark.min.css"><style>body{margin:0;background:#0d1219;color:#e5e9f0;padding:20px;}pre{margin:0;white-space:pre-wrap;word-wrap:break-word;}</style></head><body><pre><code class="hljs">${highlightedCode}</code></pre></body></html>`;
+
+        win.document.open();
+        win.document.write(html);
+        win.document.close();
       } catch (e) {
         alert(`Failed to open artifact: ${e.message}`);
       }
@@ -1236,14 +1280,16 @@
 
     function formatMaybeJSON(text, artifactPath) {
       try {
-        if (artifactPath.endsWith(".jsonl")) {
+        const lower = artifactPath.toLowerCase();
+        if (lower.endsWith(".jsonl")) {
           const rows = parseJSONL(text);
           return JSON.stringify(rows, null, 2);
         }
-        if (artifactPath.endsWith(".json")) {
+        if (lower.endsWith(".json")) {
           return JSON.stringify(JSON.parse(text), null, 2);
         }
       } catch (e) {
+        console.warn("Formatting failed, falling back to raw text", e);
         // fall through to raw text
       }
       return text;
@@ -1266,7 +1312,8 @@
       if (inst) {
         chips.push(`<div class="chip"><strong>Cost</strong> ${(inst.llm_totals?.cost || 0).toFixed(4)}</div>`);
         chips.push(`<div class="chip"><strong>Calls</strong> ${inst.llm_totals?.calls || 0}</div>`);
-        chips.push(`<div class="chip"><strong>Tokens</strong> ${inst.llm_totals?.prompt_tokens || 0}/${inst.llm_totals?.completion_tokens || 0}</div>`);
+        chips.push(`<div class="chip"><strong>Tokens</strong> ${inst.llm_totals?.prompt_tokens ||
+          0}/${inst.llm_totals?.completion_tokens || 0}</div>`);
         if (inst.wall_seconds != null) {
           chips.push(`<div class="chip"><strong>Wall</strong> ${inst.wall_seconds.toFixed(2)}s</div>`);
         }
@@ -1283,9 +1330,10 @@
         if (!res.ok) throw new Error("Unable to fetch artifact");
         const text = await res.text();
         let parsed;
-        if (artifactPath.endsWith(".jsonl")) {
+        const lower = artifactPath.toLowerCase();
+        if (lower.endsWith(".jsonl")) {
           parsed = parseJSONL(text);
-        } else if (artifactPath.endsWith(".json")) {
+        } else if (lower.endsWith(".json")) {
           parsed = JSON.parse(text);
         } else {
           parsed = text;
@@ -1311,11 +1359,11 @@
 
     function renderMetrics(stage, artifactPath, metrics) {
       artifactMeta.innerHTML = `
-        <div class="chip"><strong>Stage</strong> ${stage}</div>
-        <div class="chip"><strong>Records</strong> ${metrics.count}</div>
-        <div class="chip"><strong>Confidence</strong> avg ${metrics.avg}, min ${metrics.min}, max ${metrics.max}</div>
-        <div class="chip"><strong>Path</strong> ${artifactPath}</div>
-      `;
+<div class="chip"><strong>Stage</strong> ${stage}</div>
+<div class="chip"><strong>Records</strong> ${metrics.count}</div>
+<div class="chip"><strong>Confidence</strong> avg ${metrics.avg}, min ${metrics.min}, max ${metrics.max}</div>
+<div class="chip"><strong>Path</strong> ${artifactPath}</div>
+`;
       const sample = metrics.sample ?? [];
       const preview = {
         sample: sample,
@@ -1365,6 +1413,55 @@
     toggleAuto.onclick = () => {
       if (autoTimer) stopAuto(); else startAuto();
     };
+
+    function getRunDurationHtml(state, events) {
+      if (!events || !events.length) return "Duration: —";
+      const startEvt = events[0];
+      const endEvt = events[events.length - 1];
+      const start = parseTimestamp(startEvt.timestamp);
+      const end = parseTimestamp(endEvt.timestamp);
+      if (!start) return "Duration: —";
+
+      const now = Date.now();
+      // Check if run is truly done based on state status OR if all stages are done
+      let isDone = (state.status || "").toLowerCase() === "done" || (state.status || "").toLowerCase() === "failed";
+      if (!isDone && state.stages) {
+        const stages = Object.values(state.stages);
+        if (stages.length > 0 && stages.every(s => s.status === "done" || s.status === "failed" || s.status === "skipped")) {
+          isDone = true;
+        }
+      }
+
+      if (isDone) {
+        const duration = end - start;
+        const durStr = formatDuration(duration / 1000);
+        const ago = Math.floor((now - end) / 1000);
+        let agoStr = "just now";
+        if (ago > 0) agoStr = formatDuration(ago) + " ago";
+        return `Finished ${agoStr} (took ${durStr})`;
+      } else {
+        // Running
+        const duration = now - start;
+        const durStr = formatDuration(duration / 1000);
+        // Return a span with data attributes for live updates
+        return `<span class="live-duration" data-start="${start}">Running for ${durStr}</span>`;
+      }
+    }
+
+    function updateLiveTimers() {
+      document.querySelectorAll(".live-duration").forEach(el => {
+        const start = parseInt(el.dataset.start, 10);
+        if (!start) return;
+        const now = Date.now();
+        const duration = (now - start) / 1000;
+        el.textContent = `Running for ${formatDuration(duration)}`;
+      });
+    }
+
+    // Start live timer loop
+    if (!liveTimer) {
+      liveTimer = setInterval(updateLiveTimers, 1000);
+    }
 
     loadManifest().then(() => {
       if (currentRun) {

@@ -45,6 +45,7 @@ This repo processes scanned (or text) books into structured JSON, using modular 
 - Dry-run a DAG recipe: `python driver.py --recipe configs/recipes/recipe-ocr-dag.yaml --dry-run`
 - Section coverage check (map + backfill + fail on missing): `python modules/adapter/section_target_guard_v1/main.py --inputs output/runs/ocr-enrich-sections-noconsensus/portions_enriched.jsonl --out /tmp/portions_enriched_guard.jsonl --report /tmp/section_target_report.json`
 - Legacy map/backfill adapters are obsolete; use `section_target_guard_v1` (no backward compatibility maintained).
+- **Dashboard Testing**: Serve from repo root (`python -m http.server 8000`) and access via `http://localhost:8000/docs/pipeline-visibility.html`. Do not use `file://` URIs as they block CORS/fetch.
 
 ## Open Questions / WIP
 - Enrichment stage not implemented (Story 018).
