@@ -48,6 +48,7 @@ This index tracks stories in `/docs/stories/` for the codex-forge pipeline.
 | 024 | Image cropper follow-up | Medium | To Do | /docs/stories/story-024-image-cropper-followup.md |
 | 025 | Module pruning & registry hygiene | Medium | Done | /docs/stories/story-025-module-prune.md |
 | 026 | Onward to the Unknown — Arthur L'Heureux pilot | Medium | To Do | /docs/stories/story-026-onward-unknown-arthur-lheureux.md |
+| 027 | Contact-sheet intake for automatic book type planning | Medium | Done | /docs/stories/story-027-contact-sheet-auto-intake.md |
 | 099 | Remove dev-only backcompat disclaimer | Low | To Do | /docs/stories/story-099-remove-dev-backcompat-note.md |
 
 ## Notes

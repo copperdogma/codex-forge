@@ -1,0 +1,60 @@
+module_id: contact_sheet_builder_v1
+stage: intake
+entrypoint: modules/intake/contact_sheet_builder_v1/main.py
+input_schema: none
+output_schema: contact_sheet_manifest_v1
+default_params:
+  max_width: 200
+  grid_cols: 5
+  grid_rows: 4
+  pad: 10
+  number_overlay: true
+  pdf: ""
+  dpi: 300
+  image_format: jpeg
+param_schema:
+  input_dir:
+    type: string
+    description: Directory containing input page images.
+    required: false
+  out:
+    type: string
+    description: Optional manifest output path for driver stamping.
+    required: false
+  pdf:
+    type: string
+    description: PDF file to render into images if input_dir not provided.
+    required: false
+  dpi:
+    type: integer
+    description: DPI for PDF rendering when pdf is provided.
+    required: false
+  image_format:
+    type: string
+    description: Image format for rendered pages (jpeg/png).
+    required: false
+  output_dir:
+    type: string
+    description: Directory to write contact sheets and manifest.
+    required: true
+  max_width:
+    type: integer
+    description: Max width of each thumb tile.
+    required: false
+  grid_cols:
+    type: integer
+    description: Number of columns per sheet.
+    required: false
+  grid_rows:
+    type: integer
+    description: Number of rows per sheet.
+    required: false
+  pad:
+    type: integer
+    description: Padding (pixels) around tiles.
+    required: false
+  number_overlay:
+    type: boolean
+    description: Overlay display numbers on tiles.
+    required: false
+notes: "Generate low-res contact sheets and a manifest mapping tiles to original images for intake overview."

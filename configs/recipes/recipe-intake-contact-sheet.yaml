@@ -1,0 +1,55 @@
+## Generic intake via contact sheets. Override run_id/output_dir on invocation if desired.
+run_id: intake-generic
+input:
+  images_dir: input/onward-to-the-unknown-images
+output_dir: output/runs/intake-generic
+outputs:
+  build_contact_sheets: build_contact_sheets.jsonl
+  overview_plan: overview_plan.jsonl
+  zoom_refine: overview_plan_zoom.jsonl
+  gap_analysis: overview_plan_gap.jsonl
+  confirm_plan: overview_plan_final.jsonl
+stages:
+  - id: build_contact_sheets
+    stage: intake
+    module: contact_sheet_builder_v1
+    params:
+      input_dir: input/onward-to-the-unknown-images
+      output_dir: output/runs/intake-generic/contact-sheets
+      out: output/runs/intake-generic/build_contact_sheets.jsonl
+      max_width: 200
+      grid_cols: 5
+      grid_rows: 4
+  - id: overview_plan
+    stage: intake
+    module: contact_sheet_overview_v1
+    needs: [build_contact_sheets]
+    params:
+      manifest: output/runs/intake-generic/build_contact_sheets.jsonl
+      sheets_dir: output/runs/intake-generic/contact-sheets
+      out: output/runs/intake-generic/overview_plan.jsonl
+  - id: zoom_refine
+    stage: intake
+    module: zoom_refine_v1
+    needs: [overview_plan]
+    params:
+      plan_in: output/runs/intake-generic/overview_plan.jsonl
+      out: output/runs/intake-generic/overview_plan_zoom.jsonl
+      max_zoom_pages: 5
+  - id: gap_analysis
+    stage: intake
+    module: gap_analyzer_v1
+    needs: [zoom_refine]
+    params:
+      plan_in: output/runs/intake-generic/overview_plan_zoom.jsonl
+      out: output/runs/intake-generic/overview_plan_gap.jsonl
+      catalog_path: modules/module_catalog.yaml
+      # signals file is optional; provide if upstream overview adds one
+  - id: confirm_plan
+    stage: intake
+    module: confirm_plan_v1
+    needs: [gap_analysis]
+    params:
+      plan: output/runs/intake-generic/overview_plan_gap.jsonl
+      out: output/runs/intake-generic/overview_plan_final.jsonl
+      auto_approve: true

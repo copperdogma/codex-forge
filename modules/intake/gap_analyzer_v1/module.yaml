@@ -1,0 +1,25 @@
+module_id: gap_analyzer_v1
+stage: intake
+entrypoint: modules/intake/gap_analyzer_v1/main.py
+input_schema: intake_plan_v1
+output_schema: intake_plan_v1
+default_params:
+  catalog_path: modules/module_catalog.yaml
+param_schema:
+  plan_in:
+    type: string
+    description: Path to intake_plan_v1 JSON to enrich (optional; if omitted, start a new plan).
+    required: false
+  out:
+    type: string
+    description: Path to write updated intake_plan_v1 JSON.
+    required: true
+  signals:
+    type: string
+    description: JSON file listing detected signals/capabilities (e.g., ["tables","formulas"]).
+    required: false
+  catalog_path:
+    type: string
+    description: Module catalog YAML enumerating capabilities.
+    required: false
+notes: "Enrich intake plan with capability gaps by comparing detected signals to available modules; surfaces missing or partial support."

@@ -1,0 +1,15 @@
+module_id: dispatch_hint_v1
+stage: intake
+entrypoint: modules/intake/dispatch_hint_v1/main.py
+input_schema: intake_plan_v1
+output_schema: intake_plan_v1
+param_schema:
+  plan:
+    type: string
+    description: Path to confirmed intake_plan_v1 JSON.
+    required: true
+  out:
+    type: string
+    description: Path to write dispatch hint (recommended recipe).
+    required: true
+notes: "Writes a small JSON hint with recommended_recipe from the plan for downstream runner to branch."

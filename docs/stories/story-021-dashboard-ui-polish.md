@@ -18,8 +18,10 @@
 - [ ] Apply general UI polish per latest feedback (layout/spacing/visual tweaks).
 - [x] Order stage cards in execution order instead of current arbitrary ordering.
 - [ ] Fix artifact pane vertical sizing: View in pane + Load metrics should use the full right-column height, not a small window.
+- [ ] The Load/Pause Audio buttons are misaligned.
+- [ ] In the Overall Progress card, put elapsed time with a live counter if it's still running or a static final time once complete for the ENTIRE run. If it's done, it should also say when it finished. Nicely. Like "1 min ago/10 mins ago/1 hour ago/etc/etc" until it finally just defaults to date/time. Just pick a nice gradinet of date formats. I think there are libraries out there that do this, so just use one of them and their defaults.
 - [ ] Ensure footer sticks to the page bottom; it currently sits mid-page under panels.
-- [ ] Improve link contrast for panel links (Instrumentation JSON/Markdown, Artifacts Input PDF/Final JSON) against the background.
+- [ ] We shouldn't have any raw html links in the page. Use the "btn-small" styles. Unless you think it's inappropriate for something and then run it by me first.
 - [ ] Pretty-print outputs in both "Open artifact (new tab)" and "View in pane"/"Load metrics" displays. Might need to Fix highlight.js initialization so both pane and new-tab outputs render colored JSON/JSONL.
 - [ ] Question mark hovers get cut off on the left-most ones.
 

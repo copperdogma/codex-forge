@@ -1,4 +1,4 @@
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Optional, Literal
 from pydantic import BaseModel, Field, field_validator, model_validator
 
 
@@ -244,3 +244,88 @@ class RunInstrumentation(BaseModel):
     totals: Dict[str, Any] = Field(default_factory=dict)
     pricing: Dict[str, Any] = Field(default_factory=dict)
     env: Dict[str, Any] = Field(default_factory=dict)
+
+
+class ContactSheetBBox(BaseModel):
+    x: int
+    y: int
+    width: int
+    height: int
+
+    @model_validator(mode="after")
+    def positive_dims(self):
+        if self.width <= 0 or self.height <= 0:
+            raise ValueError("width and height must be positive")
+        return self
+
+
+class ContactSheetTile(BaseModel):
+    schema_version: str = "contact_sheet_manifest_v1"
+    sheet_id: str
+    tile_index: int = Field(ge=0)
+    source_image: str
+    display_number: int = Field(ge=0)
+    sheet_path: str
+    tile_bbox: Optional[ContactSheetBBox] = None
+    orig_size: Optional[Dict[str, int]] = None  # {"width": int, "height": int}
+
+
+class PageSpan(BaseModel):
+    start_image: str
+    end_image: str
+
+
+class SectionPlan(BaseModel):
+    label: str
+    type: str
+    page_spans: List[PageSpan] = Field(default_factory=list)
+    notes: Optional[str] = None
+
+
+class CapabilityGap(BaseModel):
+    capability: str
+    severity: Literal["missing", "partial"] = "missing"
+    suggested_action: Optional[str] = None
+    notes: Optional[str] = None
+    pages: List[str] = Field(default_factory=list)
+
+
+class SignalEvidence(BaseModel):
+    signal: str
+    pages: List[str] = Field(default_factory=list)
+    reason: Optional[str] = None
+
+
+class IntakePlan(BaseModel):
+    schema_version: str = "intake_plan_v1"
+    book_type: Literal[
+        "novel",
+        "cyoa",
+        "genealogy",
+        "textbook",
+        "mixed",
+        "other",
+    ]
+    type_confidence: Optional[float] = None
+    sections: List[SectionPlan] = Field(default_factory=list)
+    zoom_requests: List[str] = Field(default_factory=list)
+    recommended_recipe: Optional[str] = None
+    sectioning_strategy: Optional[str] = None
+    assumptions: List[str] = Field(default_factory=list)
+    warnings: List[str] = Field(default_factory=list)
+    notes: Optional[str] = None
+    signals: List[str] = Field(default_factory=list)
+    sheets: List[str] = Field(default_factory=list)
+    manifest_path: Optional[str] = None
+    run_id: Optional[str] = None
+    created_at: Optional[str] = None
+    meta: Dict[str, Any] = Field(default_factory=dict)
+    capability_gaps: List[CapabilityGap] = Field(default_factory=list)
+    recommended_recipe: Optional[str] = None
+    signal_evidence: List[SignalEvidence] = Field(default_factory=list)
+
+    @field_validator("type_confidence")
+    def confidence_range(cls, v):
+        if v is not None and (v < 0.0 or v > 1.0):
+            raise ValueError("type_confidence must be between 0 and 1")
+        return v

@@ -1,0 +1,21 @@
+module_id: confirm_plan_v1
+stage: intake
+entrypoint: modules/intake/confirm_plan_v1/main.py
+input_schema: intake_plan_v1
+output_schema: intake_plan_v1
+default_params:
+  auto_approve: false
+param_schema:
+  plan:
+    type: string
+    description: Path to intake_plan_v1 JSON to present.
+    required: true
+  out:
+    type: string
+    description: Path to write intake_plan_v1 JSON (copied through if confirmed).
+    required: true
+  auto_approve:
+    type: boolean
+    description: Skip interactive prompt and approve plan automatically.
+    required: false
+notes: "Confirmation gate for intake plan; prints summary and exits non-zero unless approved or auto_approve is set."

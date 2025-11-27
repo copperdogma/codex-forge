@@ -1,0 +1,32 @@
+modules:
+  - id: portionize_sections_v1
+    stage: portionize
+    capabilities: ["cyoa", "narrative"]
+  - id: consensus_merge_v1
+    stage: consensus
+    capabilities: ["cyoa", "narrative"]
+  - id: section_target_guard_v1
+    stage: adapter
+    capabilities: ["cyoa", "narrative"]
+  - id: image_cropper_v1
+    stage: extract
+    capabilities: ["images"]
+  - id: contact_sheet_builder_v1
+    stage: intake
+    capabilities: ["overview", "images"]
+  - id: enrichment_v1
+    stage: enrich
+    capabilities: ["cyoa"]
+capabilities:
+  - name: formulas
+    modules: []
+  - name: tables
+    modules: []
+  - name: images
+    modules: ["image_cropper_v1", "contact_sheet_builder_v1"]
+  - name: cyoa
+    modules: ["portionize_sections_v1", "consensus_merge_v1", "enrichment_v1", "section_target_guard_v1"]
+  - name: genealogy
+    modules: []
+  - name: overview
+    modules: ["contact_sheet_builder_v1"]

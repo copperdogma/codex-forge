@@ -1,0 +1,41 @@
+module_id: zoom_refine_v1
+stage: intake
+entrypoint: modules/intake/zoom_refine_v1/main.py
+input_schema: intake_plan_v1
+output_schema: intake_plan_v1
+default_params:
+  max_zoom_pages: 5
+  model: gpt-4.1
+  vision_detail: low
+  source_images_dir: input/onward-to-the-unknown-images
+  mock_output: ""
+param_schema:
+  plan_in:
+    type: string
+    description: Path to draft intake_plan_v1 JSON.
+    required: true
+  out:
+    type: string
+    description: Path to write refined intake_plan_v1 JSON.
+    required: true
+  max_zoom_pages:
+    type: integer
+    description: Cap on zoom requests to honor.
+    required: false
+  model:
+    type: string
+    description: Vision LLM model for zoom refinement.
+    required: false
+  vision_detail:
+    type: string
+    description: Vision detail level (low/high).
+    required: false
+  source_images_dir:
+    type: string
+    description: Directory containing source page images for zoom fetch.
+    required: false
+  mock_output:
+    type: string
+    description: Optional path to JSON to use instead of calling the LLM.
+    required: false
+notes: "Stub zoom refinement: copies plan, caps zoom_requests, and heuristically sets recommended_recipe based on signals/book_type."

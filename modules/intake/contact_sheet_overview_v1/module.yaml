@@ -1,0 +1,45 @@
+module_id: contact_sheet_overview_v1
+stage: intake
+entrypoint: modules/intake/contact_sheet_overview_v1/main.py
+input_schema: contact_sheet_manifest_v1
+output_schema: intake_plan_v1
+default_params:
+  model: gpt-4o
+  boost_model: gpt-4o
+  max_sheets: 0
+  vision_detail: low
+  mock_output: ""
+param_schema:
+  manifest:
+    type: string
+    description: Path to contact_sheet_manifest.jsonl
+    required: true
+  sheets_dir:
+    type: string
+    description: Directory containing contact sheet images.
+    required: true
+  out:
+    type: string
+    description: Path to write draft intake_plan_v1 JSON.
+    required: true
+  model:
+    type: string
+    description: LLM model for overview classification.
+    required: false
+  boost_model:
+    type: string
+    description: Optional secondary model.
+    required: false
+  max_sheets:
+    type: integer
+    description: Max number of contact sheets to send to the LLM (0 = all).
+    required: false
+  vision_detail:
+    type: string
+    description: Vision detail level (low/high).
+    required: false
+  mock_output:
+    type: string
+    description: Optional path to JSON to return instead of calling the LLM (for tests/offline).
+    required: false
+notes: "Classify book type from contact sheets only (no web), propose sections and zoom requests, and output draft intake_plan_v1."

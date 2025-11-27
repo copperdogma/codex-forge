@@ -1,0 +1,12 @@
+{
+  "schema_version": "intake_plan_v1",
+  "book_type": "mixed",
+  "type_confidence": 0.4,
+  "sections": [],
+  "zoom_requests": ["Image001.jpg"],
+  "signals": ["images"],
+  "warnings": [],
+  "capability_gaps": [],
+  "sheets": ["sheet-000"],
+  "manifest_path": "/tmp/sheet-000.jsonl"
+}

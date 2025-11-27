@@ -14,6 +14,8 @@ from schemas import (
     StageInstrumentation,
     LLMCallUsage,
     ImageCrop,
+    ContactSheetTile,
+    IntakePlan,
 )
 
 
@@ -28,6 +30,8 @@ SCHEMA_MAP: Dict[str, Type[BaseModel]] = {
     "instrumentation_stage_v1": StageInstrumentation,
     "instrumentation_call_v1": LLMCallUsage,
     "image_crop_v1": ImageCrop,
+    "contact_sheet_manifest_v1": ContactSheetTile,
+    "intake_plan_v1": IntakePlan,
 }
 
 

@@ -1,0 +1,7 @@
+{
+  "book_type": "genealogy",
+  "type_confidence": 0.72,
+  "signals": ["tables", "images"],
+  "zoom_requests": ["Image029.jpg", "Image030.jpg"],
+  "warnings": []
+}

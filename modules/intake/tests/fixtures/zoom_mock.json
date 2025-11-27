@@ -1,0 +1,8 @@
+{
+  "book_type": "genealogy",
+  "type_confidence": 0.8,
+  "signals": ["tables","images"],
+  "recommended_recipe": "configs/recipes/recipe-genealogy.yaml",
+  "zoom_requests": ["Image029.jpg","Image030.jpg"],
+  "warnings": []
+}

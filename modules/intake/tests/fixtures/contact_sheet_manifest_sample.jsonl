@@ -1,0 +1,2 @@
+{"sheet_id":"sheet-000","tile_index":0,"source_image":"Image001.jpg","display_number":1,"sheet_path":"/tmp/sheet-000.jpg","tile_bbox":{"x":0,"y":0,"width":200,"height":260},"orig_size":{"width":5100,"height":6600},"schema_version":"contact_sheet_manifest_v1"}
+{"sheet_id":"sheet-000","tile_index":1,"source_image":"Image002.jpg","display_number":2,"sheet_path":"/tmp/sheet-000.jpg","tile_bbox":{"x":210,"y":0,"width":200,"height":260},"orig_size":{"width":5100,"height":6600},"schema_version":"contact_sheet_manifest_v1"}

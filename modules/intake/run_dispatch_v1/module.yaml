@@ -1,0 +1,21 @@
+module_id: run_dispatch_v1
+stage: intake
+entrypoint: modules/intake/run_dispatch_v1/main.py
+input_schema: intake_plan_v1
+output_schema: none
+default_params:
+  dry_run: true
+param_schema:
+  dispatch_hint:
+    type: string
+    description: Path to dispatch_hint.json produced by dispatch_hint_v1.
+    required: true
+  default_recipe:
+    type: string
+    description: Fallback recipe path if recommended_recipe is missing.
+    required: false
+  dry_run:
+    type: boolean
+    description: If true, print command but do not execute downstream recipe.
+    required: false
+notes: "Dispatch downstream recipe based on recommended_recipe in dispatch_hint.json; exits non-zero if none available."
