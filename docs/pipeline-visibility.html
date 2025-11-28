@@ -668,11 +668,11 @@
     }
 
     function parseTimestamp(val) {
-      if (!val) return 0;
+      if (!val) return -Infinity;
       // Trim fractional seconds to 3 digits for JS Date.parse compatibility
       const fixed = val.replace(/\\.(\\d{3})\\d+Z$/, ".$1Z");
       const ts = Date.parse(fixed);
-      return isNaN(ts) ? 0 : ts;
+      return isNaN(ts) ? -Infinity : ts;
     }
 
     async function loadManifest() {
@@ -1030,10 +1030,21 @@
         instrumentation.stages.forEach(s => { if (s.id) instMap[s.id] = s; });
       }
       const stageEntries = Object.entries(stages || {}).filter(([_, info]) => info?.module_id || info?.description);
+      const stageFirstTs = {};
+      if (events && events.length) {
+        events.forEach(e => {
+          const t = parseTimestamp(e.timestamp);
+          if (t === -Infinity) return;
+          const st = e.stage;
+          if (stageFirstTs[st] === undefined || t < stageFirstTs[st]) {
+            stageFirstTs[st] = t;
+          }
+        });
+      }
       const ordered = stageEntries.map(([k]) => k).sort((a, b) => {
-        const startA = durations?.[a]?.start || 0;
-        const startB = durations?.[b]?.start || 0;
-        if (startA !== startB) return startA - startB;
+        const tsA = (durations?.[a]?.start ?? stageFirstTs[a] ?? parseTimestamp(stages[a]?.updated_at));
+        const tsB = (durations?.[b]?.start ?? stageFirstTs[b] ?? parseTimestamp(stages[b]?.updated_at));
+        if (tsA !== tsB) return tsA - tsB;
         return a.localeCompare(b);
       });
       console.log('Ordered stages:', ordered);
@@ -1067,9 +1078,9 @@
       <div class="status ${statusDescriptors[status]?.class || ""}">${status.toUpperCase()}${runCountText}</div>
       <div class="progress-bar"><span style="width:${Math.min(100, prog.percent || (status === "done" ? 100 : 0))}%"></span></div>
       <div class="meta">
-        <span>${prog.current ?? "—"} / ${prog.total ?? "?"}</span>
+        <span>${prog.current ?? ""}${prog.total != null ? " / " + prog.total : ""}</span>
         <span>${percentText(prog.percent)}</span>
-        <span>${info.updated_at || ""}</span>
+        <span>${(info.updated_at || "").replace(/\\.(\\d{3})\\d+Z$/, ".$1Z")}</span>
       </div>
     `;
 
@@ -1374,16 +1385,24 @@
 
     function findFinalArtifact(stages) {
       if (!stages) return null;
+      // Prefer explicit build_ff_engine (our FF final JSON)
+      if (stages["build_ff_engine"]?.artifact) return stages["build_ff_engine"].artifact;
+
       const entries = Object.entries(stages);
       // Prefer confirm/dispatch outputs first
       const preferredOrder = ["confirm_plan", "dispatch", "dispatch_hint", "gap_analysis", "zoom_refine", "overview_plan"];
       for (const id of preferredOrder) {
         if (stages[id]?.artifact) return stages[id].artifact;
       }
-      // Otherwise pick most recent done stage with an artifact
+      // Otherwise pick the most recent done stage with an artifact, but deprioritize validate-only stages
       const doneWithArtifact = entries
         .filter(([, v]) => v.artifact)
-        .sort((a, b) => parseTimestamp(b[1].updated_at) - parseTimestamp(a[1].updated_at));
+        .sort((a, b) => {
+          const aIsValidate = a[0].startsWith("validate");
+          const bIsValidate = b[0].startsWith("validate");
+          if (aIsValidate !== bIsValidate) return aIsValidate ? 1 : -1; // prefer non-validate
+          return parseTimestamp(b[1].updated_at) - parseTimestamp(a[1].updated_at);
+        });
       return doneWithArtifact.length ? doneWithArtifact[0][1].artifact : null;
     }
 

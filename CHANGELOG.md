@@ -245,3 +245,17 @@
 
 ### Planned follow-ups
 - Tag remaining experimental modules (section stack, coarse/merge) in manifests and rerun OCR/text smoke recipes.
+## [2025-11-28] - Fighting Fantasy Engine export complete
+
+### Added
+- Official FF Engine validator bundled with Ajv and wrapped as `validate_ff_engine_node_v1`; recipe `recipe-ff-engine.yaml` builds and validates `gamebook.json`.
+- Heuristic section typing/front-matter cues in `build_ff_engine_v1` plus provenance stub reporting; stub targets recorded in output metadata.
+- Manual smoke script `scripts/smoke-ff-engine.sh` to run mock build+validate locally.
+
+### Fixed/Changed
+- Dashboard final-artifact selection now prefers `build_ff_engine` over validate stages and sorts cards by actual timestamps; stage meta display no longer shows placeholder counts.
+- `section_enrich_v1` consumes `resolved_portion_v1` to align with the FF pipeline; recipe wires enrich → build → validate.
+
+### Tested
+- Mock smoke: `bash scripts/smoke-ff-engine.sh` (passes official validator).
+- Full run: `python driver.py --recipe configs/recipes/recipe-ff-engine.yaml --instrument --start-from portionize_fine` (passes official validator; reachability warnings only due to stubbed targets).

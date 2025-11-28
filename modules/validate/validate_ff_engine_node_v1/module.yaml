@@ -1,0 +1,16 @@
+module_id: validate_ff_engine_node_v1
+stage: export
+description: Run the official Fighting Fantasy Engine validator (Node/Ajv) on a gamebook JSON.
+entrypoint: modules/validate/validate_ff_engine_node_v1/main.py
+params:
+  - name: validator_dir
+    desc: Path to the bundled validator directory (contains cli-validator.js)
+    required: false
+    default: input/ff-format/validator
+  - name: node_bin
+    desc: Node executable to use
+    required: false
+    default: node
+notes: >
+  Wraps the upstream validator (cli-validator.js --json). Requires Node >=18 and
+  the ajv package installed (`npm install ajv`) in the validator directory or globally.

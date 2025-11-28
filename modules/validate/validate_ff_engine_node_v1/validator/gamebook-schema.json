@@ -1,0 +1,321 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://fighting-fantasy-engine.github.io/schema/gamebook.json",
+  "title": "Fighting Fantasy Gamebook JSON Schema",
+  "description": "Schema specification for Fighting Fantasy gamebook JSON format. This is the required format that the PDF-to-JSON parser must produce.",
+  "type": "object",
+  "required": ["metadata", "sections"],
+  "additionalProperties": true,
+  "properties": {
+    "metadata": {
+      "type": "object",
+      "required": ["title", "startSection", "formatVersion"],
+      "additionalProperties": true,
+      "properties": {
+        "title": {
+          "type": "string",
+          "description": "Book title"
+        },
+        "author": {
+          "type": "string",
+          "description": "Book author (optional)"
+        },
+        "startSection": {
+          "type": "string",
+          "description": "Starting section ID (usually '1')"
+        },
+        "formatVersion": {
+          "type": "string",
+          "description": "Format version (e.g., '1.0.0')"
+        }
+      }
+    },
+    "sections": {
+      "type": "object",
+      "description": "All sections in the gamebook, keyed by section ID",
+      "patternProperties": {
+        "^.+$": {
+          "$ref": "#/definitions/GamebookSection"
+        }
+      }
+    }
+  },
+  "definitions": {
+    "SectionId": {
+      "type": "string",
+      "description": "Unique section identifier (e.g., '1', '270', 'S003')"
+    },
+    "GamebookSection": {
+      "type": "object",
+      "required": ["id", "text", "isGameplaySection", "type"],
+      "additionalProperties": true,
+      "properties": {
+        "id": {
+          "$ref": "#/definitions/SectionId"
+        },
+        "text": {
+          "type": "string",
+          "description": "Raw text content from the book (preserve original text exactly)"
+        },
+        "pageStart": {
+          "type": "number",
+          "description": "Starting page number (optional, for citation)"
+        },
+        "pageEnd": {
+          "type": "number",
+          "description": "Ending page number (optional, for citation)"
+        },
+        "isGameplaySection": {
+          "type": "boolean",
+          "description": "true = gameplay section (has navigation, combat, etc.), false = non-gameplay content (cover, rules, etc.)"
+        },
+        "type": {
+          "type": "string",
+          "enum": [
+            "section",
+            "front_cover",
+            "back_cover",
+            "title_page",
+            "publishing_info",
+            "toc",
+            "intro",
+            "rules",
+            "adventure_sheet",
+            "template"
+          ],
+          "description": "Section type categorizing the content"
+        },
+        "navigationLinks": {
+          "type": "array",
+          "description": "Simple navigation links (only for gameplay sections)",
+          "items": {
+            "$ref": "#/definitions/NavigationLink"
+          }
+        },
+        "conditionalNavigation": {
+          "type": "array",
+          "description": "Conditional navigation logic (only for gameplay sections)",
+          "items": {
+            "$ref": "#/definitions/ConditionalNavigation"
+          }
+        },
+        "combat": {
+          "$ref": "#/definitions/CombatEncounter",
+          "description": "Combat encounter data (only for gameplay sections)"
+        },
+        "items": {
+          "type": "array",
+          "description": "Item references (only for gameplay sections)",
+          "items": {
+            "$ref": "#/definitions/ItemReference"
+          }
+        },
+        "statModifications": {
+          "type": "array",
+          "description": "Changes to player stats (only for gameplay sections)",
+          "items": {
+            "$ref": "#/definitions/StatModification"
+          }
+        },
+        "deathConditions": {
+          "type": "array",
+          "description": "Death conditions (only for gameplay sections)",
+          "items": {
+            "$ref": "#/definitions/DeathCondition"
+          }
+        },
+        "testYourLuck": {
+          "type": "array",
+          "description": "Test Your Luck mechanics (only for gameplay sections)",
+          "items": {
+            "$ref": "#/definitions/TestYourLuck"
+          }
+        },
+        "metadata": {
+          "type": "object",
+          "description": "Additional section metadata",
+          "properties": {
+            "title": {
+              "type": "string",
+              "description": "Section title if available"
+            }
+          }
+        }
+      }
+    },
+    "NavigationLink": {
+      "type": "object",
+      "required": ["targetSection"],
+      "properties": {
+        "targetSection": {
+          "$ref": "#/definitions/SectionId",
+          "description": "Target section ID extracted from 'Turn to X' patterns"
+        },
+        "choiceText": {
+          "type": "string",
+          "description": "Optional descriptive text for the choice"
+        },
+        "isConditional": {
+          "type": "boolean",
+          "description": "Whether this link is conditional (requires evaluation)",
+          "default": false
+        }
+      }
+    },
+    "ConditionalNavigation": {
+      "type": "object",
+      "required": ["condition", "ifTrue", "ifFalse"],
+      "properties": {
+        "condition": {
+          "type": "string",
+          "enum": ["has_item", "test_luck", "stat_check", "skill_check", "custom"],
+          "description": "Condition type"
+        },
+        "conditionParams": {
+          "type": "object",
+          "description": "Condition parameters (e.g., { itemName: 'key' })",
+          "additionalProperties": true
+        },
+        "ifTrue": {
+          "$ref": "#/definitions/NavigationLink",
+          "description": "Navigation if condition is true"
+        },
+        "ifFalse": {
+          "$ref": "#/definitions/NavigationLink",
+          "description": "Navigation if condition is false"
+        }
+      }
+    },
+    "CombatEncounter": {
+      "type": "object",
+      "required": ["creature", "winSection"],
+      "properties": {
+        "creature": {
+          "$ref": "#/definitions/CreatureStats"
+        },
+        "winSection": {
+          "$ref": "#/definitions/SectionId",
+          "description": "Section to navigate to if player wins"
+        },
+        "loseSection": {
+          "$ref": "#/definitions/SectionId",
+          "description": "Section to navigate to if player loses (optional, death may be implicit)"
+        }
+      }
+    },
+    "CreatureStats": {
+      "type": "object",
+      "required": ["name", "skill", "stamina"],
+      "properties": {
+        "name": {
+          "type": "string",
+          "description": "Creature name"
+        },
+        "skill": {
+          "type": "number",
+          "description": "Combat Skill value"
+        },
+        "stamina": {
+          "type": "number",
+          "description": "Stamina (hit points)"
+        },
+        "specialRules": {
+          "type": "array",
+          "description": "Optional special combat rules",
+          "items": {
+            "type": "string"
+          }
+        },
+        "allowEscape": {
+          "type": "boolean",
+          "description": "Whether escape is allowed from this combat"
+        },
+        "escapeSection": {
+          "$ref": "#/definitions/SectionId",
+          "description": "Section to navigate to if player escapes"
+        }
+      }
+    },
+    "ItemReference": {
+      "type": "object",
+      "required": ["name", "action"],
+      "properties": {
+        "name": {
+          "type": "string",
+          "description": "Item name (as it appears in text)"
+        },
+        "action": {
+          "type": "string",
+          "enum": ["add", "remove", "check", "reference"],
+          "description": "Item action: add to inventory, remove from inventory, check if player has, or just reference"
+        },
+        "checkSuccessSection": {
+          "$ref": "#/definitions/SectionId",
+          "description": "Section to navigate to if item check is true (for check actions)"
+        },
+        "checkFailureSection": {
+          "$ref": "#/definitions/SectionId",
+          "description": "Section to navigate to if item check is false (for check actions)"
+        }
+      }
+    },
+    "StatModification": {
+      "type": "object",
+      "required": ["stat", "amount"],
+      "properties": {
+        "stat": {
+          "type": "string",
+          "enum": ["skill", "stamina", "luck"],
+          "description": "Stat name: 'skill', 'stamina', or 'luck'"
+        },
+        "amount": {
+          "type": "number",
+          "description": "Amount to change (can be negative)"
+        },
+        "permanent": {
+          "type": "boolean",
+          "description": "Whether this is a permanent modification (affects initial value)",
+          "default": false
+        }
+      }
+    },
+    "DeathCondition": {
+      "type": "object",
+      "required": ["trigger"],
+      "properties": {
+        "trigger": {
+          "type": "string",
+          "enum": ["stamina_zero", "instant_death", "conditional"],
+          "description": "Death trigger type"
+        },
+        "message": {
+          "type": "string",
+          "description": "Death message/reason"
+        },
+        "deathSection": {
+          "$ref": "#/definitions/SectionId",
+          "description": "Section to navigate to on death (if different from standard game over)"
+        }
+      }
+    },
+    "TestYourLuck": {
+      "type": "object",
+      "required": ["luckySection", "unluckySection"],
+      "properties": {
+        "luckySection": {
+          "$ref": "#/definitions/SectionId",
+          "description": "Section to navigate to if lucky"
+        },
+        "unluckySection": {
+          "$ref": "#/definitions/SectionId",
+          "description": "Section to navigate to if unlucky"
+        },
+        "description": {
+          "type": "string",
+          "description": "Optional description of consequences"
+        }
+      }
+    }
+  }
+}
+
