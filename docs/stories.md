@@ -1,6 +1,7 @@
 # Project Stories — codex-forge
 
 ## Recommended Order (next up)
+- 031 Fighting Fantasy output refinement — fix quality and correctness issues in FF output modules.
 - 030 Fighting Fantasy Engine format export — retarget FF recipe to the engine schema while keeping provenance/images.
 - DONE: 016 Driver DAG & schema compatibility — unlocks arbitrary workflows, coarse+fine branches, safer schema wiring.
 - DONE: 017 Module UX polish (params & outputs) — catches bad configs early; allows custom outputs for varied runs.
@@ -51,6 +52,7 @@ This index tracks stories in `/docs/stories/` for the codex-forge pipeline.
 | 026 | Onward to the Unknown — Arthur L'Heureux pilot | Medium | To Do | /docs/stories/story-026-onward-unknown-arthur-lheureux.md |
 | 027 | Contact-sheet intake for automatic book type planning | Medium | Done | /docs/stories/story-027-contact-sheet-auto-intake.md |
 | 030 | Fighting Fantasy Engine format export | High | Done | /docs/stories/story-030-ff-engine-format.md |
+| 031 | Fighting Fantasy output refinement | High | In Progress | /docs/stories/story-031-ff-output-refinement.md |
 | 099 | Remove dev-only backcompat disclaimer | Low | To Do | /docs/stories/story-099-remove-dev-backcompat-note.md |
 
 ## Notes

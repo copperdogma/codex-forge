@@ -245,6 +245,18 @@
 
 ### Planned follow-ups
 - Tag remaining experimental modules (section stack, coarse/merge) in manifests and rerun OCR/text smoke recipes.
+## [2025-11-28] - FF output refinement paused, AI guardrails noted
+
+### Added
+- Issue 0 analysis updated with guidance to avoid overcoding and to use AI ensemble/arbiter patterns for high-stakes steps.
+- Work log captured mock-free recomposition run findings (`deathtrap-ff-engine-nomock`) isolating remaining portionization/enrichment failures.
+
+### Changed
+- Story 031 status set to Paused pending planned intake/architecture overhaul (potential Unstructured adoption); guardrail implementation deferred until new direction is chosen.
+
+### Tested
+- Not run (story paused; analysis/documentation only).
+
 ## [2025-11-28] - Fighting Fantasy Engine export complete
 
 ### Added
