@@ -1,0 +1,37 @@
+module_id: unstructured_pdf_intake_v1
+stage: intake
+entrypoint: modules/intake/unstructured_pdf_intake_v1/main.py
+input_schema: pdf_path
+output_schema: unstructured_element_v1
+default_params:
+  strategy: hi_res
+  infer_table_structure: true
+  extract_images: false
+  start_page: null
+  end_page: null
+  save_raw: false
+param_schema:
+  properties:
+    strategy:
+      type: string
+      enum: [auto, fast, hi_res, ocr_only]
+      description: "Unstructured partitioning strategy (hi_res recommended for tables)"
+    infer_table_structure:
+      type: boolean
+      description: "Extract table structure and HTML"
+    extract_images:
+      type: boolean
+      description: "Extract and save embedded images"
+    start_page:
+      type: integer
+      minimum: 1
+      description: "First page to process (1-based, null = all)"
+    end_page:
+      type: integer
+      minimum: 1
+      description: "Last page to process (inclusive, null = all)"
+    save_raw:
+      type: boolean
+      description: "Save raw Unstructured output for debugging"
+  required: [strategy, infer_table_structure, extract_images]
+notes: "Partition PDF with Unstructured library into elements.jsonl (Unstructured-native format with _codex namespace for provenance)."

@@ -1,18 +1,94 @@
 import argparse
 import json
 from typing import Any, Dict, List, Optional
+from collections import defaultdict
 
 from modules.common.utils import read_jsonl, save_json, ProgressLogger
 
 
-def load_pages(path: str) -> Dict[int, Dict[str, Any]]:
-    pages: Dict[int, Dict[str, Any]] = {}
-    for row in read_jsonl(path):
-        page_num = row.get("page")
-        if page_num is None:
-            continue
-        pages[int(page_num)] = row
+def elements_to_pages_dict(elements: List[Dict]) -> Dict[int, Dict[str, Any]]:
+    """
+    Convert elements.jsonl to page-based dict for text slicing.
+
+    Groups elements by page_number and concatenates text in reading order.
+    Returns dict keyed by page number with text fields.
+    """
+    # Group elements by page
+    pages_dict = defaultdict(list)
+    for elem in elements:
+        page_num = elem.get("metadata", {}).get("page_number", 1)
+        pages_dict[page_num].append(elem)
+
+    # Sort elements within each page by sequence or coordinates
+    def sort_key(elem):
+        # Try _codex.sequence first
+        sequence = elem.get("_codex", {}).get("sequence")
+        if sequence is not None:
+            return (0, sequence)
+
+        # Try coordinates (y-coordinate, then x)
+        coords = elem.get("metadata", {}).get("coordinates", {})
+        points = coords.get("points", [])
+        if points:
+            ys = [p[1] for p in points]
+            xs = [p[0] for p in points]
+            return (1, min(ys), min(xs))
+
+        return (2, 0)
+
+    # Build page objects
+    pages = {}
+    for page_num in sorted(pages_dict.keys()):
+        page_elements = sorted(pages_dict[page_num], key=sort_key)
+
+        # Filter out headers/footers
+        content_elements = [
+            e for e in page_elements
+            if e.get("type") not in ("Header", "Footer", "PageBreak")
+        ]
+
+        # Concatenate text
+        text_parts = []
+        for elem in content_elements:
+            text = elem.get("text", "").strip()
+            if text:
+                text_parts.append(text)
+
+        page_text = "\n\n".join(text_parts)
+
+        pages[page_num] = {
+            "page": page_num,
+            "text": page_text,
+            "clean_text": page_text,
+            "raw_text": page_text,
+            "element_count": len(content_elements)
+        }
+
     return pages
+
+
+def load_pages(path: str) -> Dict[int, Dict[str, Any]]:
+    """Load pages from elements.jsonl or legacy pages format."""
+    raw_data = list(read_jsonl(path))
+    if not raw_data:
+        return {}
+
+    # Detect format: elements have "type" and "metadata", pages have "page" at top level
+    first = raw_data[0]
+    is_elements = "type" in first and "metadata" in first
+
+    if is_elements:
+        # Convert elements to pages dict
+        return elements_to_pages_dict(raw_data)
+    else:
+        # Legacy pages format
+        pages: Dict[int, Dict[str, Any]] = {}
+        for row in raw_data:
+            page_num = row.get("page")
+            if page_num is None:
+                continue
+            pages[int(page_num)] = row
+        return pages
 
 
 def slice_text(pages: Dict[int, Dict[str, Any]], start: int, end: int, key: str) -> str:
@@ -193,7 +269,7 @@ def collect_targets(section: Dict[str, Any]) -> List[str]:
 
 def main():
     parser = argparse.ArgumentParser(description="Build Fighting Fantasy Engine gamebook JSON from portions + pages.")
-    parser.add_argument("--pages", required=True, help="Path to clean_page JSONL")
+    parser.add_argument("--pages", required=True, help="Path to elements.jsonl (or legacy clean_page JSONL)")
     parser.add_argument("--portions", required=True, help="Path to resolved/enriched portion JSONL")
     parser.add_argument("--out", required=True, help="Output gamebook JSON path")
     parser.add_argument("--title", required=True, help="Gamebook title")

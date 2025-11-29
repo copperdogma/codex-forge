@@ -22,6 +22,7 @@ from modules.common.utils import save_jsonl
 
 
 DEFAULT_OUTPUTS = {
+    "intake": "elements.jsonl",
     "extract": "pages_raw.jsonl",
     "image_crop": "image_crops.jsonl",
     "clean": "pages_clean.jsonl",
@@ -481,7 +482,7 @@ def build_command(entrypoint: str, params: Dict[str, Any], stage_conf: Dict[str,
     flags_added = set()
 
     # Standard parameter conveniences by stage
-    if stage_conf["stage"] == "extract":
+    if stage_conf["stage"] in ("intake", "extract"):
         if "pdf" in recipe_input:
             cmd += ["--pdf", recipe_input["pdf"]]; flags_added.add("--pdf")
         if "images" in recipe_input:

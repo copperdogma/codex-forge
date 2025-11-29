@@ -2,6 +2,7 @@ import argparse
 import os
 import re
 from typing import List, Dict, Any
+from collections import defaultdict
 
 from modules.common.utils import read_jsonl, append_jsonl, ensure_dir
 from schemas import EnrichedPortion
@@ -10,8 +11,58 @@ SECTION_RE = re.compile(r"^\s*(\d{1,4})\b")
 TARGET_RE = re.compile(r"\b(?:turn|go)\s+to\s+(\d{1,4})\b", re.IGNORECASE)
 
 
+def elements_to_pages_dict(elements: List[Dict]) -> Dict[int, Dict]:
+    """Convert elements.jsonl to page-based dict."""
+    pages_dict = defaultdict(list)
+    for elem in elements:
+        page_num = elem.get("metadata", {}).get("page_number", 1)
+        pages_dict[page_num].append(elem)
+
+    # Sort and concatenate
+    def sort_key(elem):
+        sequence = elem.get("_codex", {}).get("sequence")
+        if sequence is not None:
+            return (0, sequence)
+        coords = elem.get("metadata", {}).get("coordinates", {})
+        points = coords.get("points", [])
+        if points:
+            ys = [p[1] for p in points]
+            xs = [p[0] for p in points]
+            return (1, min(ys), min(xs))
+        return (2, 0)
+
+    pages = {}
+    for page_num in sorted(pages_dict.keys()):
+        page_elements = sorted(pages_dict[page_num], key=sort_key)
+        content_elements = [
+            e for e in page_elements
+            if e.get("type") not in ("Header", "Footer", "PageBreak")
+        ]
+        text_parts = [e.get("text", "").strip() for e in content_elements if e.get("text", "").strip()]
+        page_text = "\n\n".join(text_parts)
+        pages[page_num] = {
+            "page": page_num,
+            "text": page_text,
+            "clean_text": page_text,
+            "raw_text": page_text,
+        }
+    return pages
+
+
 def load_pages(path: str) -> Dict[int, Dict]:
-    return {p["page"]: p for p in read_jsonl(path)}
+    """Load pages from elements.jsonl or legacy pages format."""
+    raw_data = list(read_jsonl(path))
+    if not raw_data:
+        return {}
+
+    # Detect format
+    first = raw_data[0]
+    is_elements = "type" in first and "metadata" in first
+
+    if is_elements:
+        return elements_to_pages_dict(raw_data)
+    else:
+        return {p["page"]: p for p in raw_data}
 
 
 def extract_text(portion: Dict, pages: Dict[int, Dict], max_chars: int) -> str:
@@ -39,7 +90,7 @@ def detect_targets(text: str) -> List[str]:
 
 def main():
     parser = argparse.ArgumentParser(description="Add section_id and targets heuristically to portions.")
-    parser.add_argument("--pages", required=True, help="pages_clean JSONL")
+    parser.add_argument("--pages", required=True, help="elements.jsonl or legacy pages_clean JSONL")
     parser.add_argument("--portions", required=True, help="resolved_portion JSONL")
     parser.add_argument("--out", required=True, help="Output enriched_portion JSONL")
     parser.add_argument("--max_chars", type=int, default=2000)

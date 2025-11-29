@@ -53,6 +53,9 @@ This index tracks stories in `/docs/stories/` for the codex-forge pipeline.
 | 027 | Contact-sheet intake for automatic book type planning | Medium | Done | /docs/stories/story-027-contact-sheet-auto-intake.md |
 | 030 | Fighting Fantasy Engine format export | High | Done | /docs/stories/story-030-ff-engine-format.md |
 | 031 | Fighting Fantasy output refinement | High | In Progress | /docs/stories/story-031-ff-output-refinement.md |
+| 032 | Unstructured intake & Document IR adoption | Medium | Done | /docs/stories/story-032-unstructured-intake-and-document-ir-adoption.md |
+| 033 | ARM64-native pipeline environment & performance | Medium | To Do | /docs/stories/story-033-arm64-pipeline-conversion.md |
+| 034 | FF Unstructured follow-ups (elements, helpers, graph quality) | High | To Do | /docs/stories/story-034-ff-unstructured-followups.md |
 | 099 | Remove dev-only backcompat disclaimer | Low | To Do | /docs/stories/story-099-remove-dev-backcompat-note.md |
 
 ## Notes

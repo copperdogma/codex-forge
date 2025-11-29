@@ -1,13 +1,26 @@
 # codex-forge
 AI-first, modular pipeline for turning scanned books into structured JSON with full traceability.
 
+## Pipeline Architecture
+
+The pipeline follows a 5-stage model:
+
+1. **Intake → IR (generic)**: PDF/images → structured elements (Unstructured library provides rich IR with text, types, coordinates, tables)
+2. **Verify IR (generic)**: QA checks on completeness, page coverage, element quality
+3. **Portionize (domain-specific)**: Identify logical portions (CYOA sections, genealogy chapters, textbook problems) and reference IR elements
+4. **Augment (domain-specific)**: Enrich portions with domain data (choices/combat for CYOA, relationships for genealogy)
+5. **Export (format-specific)**: Output to target format (FF Engine JSON, HTML, Markdown) using IR + augmentations
+
+Steps 1-2 are universal across all document types. Steps 3-4 vary by domain (gamebooks vs genealogies vs textbooks). Step 5 is tied to output requirements (precise layout for PDF, simplified for Markdown).
+
+The **Intermediate Representation (IR)** stays unchanged throughout; portionization and augmentation annotate/reference it rather than transforming it.
+
 ## What it does (today)
-- Ingest PDF or page images
-- OCR → per-page raw text
+- Ingest PDF or page images → structured element IR (Unstructured or OCR-based)
 - Multimodal LLM cleaning → per-page clean text + confidence
-- Sliding-window portionization (LLM, optional priors, multimodal)
+- Sliding-window portionization (LLM, optional priors, multimodal) → portions reference IR elements
 - Consensus/dedupe/normalize, resolve overlaps, guarantee coverage
-- Assemble per-portion JSON (page spans, source images, raw_text)
+- Assemble per-portion JSON (page spans, source images, raw_text from IR)
 - Run outputs stored under `output/runs/<run_id>/` with manifests and state
 
 ## Repository layout

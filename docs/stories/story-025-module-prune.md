@@ -1,7 +1,6 @@
 # Story: Module pruning & registry hygiene
 
 **Status**: Done  
-**Owner**: TODO  
 **Created**: 2025-11-26  
 
 ---

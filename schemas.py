@@ -1,4 +1,4 @@
-from typing import Any, Dict, List, Optional, Literal
+from typing import Any, Dict, List, Optional, Literal, Union
 from pydantic import BaseModel, Field, field_validator, model_validator
 
 
@@ -329,3 +329,71 @@ class IntakePlan(BaseModel):
         if v is not None and (v < 0.0 or v > 1.0):
             raise ValueError("type_confidence must be between 0 and 1")
         return v
+
+
+# ────────────────────────────────────────────────────────────────
+# Document IR – Unstructured-native element representation
+# ────────────────────────────────────────────────────────────────
+
+
+class CodexMetadata(BaseModel):
+    """
+    Codex-forge metadata namespace for provenance and internal tracking.
+
+    This is added to each Unstructured element to track our pipeline metadata
+    without polluting the Unstructured fields.
+
+    Note: This is serialized as '_codex' in JSON (see UnstructuredElement.model_dump).
+    """
+    run_id: Optional[str] = None
+    module_id: Optional[str] = None
+    sequence: Optional[int] = None  # Order within document (for stable sorting)
+    created_at: Optional[str] = None
+
+
+class UnstructuredElement(BaseModel):
+    """
+    Wrapper for Unstructured element serialized to JSON.
+
+    This is the core Document IR format for codex-forge. We preserve Unstructured's
+    native element structure (type, text, metadata) and add a 'codex' namespace
+    for our provenance tracking.
+
+    Unstructured provides rich element types:
+    - Title, NarrativeText, Text, ListItem, Table, Image
+    - Header, Footer, FigureCaption, PageBreak, etc.
+
+    We preserve these exactly as Unstructured provides them, keeping all metadata:
+    - metadata.page_number (1-based)
+    - metadata.coordinates (bbox points)
+    - metadata.text_as_html (for tables)
+    - metadata.parent_id (hierarchy)
+    - metadata.emphasized_text_contents, emphasized_text_tags
+    - metadata.detection_class_prob (confidence scores)
+    - ... and any other fields Unstructured provides
+
+    This approach:
+    - Keeps the IR rich and future-proof as Unstructured evolves
+    - Avoids normalization complexity
+    - Preserves all provenance and layout information
+    - Makes downstream code simpler (one source of truth)
+
+    Note: When serializing to JSON, use model_dump(by_alias=True) to get '_codex'
+    instead of 'codex' in the output.
+    """
+    # Core Unstructured fields
+    id: str  # Element ID from Unstructured or generated UUID
+    type: str  # Unstructured element type (Title, NarrativeText, Table, etc.)
+    text: str = ""  # Plain text content
+
+    # Unstructured metadata (preserve all fields as-is)
+    metadata: Dict[str, Any] = Field(default_factory=dict)
+
+    # Codex-forge namespace for our tracking (aliased to '_codex' in JSON)
+    codex: CodexMetadata = Field(default_factory=CodexMetadata, alias="_codex")
+
+    class Config:
+        # Allow extra fields for forward compatibility
+        extra = "allow"
+        # Support both 'codex' and '_codex' when parsing
+        populate_by_name = True

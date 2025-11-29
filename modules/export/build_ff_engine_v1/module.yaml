@@ -4,7 +4,7 @@ description: Build Fighting Fantasy Engine gamebook.json with provenance from re
 entrypoint: modules/export/build_ff_engine_v1/main.py
 params:
   - name: pages
-    desc: Path to clean_page JSONL (provides clean/raw text and page images)
+    desc: Path to elements.jsonl or legacy clean_page JSONL (provides page text)
     required: true
   - name: portions
     desc: Path to resolved or enriched portion JSONL

@@ -1,0 +1,33 @@
+# Genealogy book HTML rendering pipeline using Unstructured and elements IR
+# This recipe demonstrates layout-faithful HTML reconstruction from PDF
+# using Unstructured's native element format
+
+run_id: genealogy-html-test
+input:
+  pdf: input/genealogy-book.pdf  # Update with actual path
+output_dir: output/runs/genealogy-html-test
+stages:
+  # Stage 1: Unstructured intake → elements.jsonl
+  - id: unstructured_intake
+    stage: intake
+    module: unstructured_pdf_intake_v1
+    params:
+      strategy: hi_res  # High resolution for layout preservation
+      infer_table_structure: true  # Critical for genealogy tables
+      extract_images: true  # Extract family photos/diagrams
+      save_raw: true  # Save for debugging table extraction
+
+  # Stage 2: Render elements → HTML
+  - id: render_html
+    stage: render
+    module: render_html_from_elements_v1
+    needs: [unstructured_intake]
+    params:
+      elements: output/runs/genealogy-html-test/unstructured_intake/elements.jsonl
+      output_filename: genealogy.html
+      include_css: true
+      page_width_px: 800
+      include_tables: true
+      include_images: true
+      include_headers: false  # Skip page headers
+      include_footers: false  # Skip page footers

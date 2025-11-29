@@ -2,6 +2,7 @@ import argparse
 import json
 import os
 from typing import List, Dict
+from collections import defaultdict
 from openai import OpenAI
 from tqdm import tqdm
 
@@ -28,6 +29,76 @@ def window_iter(pages: List[Dict], window: int, stride: int):
         batch = pages[i:i+window]
         yield batch
         i += stride
+
+
+def elements_to_pages(elements: List[Dict]) -> List[Dict]:
+    """
+    Convert elements.jsonl to page-based format for portionization.
+
+    Groups elements by page_number and concatenates text in reading order.
+    Returns list of page dicts compatible with existing sliding window logic.
+    """
+    # Group elements by page
+    pages_dict = defaultdict(list)
+    for elem in elements:
+        page_num = elem.get("metadata", {}).get("page_number", 1)
+        pages_dict[page_num].append(elem)
+
+    # Sort elements within each page by sequence or coordinates
+    def sort_key(elem):
+        # Try _codex.sequence first
+        sequence = elem.get("_codex", {}).get("sequence")
+        if sequence is not None:
+            return (0, sequence)
+
+        # Try coordinates (y-coordinate, then x)
+        coords = elem.get("metadata", {}).get("coordinates", {})
+        points = coords.get("points", [])
+        if points:
+            ys = [p[1] for p in points]
+            xs = [p[0] for p in points]
+            return (1, min(ys), min(xs))
+
+        return (2, 0)
+
+    # Build page objects
+    pages = []
+    for page_num in sorted(pages_dict.keys()):
+        page_elements = sorted(pages_dict[page_num], key=sort_key)
+
+        # Filter out headers/footers (optional - can be controlled by param)
+        content_elements = [
+            e for e in page_elements
+            if e.get("type") not in ("Header", "Footer", "PageBreak")
+        ]
+
+        # Concatenate text
+        text_parts = []
+        for elem in content_elements:
+            elem_type = elem.get("type")
+            text = elem.get("text", "").strip()
+
+            if not text:
+                continue
+
+            # Add type hints for better LLM understanding
+            if elem_type == "Title":
+                text_parts.append(f"## {text}")
+            elif elem_type == "ListItem":
+                text_parts.append(f"• {text}")
+            else:
+                text_parts.append(text)
+
+        page_text = "\n\n".join(text_parts)
+
+        pages.append({
+            "page": page_num,
+            "text": page_text,
+            "clean_text": page_text,
+            "element_count": len(content_elements)
+        })
+
+    return pages
 
 
 def call_llm(client: OpenAI, model: str, batch: List[Dict], priors: List[Dict]) -> List[Dict]:
@@ -73,7 +144,7 @@ def call_llm(client: OpenAI, model: str, batch: List[Dict], priors: List[Dict]) 
 
 def main():
     parser = argparse.ArgumentParser(description="LLM-driven portion hypotheses over sliding windows.")
-    parser.add_argument("--pages", required=True, help="Path to pages_raw.jsonl or pages_clean.jsonl.")
+    parser.add_argument("--pages", required=True, help="Path to elements.jsonl (or legacy pages_raw.jsonl/pages_clean.jsonl).")
     parser.add_argument("--out", required=True, help="Path to window_hypotheses.jsonl (appended).")
     parser.add_argument("--window", type=int, default=5)
     parser.add_argument("--stride", type=int, default=1)
@@ -87,7 +158,22 @@ def main():
     parser.add_argument("--run-id", help="Run identifier for logging")
     args = parser.parse_args()
 
-    pages = list(read_jsonl(args.pages))
+    # Load pages - detect if elements.jsonl or legacy pages format
+    raw_data = list(read_jsonl(args.pages))
+    if not raw_data:
+        raise SystemExit("No data in input file.")
+
+    # Detect format: elements have "type" and "metadata", pages have "page" at top level
+    first = raw_data[0]
+    is_elements = "type" in first and "metadata" in first
+
+    if is_elements:
+        # Convert elements to pages
+        pages = elements_to_pages(raw_data)
+    else:
+        # Legacy pages format
+        pages = raw_data
+
     if args.pstart or args.pend:
         ps = args.pstart or pages[0]["page"]
         pe = args.pend or pages[-1]["page"]

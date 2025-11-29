@@ -1,7 +1,6 @@
 # Story: Fighting Fantasy output refinement
 
 **Status**: Paused  
-**Owner**: TODO  
 **Created**: 2025-01-27  
 
 ---

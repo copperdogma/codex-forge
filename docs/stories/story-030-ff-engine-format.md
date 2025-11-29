@@ -1,7 +1,6 @@
 # Story: Fighting Fantasy Engine format export
 
 **Status**: Done  
-**Owner**: TODO  
 **Created**: 2025-11-27  
 
 ---

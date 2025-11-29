@@ -1,7 +1,7 @@
 module_id: portionize_sliding_v1
 stage: portionize
 entrypoint: modules/portionize/portionize_sliding_v1/main.py
-input_schema: clean_page_v1
+input_schema: unstructured_element_v1  # Also accepts legacy clean_page_v1
 output_schema: portion_hyp_v1
 default_params:
   window: 8
