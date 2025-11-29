@@ -133,6 +133,79 @@ Artifacts appear under `output/runs/<run_id>/` as listed in the recipe; use `--s
 - Coarse+fine portionizer; continuation merge
 - AI planner to pick modules/configs based on user goals
 
+## Environment Setup
+
+### x86_64/Rosetta (Default, Recommended for Quick Starts)
+
+The default setup uses x86_64 Python running under Rosetta 2 on Apple Silicon. This is the most stable and compatible option.
+
+**Setup:**
+- Install Miniconda (x86_64): Download from https://docs.conda.io/en/latest/miniconda.html (choose macOS Intel 64-bit)
+- Create environment: `conda create -n codex python=3.11`
+- Install dependencies: `pip install -r requirements.txt`
+
+**When to use:**
+- Quick starts and one-off runs
+- When you need maximum compatibility
+- When OCR quality from `ocr_only` strategy is sufficient
+
+**Limitations:**
+- Cannot use `hi_res` OCR strategy (requires JAX, which has AVX incompatibilities under Rosetta)
+- Slower performance (~3-5 minutes/page for OCR)
+- No GPU acceleration
+
+### ARM64 Native (Recommended for Heavy Workloads)
+
+For repeated processing or when you need `hi_res` OCR with table structure inference, use native ARM64 with JAX/Metal GPU acceleration.
+
+**Setup:**
+1. Install Miniforge (ARM64):
+   ```bash
+   wget https://github.com/conda-forge/miniforge/releases/latest/download/Miniforge3-MacOSX-arm64.sh
+   bash Miniforge3-MacOSX-arm64.sh -b -p ~/miniforge3
+   ```
+2. Create ARM64 environment:
+   ```bash
+   ~/miniforge3/bin/conda create -n codex-arm python=3.11 -y
+   ~/miniforge3/envs/codex-arm/bin/pip install -r requirements.txt
+   ```
+3. Install JAX with Metal support:
+   ```bash
+   ~/miniforge3/envs/codex-arm/bin/pip install jax-metal
+   ```
+4. Fix pdfminer compatibility (required for unstructured):
+   ```bash
+   ~/miniforge3/envs/codex-arm/bin/pip install "pdfminer.six==20240706"
+   ```
+5. Verify JAX/Metal:
+   ```bash
+   ~/miniforge3/envs/codex-arm/bin/python -c "import jax; print(jax.devices())"
+   # Should show: [METAL(id=0)]
+   ```
+
+**Activation:**
+```bash
+source ~/miniforge3/bin/activate
+conda activate codex-arm
+```
+
+**When to use:**
+- Processing many PDFs regularly
+- Books with complex tables/layouts where `hi_res` helps
+- When you want GPU acceleration (2-5× faster than x86_64/Rosetta)
+- New machine/environment setup from scratch
+
+**Performance:**
+- `hi_res` OCR: ~95s/page (tested on M4 Pro, 3 pages)
+- `ocr_only` OCR: ~105s/page (ARM64 native, no JAX)
+- Expected 2-5× speedup over x86_64/Rosetta for `hi_res` workloads
+
+**Known issues:**
+- numpy version conflict: jax-metal requires numpy>=2.0, but unstructured requires numpy<2 (works despite warning)
+- pdfminer.six must be pinned to 20240706 for unstructured 0.16.9 compatibility
+
+**Rollback:** Simply use your existing x86_64 environment. Miniforge and Miniconda can coexist.
+
 ## Dev notes
 - Requires Tesseract installed/on PATH.
 - Models configurable; defaults use `gpt-4.1-mini` with `--boost_model gpt-5`.
