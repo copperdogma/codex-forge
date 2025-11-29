@@ -9,6 +9,12 @@ def pages_set(p):
 
 
 def resolve(portions: List[Dict], forced_range=None) -> List[Dict]:
+    # Detect element-based portionization: high confidence, many unique portion_ids
+    # For element-based, allow same-page sections (they're distinct sections, not overlaps)
+    unique_portions = len(set(p.get("portion_id") for p in portions if p.get("portion_id")))
+    avg_conf = sum(p.get("confidence", 0) for p in portions) / len(portions) if portions else 0
+    is_element_based = unique_portions > len(portions) * 0.9 and avg_conf >= 0.8
+    
     # Sort by confidence desc, then shorter span, then lower page_start
     portions_sorted = sorted(
         portions,
@@ -21,13 +27,25 @@ def resolve(portions: List[Dict], forced_range=None) -> List[Dict]:
 
     kept: List[Dict] = []
     occupied: Set[int] = set()
+    seen_portion_ids: Set[str] = set()
 
     for p in portions_sorted:
         span = pages_set(p)
-        if occupied & span:
+        portion_id = p.get("portion_id")
+        
+        # For element-based portionization: check portion_id uniqueness instead of page overlap
+        if is_element_based and portion_id:
+            if portion_id in seen_portion_ids:
+                continue  # Skip duplicate portion_id
+            seen_portion_ids.add(portion_id)
+            kept.append(p)
+            # Don't mark pages as occupied - allow same-page sections
+        elif occupied & span:
+            # Traditional overlap filtering for sliding-window portionization
             continue
-        kept.append(p)
-        occupied |= span
+        else:
+            kept.append(p)
+            occupied |= span
 
     # Ensure coverage if forced_range is provided
     if forced_range:

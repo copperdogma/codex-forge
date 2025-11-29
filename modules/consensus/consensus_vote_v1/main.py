@@ -8,13 +8,18 @@ from schemas import LockedPortion
 
 def vote_portions(hypotheses: List[Dict], min_conf: float = 0.6, forced_range=None):
     # Group identical spans
+    # For element-based portionization: include portion_id in key to preserve unique sections
+    # that happen to share the same page span (common when multiple sections start on same page)
     span_votes = defaultdict(list)
     for h in hypotheses:
         if "page_start" not in h or "page_end" not in h:
             continue
         if h.get("confidence", 0) < min_conf:
             continue
-        span_votes[(h["page_start"], h["page_end"], h.get("title"), h.get("type"))].append(h)
+        # Include portion_id if present to distinguish sections with same span
+        portion_id = h.get("portion_id")
+        key = (h["page_start"], h["page_end"], h.get("title"), h.get("type"), portion_id)
+        span_votes[key].append(h)
 
     # Greedy select non-overlapping spans, highest votes then confidence then length
     candidates = []
@@ -29,14 +34,35 @@ def vote_portions(hypotheses: List[Dict], min_conf: float = 0.6, forced_range=No
     locked = []
     occupied = set()
     next_portion_idx = 1
+    
+    # Detect element-based portionization: if all hypotheses have same high confidence (0.85)
+    # and many unique portion_ids, likely element-based and should allow same-page sections
+    unique_portions = len(set(h.get("portion_id") for h in hypotheses if h.get("portion_id")))
+    avg_conf = sum(h.get("confidence", 0) for h in hypotheses) / len(hypotheses) if hypotheses else 0
+    is_element_based = unique_portions > len(hypotheses) * 0.9 and avg_conf >= 0.8
+    
     for votes, conf, key, items in candidates:
-        ps, pe, title, typ = key
+        # Key is now (page_start, page_end, title, type, portion_id)
+        ps, pe, title, typ = key[:4]
+        portion_id = key[4] if len(key) > 4 else None
         span_pages = set(range(ps, pe+1))
-        if occupied & span_pages:
+        
+        # For element-based portionization: allow sections with same page spans if they have unique portion_ids
+        # This handles cases where multiple sections legitimately start on the same page
+        if is_element_based and portion_id:
+            # Check if this portion_id was already added (dedupe check)
+            existing_ids = {p.get("portion_id") for p in locked}
+            if portion_id in existing_ids:
+                continue
+        elif occupied & span_pages:
+            # Traditional overlap filtering for sliding-window portionization
             continue
+            
         rep = max(items, key=lambda i: i.get("confidence", 0))
+        # Use portion_id from key if available, otherwise from items
+        final_portion_id = portion_id or items[0].get("portion_id") or f"P{next_portion_idx:03d}"
         locked.append(LockedPortion(
-            portion_id=items[0].get("portion_id") or f"P{next_portion_idx:03d}",
+            portion_id=final_portion_id,
             page_start=ps,
             page_end=pe,
             title=title,
@@ -46,7 +72,9 @@ def vote_portions(hypotheses: List[Dict], min_conf: float = 0.6, forced_range=No
             continuation_of=rep.get("continuation_of"),
             continuation_confidence=rep.get("continuation_confidence")
         ).dict())
-        occupied |= span_pages
+        # Only mark pages as occupied for non-element-based (sliding window) portionization
+        if not is_element_based:
+            occupied |= span_pages
         next_portion_idx += 1
 
     # Fill gaps with best available hypothesis covering missing pages

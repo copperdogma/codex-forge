@@ -1,43 +1,128 @@
 # Story: Fighting Fantasy output refinement
 
-**Status**: Paused  
+**Status**: In Progress  
 **Created**: 2025-01-27  
+**Reopened**: 2025-11-29 (expanded scope for Unstructured pipeline)
 
 ---
 
 ## Goal
-Refine and fix issues discovered in the Fighting Fantasy output pipeline. Address quality, accuracy, and correctness problems in the modules that produce FF Engine format output (`gamebook.json`), ensuring the exported gamebook data is accurate, complete, and properly structured.
+Refine and fix issues discovered in the Fighting Fantasy output pipeline across both legacy OCR-based and new Unstructured-based architectures. Address quality, accuracy, and correctness problems in the modules that produce FF Engine format output (`gamebook.json`), ensuring the exported gamebook data is accurate, complete, and properly structured.
+
+**Current Focus**: Unstructured-based pipeline (Story 032/034) - element-aware portionization and build stages producing poor quality output (duplicates, garbage text, wrong sections).
 
 ## Success Criteria / Acceptance
 - All identified FF output issues are documented, prioritized, and resolved.
+- **Output quality improvements are validated by manually inspecting actual artifact files** (`.jsonl`, `.json`) at each stage - not just code/log checks.
+- **Artifact verification is performed at every step**: Before and after each fix, AI must open and read output files, sample entries, verify text quality and structure.
 - Output quality improvements are validated against Fighting Fantasy gamebook standards.
 - Module refinements maintain backward compatibility with existing recipes and artifacts.
 - Validation passes for refined outputs with no regressions in schema compliance.
+- **Final verification**: Manually read `gamebook.json` sections, compare to baseline, confirm quality improvements are visible in actual output content.
 
 ## Approach
 1. **Issue collection** — Document specific problems found in FF output (text accuracy, section mapping, navigation links, combat mechanics, item handling, etc.).
 2. **Root cause analysis** — Trace issues back to source modules (extract, clean, portionize, resolve, enrich, build) and identify where refinements are needed.
+   - **REQUIRED**: Inspect actual artifacts at each stage to understand what's happening
+   - **REQUIRED**: Manually verify output quality, not just code execution
 3. **Module refinement** — Fix identified issues in the relevant modules, prioritizing high-impact problems first.
 4. **Validation & testing** — Verify fixes against Fighting Fantasy samples and ensure no regressions.
+   - **REQUIRED**: After each fix, manually inspect artifacts to confirm improvement
+   - **REQUIRED**: Compare output quality before/after changes
+   - **REQUIRED**: Sample multiple sections/entries to validate fixes work broadly
 
-**Critical Workflow Requirement**: Before starting work on ANY issue:
+## ⚠️ CRITICAL WORKFLOW REQUIREMENT ⚠️
+
+**MANDATORY: Manual Artifact Verification at Each Step**
+
+**The AI MUST manually inspect and verify actual output artifacts at every stage, not just check code/logs/errors.**
+
+**Before marking any task complete:**
+1. **Inspect actual artifacts**: Open `output/runs/<run_id>/<artifact>.jsonl` or `.json` files
+2. **Verify content quality**: Read sample entries, check text accuracy, validate structure
+3. **Compare stages**: Look at artifacts BEFORE and AFTER each stage to see what changed
+4. **Validate against expectations**: Confirm output matches what the stage should produce
+5. **Use findings to refine plan**: If artifacts reveal issues, update approach before continuing
+
+**Examples of required verification:**
+- After portionize: Open `window_hypotheses.jsonl`, read several portions, verify `raw_text` is populated and accurate
+- After enrich: Open `portions_enriched.jsonl`, verify `section_id` extracted correctly, check text quality
+- After build: Open `gamebook.json`, read actual section text, compare to old pipeline baseline
+- At each stage: Spot-check 5-10 entries manually to catch issues code checks won't find
+
+**What NOT to do:**
+- ❌ Only check if code runs without errors
+- ❌ Only verify logs show "success" messages
+- ❌ Only look at code structure/logic
+- ❌ Assume output is correct because code executed
+
+**What TO do:**
+- ✅ Open and read actual artifact files
+- ✅ Sample entries across different sections/types
+- ✅ Compare artifact content before/after changes
+- ✅ Verify text quality, structure, completeness
+- ✅ Use artifact findings to guide next steps
+
+**If artifacts reveal problems, stop and refine the approach. Don't proceed with broken output.**
+
+---
+
+**Additional Critical Workflow Requirement**: Before starting work on ANY issue:
 1. **THOROUGHLY investigate** exactly how the issue arose in the first place
 2. **Trace it back** through the pipeline stages to understand the complete flow
 3. **Document the root cause** with evidence (intermediate artifacts, code paths, data transformations)
 4. **THEN** design a fix based on complete understanding
 5. **THEN** implement the fix
+6. **VERIFY by inspecting actual artifacts** - manually read output files, sample entries, validate quality
 
-Do not skip investigation or jump to implementation. Understanding must come first.
+Do not skip investigation or jump to implementation. Understanding must come first. **Artifact verification is not optional - it's required at every step.**
 
 ## Tasks
+
+**CURRENT PRIORITY: Unstructured Pipeline Quality Fixes**
+
+- [ ] **PRIORITY 1 (Critical)**: Fix text extraction in `portionize_elements_v1` (Issue 9)
+  - [ ] Modify `portionize_elements_v1` to extract text from elements between section boundaries
+  - [ ] Populate `raw_text` field in portion hypotheses
+  - [ ] Include `element_ids` array for provenance
+  - [ ] **VERIFY**: Manually open `window_hypotheses.jsonl`, read 10-15 entries, confirm `raw_text` is populated and contains correct section text
+  - [ ] **VERIFY**: Check that text matches source elements (compare to `elements.jsonl` for same section)
+  - [ ] Verify all hypotheses have non-empty `raw_text` before consensus
+
+- [ ] **PRIORITY 1 (Critical)**: Fix build stage page slicing (Issue 10)
+  - [ ] Update `build_ff_engine_v1` to use element IDs when present (not page slicing)
+  - [ ] Assemble section text directly from elements
+  - [ ] Fallback to page slicing only for legacy portions
+  - [ ] **VERIFY**: Manually open `gamebook.json`, read sections 1, 10, 50, 100
+  - [ ] **VERIFY**: Compare section text to old pipeline baseline - should match or be better
+  - [ ] **VERIFY**: Check that section 1 text is correct (not garbage from wrong pages)
+  - [ ] **VERIFY**: Sample multiple sections, confirm text is accurate and complete
+  - [ ] Verify section text matches source elements exactly
+
+- [ ] **PRIORITY 2 (High)**: Fix duplicate section handling (Issue 11)
+  - [ ] Improve false positive filtering in `portionize_elements_v1`
+  - [ ] Add deduplication by `section_id` in consensus/resolve stages
+  - [ ] Build stage: detect and handle duplicate section_ids (merge or fail loudly)
+  - [ ] Verify final gamebook has unique section_ids
+
+- [ ] **PRIORITY 2 (High)**: Fix enrichment text extraction (Issue 12)
+  - [ ] Update `section_enrich_v1` to use element IDs when present
+  - [ ] Extract text from elements directly (not page slices)
+  - [ ] Preserve element precision in enriched portions
+  - [ ] Verify enriched portions have accurate `raw_text`
+
+- [ ] **VERIFICATION**: Full pipeline test after fixes
+  - [ ] Run complete pipeline with fixed modules
+  - [ ] **MANUALLY INSPECT** `gamebook.json`: Read actual section text (sections 1, 2, 10, 50, 100), verify accuracy
+  - [ ] **MANUALLY INSPECT** `portions_enriched.jsonl`: Sample 10-20 portions, verify `raw_text` populated, check quality
+  - [ ] **MANUALLY INSPECT** `window_hypotheses.jsonl`: Verify `raw_text` present, check for duplicates
+  - [ ] **COMPARE** output quality vs old pipeline baseline (read same sections side-by-side)
+  - [ ] **VERIFY** no duplicates, garbage text, or wrong sections (manually check, don't just run validators)
+  - [ ] **VALIDATE** section text accuracy and completeness (read text content, not just check counts)
+
+**LEGACY PIPELINE (Old OCR-based - Deferred)**
+
 - [ ] **PRIORITY 1**: Pipeline meta-analysis and structural redesign (Issue 0) - prerequisite for all other fixes
-- [ ] Document all identified FF output issues (user will provide)
-- [ ] Prioritize issues by severity and impact
-- [ ] Trace issues to source modules
-- [ ] Implement fixes for high-priority issues
-- [ ] Validate fixes against FF samples
-- [ ] Update recipes/modules as needed
-- [ ] Document any module behavior changes
 - [x] Capture current FF build baseline (recipe, command, run_id, key artifact paths) for `06 deathtrap dungeon` before changes
 - [ ] Perform Issue 0 investigation: trace representative sections (e.g., 32-39, 14-17) through artifacts (`window_hypotheses`, `portions_resolved`, `portions_enriched`, `gamebook.json`) and record root causes with evidence
 - [ ] Draft pipeline redesign + quality gate plan (AI utilization audit, stage order, safeguards; includes stub/duplicate/misclassification detection)
@@ -51,54 +136,84 @@ Do not skip investigation or jump to implementation. Understanding must come fir
 
 ## Issue Priority & Dependencies
 
+**CURRENT FOCUS: Unstructured Pipeline (Issues 9-12)**
+
+**Priority #1 (Critical - Unstructured Pipeline)**: Issues 9, 10
+- **Issue 9**: Portionizer doesn't extract text (blocks all downstream stages)
+- **Issue 10**: Build stage incorrectly slices pages (causes garbage text)
+- **Dependency**: Must be fixed together - portionizer extracts text, build uses element IDs
+- **Note**: These are the root causes of poor output quality in new pipeline
+
+**Priority #2 (High - Unstructured Pipeline)**: Issues 11, 12
+- **Issue 11**: Duplicate sections not deduplicated (wastes space, creates confusion)
+- **Issue 12**: Enrichment adds text incorrectly (loses element precision)
+- **Dependency**: Depends on Priority #1 (need proper text extraction first)
+- **Note**: Deduplication can be improved while fixing text extraction
+
+**LEGACY ISSUES (Old OCR Pipeline - Issues 0-8)**
+
 **Priority #1 (Prerequisite)**: Issue 0 - Pipeline meta-analysis
 - Must be completed first to inform all other fixes
 - Will determine structural changes needed
 - Will identify where AI should replace code
 - Will design safeguards and quality gates
 
-**Priority #2 (Core portionization fixes)**: Issues 1, 3, 8
+**Priority #2 (Core portionization fixes - Legacy)**: Issues 1, 3, 8
 - **Issue 1**: Multiple sections merged (blocks proper section handling)
 - **Issue 3**: Narrative split at boundaries (blocks proper content flow)
 - **Issue 8**: Malformed boundaries (blocks proper section detection)
 - **Dependency**: These are all portionization failures - fix together after Issue 0 analysis
 - **Note**: May require switching to `portionize_sections_v1` or redesigning portionization approach
 
-**Priority #3 (Detection and validation)**: Issues 2, 5, 6
+**Priority #3 (Detection and validation - Legacy)**: Issues 2, 5, 6
 - **Issue 2**: Silent stub creation (validation/quality gate problem)
 - **Issue 5**: Duplicate sections (detection/deduplication problem)
 - **Issue 6**: Misclassification (detection/classification problem)
 - **Dependency**: Depends on Issue 0 (safeguard design) and Priority #2 fixes (proper portionization)
 - **Note**: These are about catching/detecting problems - need quality gates from Issue 0
 
-**Priority #4 (Enrichment and extraction)**: Issue 7
+**Priority #4 (Enrichment and extraction - Legacy)**: Issue 7
 - **Issue 7**: Missing gameplay mechanics extraction
 - **Dependency**: Depends on Priority #2 (proper sections) and Issue 0 (may identify need for AI-based extraction)
 - **Note**: May require new enrichment module or AI-based extraction approach
 
-**Priority #5 (Formatting and polish)**: Issue 4
+**Priority #5 (Formatting and polish - Legacy)**: Issue 4
 - **Issue 4**: Section formatting improvements (sectionNum, descriptions, newlines)
 - **Dependency**: Depends on all above (need proper sections first)
 - **Note**: This is polish/UX improvement, not a correctness issue
 
-**Implementation Order**:
-1. Issue 0 (meta-analysis) → informs everything
-2. Issues 1, 3, 8 (portionization) → fix core data structure problems
-3. Issues 2, 5, 6 (validation/detection) → add safeguards and fix detection
-4. Issue 7 (enrichment) → extract missing mechanics
-5. Issue 4 (formatting) → polish output format
+**Implementation Order (Current Focus)**:
+1. Issues 9, 10 (Unstructured text extraction & build) → fix critical quality blockers
+2. Issues 11, 12 (Unstructured deduplication & enrichment) → improve accuracy
+3. Issue 0 (meta-analysis) → design safeguards for both pipelines
+4. Issues 1, 3, 8 (legacy portionization) → fix legacy if still needed
+5. Issues 2, 5, 6 (legacy validation) → add safeguards
+6. Issue 7 (enrichment) → extract missing mechanics
+7. Issue 4 (formatting) → polish output format
 
 **Workflow for Each Issue**:
 1. **Investigate thoroughly** - Trace the issue through pipeline stages, examine intermediate artifacts, understand complete data flow
+   - **MANDATORY**: Open and manually read artifact files (`.jsonl`, `.json`) at each stage
+   - **MANDATORY**: Sample 5-10 entries to verify content quality, not just structure
 2. **Document root cause** - With evidence showing exactly how the problem was introduced
+   - **MANDATORY**: Include actual artifact excerpts showing the problem
+   - **MANDATORY**: Show before/after comparisons from artifacts
 3. **Design fix** - Based on complete understanding, not assumptions
+   - **MANDATORY**: Design should address what you actually saw in artifacts
 4. **Implement** - Apply the fix with confidence that it addresses the root cause
 5. **Validate** - Verify the fix resolves the issue and doesn't introduce regressions
+   - **MANDATORY**: After implementation, manually inspect new artifacts
+   - **MANDATORY**: Read actual output text/content, verify quality improvements
+   - **MANDATORY**: Compare new artifacts to old ones, confirm fixes work
+   - **DO NOT** assume success just because code runs - verify output quality manually
 
 ## Notes
 - Related to Story 030 (FF Engine format export) which established the current export pipeline.
+- Related to Story 032 (Unstructured intake) and Story 034 (element-aware portionization) which introduced the new architecture.
+- **Legacy Issues (0-8)**: Documented for old OCR-based pipeline (`portionize_sliding_v1`, mock contamination).
+- **Current Issues (9-12)**: Discovered in new Unstructured pipeline (`portionize_elements_v1`, missing text extraction).
 - Focus on quality and correctness rather than new features.
-- Issues may span multiple stages: OCR/extract → clean → portionize → resolve → enrich → build.
+- Issues may span multiple stages: intake → portionize → resolve → enrich → build.
 
 ## Issues Identified
 
@@ -410,6 +525,126 @@ Do not skip investigation or jump to implementation. Understanding must come fir
 3. **Validation** - Detect sections that start mid-sentence and flag as errors
 4. **Post-processing** - Merge sections that are clearly continuations
 
+---
+
+## Issues Identified - Unstructured Pipeline (Current Focus)
+
+### Issue 9: Portionizer doesn't extract text from elements
+**Severity**: Critical  
+**Pipeline**: Unstructured-based (`portionize_elements_v1`)  
+**Priority**: #1 - Blocks all downstream stages
+
+**Problem**: `portionize_elements_v1` detects section boundaries (portion_id, page spans) but doesn't extract or populate `raw_text` field. All 293 hypotheses have empty/null `raw_text`.
+
+**Root Cause Analysis**:
+- `portionize_elements_v1` only calls `detect_sections_from_elements()` which identifies section starts by regex
+- `create_portions_from_sections()` creates portion metadata (portion_id, page_start, page_end) but never extracts text from elements
+- Portions are created with structure but no content
+- Downstream stages (enrich, build) try to fill text by slicing full page text, causing cross-contamination
+
+**Evidence**:
+- `window_hypotheses.jsonl`: 293 hypotheses, 0 have `raw_text` populated
+- Hypotheses only contain: `portion_id`, `page_start`, `page_end`, `confidence`, `notes`
+- Enrichment stage adds `raw_text` by converting elements → pages and slicing, losing precision
+
+**Affected Modules**:
+- `portionize_elements_v1` - needs to extract text from elements within section boundaries
+- Downstream stages expect `raw_text` but get empty values
+
+**Solution**:
+- **Fix `portionize_elements_v1`**: After detecting section boundaries, extract text from elements between section start and next section start (or end of document)
+- **Extract element text**: Group elements by section, concatenate in reading order, populate `raw_text` in hypotheses
+- **Include element IDs**: Store `element_ids` array for provenance and future element-level assembly
+- **Verify**: Each hypothesis should have non-empty `raw_text` field before passing to consensus
+
+### Issue 10: Build stage incorrectly slices page text, mixing sections
+**Severity**: Critical  
+**Pipeline**: Unstructured-based  
+**Priority**: #1 - Causes garbage text and wrong sections
+
+**Problem**: `build_ff_engine_v1` uses `slice_text()` which concatenates full page text. When multiple sections share a page, they all get mixed together. Section 1 gets garbage from page 90 instead of correct text from page 16.
+
+**Root Cause Analysis**:
+- `build_ff_engine_v1.load_pages()` converts elements → pages (full page text concatenated)
+- `build_section()` calls `slice_text(pages, page_start, page_end, "clean_text")` which returns entire page text
+- Multiple sections starting on same page (e.g., sections 3-7 all on page 7) get identical full-page text
+- Section 1 is assigned page span 7-7, but build slices wrong page entirely (page 90 content instead of page 7)
+
+**Evidence**:
+- New run section 1: "1 21- 32)  324  J21  Have you  talked  to  the  crippled  servant..." (1564 chars, garbage)
+- Old run section 1: "1\nThe clamour of the excited spectators gradually fades..." (1234 chars, correct)
+- Section 1 hypothesis has `page_start=7, page_end=7` but final text is from completely different pages
+
+**Affected Modules**:
+- `build_ff_engine_v1` - `slice_text()` doesn't work for element-based portions with shared pages
+- Should use element IDs when present, not page slicing
+
+**Solution**:
+- **Element-aware assembly**: When portions include `element_ids`, load elements directly and assemble text from those elements (not page slices)
+- **Fallback to page slicing**: Only use page slicing for legacy portions without element IDs
+- **Precise boundaries**: Element-level assembly gives precise section boundaries, no cross-contamination
+- **Verify**: Each section's text should match source elements exactly, no mixing between sections
+
+### Issue 11: Duplicate sections not deduplicated
+**Severity**: High  
+**Pipeline**: Unstructured-based  
+**Priority**: #2 - Wastes space, creates confusion
+
+**Problem**: 74 sections have multiple portions with same `section_id`. Build stage creates duplicate entries or overwrites with wrong content. Example: Section 1 has 6 portions, Section 12 has 5 portions.
+
+**Root Cause Analysis**:
+- `portionize_elements_v1` detects 293 unique section IDs but creates 375 sections (some duplicates)
+- Multiple elements match same section number anchor (e.g., "1" appears in rules text, page numbers, etc.)
+- Consensus and resolve stages don't properly deduplicate by `section_id` (they check page spans)
+- Build stage processes all portions, overwriting same `section_id` with last processed one
+- Result: Some sections have correct content, others have wrong content from later duplicate
+
+**Evidence**:
+- `portions_enriched.jsonl`: 401 portions total, but only ~319 unique section_ids
+- Section 1: 6 portions (pages 8, 90, etc.) with same section_id
+- Section 12: 5 portions all on page 19
+- Duplicate sections share same text (21 unique texts appear multiple times)
+
+**Affected Modules**:
+- `portionize_elements_v1` - needs better false positive filtering (Issue 9 addresses this)
+- `consensus_vote_v1` - should deduplicate by section_id, not just page spans
+- `resolve_overlaps_v1` - should check section_id uniqueness
+- `build_ff_engine_v1` - should merge or prefer best portion for each section_id
+
+**Solution**:
+- **Fix portionizer filtering**: Better false positive detection in `portionize_elements_v1` (remove non-gameplay matches)
+- **Deduplicate early**: Consensus or resolve should merge portions with same `section_id`, keeping best one
+- **Build stage safety**: Build should detect duplicate section_ids and either merge or fail loudly
+- **Verify**: Final gamebook should have unique section_ids, no duplicates
+
+### Issue 12: Enrichment adds text incorrectly from page slices
+**Severity**: High  
+**Pipeline**: Unstructured-based  
+**Priority**: #2 - Loses element precision
+
+**Problem**: `section_enrich_v1` converts elements → pages, then slices page text to populate `raw_text`. This loses the precision of element boundaries and causes issues when multiple sections share pages.
+
+**Root Cause Analysis**:
+- `portionize_elements_v1` doesn't populate `raw_text` (Issue 9)
+- `section_enrich_v1` tries to fill the gap by converting elements → pages (duplicate conversion!)
+- Then slices page text using portion's `page_start`/`page_end` spans
+- This is backwards - should extract from elements directly, not convert to pages first
+
+**Evidence**:
+- Portions before enrich: no `raw_text`
+- Portions after enrich: `raw_text` populated by page slicing
+- But page slicing is imprecise when multiple sections share pages
+
+**Affected Modules**:
+- `section_enrich_v1` - should extract text from element IDs when present
+- Should work with elements directly, not convert to pages
+
+**Solution**:
+- **Element-first extraction**: If portion has `element_ids`, extract text from those elements directly
+- **Fallback to page slicing**: Only convert elements → pages if element IDs not available (legacy compatibility)
+- **Preserve precision**: Element-level extraction maintains exact boundaries, no page-level contamination
+- **Verify**: Enriched portions should have accurate `raw_text` matching source elements exactly
+
 ## Work Log
 - 2025-01-27 — Story created to track FF output refinement issues. Awaiting user input on specific problems to address.
 - 2025-01-27 — **Issue 1 documented**: Multiple sections (37, 38, 39) merged into single section entry. Root cause: `portionize_sliding_v1` creates page-level portions; `section_enrich_v1` only detects first section number; `build_ff_engine_v1` includes all text. 
@@ -475,3 +710,11 @@ Do not skip investigation or jump to implementation. Understanding must come fir
   - **Result:** Success.
   - **Notes:** Story status set to *Paused*; pending decisions on new architecture that may supersede current plan and guardrails.
   - **Next:** Resume after intake/architecture direction is decided; re-evaluate plan and portionizer choice against new stack.
+- 20251129-1900 — **REOPENED**: Story expanded to cover Unstructured pipeline quality issues.
+  - **Result:** Story reopened with expanded scope.
+  - **Context:** Story 034 implemented element-aware portionization (`portionize_elements_v1`), but initial pipeline test revealed critical quality regressions worse than old pipeline.
+  - **New Investigation:** Discovered that `portionize_elements_v1` detects sections but doesn't extract text; build stage incorrectly slices pages mixing multiple sections; duplicate sections not handled.
+  - **Findings:** New pipeline produces duplicates, garbage text, and wrong section content. Root cause: portionizer creates hypotheses with metadata only (no `raw_text`), enrichment/build stages slice full page text causing cross-contamination when multiple sections share pages.
+  - **Comparison:** Old pipeline (`deathtrap-ff-engine`) had 102 real sections with clean text. New pipeline (`ff-unstructured-test`) has 150 real sections but terrible quality - section 1 contains garbage text from wrong pages, 74 sections have duplicate portions.
+  - **Issues Identified:** Added Issues 9-12 (see below) for Unstructured-specific problems.
+  - **Next:** Fix text extraction in `portionize_elements_v1`, fix build stage page slicing, add deduplication, verify each stage produces clean output.

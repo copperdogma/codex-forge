@@ -1,42 +1,43 @@
-# Fighting Fantasy pipeline using Unstructured intake (elements IR)
+# Fighting Fantasy pipeline using Unstructured intake with element-aware portionization
 #
-# This recipe uses the new Unstructured-based Document IR architecture.
-# All modules have been updated to support elements.jsonl format.
+# This recipe uses the new element-aware portionizer that works directly with elements
+# instead of converting to pages. Expected to find 4x more sections.
 
-run_id: ff-unstructured
+run_id: ff-unstructured-elements
 input:
   pdf: input/06 deathtrap dungeon.pdf
-output_dir: output/runs/ff-unstructured-test
+output_dir: output/runs/ff-unstructured-elements
 stages:
   # Stage 1: Unstructured intake → elements.jsonl
   - id: unstructured_intake
     stage: intake
     module: unstructured_pdf_intake_v1
     params:
-      strategy: hi_res  # Better element granularity on ARM64 (recommended)
+      strategy: hi_res  # Better element granularity on ARM64
       infer_table_structure: false
       extract_images: false
-      save_raw: false  # Set true for debugging
+      save_raw: false
 
-  # Stage 2: Portionize using elements (element-aware approach)
-  - id: portionize_fine
+  # Stage 2: Portionize using element-aware approach
+  - id: portionize_elements
     stage: portionize
     module: portionize_elements_v1
     needs: [unstructured_intake]
 
-  # Stage 3: Consensus voting
-  - id: consensus_main
-    stage: consensus
-    module: consensus_vote_v1
-    needs: [portionize_fine]
-    params:
-      min_conf: 0.55
+  # Stage 3: Consensus voting - SKIP for element-based (one detection per section, no overlaps)
+  # Element-based portionizer directly detects sections, no need for voting
+  # - id: consensus_main
+  #   stage: consensus
+  #   module: consensus_vote_v1
+  #   needs: [portionize_elements]
+  #   params:
+  #     min_conf: 0.55
 
   # Stage 4: Dedupe IDs
   - id: dedupe_main
     stage: dedupe
     module: dedupe_ids_v1
-    needs: [consensus_main]  # Keep consensus for schema conversion (now preserves unique sections)
+    needs: [portionize_elements]  # Skip consensus, go straight from portionize
 
   # Stage 5: Normalize IDs
   - id: normalize_main
@@ -44,7 +45,7 @@ stages:
     module: normalize_ids_v1
     needs: [dedupe_main]
 
-  # Stage 6: Resolve overlaps
+  # Stage 6: Resolve overlaps - Should have minimal overlaps now with fixed page spans
   - id: resolve_main
     stage: resolve
     module: resolve_overlaps_v1
@@ -85,3 +86,4 @@ stages:
     params:
       validator_dir: modules/validate/validate_ff_engine_node_v1/validator
       node_bin: node
+

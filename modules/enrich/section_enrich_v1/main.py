@@ -104,7 +104,21 @@ def main():
 
     for portion in read_jsonl(args.portions):
         raw_text = extract_text(portion, pages, args.max_chars)
+        # If portion_id looks like a normalized section ID (S001, S002, etc.), extract number
+        # Or if it's already numeric, use it directly
+        portion_id = portion.get("portion_id")
         section_id = detect_section_id(raw_text)
+        
+        # Try to extract numeric ID from portion_id
+        if not section_id and portion_id:
+            # Check if it's normalized format like "S001" or "S123"
+            import re
+            norm_match = re.match(r'^S(\d+)$', str(portion_id).strip())
+            if norm_match:
+                section_id = norm_match.group(1)
+            # Or if it's already numeric
+            elif str(portion_id).strip().isdigit():
+                section_id = str(portion_id).strip()
         targets = detect_targets(raw_text)
         enriched = EnrichedPortion(
             portion_id=portion["portion_id"],

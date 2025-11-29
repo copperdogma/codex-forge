@@ -133,6 +133,17 @@ Artifacts appear under `output/runs/<run_id>/` as listed in the recipe; use `--s
 - Coarse+fine portionizer; continuation merge
 - AI planner to pick modules/configs based on user goals
 
+## OCR Strategy Choice
+
+**Recommended: `hi_res` on ARM64, `ocr_only` on x86_64**
+
+After comprehensive testing comparing old Tesseract-based OCR with Unstructured strategies (`ocr_only` vs `hi_res`):
+
+- **`hi_res` on ARM64**: ~15% faster (88s/page vs 105s/page), extracts ~35% more granular elements (better layout boundaries), same text quality as `ocr_only`. Use when ARM64 environment is available (Story 033 complete).
+- **`ocr_only`**: More compatible (works on x86_64/Rosetta without JAX), similar text quality, fewer elements. Use as fallback or when maximum compatibility is needed.
+
+**Note**: OCR text quality is source-limited (scanned PDF quality determines accuracy), so strategy choice primarily affects performance and element granularity, not character recognition accuracy.
+
 ## Environment Setup
 
 ### x86_64/Rosetta (Default, Recommended for Quick Starts)
@@ -147,7 +158,10 @@ The default setup uses x86_64 Python running under Rosetta 2 on Apple Silicon. T
 **When to use:**
 - Quick starts and one-off runs
 - When you need maximum compatibility
-- When OCR quality from `ocr_only` strategy is sufficient
+- When `ocr_only` OCR strategy is sufficient
+
+**OCR Strategy:**
+- Uses `ocr_only` (JAX unavailable under Rosetta, so `hi_res` not possible)
 
 **Limitations:**
 - Cannot use `hi_res` OCR strategy (requires JAX, which has AVX incompatibilities under Rosetta)
@@ -195,8 +209,12 @@ conda activate codex-arm
 - When you want GPU acceleration (2-5× faster than x86_64/Rosetta)
 - New machine/environment setup from scratch
 
+**OCR Strategy:**
+- Recommended: `hi_res` (~15% faster, better element boundaries)
+- Fallback: `ocr_only` if needed
+
 **Performance:**
-- `hi_res` OCR: ~95s/page (tested on M4 Pro, 3 pages)
+- `hi_res` OCR: ~88s/page (tested on M4 Pro, pages 16-18)
 - `ocr_only` OCR: ~105s/page (ARM64 native, no JAX)
 - Expected 2-5× speedup over x86_64/Rosetta for `hi_res` workloads
 
