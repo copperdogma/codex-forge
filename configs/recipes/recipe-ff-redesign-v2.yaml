@@ -1,0 +1,119 @@
+# Fighting Fantasy Pipeline Redesign v2 (5-stage architecture)
+#
+# Stages:
+# 0. Intake → elements.jsonl (Unstructured)
+# 1. Reduce IR → elements_core.jsonl
+# 2. Header Classification → header_candidates.jsonl
+# 3. Global Structuring → sections_structured.json
+# 4. Boundaries Assembly → section_boundaries.jsonl
+# 5. Boundary Verification → boundary_verification.json
+# 6. AI Extract → portions_enriched.jsonl
+# 7. Build → gamebook.json
+# 8. Validate → validation_report.json
+#
+# Notes:
+# - Uses hi_res strategy (ARM64) for best element granularity.
+# - Elements_core feeds AI stages; original elements feed extraction.
+
+run_id: ff-redesign-v2-improved
+input:
+  pdf: input/06 deathtrap dungeon.pdf
+output_dir: output/runs/ff-redesign-v2-improved
+stages:
+  - id: intake
+    stage: intake
+    module: unstructured_pdf_intake_v1
+    params:
+      strategy: hi_res
+      infer_table_structure: false
+      extract_images: false
+      save_raw: false
+
+  - id: reduce_ir
+    stage: normalize
+    module: reduce_ir_v1
+    needs: [intake]
+    out: elements_core.jsonl
+    inputs:
+      elements: intake
+
+  - id: classify_headers
+    stage: portionize
+    module: classify_headers_v1
+    needs: [reduce_ir]
+    out: header_candidates.jsonl
+    inputs:
+      pages: reduce_ir
+    params:
+      model: gpt-4.1-nano
+      batch_size: 75
+      redundancy: forward_backward
+
+  - id: structure_globally
+    stage: portionize
+    module: structure_globally_v1
+    needs: [classify_headers, reduce_ir]
+    out: sections_structured.json
+    inputs:
+      pages: classify_headers
+      elements: reduce_ir
+    params:
+      model: gpt-4o
+      max_tokens: 16000
+
+  - id: assemble_boundaries
+    stage: portionize
+    module: assemble_boundaries_v1
+    needs: [structure_globally, reduce_ir]
+    out: section_boundaries.jsonl
+    inputs:
+      structure: structure_globally
+      elements: reduce_ir
+
+  - id: verify_boundaries
+    stage: validate
+    module: verify_boundaries_v1
+    needs: [assemble_boundaries, reduce_ir]
+    out: boundary_verification.json
+    inputs:
+      boundaries: assemble_boundaries
+      elements: reduce_ir
+    params:
+      sample_count: 8
+      model: gpt-4.1-nano
+
+  - id: ai_extract
+    stage: portionize
+    module: portionize_ai_extract_v1
+    needs: [assemble_boundaries, intake]
+    out: portions_enriched.jsonl
+    inputs:
+      pages: intake
+      boundaries: assemble_boundaries
+    params:
+      model: gpt-4o
+      max_tokens: 2000
+
+  - id: build_ff_engine
+    stage: build
+    module: build_ff_engine_v1
+    needs: [ai_extract]
+    out: gamebook.json
+    inputs:
+      portions: ai_extract
+    params:
+      title: "Deathtrap Dungeon"
+      author: "Ian Livingstone"
+      start_section: "1"
+      format_version: "1.0.0"
+
+  - id: validate_ff_engine
+    stage: validate
+    module: validate_ff_engine_v2
+    needs: [build_ff_engine]
+    out: validation_report.json
+    inputs:
+      gamebook: build_ff_engine
+    params:
+      expected_range_start: 1
+      expected_range_end: 400

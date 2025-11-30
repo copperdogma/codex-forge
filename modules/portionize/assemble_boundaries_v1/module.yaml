@@ -1,0 +1,14 @@
+module_id: assemble_boundaries_v1
+stage: portionize
+entrypoint: modules/portionize/assemble_boundaries_v1/main.py
+input_schema: sections_structured_v1
+output_schema: section_boundary_v1
+default_params:
+  confidence_default: 0.7
+param_schema:
+  properties:
+    confidence_default:
+      type: number
+      description: "Fallback confidence to use when structure lacks confidence"
+  required: []
+notes: "Deterministically assembles section_boundaries.jsonl from sections_structured.json and elements_core.jsonl. Computes end_seq from next start_seq, maps seq→element IDs, enforces ordering/uniqueness, and emits SectionBoundary records for certain sections."

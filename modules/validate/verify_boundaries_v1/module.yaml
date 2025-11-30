@@ -1,0 +1,18 @@
+module_id: verify_boundaries_v1
+stage: validate
+entrypoint: modules/validate/verify_boundaries_v1/main.py
+input_schema: section_boundary_v1
+output_schema: boundary_verification_v1
+default_params:
+  sample_count: 8
+  model: gpt-4o-mini
+param_schema:
+  properties:
+    sample_count:
+      type: integer
+      description: "Number of boundaries to sample for AI spot-checks"
+    model:
+      type: string
+      description: "OpenAI model for AI spot-checks"
+  required: []
+notes: "Verifies section_boundaries.jsonl with deterministic checks and optional AI spot-checks for mid-sentence/incorrect starts. Emits boundary_verification.json with errors/warnings."

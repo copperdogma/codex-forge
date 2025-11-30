@@ -1,0 +1,19 @@
+module_id: structure_globally_v1
+stage: portionize
+entrypoint: modules/portionize/structure_globally_v1/main.py
+input_schema: header_candidate_v1
+output_schema: sections_structured_v1
+default_params:
+  model: gpt-4o
+  max_tokens: 8000
+param_schema:
+  properties:
+    model:
+      type: string
+      description: "OpenAI model to use for global structuring (gpt-4o recommended for complex reasoning)"
+    max_tokens:
+      type: integer
+      description: "Maximum tokens for LLM response"
+  required: []
+notes: "Stage 2: Global structuring from header candidates. Takes header_candidates.jsonl (all candidates from Stage 1) and performs a single AI call to create coherent global document structure with macro sections and game sections. Uses strong constraints to ensure proper ordering and conservatively marks uncertain sections. Outputs sections_structured.json."
+

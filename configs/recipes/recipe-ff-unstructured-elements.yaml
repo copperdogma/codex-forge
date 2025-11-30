@@ -24,20 +24,21 @@ stages:
     module: portionize_elements_v1
     needs: [unstructured_intake]
 
-  # Stage 3: Consensus voting - SKIP for element-based (one detection per section, no overlaps)
-  # Element-based portionizer directly detects sections, no need for voting
-  # - id: consensus_main
-  #   stage: consensus
-  #   module: consensus_vote_v1
-  #   needs: [portionize_elements]
-  #   params:
-  #     min_conf: 0.55
+  # Stage 3: Consensus voting
+  # Element-based portionizer creates one hypothesis per section, but we still need
+  # consensus to convert portion_hyp_v1 → locked_portion_v1 schema
+  - id: consensus_main
+    stage: consensus
+    module: consensus_vote_v1
+    needs: [portionize_elements]
+    params:
+      min_conf: 0.55
 
   # Stage 4: Dedupe IDs
   - id: dedupe_main
     stage: dedupe
     module: dedupe_ids_v1
-    needs: [portionize_elements]  # Skip consensus, go straight from portionize
+    needs: [consensus_main]
 
   # Stage 5: Normalize IDs
   - id: normalize_main

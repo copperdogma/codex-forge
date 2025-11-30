@@ -1,0 +1,10 @@
+module_id: reduce_ir_v1
+stage: normalize
+entrypoint: modules/normalize/reduce_ir_v1/main.py
+input_schema: unstructured_element_v1
+output_schema: element_core_v1
+default_params: {}
+param_schema:
+  properties: {}
+  required: []
+notes: "Reduce Unstructured's verbose IR to minimal internal schema (elements_core.jsonl) for all AI operations. Maps Unstructured element types to simple kind categories, extracts layout hints, and adds sequential ordering."

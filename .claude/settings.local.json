@@ -1,0 +1,20 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(python:*)",
+      "Bash(pip install:*)",
+      "Bash(PYTHONPATH=/Users/cam/Documents/Projects/codex-forge python:*)",
+      "Bash(cat:*)",
+      "Bash(tee:*)",
+      "Bash(python3:*)",
+      "Bash(sw_vers)",
+      "Bash(pip show jax jaxlib)",
+      "Bash(pip uninstall:*)",
+      "Bash(conda info:*)",
+      "Bash(arch -arm64 /usr/bin/python3:*)",
+      "WebSearch"
+    ],
+    "deny": [],
+    "ask": []
+  }
+}

@@ -1,0 +1,29 @@
+module_id: classify_headers_v1
+stage: portionize
+entrypoint: modules/portionize/classify_headers_v1/main.py
+input_schema: element_core_v1
+output_schema: header_candidate_v1
+default_params:
+  model: gpt-4.1-nano
+  batch_size: 75
+  max_tokens: 4000
+  redundancy: forward_backward
+param_schema:
+  properties:
+    model:
+      type: string
+      description: "OpenAI model to use for classification"
+    batch_size:
+      type: integer
+      minimum: 50
+      maximum: 100
+      description: "Number of elements per batch (50-100 recommended)"
+    max_tokens:
+      type: integer
+      description: "Maximum tokens for LLM response"
+    redundancy:
+      type: string
+      enum: [none, forward_backward, multiple_calls]
+      description: "Redundancy strategy: none, forward_backward (recommended), or multiple_calls"
+  required: []
+notes: "AI-powered header classification for Fighting Fantasy books. Batches elements_core.jsonl into chunks of 50-100 elements, uses AI to classify each element as macro header, game section header, or neither. Supports forward/backward pass redundancy for robustness. Outputs header_candidates.jsonl with all elements classified."

@@ -1,104 +1,8 @@
 import argparse
 import json
 from typing import Any, Dict, List, Optional
-from collections import defaultdict
 
 from modules.common.utils import read_jsonl, save_json, ProgressLogger
-
-
-def elements_to_pages_dict(elements: List[Dict]) -> Dict[int, Dict[str, Any]]:
-    """
-    Convert elements.jsonl to page-based dict for text slicing.
-
-    Groups elements by page_number and concatenates text in reading order.
-    Returns dict keyed by page number with text fields.
-    """
-    # Group elements by page
-    pages_dict = defaultdict(list)
-    for elem in elements:
-        page_num = elem.get("metadata", {}).get("page_number", 1)
-        pages_dict[page_num].append(elem)
-
-    # Sort elements within each page by sequence or coordinates
-    def sort_key(elem):
-        # Try _codex.sequence first
-        sequence = elem.get("_codex", {}).get("sequence")
-        if sequence is not None:
-            return (0, sequence)
-
-        # Try coordinates (y-coordinate, then x)
-        coords = elem.get("metadata", {}).get("coordinates", {})
-        points = coords.get("points", [])
-        if points:
-            ys = [p[1] for p in points]
-            xs = [p[0] for p in points]
-            return (1, min(ys), min(xs))
-
-        return (2, 0)
-
-    # Build page objects
-    pages = {}
-    for page_num in sorted(pages_dict.keys()):
-        page_elements = sorted(pages_dict[page_num], key=sort_key)
-
-        # Filter out headers/footers
-        content_elements = [
-            e for e in page_elements
-            if e.get("type") not in ("Header", "Footer", "PageBreak")
-        ]
-
-        # Concatenate text
-        text_parts = []
-        for elem in content_elements:
-            text = elem.get("text", "").strip()
-            if text:
-                text_parts.append(text)
-
-        page_text = "\n\n".join(text_parts)
-
-        pages[page_num] = {
-            "page": page_num,
-            "text": page_text,
-            "clean_text": page_text,
-            "raw_text": page_text,
-            "element_count": len(content_elements)
-        }
-
-    return pages
-
-
-def load_pages(path: str) -> Dict[int, Dict[str, Any]]:
-    """Load pages from elements.jsonl or legacy pages format."""
-    raw_data = list(read_jsonl(path))
-    if not raw_data:
-        return {}
-
-    # Detect format: elements have "type" and "metadata", pages have "page" at top level
-    first = raw_data[0]
-    is_elements = "type" in first and "metadata" in first
-
-    if is_elements:
-        # Convert elements to pages dict
-        return elements_to_pages_dict(raw_data)
-    else:
-        # Legacy pages format
-        pages: Dict[int, Dict[str, Any]] = {}
-        for row in raw_data:
-            page_num = row.get("page")
-            if page_num is None:
-                continue
-            pages[int(page_num)] = row
-        return pages
-
-
-def slice_text(pages: Dict[int, Dict[str, Any]], start: int, end: int, key: str) -> str:
-    parts: List[str] = []
-    for page in range(start, end + 1):
-        pg = pages.get(page, {})
-        txt = pg.get(key) or ""
-        if txt:
-            parts.append(txt)
-    return "\n".join(parts)
 
 
 def make_navigation(portion: Dict[str, Any]) -> List[Dict[str, Any]]:
@@ -162,13 +66,19 @@ def is_gameplay(section_id: str, portion: Dict[str, Any], candidate_type: Option
     return False
 
 
-def build_section(portion: Dict[str, Any], pages: Dict[int, Dict[str, Any]]) -> Dict[str, Any]:
+def build_section(portion: Dict[str, Any]) -> tuple[str, Dict[str, Any]]:
+    """
+    Build a Fighting Fantasy Engine section from an EnrichedPortion.
+
+    Simplified for AI-first pipeline - raw_text is always provided by portionize_ai_extract_v1.
+    """
     section_id = str(portion.get("section_id") or portion.get("portion_id"))
     page_start = int(portion.get("page_start"))
     page_end = int(portion.get("page_end"))
 
-    text_body = slice_text(pages, page_start, page_end, "clean_text") or slice_text(pages, page_start, page_end, "raw_text")
-    raw_body = slice_text(pages, page_start, page_end, "raw_text")
+    # AI pipeline always provides raw_text
+    text_body = portion.get("raw_text", "")
+    raw_body = text_body
 
     nav_links = make_navigation(portion)
 
@@ -268,9 +178,8 @@ def collect_targets(section: Dict[str, Any]) -> List[str]:
 
 
 def main():
-    parser = argparse.ArgumentParser(description="Build Fighting Fantasy Engine gamebook JSON from portions + pages.")
-    parser.add_argument("--pages", required=True, help="Path to elements.jsonl (or legacy clean_page JSONL)")
-    parser.add_argument("--portions", required=True, help="Path to resolved/enriched portion JSONL")
+    parser = argparse.ArgumentParser(description="Build Fighting Fantasy Engine gamebook JSON from enriched portions.")
+    parser.add_argument("--portions", required=True, help="Path to portions_enriched.jsonl")
     parser.add_argument("--out", required=True, help="Output gamebook JSON path")
     parser.add_argument("--title", required=True, help="Gamebook title")
     parser.add_argument("--author", help="Gamebook author")
@@ -282,14 +191,17 @@ def main():
     args = parser.parse_args()
 
     logger = ProgressLogger(state_path=args.state_file, progress_path=args.progress_file, run_id=args.run_id)
-    logger.log("build_ff_engine", "running", current=0, total=None, message="Loading inputs", module_id="build_ff_engine_v1")
+    logger.log("build_ff_engine", "running", current=0, total=None, message="Loading enriched portions", module_id="build_ff_engine_v1")
 
-    pages = load_pages(args.pages)
     portions = list(read_jsonl(args.portions))
 
     sections: Dict[str, Any] = {}
     for idx, portion in enumerate(portions, start=1):
-        section_id, section = build_section(portion, pages)
+        # Skip error records
+        if "error" in portion:
+            continue
+
+        section_id, section = build_section(portion)
         sections[section_id] = section
         if idx % 20 == 0:
             logger.log("build_ff_engine", "running", current=idx, total=len(portions),

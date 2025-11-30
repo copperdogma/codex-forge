@@ -124,6 +124,8 @@ class PortionHypothesis(BaseModel):
     source_pages: List[int] = Field(default_factory=list)
     continuation_of: Optional[str] = None
     continuation_confidence: Optional[float] = None
+    raw_text: Optional[str] = None  # Text extracted from elements/pages
+    element_ids: Optional[List[str]] = None  # Source element IDs for provenance
 
 
 class LockedPortion(BaseModel):
@@ -141,6 +143,8 @@ class LockedPortion(BaseModel):
     source_images: List[str] = Field(default_factory=list)
     continuation_of: Optional[str] = None
     continuation_confidence: Optional[float] = None
+    raw_text: Optional[str] = None  # Text extracted from elements/pages
+    element_ids: Optional[List[str]] = None  # Source element IDs for provenance
 
 
 class ResolvedPortion(BaseModel):
@@ -159,6 +163,8 @@ class ResolvedPortion(BaseModel):
     orig_portion_id: Optional[str] = None
     continuation_of: Optional[str] = None
     continuation_confidence: Optional[float] = None
+    raw_text: Optional[str] = None  # Text extracted from elements/pages
+    element_ids: Optional[List[str]] = None  # Source element IDs for provenance
 
 
 class EnrichedPortion(BaseModel):
@@ -183,6 +189,7 @@ class EnrichedPortion(BaseModel):
     test_luck: Optional[bool] = None
     item_effects: List[ItemEffect] = Field(default_factory=list)
     targets: List[str] = Field(default_factory=list)
+    element_ids: Optional[List[str]] = None  # Source element IDs for provenance
 
 
 class LLMCallUsage(BaseModel):
@@ -397,3 +404,162 @@ class UnstructuredElement(BaseModel):
         extra = "allow"
         # Support both 'codex' and '_codex' when parsing
         populate_by_name = True
+
+
+# ────────────────────────────────────────────────────────────────
+# Fighting Fantasy AI Pipeline Schemas
+# ────────────────────────────────────────────────────────────────
+
+
+class SectionBoundary(BaseModel):
+    """
+    AI-detected section boundary in Fighting Fantasy book.
+
+    This schema represents a single gameplay section detected by AI analysis.
+    The AI scans elements to find section numbers (1-400) and identifies the
+    start/end element IDs that bound each section's content.
+    """
+    schema_version: str = "section_boundary_v1"
+    module_id: Optional[str] = None
+    run_id: Optional[str] = None
+    created_at: Optional[str] = None
+
+    section_id: str  # "1", "2", "3", etc. (Fighting Fantasy section numbers)
+    start_element_id: str  # ID of first element in this section
+    end_element_id: Optional[str] = None  # ID of last element (None if extends to next section)
+    confidence: float  # 0.0-1.0, AI's confidence this is a real section boundary
+    evidence: Optional[str] = None  # Why AI thinks this is a section boundary
+
+
+class BoundaryIssue(BaseModel):
+    """Single boundary issue discovered during verification."""
+    section_id: str
+    severity: Literal["error", "warning"]
+    message: str
+    start_element_id: Optional[str] = None
+    page: Optional[int] = None
+    evidence: Optional[str] = None
+
+
+class BoundaryVerificationReport(BaseModel):
+    """Report produced by verify_boundaries_v1."""
+    schema_version: str = "boundary_verification_v1"
+    run_id: Optional[str] = None
+    checked: int
+    errors: List[BoundaryIssue] = Field(default_factory=list)
+    warnings: List[BoundaryIssue] = Field(default_factory=list)
+    ai_samples: List[Dict[str, Any]] = Field(default_factory=list)
+    is_valid: bool = True
+
+
+class ValidationReport(BaseModel):
+    """
+    Validation report for Fighting Fantasy Engine output.
+
+    This schema captures quality checks on the final gamebook.json output,
+    including missing sections, duplicates, and structural issues.
+    """
+    schema_version: str = "validation_report_v1"
+    run_id: Optional[str] = None
+    created_at: Optional[str] = None
+
+    total_sections: int
+    missing_sections: List[str] = Field(default_factory=list)  # Section IDs that should exist but don't
+    duplicate_sections: List[str] = Field(default_factory=list)  # Section IDs appearing multiple times
+    sections_with_no_text: List[str] = Field(default_factory=list)
+    sections_with_no_choices: List[str] = Field(default_factory=list)
+
+    is_valid: bool  # True if no critical errors
+    warnings: List[str] = Field(default_factory=list)
+    errors: List[str] = Field(default_factory=list)
+
+
+# ────────────────────────────────────────────────────────────────
+# Pipeline Redesign v2: Minimal IR Schemas
+# ────────────────────────────────────────────────────────────────
+
+
+class ElementLayout(BaseModel):
+    """Layout information for an element (simplified from Unstructured metadata)."""
+    h_align: str = "unknown"  # "left" | "center" | "right" | "unknown"
+    y: Optional[float] = None  # Normalized vertical position 0-1 on page
+
+
+class ElementCore(BaseModel):
+    """
+    Minimal internal IR schema for all AI operations.
+    
+    This schema reduces Unstructured's verbose IR to only the essential fields
+    needed for section detection and boundary identification. All subsequent
+    AI work depends only on elements_core.jsonl plus derived artifacts.
+    
+    Per pipeline redesign spec: {id, seq, page, kind, text, layout}
+    No metadata fields (schema_version, module_id, run_id, created_at) to minimize
+    AI workload and improve readability. Metadata lives in pipeline state/manifests.
+    
+    Derived from UnstructuredElement by:
+    - Preserving id, text, page
+    - Adding seq (0-based reading order index, preserved from original)
+    - Mapping Unstructured types to simple "kind" categories
+    - Extracting layout hints (alignment, vertical position)
+    - Filtering out empty elements (text.strip() == "")
+    """
+    id: str  # Original element ID from Unstructured
+    seq: int  # Global reading-order index (0-based, preserved from original elements_full)
+    page: int  # Page number as reported by Unstructured (1-based)
+    kind: str  # "text" | "image" | "table" | "other"
+    text: str  # Raw text, normalized whitespace only (non-empty after filtering)
+    layout: Optional[ElementLayout] = None  # Layout hints if available
+
+
+class HeaderCandidate(BaseModel):
+    """
+    AI-classified header candidate from element-level analysis.
+    
+    This schema represents the output of Stage 1 (Header Classification), where AI
+    analyzes each element to identify if it's a macro section header or game section header.
+    This stage labels candidates only - it does not decide final section mapping.
+    
+    Per pipeline redesign spec v2: header_candidates.jsonl contains all elements with
+    their classification results, not just positives, for downstream context.
+    """
+    seq: int  # Element sequence number (from elements_core)
+    page: int  # Page number (from elements_core)
+    macro_header: str = "none"  # "none" | "cover" | "title_page" | "rules" | "introduction" | ...
+    game_section_header: bool = False  # True if this is a numbered gameplay section header
+    claimed_section_number: Optional[int] = None  # Section number (1-400) if game_section_header is true
+    confidence: float  # 0.0-1.0, AI's confidence in this classification
+    text: Optional[str] = None  # Text content from elements_core (for verification)
+
+
+class MacroSection(BaseModel):
+    """Macro section (front_matter, game_sections region, etc.)"""
+    id: str  # "front_matter", "game_sections", etc.
+    start_seq: int  # Starting sequence number
+    end_seq: int  # Ending sequence number
+    confidence: float  # 0.0-1.0
+
+
+class GameSectionStructured(BaseModel):
+    """Game section with structured metadata from global analysis"""
+    id: int  # Section number (1-400)
+    start_seq: Optional[int] = None  # Starting sequence number (null if uncertain)
+    status: Literal["certain", "uncertain"] = "certain"  # Status of this section
+    confidence: float  # 0.0-1.0
+    text: Optional[str] = None  # Full text content from start_seq until next section (for verification)
+    text_length: Optional[int] = None  # Length of text in characters
+
+
+class SectionsStructured(BaseModel):
+    """
+    Global structured view of document sections from Stage 2.
+    
+    This schema represents the output of Stage 2 (Global Structuring), where a single
+    AI call analyzes header candidates to create a coherent global structure with
+    macro sections and game sections.
+    
+    Per pipeline redesign spec v2: sections_structured.json contains macro sections
+    (front_matter, game_sections) and game sections with strict ordering constraints.
+    """
+    macro_sections: List[MacroSection]  # Macro sections (front_matter, game_sections region)
+    game_sections: List[GameSectionStructured]  # Game sections with status (certain/uncertain)

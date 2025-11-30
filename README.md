@@ -137,6 +137,8 @@ Artifacts appear under `output/runs/<run_id>/` as listed in the recipe; use `--s
 
 **Recommended: `hi_res` on ARM64, `ocr_only` on x86_64**
 
+**⚠️ Before choosing a strategy**: Check your Python architecture (`python -c "import platform; print(platform.machine())"`). On Apple Silicon Macs, verify if ARM64 environment exists even if your current shell is using x86_64.
+
 After comprehensive testing comparing old Tesseract-based OCR with Unstructured strategies (`ocr_only` vs `hi_res`):
 
 - **`hi_res` on ARM64**: ~15% faster (88s/page vs 105s/page), extracts ~35% more granular elements (better layout boundaries), same text quality as `ocr_only`. Use when ARM64 environment is available (Story 033 complete).
@@ -145,6 +147,26 @@ After comprehensive testing comparing old Tesseract-based OCR with Unstructured 
 **Note**: OCR text quality is source-limited (scanned PDF quality determines accuracy), so strategy choice primarily affects performance and element granularity, not character recognition accuracy.
 
 ## Environment Setup
+
+**⚠️ IMPORTANT: Check Your Environment First**
+
+Before assuming x86_64/Rosetta, check if you have an ARM64 environment available:
+
+```bash
+# Check if ARM64 environment exists
+ls -la ~/miniforge3/envs/codex-arm/bin/python 2>/dev/null && echo "ARM64 environment available"
+
+# Check current Python architecture
+python -c "import platform; print(f'Machine: {platform.machine()}')"
+# ARM64 native: "Machine: arm64"
+# x86_64/Rosetta: "Machine: x86_64"
+
+# Check ARM64 environment architecture
+~/miniforge3/envs/codex-arm/bin/python -c "import platform; print(f'Machine: {platform.machine()}')" 2>/dev/null
+# Should show: "Machine: arm64"
+```
+
+**On Apple Silicon (M-series) Macs**: You likely have both environments. Always check for ARM64 first and use it for better performance unless you have a specific reason to use x86_64.
 
 ### x86_64/Rosetta (Default, Recommended for Quick Starts)
 
@@ -162,6 +184,7 @@ The default setup uses x86_64 Python running under Rosetta 2 on Apple Silicon. T
 
 **OCR Strategy:**
 - Uses `ocr_only` (JAX unavailable under Rosetta, so `hi_res` not possible)
+- **Note**: If you're on Apple Silicon but using x86_64 Python, check if ARM64 environment exists and use that instead
 
 **Limitations:**
 - Cannot use `hi_res` OCR strategy (requires JAX, which has AVX incompatibilities under Rosetta)

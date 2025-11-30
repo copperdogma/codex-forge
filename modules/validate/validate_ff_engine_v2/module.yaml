@@ -1,0 +1,16 @@
+module_id: validate_ff_engine_v2
+stage: validate
+entrypoint: modules/validate/validate_ff_engine_v2/main.py
+input_schema: null
+output_schema: validation_report_v1
+default_params:
+  expected_range_start: 1
+  expected_range_end: 400
+param_schema:
+  properties:
+    expected_range_start:
+      type: integer
+    expected_range_end:
+      type: integer
+  required: []
+notes: "Validates Fighting Fantasy Engine gamebook.json output. Checks for missing sections, duplicates, empty sections, and structural issues. Generates detailed validation report."
