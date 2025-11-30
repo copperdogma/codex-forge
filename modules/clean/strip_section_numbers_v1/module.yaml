@@ -1,0 +1,8 @@
+module_id: strip_section_numbers_v1
+stage: clean
+entrypoint: modules/clean/strip_section_numbers_v1/main.py
+input_schema: enriched_portion_v1
+output_schema: enriched_portion_v1
+default_params: {}
+param_schema: {}
+notes: "Remove section/page number artifacts from section text while preserving paragraph structure."

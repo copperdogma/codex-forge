@@ -2,6 +2,7 @@
 
 ## Recommended Order (next up)
 - 031 Fighting Fantasy output refinement — fix quality and correctness issues in FF output modules.
+- 036 FF OCR recovery & text repair — recover missing headers and repair garbled text after story-035.
 - 030 Fighting Fantasy Engine format export — retarget FF recipe to the engine schema while keeping provenance/images.
 - DONE: 016 Driver DAG & schema compatibility — unlocks arbitrary workflows, coarse+fine branches, safer schema wiring.
 - DONE: 017 Module UX polish (params & outputs) — catches bad configs early; allows custom outputs for varied runs.
@@ -56,6 +57,9 @@ This index tracks stories in `/docs/stories/` for the codex-forge pipeline.
 | 032 | Unstructured intake & Document IR adoption | Medium | Done | /docs/stories/story-032-unstructured-intake-and-document-ir-adoption.md |
 | 033 | ARM64-native pipeline environment & performance | Medium | Done | /docs/stories/story-033-arm64-pipeline-conversion.md |
 | 034 | FF Unstructured follow-ups (elements, helpers, graph quality) | High | Done | /docs/stories/story-034-ff-unstructured-followups.md |
+| 035 | Fighting Fantasy Pipeline Optimization | High | In Progress | /docs/stories/story-035-ff-pipeline-optimization.md |
+| 036 | FF OCR Recovery & Text Repair | High | To Do | /docs/stories/story-036-ff-ocr-recovery-and-text-repair.md |
+| 037 | FF OCR Ensemble with BetterOCR | High | To Do | /docs/stories/story-037-ocr-ensemble-with-betterocr.md |
 | 099 | Remove dev-only backcompat disclaimer | Low | To Do | /docs/stories/story-099-remove-dev-backcompat-note.md |
 
 ## Notes

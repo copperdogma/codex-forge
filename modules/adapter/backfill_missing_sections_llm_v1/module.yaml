@@ -1,0 +1,25 @@
+module_id: backfill_missing_sections_llm_v1
+stage: adapter
+entrypoint: modules/adapter/backfill_missing_sections_llm_v1/main.py
+input_schema: section_boundary_v1
+output_schema: section_boundary_v1
+default_params:
+  model: gpt-4.1-mini
+  max_tokens: 800
+  max_elements: 120
+  expected_range_start: 1
+  expected_range_end: 400
+param_schema:
+  properties:
+    model:
+      type: string
+    max_tokens:
+      type: integer
+    max_elements:
+      type: integer
+    expected_range_start:
+      type: integer
+    expected_range_end:
+      type: integer
+  required: []
+notes: "LLM backfill: for numeric gaps between known section boundaries, ask LLM to locate missing section headers within the interstitial elements and emit low-confidence boundaries."

@@ -1,0 +1,81 @@
+# Fighting Fantasy AI-First Pipeline
+#
+# This recipe uses a clean AI-first approach to section detection and extraction:
+# 1. Unstructured intake → elements
+# 2. AI scan → section boundaries (GPT-4o-mini, ~$0.003)
+# 3. AI extract → enriched portions (GPT-4o, ~$0.03)
+# 4. Build → gamebook.json
+# 5. Validate → validation report
+#
+# Total cost: ~$0.033 per book
+# No regex, no heuristics, no over-engineering
+
+run_id: ff-ai-pipeline
+input:
+  pdf: input/06 deathtrap dungeon.pdf
+output_dir: output/runs/ff-ai-pipeline
+stages:
+  # Stage 1: Unstructured intake → elements.jsonl
+  - id: unstructured_intake
+    stage: intake
+    module: unstructured_pdf_intake_v1
+    params:
+      strategy: hi_res  # Use hi_res on ARM64 (faster, better element granularity). Per README: "hi_res on ARM64: ~15% faster (88s/page vs 105s/page)"
+      infer_table_structure: false
+      extract_images: false
+      save_raw: false
+
+  # Stage 2: AI scan for section boundaries → section_boundaries.jsonl
+  # Quick scan with GPT-4o-mini to find all section numbers and element IDs
+  - id: ai_scan
+    stage: portionize
+    module: portionize_ai_scan_v1
+    needs: [unstructured_intake]
+    out: section_boundaries.jsonl
+    inputs:
+      pages: unstructured_intake
+    params:
+      model: gpt-4o-mini
+      max_tokens: 4000
+
+  # Stage 3: AI extract section content → portions_enriched.jsonl
+  # Detailed extraction with GPT-4o to parse gameplay data for each section
+  - id: ai_extract
+    stage: portionize
+    module: portionize_ai_extract_v1
+    needs: [unstructured_intake, ai_scan]
+    out: portions_enriched.jsonl
+    inputs:
+      pages: unstructured_intake
+      boundaries: ai_scan
+    params:
+      model: gpt-4o
+      max_tokens: 2000
+
+  # Stage 4: Build FF Engine JSON → gamebook.json
+  # Simple conversion from enriched portions to FF Engine format
+  - id: build_ff_engine
+    stage: build
+    module: build_ff_engine_v1
+    needs: [ai_extract]
+    out: gamebook.json
+    inputs:
+      portions: ai_extract
+    params:
+      title: "Deathtrap Dungeon"
+      author: "Ian Livingstone"
+      start_section: "1"
+      format_version: "1.0.0"
+
+  # Stage 5: Validate output → validation_report.json
+  # Check for missing sections, duplicates, structural issues
+  - id: validate_ff_engine
+    stage: validate
+    module: validate_ff_engine_v2
+    needs: [build_ff_engine]
+    out: validation_report.json
+    inputs:
+      gamebook: build_ff_engine
+    params:
+      expected_range_start: 1
+      expected_range_end: 400

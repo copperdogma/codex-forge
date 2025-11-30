@@ -1,0 +1,16 @@
+module_id: portionize_ai_scan_v1
+stage: portionize
+entrypoint: modules/portionize/portionize_ai_scan_v1/main.py
+input_schema: null
+output_schema: section_boundary_v1
+default_params:
+  model: gpt-4o-mini
+  max_tokens: 4000
+param_schema:
+  properties:
+    model:
+      type: string
+    max_tokens:
+      type: integer
+  required: []
+notes: "AI-powered section boundary detection for Fighting Fantasy books. Scans all elements to find section numbers (1-400) and their element boundaries. Uses GPT-4o-mini for fast, cost-effective scanning (~$0.003/book)."

@@ -271,3 +271,17 @@
 ### Tested
 - Mock smoke: `bash scripts/smoke-ff-engine.sh` (passes official validator).
 - Full run: `python driver.py --recipe configs/recipes/recipe-ff-engine.yaml --instrument --start-from portionize_fine` (passes official validator; reachability warnings only due to stubbed targets).
+## [2025-11-30] - FF cleanup/backfill modules and OCR recovery planning
+
+### Added
+- New cleaning module `strip_section_numbers_v1` to remove section/page numbers, gibberish lines, and null `created_at` while preserving paragraphs.
+- Backfill adapters `backfill_missing_sections_v2` (digit/fuzzy hits) and `backfill_missing_sections_llm_v1` (gap-based LLM) plus registration in `module_catalog`.
+- Story 036 (FF OCR Recovery & Text Repair) and story 037 (FF OCR Ensemble with BetterOCR) to track remaining OCR/header repair work; updated stories index accordingly.
+- Recipe `recipe-ff-redesign-v2-clean.yaml` wiring cleanup stage after extraction (experimental baseline).
+
+### Fixed/Changed
+- `portionize_ai_extract_v1` now writes enriched portions with `exclude_none=True`, dropping null `created_at` fields.
+- AGENTS guide reminds agents to ship new behavior as a separate module and baseline before merging.
+
+### Tested
+- Manual runs: backfill + LLM gap backfill + cleanup on `ff-redesign-v2-improved` artifacts; validation shows 382 sections (18 missing) as current best baseline.

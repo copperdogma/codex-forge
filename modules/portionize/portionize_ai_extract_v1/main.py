@@ -270,7 +270,7 @@ def main():
                 run_id=args.run_id,
             )
 
-            append_jsonl(args.out, enriched.dict(by_alias=True))
+            append_jsonl(args.out, enriched.dict(by_alias=True, exclude_none=True))
 
             logger.log("portionize", "running", current=idx, total=len(boundaries_sorted),
                        message=f"Extracted section {section_id}",

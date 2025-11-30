@@ -25,6 +25,8 @@ Before writing any significant code or starting implementation:
 
 **You are not a code monkey**. You are a technical partner. Think critically, challenge assumptions, propose improvements.
 
+**When adding new behaviors**, prefer shipping them as a separate module first, run a baseline, and only merge into an existing module after comparing baselines to prove no regressions.
+
 ### After Building: Verify Actual Results
 **DO NOT declare success just because code runs without errors.**
 
