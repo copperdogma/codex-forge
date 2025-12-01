@@ -1,0 +1,14 @@
+module_id: resolve_overlaps_simple_v1
+stage: resolve
+entrypoint: modules/resolve/resolve_overlaps_simple_v1/main.py
+input_schema: portion_hyp_v1
+output_schema: resolved_portion_v1
+default_params: {}
+param_schema:
+  properties:
+    input:
+      type: string
+    out:
+      type: string
+  required: []
+notes: "Greedy non-overlap resolver: keeps highest-confidence spans, emits resolved_portion_v1."

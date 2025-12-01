@@ -1,0 +1,34 @@
+run_id: deathtrap-pagelines-gpt4v
+input:
+  pagelines_run: output/runs/ocr-ensemble-better-gpt4v-iter
+output_dir: output/runs/deathtrap-pagelines-gpt4v
+
+stages:
+  - id: pagelines_to_clean
+    stage: intake
+    module: pagelines_to_clean_v1
+    out: pages_clean.jsonl
+    params:
+      index: output/runs/ocr-ensemble-better-gpt4v-iter/pagelines_index.json
+      out: output/runs/deathtrap-pagelines-gpt4v/pages_clean.jsonl
+
+  - id: portionize_detect
+    stage: portionize
+    module: portionize_detect_sections_v1
+    needs: [pagelines_to_clean]
+    params:
+      pages: output/runs/deathtrap-pagelines-gpt4v/pages_clean.jsonl
+      out: output/runs/deathtrap-pagelines-gpt4v/window_hypotheses.jsonl
+
+  - id: convert_portions
+    stage: adapter
+    module: portion_hyp_to_resolved_v1
+    needs: [portionize_detect]
+
+  - id: build_final
+    stage: build
+    module: build_portions_v1
+    needs: [convert_portions, pagelines_to_clean]
+    inputs:
+      pages: pagelines_to_clean
+      portions: convert_portions

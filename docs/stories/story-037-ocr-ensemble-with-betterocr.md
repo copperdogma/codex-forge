@@ -1,6 +1,6 @@
 # Story: Fighting Fantasy OCR Ensemble with BetterOCR
 
-Status: Open
+Status: Done
 Created: 2025-11-30
 Parent Story: story-031 (pipeline redesign - COMPLETE)
 
@@ -14,6 +14,10 @@ Integrate a multi-engine OCR ensemble (via BetterOCR) into the Fighting Fantasy 
 	•	Flag low-confidence pages for escalation to OpenAI Vision.
 
 This is a focused upgrade to the OCR intake stage that feeds the already-redesigned pipeline from story-031.
+
+Source integrity note (2025-12-01)
+	•	Confirmed present in the current working PDF: sections/pages 177, 179, 192, 250, 255, 256, 272, 293, 297, 298, 302, 305, 310, 313, 329, 331, 332, 341, 342, 351, 358, 363, 372, 377, 379, 382, 387.
+	•	Missing from this PDF: sections/pages 169–170. They do appear in the Internet Archive copy: https://archive.org/details/deathtrapdungeon00ian_jn9/page/n109/mode/2up. Treat 169–170 as absent-from-source unless we swap to that copy.
 
 Current OCR Situation (implicit from story-031 baseline):
 	•	Single-engine OCR occasionally:
@@ -236,5 +240,34 @@ Notes
 
 ⸻
 
+Next Plan (2025-11-30)
+	•	Goal: Switch to a pagelines-first pipeline that consumes the escalated PageLines (no OCR rerun) and produces the same final artifacts (sections/gamebook) without legacy OCR IR.
+	•	Steps:
+		1) Add an intake module `pagelines_to_clean_v1` that reads a pagelines index + quality (e.g., `output/runs/ocr-ensemble-better-gpt4v-iter/`) and emits `clean_page_v1` rows by joining lines (preserving page numbers and images). This replaces the old OCR-derived clean stage.
+		2) Create a new recipe that starts from an existing pagelines run dir, skips extract, runs `pagelines_to_clean_v1`, then continues with portionize → consensus → resolve → build to produce final outputs. The recipe should accept `run_dir` for pagelines and write outputs to a new run id.
+		3) Validate by running the recipe on the latest escalated pagelines; confirm final artifacts exist and sample sections look clean.
+
+Plan (2025-12-01) — Selective re-OCR loop for missing headers
+	•	Goal: Recover missing section headers without full OCR reruns by selectively re-OCRing pages that lack/lose headers, using GPT-4V escalation in a capped loop.
+	•	Approach:
+		1) Detect gaps: run numeric header detector over cleaned pagelines to list missing section IDs and pages with zero/low header density.
+		2) Target pages: combine (a) zero-header game pages, (b) ≤1-header game pages, and (c) high-disagreement pages from `ocr_quality_report`.
+		3) Re-OCR: use `escalate_gpt4v_iter_v1` with explicit page list + batch/cap to re-transcribe those pages; write to a new pagelines run dir (suffix `gpt4v-iter-r1`).
+		4) Re-run pagelines-first recipe against the new pagelines run; measure recovered headers and remaining missing IDs.
+		5) Iterate until (headers found) or (max attempts reached); surface remaining gaps + suggested pages/sections for further escalation in the final report.
+
+⸻
+
 Work Log
-	•	(empty – to be filled as work progresses)
+	•	2025-11-30: Added PageLines IR schema (`pagelines_v1`) and initial OCR ensemble design doc (`docs/pipeline/ocr_ensemble.md`). Scaffolded new module `extract_ocr_ensemble_v1` (BetterOCR wrapper) writing PageLines files, disagreement scores, and quality report; added to module catalog.
+	•	2025-11-30: Smoke run on pages 1–2 of `input/06 deathtrap dungeon.pdf` with BetterOCR missing → tesseract fallback. Outputs under `output/runs/ocr-ensemble-smoke/ocr_ensemble/`; quality report marks `fallback: true`. Page 1 text still garbled (needs BetterOCR install + multi-engine). Next: install `betterocr easyocr` and re-run full book.
+	•	2025-11-30: Added prompt drafts `prompts/ocr_line_reconcile.md` (text-only line adjudication) and `prompts/ocr_page_gpt4v.md` (strict page transcription for GPT-4V).
+	•	2025-11-30: Installed BetterOCR/EasyOCR into `.pip-packages/` and reran with full access. Successful run on full PDF (`input/06 deathtrap dungeon.pdf` → 113 pages) with both engines; output in `output/runs/ocr-ensemble-better/ocr_ensemble/`. Rebuilt quality report (113 entries): worst disagreements on pages 18 (0.98), 108 (0.97), 89 (0.95), 12 (0.95), 66 (0.95); page 1 still garbled (cover). Added `.pip-packages/` to `.gitignore` to avoid snapshot bloat.
+	•	2025-11-30: Added GPT-4V escalation module `escalate_gpt4v_v1` (adapter stage) with CLI/docs; ready to run once `OPENAI_API_KEY` is set.
+	•	2025-11-30: GPT-4V escalation batches:
+		• Batch1 → `output/runs/ocr-ensemble-better-gpt4v/` (pages 12, 18, 66, 89, 108).
+		• Batch2 (from Batch1 outputs) → `output/runs/ocr-ensemble-better-gpt4v-b3/` (pages 1, 8, 12, 18, 48, 66, 72, 89, 94, 108). Remaining max disagreement 0.8879; page 1 now clean.
+		• Iterative escalator `escalate_gpt4v_iter_v1` added and run once on original BetterOCR outputs with threshold 0.4, batch_size 10, max_pages 40 → `output/runs/ocr-ensemble-better-gpt4v-iter/` (40 pages escalated across 4 batches; remaining max disagreement 0.7265). Ready to rerun to drive remaining pages below threshold without redoing OCR.
+	•	2025-12-01: Added explicit-page mode to `escalate_gpt4v_iter_v1` (`--pages`), then escalated targeted pages (12,14,15,16,18,19,20,27,28,30,37,46,49,52,60,73,95,98,101) into `output/runs/ocr-ensemble-better-gpt4v-iter-r1/` using GPT-4.1V. Rewired pagelines-first recipe to consume this run (`run_id: deathtrap-pagelines-two-pass-r1`), yielding 337 detected section headers (was 332) and 63 remaining missing IDs. Remaining gaps likely due to headers absent in OCR text; next iteration will choose pages near those gaps or re-OCR with a higher-resolution pass if needed.
+	•	2025-12-02: Added fuzzy numeric header detection, missing-header resolver in-recipe, and targeted GPT-4V escalations. Recipe `deathtrap-pagelines-two-pass-r5` now converges automatically to 398/400 (169–170 absent from source PDF), logs resolver report, and feeds updated headers into downstream stages.
+	•	2025-12-02: Spot check: section 272 now present post-escalation (page 79/80 range); verified in `window_hypotheses.jsonl` and `portions_final_raw.json` for run r5.

@@ -16,6 +16,7 @@ from schemas import (
     ImageCrop,
     ContactSheetTile,
     IntakePlan,
+    PageLines,
 )
 
 
@@ -32,6 +33,7 @@ SCHEMA_MAP: Dict[str, Type[BaseModel]] = {
     "image_crop_v1": ImageCrop,
     "contact_sheet_manifest_v1": ContactSheetTile,
     "intake_plan_v1": IntakePlan,
+    "pagelines_v1": PageLines,
 }
 
 

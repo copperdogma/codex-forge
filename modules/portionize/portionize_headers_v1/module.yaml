@@ -1,0 +1,29 @@
+module_id: portionize_headers_v1
+stage: portionize
+entrypoint: modules/portionize/portionize_headers_v1/main.py
+input_schema: clean_page_v1
+output_schema: portion_hyp_v1
+default_params:
+  window: 3
+  stride: 1
+  model: gpt-4.1
+param_schema:
+  properties:
+    pages:
+      type: string
+    regions:
+      type: string
+    out:
+      type: string
+    window:
+      type: integer
+      minimum: 1
+    stride:
+      type: integer
+      minimum: 1
+    model:
+      type: string
+    deterministic_first:
+      type: boolean
+  required: [pages, regions, out]
+notes: "LLM header detector inside GAME region; emits portion_hyp_v1 for section starts."

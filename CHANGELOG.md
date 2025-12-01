@@ -1,3 +1,20 @@
+## [2025-12-01] - OCR ensemble retries, resolver, and fuzzy headers
+
+### Added
+- Pagelines-first recipes with GPT-4V escalation and missing-header resolver (`recipe-pagelines-two-pass.yaml`, `recipe-pagelines-to-gamebook.yaml`, `recipe-ocr-ensemble-gpt4v.yaml`).
+- Missing-header resolver adapter with env-overridable params and logging; PageLines schema and validation support.
+- Unit tests for fuzzy numeric headers and resolver dry-run; local smoke script to assert only 169–170 are missing.
+- Pipeline doc for OCR/resolver env overrides (`docs/pipeline/ocr_ensemble.md`); Story 038 noted in stories index.
+
+### Fixed/Changed
+- Numeric header detector now defaults to fused/fuzzy matching; pagelines two-pass recipe rewrites headers after optional escalation.
+- Module catalog expanded with OCR ensemble, resolver, and intake modules; Story 037 marked Done with source-integrity notes.
+
+### Tested
+- `python driver.py --recipe configs/recipes/recipe-pagelines-two-pass.yaml`
+- `PYTHONPATH=. python tests/test_headers_numeric_fuzzy.py`
+- `PYTHONPATH=. python tests/test_missing_header_resolver.py`
+
 ## [2025-11-27] - Intake dashboard fixes and reuse guidance
 
 ### Added

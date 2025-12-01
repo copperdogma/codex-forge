@@ -1,0 +1,70 @@
+input:
+  pagelines_run: output/runs/ocr-ensemble-better-gpt4v-iter-r5
+output_dir: output/runs/deathtrap-pagelines-two-pass-r5
+params:
+  resolver:
+    batch_size: 25
+    max_pages: 40
+    model: gpt-4.1
+    outdir: output/runs/ocr-ensemble-better-gpt4v-iter-r5
+run_id: deathtrap-pagelines-two-pass-r5
+stages:
+- id: pagelines_to_clean
+  module: pagelines_to_clean_v1
+  out: pages_clean.jsonl
+  params:
+    index: output/runs/ocr-ensemble-better-gpt4v-iter-r5/pagelines_index.json
+    out: output/runs/deathtrap-pagelines-two-pass-r5/pages_clean.jsonl
+  stage: intake
+- id: regions
+  module: portionize_regions_v1
+  needs:
+  - pagelines_to_clean
+  out: regions.json
+  params:
+    model: gpt-4.1-mini
+    out: output/runs/deathtrap-pagelines-two-pass-r5/regions.json
+    pages: output/runs/deathtrap-pagelines-two-pass-r5/pages_clean.jsonl
+    stride: 4
+    window: 6
+  stage: portionize
+- id: headers_numeric
+  module: portionize_headers_numeric_v1
+  needs:
+  - pagelines_to_clean
+  params:
+    out: output/runs/deathtrap-pagelines-two-pass-r5/window_hypotheses.jsonl
+    pages: output/runs/deathtrap-pagelines-two-pass-r5/pages_clean.jsonl
+  stage: portionize
+- id: missing_header_resolver
+  module: missing_header_resolver_v1
+  needs:
+  - headers_numeric
+  out: window_hypotheses.jsonl
+  params:
+    batch-size: 25
+    headers: output/runs/deathtrap-pagelines-two-pass-r5/window_hypotheses.jsonl
+    images-dir: output/runs/ocr-ensemble-better/images
+    max-pages: 40
+    model: gpt-4.1
+    outdir: output/runs/ocr-ensemble-better-gpt4v-iter-r5
+    pagelines-index: output/runs/ocr-ensemble-better-gpt4v-iter-r5/pagelines_index.json
+    quality: output/runs/ocr-ensemble-better-gpt4v-iter-r5/ocr_quality_report.json
+  stage: adapter
+- id: convert_portions
+  module: portion_hyp_to_resolved_v1
+  needs:
+  - missing_header_resolver
+  params:
+    input: output/runs/deathtrap-pagelines-two-pass-r5/window_hypotheses.jsonl
+    out: output/runs/deathtrap-pagelines-two-pass-r5/portions_resolved.jsonl
+  stage: adapter
+- id: build_final
+  inputs:
+    pages: pagelines_to_clean
+    portions: convert_portions
+  module: build_portions_v1
+  needs:
+  - convert_portions
+  - pagelines_to_clean
+  stage: build

@@ -1,0 +1,6 @@
+module_id: missing_header_resolver_v1
+stage: adapter
+entrypoint: modules/adapter/missing_header_resolver_v1/main.py
+input_schema: portion_hyp_v1
+output_schema: portion_hyp_v1
+capabilities: ["cyoa"]

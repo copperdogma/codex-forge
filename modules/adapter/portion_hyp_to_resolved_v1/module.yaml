@@ -1,0 +1,14 @@
+module_id: portion_hyp_to_resolved_v1
+stage: adapter
+entrypoint: modules/adapter/portion_hyp_to_resolved_v1/main.py
+input_schema: portion_hyp_v1
+output_schema: resolved_portion_v1
+default_params: {}
+param_schema:
+  properties:
+    input:
+      type: string
+    out:
+      type: string
+  required: []
+notes: "Pass-through converter from portion_hyp_v1 to resolved_portion_v1 (no dedupe)."

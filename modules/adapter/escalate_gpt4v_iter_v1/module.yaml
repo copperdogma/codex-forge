@@ -1,0 +1,40 @@
+module_id: escalate_gpt4v_iter_v1
+stage: adapter
+entrypoint: modules/adapter/escalate_gpt4v_iter_v1/main.py
+input_schema: pagelines_v1
+output_schema: adapter_out
+default_params:
+  threshold: 0.4
+  batch_size: 10
+  max_pages: 40
+  model: gpt-4.1
+  prompt_file: prompts/ocr_page_gpt4v.md
+  dry_run: false
+param_schema:
+  properties:
+    index:
+      type: string
+    quality:
+      type: string
+    images_dir:
+      type: string
+    outdir:
+      type: string
+    threshold:
+      type: number
+      minimum: 0
+      maximum: 1
+    batch_size:
+      type: integer
+      minimum: 1
+    max_pages:
+      type: integer
+      minimum: 1
+    model:
+      type: string
+    prompt_file:
+      type: string
+    dry_run:
+      type: boolean
+  required: [index, quality, images_dir, outdir, threshold, batch_size, max_pages, model]
+notes: "Iteratively escalate high-disagreement pages via GPT-4V until threshold or budget reached."

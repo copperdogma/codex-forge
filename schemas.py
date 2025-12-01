@@ -74,6 +74,25 @@ class PageDoc(BaseModel):
     source_path: Optional[str] = None
 
 
+class PageLine(BaseModel):
+    text: str
+    source: Optional[str] = None  # e.g., "betterocr", "gpt4v", "llm_reconcile"
+    meta: Optional[Dict[str, Any]] = None  # engine-level details, confidences, alignment notes
+
+
+class PageLines(BaseModel):
+    schema_version: str = "pagelines_v1"
+    module_id: Optional[str] = None
+    run_id: Optional[str] = None
+    source: Optional[List[str]] = None
+    created_at: Optional[str] = None
+    page: int
+    image: Optional[str] = None
+    lines: List[PageLine]
+    disagreement_score: Optional[float] = None
+    needs_escalation: bool = False
+
+
 class BoundingBox(BaseModel):
     x0: int
     y0: int

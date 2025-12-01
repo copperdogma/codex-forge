@@ -1,0 +1,25 @@
+module_id: portionize_regions_v1
+stage: portionize
+entrypoint: modules/portionize/portionize_regions_v1/main.py
+input_schema: clean_page_v1
+output_schema: region_spans_v1
+default_params:
+  window: 6
+  stride: 4
+  model: gpt-5-nano
+param_schema:
+  properties:
+    pages:
+      type: string
+    out:
+      type: string
+    window:
+      type: integer
+      minimum: 1
+    stride:
+      type: integer
+      minimum: 1
+    model:
+      type: string
+  required: [pages, out]
+notes: "LLM coarse region detector (frontmatter/rules/game/backmatter) over pagelines."

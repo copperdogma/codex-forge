@@ -59,7 +59,8 @@ This index tracks stories in `/docs/stories/` for the codex-forge pipeline.
 | 034 | FF Unstructured follow-ups (elements, helpers, graph quality) | High | Done | /docs/stories/story-034-ff-unstructured-followups.md |
 | 035 | Fighting Fantasy Pipeline Optimization | High | In Progress | /docs/stories/story-035-ff-pipeline-optimization.md |
 | 036 | FF OCR Recovery & Text Repair | High | To Do | /docs/stories/story-036-ff-ocr-recovery-and-text-repair.md |
-| 037 | FF OCR Ensemble with BetterOCR | High | To Do | /docs/stories/story-037-ocr-ensemble-with-betterocr.md |
+ | 037 | FF OCR Ensemble with BetterOCR | High | Done | /docs/stories/story-037-ocr-ensemble-with-betterocr.md |
+| 038 | Agentic Pipeline Coordinator | Medium | To Do | /docs/stories/story-038-agentic-pipeline-coordinator.md |
 | 099 | Remove dev-only backcompat disclaimer | Low | To Do | /docs/stories/story-099-remove-dev-backcompat-note.md |
 
 ## Notes

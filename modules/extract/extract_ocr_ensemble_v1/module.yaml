@@ -1,0 +1,58 @@
+module_id: extract_ocr_ensemble_v1
+stage: extract
+entrypoint: modules/extract/extract_ocr_ensemble_v1/main.py
+input_schema: pdf_path
+output_schema: pagelines_v1
+default_params:
+  start: 1
+  end: null
+  dpi: 300
+  engines: [tesseract, easyocr]
+  lang: eng
+  use_llm: false
+  llm_model: gpt-4.1-mini
+  escalation_threshold: 0.15
+  write_engine_dumps: false
+  disable_fallback: false
+  psm: 4
+  oem: 3
+param_schema:
+  properties:
+    start:
+      type: integer
+      minimum: 1
+    end:
+      type: integer
+      minimum: 1
+    dpi:
+      type: integer
+      minimum: 72
+      maximum: 1200
+    engines:
+      type: array
+      items:
+        type: string
+    lang:
+      type: string
+    use_llm:
+      type: boolean
+    llm_model:
+      type: string
+    escalation_threshold:
+      type: number
+      minimum: 0
+      maximum: 1
+    write_engine_dumps:
+      type: boolean
+    disable_fallback:
+      type: boolean
+    psm:
+      type: integer
+      minimum: 0
+      maximum: 13
+    oem:
+      type: integer
+      minimum: 0
+      maximum: 3
+  required: [start, dpi, engines, lang, escalation_threshold, psm, oem]
+notes: "BetterOCR ensemble wrapper producing PageLines IR with disagreement scores."

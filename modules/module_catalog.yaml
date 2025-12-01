@@ -11,6 +11,12 @@ modules:
   - id: image_cropper_v1
     stage: extract
     capabilities: ["images"]
+  - id: extract_ocr_ensemble_v1
+    stage: extract
+    capabilities: ["cyoa", "images"]
+  - id: pagelines_to_clean_v1
+    stage: intake
+    capabilities: ["cyoa", "images"]
   - id: contact_sheet_builder_v1
     stage: intake
     capabilities: ["overview", "images"]
@@ -26,15 +32,42 @@ modules:
   - id: backfill_missing_sections_llm_v1
     stage: adapter
     capabilities: ["cyoa"]
+  - id: escalate_gpt4v_v1
+    stage: adapter
+    capabilities: ["cyoa", "images"]
+  - id: escalate_gpt4v_iter_v1
+    stage: adapter
+    capabilities: ["cyoa", "images"]
+  - id: resolve_overlaps_simple_v1
+    stage: resolve
+    capabilities: ["cyoa"]
+  - id: portionize_detect_sections_v1
+    stage: portionize
+    capabilities: ["cyoa"]
+  - id: portionize_regions_v1
+    stage: portionize
+    capabilities: ["cyoa"]
+  - id: portionize_headers_v1
+    stage: portionize
+    capabilities: ["cyoa"]
+  - id: portionize_headers_numeric_v1
+    stage: portionize
+    capabilities: ["cyoa"]
+  - id: portion_hyp_to_resolved_v1
+    stage: adapter
+    capabilities: ["cyoa"]
+  - id: missing_header_resolver_v1
+    stage: adapter
+    capabilities: ["cyoa"]
 capabilities:
   - name: formulas
     modules: []
   - name: tables
     modules: []
   - name: images
-    modules: ["image_cropper_v1", "contact_sheet_builder_v1"]
+    modules: ["image_cropper_v1", "contact_sheet_builder_v1", "extract_ocr_ensemble_v1", "escalate_gpt4v_v1", "escalate_gpt4v_iter_v1", "pagelines_to_clean_v1"]
   - name: cyoa
-    modules: ["portionize_sections_v1", "consensus_merge_v1", "enrichment_v1", "section_target_guard_v1", "strip_section_numbers_v1", "backfill_missing_sections_v2"]
+    modules: ["portionize_sections_v1", "consensus_merge_v1", "enrichment_v1", "section_target_guard_v1", "strip_section_numbers_v1", "backfill_missing_sections_v2", "extract_ocr_ensemble_v1", "escalate_gpt4v_v1", "escalate_gpt4v_iter_v1", "pagelines_to_clean_v1", "resolve_overlaps_simple_v1", "portionize_detect_sections_v1", "portion_hyp_to_resolved_v1", "portionize_regions_v1", "portionize_headers_v1", "portionize_headers_numeric_v1"]
   - name: genealogy
     modules: []
   - name: overview

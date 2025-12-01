@@ -1,7 +1,11 @@
 input/
 output/
+.pip-packages/
 models/
 **/__pycache__/
 .venv/
 .cursor/
 .DS_Store
+
+# Local pip cache
+.pip-packages/

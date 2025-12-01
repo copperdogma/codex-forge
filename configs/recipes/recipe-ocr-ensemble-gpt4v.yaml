@@ -1,0 +1,27 @@
+run_id: deathtrap-ocr-ensemble-gpt4v
+input:
+  pdf: input/06 deathtrap dungeon.pdf
+output_dir: output/runs/deathtrap-ocr-ensemble-gpt4v
+
+stages:
+  - id: extract_ocr_ensemble
+    stage: extract
+    module: extract_ocr_ensemble_v1
+    params:
+      dpi: 300
+      engines: [tesseract, easyocr]
+      write_engine_dumps: false
+
+  - id: escalate_gpt4v
+    stage: adapter
+    module: escalate_gpt4v_v1
+    needs: [extract_ocr_ensemble]
+    params:
+      index: output/runs/deathtrap-ocr-ensemble-gpt4v/ocr_ensemble/pagelines_index.json
+      quality: output/runs/deathtrap-ocr-ensemble-gpt4v/ocr_ensemble/ocr_quality_report.json
+      images_dir: output/runs/deathtrap-ocr-ensemble-gpt4v/images
+      outdir: output/runs/deathtrap-ocr-ensemble-gpt4v-gpt4v
+      threshold: 0.4
+      max_pages: 20
+      model: gpt-4.1
+      dry_run: false
