@@ -3,12 +3,15 @@ stage: intake
 entrypoint: modules/intake/pagelines_to_clean_v1/main.py
 input_schema: pagelines_v1
 output_schema: clean_page_v1
-default_params: {}
+default_params:
+  preserve-numeric-lines: true
 param_schema:
   properties:
     index:
       type: string
     out:
       type: string
+    preserve-numeric-lines:
+      type: boolean
   required: [index, out]
 notes: "Convert PageLines IR (index) into clean_page_v1 JSONL without rerunning OCR."

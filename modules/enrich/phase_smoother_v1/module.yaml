@@ -1,0 +1,11 @@
+module_id: phase_smoother_v1
+stage: enrich
+description: >
+  Enforces a monotonic book phase: front_matter → gameplay → endmatter based only on order/IDs/choices.
+  Sets section_type and is_gameplay before classification to prevent early flip-flops.
+entrypoint: modules/enrich/phase_smoother_v1/main.py
+params:
+  portions: Input portions file (json/jsonl).
+  out: Output path (same format as input).
+  frontmatter_cap: IDs <= this stay front_matter unless clear gameplay (default 12).
+  endmatter_hint: IDs >= this tilt to endmatter if non-choice (default 380).

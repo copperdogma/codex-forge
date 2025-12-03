@@ -1,0 +1,5 @@
+module_id: header_loop_runner
+stage: adapter
+entrypoint: tools/header_loop_runner.py
+output_schema: portion_hyp_v1
+notes: "Iterative header resolve loop: detect -> dedupe -> coverage -> resolver until done or retries hit."

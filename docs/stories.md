@@ -66,3 +66,7 @@ This index tracks stories in `/docs/stories/` for the codex-forge pipeline.
 ## Notes
 - Status “Done” reflects current working state in codex-forge. “To Do” items are planned next steps aligned with `docs/requirements.md` and `snapshot.md`.
 - Use existing files in `/docs/stories/` as templates for structure when creating these story documents.
+- story-050-ff-ending-detection.md
+- story-051-text-quality-eval.md
+- story-052-apple-ocr-integration.md
+- story-053-smoke-test-pipeline.md

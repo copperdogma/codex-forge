@@ -14,6 +14,7 @@ import json
 import os
 import subprocess
 import sys
+import hashlib
 from typing import Dict, List, Set
 
 from modules.common.utils import read_jsonl, save_json, ProgressLogger
@@ -60,6 +61,8 @@ def main():
     ap.add_argument("--model", default="gpt-4.1")
     ap.add_argument("--pages-clean-out", help="Path to write cleaned pages for escalated index (temporary)")
     ap.add_argument("--dry-run", action="store_true", help="Skip GPT-4V calls; just emit report")
+    ap.add_argument("--index-hash", help="Expected hash of pagelines_index.json; fail if mismatch (prevents stale inputs).")
+    ap.add_argument("--record-hash", help="Where to write the hash used (for downstream checks).")
     args = ap.parse_args()
 
     def expand_env(val: str):
@@ -74,9 +77,24 @@ def main():
     if not hdr_path:
         raise SystemExit("Must provide --headers or --inputs")
 
+    def file_hash(path: str) -> str:
+        h = hashlib.sha256()
+        with open(path, "rb") as f:
+            while True:
+                chunk = f.read(8192)
+                if not chunk:
+                    break
+                h.update(chunk)
+        return h.hexdigest()
+
     logger = ProgressLogger()
 
     by_id = load_headers(hdr_path)
+    current_hash = file_hash(args.pagelines_index)
+    if args.index_hash and args.index_hash != current_hash:
+        raise SystemExit(f"pagelines_index hash mismatch (got {current_hash}, expected {args.index_hash}); refusing to run to avoid stale OCR")
+    if args.record_hash:
+        save_json(args.record_hash, {"pagelines_index_hash": current_hash})
     all_ids = set(range(1, 401))
     missing = sorted(list(all_ids - set(by_id.keys())))
 

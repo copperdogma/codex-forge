@@ -38,6 +38,8 @@ def classify_type(section_id: str, portion: Dict[str, Any], text_body: str) -> s
         "adventure_sheet",
         "template",
     }
+    if portion.get("section_type") in allowed_types:
+        return portion["section_type"]
     if portion.get("type") in allowed_types:
         return portion["type"]
     if section_id.isdigit():
@@ -59,6 +61,8 @@ def classify_type(section_id: str, portion: Dict[str, Any], text_body: str) -> s
 
 
 def is_gameplay(section_id: str, portion: Dict[str, Any], candidate_type: Optional[str] = None) -> bool:
+    if portion.get("is_gameplay") is not None:
+        return bool(portion["is_gameplay"])
     if candidate_type == "section" or section_id.isdigit():
         return True
     if portion.get("choices") or portion.get("combat") or portion.get("test_luck") or portion.get("item_effects"):
@@ -95,6 +99,10 @@ def build_section(portion: Dict[str, Any]) -> tuple[str, Dict[str, Any]]:
 
     if nav_links:
         section["navigationLinks"] = nav_links
+
+    # Propagate end_game marker (used to suppress no-choice warnings)
+    if portion.get("end_game") or portion.get("endGame") or portion.get("is_endgame"):
+        section["end_game"] = True
 
     # Optional fields if present
     if portion.get("items"):
@@ -188,6 +196,7 @@ def main():
     parser.add_argument("--progress-file")
     parser.add_argument("--state-file")
     parser.add_argument("--run-id")
+    parser.add_argument("--pages", help="(ignored; driver compatibility)")
     args = parser.parse_args()
 
     logger = ProgressLogger(state_path=args.state_file, progress_path=args.progress_file, run_id=args.run_id)

@@ -15,6 +15,8 @@ def main():
     parser.add_argument("--index", required=True, help="pagelines_index.json")
     parser.add_argument("--out", required=True, help="pages_clean.jsonl output path")
     parser.add_argument("--outdir", help=argparse.SUPPRESS)  # tolerate driver auto-flag
+    parser.add_argument("--preserve-numeric-lines", action="store_true", default=True,
+                        help="If set, keep standalone numeric lines (1-400) so headers survive cleaning.")
     parser.add_argument("--progress-file", help="pipeline_events.jsonl")
     parser.add_argument("--state-file", help="pipeline_state.json")
     parser.add_argument("--run-id")
@@ -28,7 +30,19 @@ def main():
     for i, (page_str, path) in enumerate(sorted(index.items(), key=lambda kv: int(kv[0]))):
         page_path = Path(path)
         data = json.load(open(page_path, "r", encoding="utf-8"))
-        text = join_lines(data.get("lines", []))
+        lines = data.get("lines", [])
+        if not args.preserve_numeric_lines:
+            text = join_lines(lines)
+        else:
+            filtered = []
+            for l in lines:
+                t = l.get("text", "")
+                # Keep numeric-only lines (likely headers) so header detection sees them
+                if t.strip().isdigit():
+                    filtered.append(l)
+                    continue
+                filtered.append(l)
+            text = "\n".join([l.get("text", "") for l in filtered])
         row = {
             "schema_version": "clean_page_v1",
             "module_id": "pagelines_to_clean_v1",

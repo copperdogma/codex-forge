@@ -57,7 +57,7 @@ def validate_gamebook(
             sections_with_no_text.append(sid)
 
     # Check for sections with no choices (potential dead ends)
-    # Exclude stubs and non-gameplay sections
+    # Exclude stubs, non-gameplay, and sections explicitly marked end_game
     sections_with_no_choices = []
     for sid, section in sections.items():
         # Skip if it's a stub
@@ -66,6 +66,9 @@ def validate_gamebook(
 
         # Skip non-gameplay sections
         if not section.get("isGameplaySection", False):
+            continue
+
+        if section.get("end_game"):
             continue
 
         # Check if section has any navigation
@@ -135,11 +138,12 @@ def main():
     parser = argparse.ArgumentParser(description="Validate Fighting Fantasy Engine gamebook output.")
     parser.add_argument("--gamebook", required=True, help="Path to gamebook.json")
     parser.add_argument("--out", required=True, help="Path to validation_report.json")
-    parser.add_argument("--expected-range-start", type=int, default=1, help="Expected first section number")
-    parser.add_argument("--expected-range-end", type=int, default=400, help="Expected last section number")
+    parser.add_argument("--expected-range-start", "--expected_range_start", type=int, default=1, dest="expected_range_start", help="Expected first section number")
+    parser.add_argument("--expected-range-end", "--expected_range_end", type=int, default=400, dest="expected_range_end", help="Expected last section number")
     parser.add_argument("--progress-file", help="Path to pipeline_events.jsonl")
     parser.add_argument("--state-file", help="Path to pipeline_state.json")
     parser.add_argument("--run-id", help="Run identifier for logging")
+    parser.add_argument("--pages", help="(ignored; driver compatibility)")
     args = parser.parse_args()
 
     logger = ProgressLogger(state_path=args.state_file, progress_path=args.progress_file, run_id=args.run_id)

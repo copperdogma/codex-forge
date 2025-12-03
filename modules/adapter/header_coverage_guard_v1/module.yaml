@@ -1,0 +1,10 @@
+module_id: header_coverage_guard_v1
+stage: adapter
+description: >
+  Compares detected headers (portion_hyp) to an expected numeric range and emits missing section_ids for escalation.
+entrypoint: modules/adapter/header_coverage_guard_v1/main.py
+params:
+  headers: portion_hyp jsonl
+  expected_start: Default 1
+  expected_end: Default 400
+  out: JSONL of missing section ids

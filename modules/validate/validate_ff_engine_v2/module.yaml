@@ -8,9 +8,13 @@ default_params:
   expected_range_end: 400
 param_schema:
   properties:
+    gamebook:
+      type: string
+    out:
+      type: string
     expected_range_start:
       type: integer
     expected_range_end:
       type: integer
-  required: []
+  required: [gamebook, out]
 notes: "Validates Fighting Fantasy Engine gamebook.json output. Checks for missing sections, duplicates, empty sections, and structural issues. Generates detailed validation report."

@@ -1,0 +1,12 @@
+module_id: macro_section_detector_ff_v1
+stage: enrich
+description: >
+  Uses a Fighting Fantasy–specific macro-section prompt to detect frontmatter, main_content (BACKGROUND/INTRO start),
+  and endmatter from truncated pages JSONL (page + raw_text[:150]), embedding the pages directly in the LLM prompt.
+entrypoint: modules/enrich/macro_section_detector_ff_v1/main.py
+params:
+  pages: pages_clean.jsonl input
+  out: Output JSON with sections array
+  model: LLM to use (default gpt-4.1-mini)
+  max_chars: Truncate raw_text to this length (default 150)
+  secondary_hint: Optional hint string

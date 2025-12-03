@@ -1,0 +1,22 @@
+module_id: repair_portions_v1
+description: >
+  Re-read flagged sections with a multimodal LLM to repair garbled or low-confidence text.
+  Flags short/low-alpha/digit-heavy raw_text (or forced IDs), sends page images + OCR
+  to the model, and replaces raw_text/clean_text with repaired text while preserving provenance.
+entrypoint: modules/clean/repair_portions_v1/main.py
+stage: clean
+params:
+  portions: Path to input portions (json/jsonl) containing raw_text and source_images.
+  out: Output path; format follows input (json or jsonl).
+  model: Primary multimodal model (default gpt-5).
+  boost_model: Optional higher-tier model if confidence is low.
+  min_chars: Flag sections shorter than this many characters (default 320).
+  alpha_threshold: Flag sections with alpha ratio below this (default 0.72).
+  max_digit_ratio: Flag sections with digit ratio above this (default 0.38).
+  min_confidence: Re-run with boost model when below this confidence (default 0.65).
+  max_repairs: Maximum sections to repair in one run (default 40).
+  max_images: Maximum images to send per section (default 2).
+  force_ids: Comma-separated portion IDs to force repair regardless of heuristics.
+  progress_file: Optional pipeline progress log path.
+  state_file: Optional pipeline state path.
+  run_id: Optional run identifier for logging.

@@ -5,6 +5,7 @@ from modules.common.utils import read_jsonl, ensure_dir, save_jsonl, ProgressLog
 from schemas import PortionHypothesis
 
 PAGE_RE = re.compile(r"^\s*\d{1,3}[–-]\d{1,3}\s*")
+NUM_TOKEN_RE = re.compile(r"(\d{1,3})")
 
 
 def clean_lines(text: str):
@@ -17,52 +18,69 @@ def clean_lines(text: str):
 
 
 def main():
-    parser = argparse.ArgumentParser(description="Pure numeric header detector (1-400) over cleaned pages.")
+    parser = argparse.ArgumentParser(description="Numeric header detector (1-400) over cleaned pages; tolerant of inline/fused numbers.")
     parser.add_argument("--pages", required=True, help="pages_clean.jsonl")
     parser.add_argument("--out", required=True, help="portion_hyp.jsonl")
     parser.add_argument("--progress-file")
     parser.add_argument("--state-file")
     parser.add_argument("--run-id")
-    parser.add_argument("--fuzzy", action="store_true", default=True, help="Enable fuzzy detection (digits followed by up to 2 non-digits)")
+    parser.add_argument("--fuzzy", action="store_true", default=True, help="Enable fuzzy detection (digits followed by a few non-digits)")
+    parser.add_argument("--max-per-page", type=int, default=12, help="Cap hypotheses per page to limit noise.")
     args = parser.parse_args()
 
     pages = list(read_jsonl(args.pages))
     pages.sort(key=lambda p: p.get("page", 0))
 
-    seen = set()
     hypos = []
     for p in pages:
-        for line in clean_lines(p.get("clean_text") or p.get("raw_text") or ""):
-            # Tier 1: strict / fused
-            m = re.match(r"^(\d{1,3})(?!\d)", line)
-            sid = int(m.group(1)) if m else None
+        raw_lines = clean_lines(p.get("clean_text") or p.get("raw_text") or "")
+        candidates = []
+        for i, line in enumerate(raw_lines):
+            trimmed = line.strip()
+            tokens = []
+            for m in NUM_TOKEN_RE.finditer(trimmed):
+                try:
+                    sid = int(m.group(1))
+                except Exception:
+                    continue
+                if not (1 <= sid <= 400):
+                    continue
+                tokens.append((sid, m.start(), m.end()))
+            if not tokens:
+                continue
 
-            # Tier 2: fuzzy (digits followed by up to 2 non-digits) if requested
-            if sid is None and args.fuzzy:
-                m2 = re.match(r"^(\d{1,3})\D{0,2}", line)
-                sid = int(m2.group(1)) if m2 else None
+            for sid, s, e in tokens:
+                at_start = s == len(trimmed) - len(trimmed.lstrip())
+                standalone = len(trimmed) <= 4 or re.fullmatch(r"\d{1,3}", trimmed)
+                confidence = 0.8 if standalone else (0.75 if at_start else 0.65)
+                if not standalone and at_start and args.fuzzy and re.match(r"^\d{1,3}\D{0,2}", trimmed):
+                    confidence = max(confidence, 0.7)
 
-            if sid is None:
-                continue
-            if not (1 <= sid <= 400):
-                continue
-            if sid in seen:
-                continue
-            seen.add(sid)
-            hypo = PortionHypothesis(
-                portion_id=str(sid),
-                page_start=p["page"],
-                page_end=p["page"],
+                # We rely on later guards to filter page numbers; keep detection permissive here.
+
+                candidates.append({
+                    "sid": sid,
+                    "conf": confidence,
+                    "page": p["page"],
+                    "source": "numeric_header_inline" if not (standalone or at_start) else ("numeric_header_fuzzy" if confidence < 0.75 else "numeric_header"),
+                    "notes": None if (standalone or at_start) else "inline_number",
+                })
+
+        candidates.sort(key=lambda c: (-c["conf"], c["sid"]))
+        for c in candidates[: args.max_per_page]:
+            hypos.append(PortionHypothesis(
+                portion_id=str(c["sid"]),
+                page_start=c["page"],
+                page_end=c["page"],
                 title=None,
                 type="section",
-                confidence=0.70 if sid and m is None else 0.75,
-                notes=None,
-                source_window=[p["page"]],
-                source_pages=[p["page"]],
+                confidence=c["conf"],
+                notes=c["notes"],
+                source_window=[c["page"]],
+                source_pages=[c["page"]],
                 raw_text=None,
-                source=["numeric_header_fuzzy" if m is None else "numeric_header"],
-            )
-            hypos.append(hypo.dict())
+                source=[c["source"]],
+            ).dict())
 
     ensure_dir(os.path.dirname(args.out) or ".")
     save_jsonl(args.out, hypos)

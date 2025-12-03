@@ -1,0 +1,4 @@
+module_id: ocr_divergence_guard_v1
+stage: intake
+entrypoint: modules/intake/ocr_divergence_guard_v1/main.py
+notes: "Flags pages with high divergence between two OCR pagelines indices (Jaccard-based)."

@@ -1,0 +1,13 @@
+module_id: portion_hyp_dedupe_v1
+stage: adapter
+entrypoint: modules/adapter/portion_hyp_dedupe_v1/main.py
+input_schema: portion_hyp_v1
+output_schema: portion_hyp_v1
+param_schema:
+  properties:
+    input:
+      type: string
+    out:
+      type: string
+  required: [input, out]
+notes: Keep the best occurrence per portion_id (confidence, later page, shorter span).

@@ -1,0 +1,4 @@
+module_id: choices_loop_runner
+stage: enrich
+entrypoint: tools/choices_loop_runner.py
+notes: "Iterative choices loop: regex detect -> coverage -> LLM escalate until choices are resolved or retries hit."

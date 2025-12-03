@@ -302,3 +302,18 @@
 
 ### Tested
 - Manual runs: backfill + LLM gap backfill + cleanup on `ff-redesign-v2-improved` artifacts; validation shows 382 sections (18 missing) as current best baseline.
+## [2025-12-02] - Header/choice loops & pipeline hardening
+
+### Added
+- Header and choice loop runner modules to iterate detect→validate→escalate until clean; recipe `recipe-pagelines-repair-choices-r6.yaml` now runs the loops automatically.
+- Presence-aware header coverage guard with per-ID debug bundles and hash guard in `missing_header_resolver_v1` to prevent stale OCR.
+- BACKGROUND→1 rule in choice escalator and end_game propagation through build/validator; choice coverage emits text snippets for misses.
+- New stories: 050 (ending verification), 051 (text-quality loop), 052 (Apple OCR evaluation), 053 (smoke test with mocked APIs).
+
+### Fixed/Changed
+- Numeric-only lines preserved in cleaning; header detector more tolerant; portion dedupe keeps best occurrence per section.
+- Choice loop output normalized to JSONL for driver stamping; build/validate accept driver compatibility args.
+- Story 036 marked Done; deferred text-quality/debug work consolidated into Story 051; smoke test work tracked in Story 053.
+
+### Tested
+- `python driver.py --recipe configs/recipes/recipe-pagelines-repair-choices-r6.yaml`

@@ -1,0 +1,14 @@
+module_id: classify_section_type_v1
+stage: enrich
+description: >
+  LLM-based coarse classifier: given section id + raw_text snippet, labels section_type
+  (front_matter, intro, rules, adventure_sheet, gameplay, other) and sets is_gameplay.
+entrypoint: modules/enrich/classify_section_type_v1/main.py
+params:
+  portions: Input portions file (json/jsonl).
+  out: Output path (same format as input).
+  model: LLM to use (default gpt-4.1-mini).
+  max_chars: Max characters from raw_text to send (default 200).
+  progress_file: Optional progress log.
+  state_file: Optional pipeline state.
+  run_id: Optional run id.

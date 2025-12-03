@@ -7,8 +7,10 @@ This repo processes scanned (or text) books into structured JSON, using modular 
 - System is in active development (not production); do not preserve backward compatibility or keep legacy shims unless explicitly requested.
 - AI-first: the AI owns implementation and self-verification; humans provide requirements and oversight. Do not report work "done" without testing/validation against requirements and story acceptance criteria.
 - Keep artifacts append-only; never rewrite user data or outputs in `output/` or `input/`.
+- Artifacts are write-only: never silently patch; any manual or auto patch must be emitted as a new artifact with traceable intent.
 - Default to `workspace-write` safe commands; avoid destructive ops (`rm -rf`, `git reset --hard`).
 - Preserve non-ASCII only if the file already contains it.
+- Do not patch artifacts by hand to hide upstream issues; fix the root cause and regenerate. Any temporary manual edit must be explicit, traceable, and leave original inputs untouched.
 
 ## Critical AI Mindset: Think First, Verify Always
 
@@ -66,6 +68,12 @@ This is a **data pipeline** project. Every stage produces **artifacts** (JSONL f
 5. If issues found → return to step 1
 6. Only declare success when **data is correct**, not when **code runs**
 
+### Escalate-to-success loop (applies to every stage)
+- Default pattern: **detect/code → validate → targeted escalate → validate**, repeat until 100% success or a retry/budget cap is hit.
+- Each pass must use the latest artifacts (hash/mtime guard to prevent stale inputs).
+- Escalation outputs become the new gold standard for that scope (do not fall back to earlier OCR/LLM results).
+- Surface evidence automatically: emit per-item presence/reason flags and small debug bundles for failures.
+
 ### Prompt Design: Trust AI Intelligence, Don't Over-Engineer
 
 **The AI models are as smart as you. Treat them as intelligent partners, not dumb pattern matchers.**
@@ -99,6 +107,21 @@ When designing prompts for AI API calls:
 - The deep dive we did on story 031 revealed issues at every stage - **issues that only became obvious when we manually inspected artifacts**.
 
 **You own the quality of your output, not just the quality of your code.**
+
+## Escalation Strategy (known-good pattern)
+When a first-pass run leaves quality gaps, escalate in a controlled, data-driven loop:
+1. **Baseline**: Run the fastest/cheapest model with conservative prompts.
+2. **Detect issues**: Programmatically flag suspect items (missing choices, low alpha ratio, empty text, dead ends, etc.).
+3. **Targeted re-read**: Re-run only the flagged items with a stronger multimodal model and a focused prompt that embeds the minimal context directly (page image + raw_text in the prompt; no external attachments).
+4. **Rebuild & revalidate**: Rebuild downstream artifacts from the patched portions and re-run validation.
+5. **Verify artifacts**: Spot-check the repaired items and confirm warnings/errors are cleared or correctly justified (e.g., true deaths).
+Avoid manual text edits; use this loop to stay generic, reproducible, and book-agnostic.
+
+### OCR structural guard (add before baseline split)
+Before portionization, automatically flag pages for high-fidelity re-OCR if either engine output shows fused/structurally bad text:
+- Headers present in the image but missing as standalone lines (e.g., multiple section numbers fused into one long line).
+- Extreme per-page text divergence between engines (token Jaccard low or one engine has a mega-line while the other does not), based on flattened page text, not headers.
+- On flagged pages, re-OCR with a stronger, layout-aware vision model (page ±1 if needed), then continue the pipeline with the improved page text.
 
 ## Repo Map (high level)
 - Modules live under `modules/<stage>/<module_id>/` with `module.yaml` + `main.py` (no registry file).

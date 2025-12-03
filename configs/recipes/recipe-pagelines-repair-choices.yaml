@@ -1,0 +1,117 @@
+output_dir: output/runs/deathtrap-pagelines-repair-choices-r5
+run_id: deathtrap-pagelines-repair-choices-r5
+
+stages:
+  - id: pagelines_to_clean
+    stage: intake
+    module: pagelines_to_clean_v1
+    out: pages_clean.jsonl
+    params:
+      index: output/runs/deathtrap-ocr-ensemble-gpt4v/ocr_ensemble/pagelines_index.json
+      out: output/runs/deathtrap-pagelines-repair-choices-r5/pages_clean.jsonl
+
+  - id: headers_numeric
+    stage: portionize
+    module: portionize_headers_numeric_v1
+    needs: [pagelines_to_clean]
+    out: window_hypotheses.jsonl
+    params:
+      pages: pages_clean.jsonl
+      out: window_hypotheses.jsonl
+
+  - id: missing_header_resolver
+    stage: adapter
+    module: missing_header_resolver_v1
+    needs: [headers_numeric]
+    out: window_hypotheses.jsonl
+    params:
+      headers: output/runs/deathtrap-pagelines-repair-choices-r5/window_hypotheses.jsonl
+      images-dir: output/runs/deathtrap-ocr-ensemble-gpt4v/images
+      pagelines-index: output/runs/deathtrap-ocr-ensemble-gpt4v/ocr_ensemble/pagelines_index.json
+      quality: output/runs/deathtrap-ocr-ensemble-gpt4v/ocr_ensemble/ocr_quality_report.json
+      outdir: output/runs/deathtrap-ocr-ensemble-gpt4v
+      batch-size: 25
+      max-pages: 40
+      model: gpt-4.1
+
+  - id: convert_portions
+    stage: adapter
+    module: portion_hyp_to_resolved_v1
+    needs: [missing_header_resolver]
+    out: portions_resolved.jsonl
+    params:
+      input: output/runs/deathtrap-pagelines-repair-choices-r5/window_hypotheses.jsonl
+      out: output/runs/deathtrap-pagelines-repair-choices-r5/portions_resolved.jsonl
+
+  - id: header_coverage
+    stage: adapter
+    module: header_coverage_guard_v1
+    needs: [missing_header_resolver]
+    out: headers_missing.jsonl
+    params:
+      headers: output/runs/deathtrap-pagelines-repair-choices-r5/window_hypotheses.jsonl
+      out: output/runs/deathtrap-pagelines-repair-choices-r5/headers_missing.jsonl
+
+  - id: build_portions
+    stage: build
+    module: build_portions_v1
+    needs: [convert_portions, pagelines_to_clean]
+    inputs:
+      pages: pagelines_to_clean
+      portions: convert_portions
+    out: portions_raw.json
+    params:
+      pages: output/runs/deathtrap-pagelines-repair-choices-r5/pages_clean.jsonl
+      portions: output/runs/deathtrap-pagelines-repair-choices-r5/portions_resolved.jsonl
+      out: output/runs/deathtrap-pagelines-repair-choices-r5/portions_raw.json
+
+  - id: repair_text
+    stage: clean
+    module: repair_portions_v1
+    needs: [build_portions]
+    out: portions_repaired.json
+    params:
+      portions: output/runs/deathtrap-pagelines-repair-choices-r5/portions_raw.json
+      out: output/runs/deathtrap-pagelines-repair-choices-r5/portions_repaired.json
+      model: gpt-4.1-mini
+      max-images: 1
+      max-repairs: 40
+      alpha-threshold: 0.72
+      min-chars: 320
+
+  - id: infer_choices
+    stage: enrich
+    module: infer_choices_regex_v1
+    needs: [repair_text]
+    out: portions_repaired_choices.json
+    inputs:
+      portions: repair_text
+    params:
+      portions: output/runs/deathtrap-pagelines-repair-choices-r5/portions_repaired.json
+      out: output/runs/deathtrap-pagelines-repair-choices-r5/portions_repaired_choices.json
+      min-target: 1
+      max-target: 400
+
+  - id: build_ff
+    stage: build
+    module: build_ff_engine_v1
+    needs: [infer_choices]
+    out: gamebook.json
+    params:
+      portions: output/runs/deathtrap-pagelines-repair-choices-r5/portions_repaired_choices.json
+      out: output/runs/deathtrap-pagelines-repair-choices-r5/gamebook.json
+      title: "Deathtrap Dungeon"
+      author: "Ian Livingstone"
+      start-section: "1"
+      format-version: "1.0.0"
+
+  - id: validate_ff
+    stage: validate
+    module: validate_ff_engine_v2
+    needs: [build_ff]
+    out: validation.json
+    params:
+      gamebook: gamebook.json
+      out: validation.json
+      expected_range_start: 1
+      expected_range_end: 400

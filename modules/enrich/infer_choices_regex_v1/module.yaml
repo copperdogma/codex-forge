@@ -1,0 +1,10 @@
+module_id: infer_choices_regex_v1
+description: >
+  Infer navigation choices by regex scanning for 'turn to <number>' in raw_text, adding choices/targets when missing.
+entrypoint: modules/enrich/infer_choices_regex_v1/main.py
+stage: enrich
+params:
+  portions: Input portions file (json/jsonl).
+  out: Output path (same format as input).
+  min_target: Minimum section number (default 1).
+  max_target: Maximum section number (default 400).
