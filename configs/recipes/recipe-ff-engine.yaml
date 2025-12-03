@@ -3,76 +3,49 @@ input:
   pdf: input/06 deathtrap dungeon.pdf
 output_dir: output/runs/deathtrap-ff-engine
 stages:
-  - id: extract_ocr
-    stage: extract
-    module: extract_ocr_v1
-    params:
-      dpi: 300
-      psm: 4
-      oem: 3
-      lang: eng
-  - id: clean_pages
-    stage: clean
-    module: clean_llm_v1
-    needs: [extract_ocr]
-    params:
-      model: gpt-4.1-mini
-      boost_model: gpt-5
-      min_conf: 0.6
-  - id: portionize_fine
-    stage: portionize
-    module: portionize_sliding_v1
-    needs: [clean_pages]
-    params:
-      window: 8
-      stride: 1
-      model: gpt-4.1-mini
-      boost_model: gpt-5
-  - id: consensus_main
-    stage: consensus
-    module: consensus_vote_v1
-    needs: [portionize_fine]
-    params:
-      min_conf: 0.55
-  - id: dedupe_main
-    stage: dedupe
-    module: dedupe_ids_v1
-    needs: [consensus_main]
-  - id: normalize_main
-    stage: normalize
-    module: normalize_ids_v1
-    needs: [dedupe_main]
-  - id: resolve_main
-    stage: resolve
-    module: resolve_overlaps_v1
-    needs: [normalize_main]
-  - id: enrich_sections
-    stage: enrich
-    module: section_enrich_v1
-    needs: [clean_pages, resolve_main]
-    inputs:
-      pages: clean_pages
-      portions: resolve_main
-  - id: build_ff_engine
-    stage: build
-    module: build_ff_engine_v1
-    needs: [clean_pages, enrich_sections]
-    out: gamebook.json
-    inputs:
-      pages: clean_pages
-      portions: enrich_sections
-    params:
-      title: "Deathtrap Dungeon"
-      author: "Ian Livingstone"
-      start_section: "1"
-      format_version: "1.0.0"
-  - id: validate_ff_engine
-    stage: export
-    module: validate_ff_engine_node_v1
-    needs: [build_ff_engine]
-    out: gamebook_validation_node.json
-    inputs:
-      input: build_ff_engine
-    params:
-      validator_dir: modules/validate/validate_ff_engine_node_v1/validator
-      node_bin: node
+- id: pages_stub
+  stage: adapter
+  module: load_stub_v1
+  out: pages_clean.jsonl
+  params:
+    stub: testdata/smoke/ff/pages_clean.jsonl
+    out: pages_clean.jsonl
+- id: regions_stub
+  stage: adapter
+  module: load_stub_v1
+  needs:
+  - pages_stub
+  out: regions.json
+  params:
+    stub: testdata/smoke/ff/regions.json
+    out: regions.json
+- id: headers_stub
+  stage: adapter
+  module: load_stub_v1
+  needs:
+  - pages_stub
+  - regions_stub
+  out: portion_hyp.jsonl
+  params:
+    stub: testdata/smoke/ff/portion_hyp.jsonl
+    out: portion_hyp.jsonl
+- id: resolve_main
+  stage: adapter
+  module: portion_hyp_to_resolved_v1
+  needs:
+  - headers_stub
+  out: portions_resolved.jsonl
+  params:
+    out: portions_resolved.jsonl
+- id: build_raw
+  stage: build
+  module: build_portions_v1
+  needs:
+  - pages_stub
+  - resolve_main
+  inputs:
+    pages: pages_stub
+    portions: resolve_main
+  out: portions_final_raw.json
+  params:
+    out: portions_final_raw.json

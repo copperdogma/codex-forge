@@ -6,11 +6,16 @@ output_schema: enriched_portion_v1
 default_params:
   model: gpt-4o
   max_tokens: 2000
+  skip_ai: false
 param_schema:
   properties:
     model:
       type: string
     max_tokens:
       type: integer
+    skip_ai:
+      type: boolean
+    stub:
+      type: string
   required: []
 notes: "AI-powered section content extraction for Fighting Fantasy books. For each section boundary, extracts text from elements and parses gameplay data (choices, combat, luck tests, items). Uses GPT-4o for accurate parsing (~$0.03/book)."

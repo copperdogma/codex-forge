@@ -503,14 +503,23 @@ def build_command(entrypoint: str, params: Dict[str, Any], stage_conf: Dict[str,
         cmd += ["--out", artifact_path]
         flags_added.update({"--pages", "--out"})
     elif stage_conf["stage"] == "adapter":
-        input_paths = artifact_inputs.get("inputs")
-        if not input_paths:
-            raise SystemExit(f"Stage {stage_conf['id']} missing adapter inputs")
-        cmd += ["--inputs", *input_paths, "--out", artifact_path]
-        if "dedupe_field" in params:
-            cmd += ["--dedupe_field", str(params["dedupe_field"])]
-            flags_added.add("--dedupe_field")
-        flags_added.update({"--inputs", "--out"})
+        if stage_conf["module"] == "load_stub_v1":
+            stub_path = params.get("stub")
+            if not stub_path:
+                raise SystemExit(f"Stage {stage_conf['id']} missing stub param")
+            cmd += ["--stub", stub_path, "--out", artifact_path]
+            if params.get("schema_version"):
+                cmd += ["--schema-version", str(params["schema_version"])]
+            flags_added.update({"--stub", "--out"})
+        else:
+            input_paths = artifact_inputs.get("inputs")
+            if not input_paths:
+                raise SystemExit(f"Stage {stage_conf['id']} missing adapter inputs")
+            cmd += ["--inputs", *input_paths, "--out", artifact_path]
+            if "dedupe_field" in params:
+                cmd += ["--dedupe_field", str(params["dedupe_field"])]
+                flags_added.add("--dedupe_field")
+            flags_added.update({"--inputs", "--out"})
     elif stage_conf["stage"] == "consensus":
         hyp_path = artifact_inputs.get("hypotheses") or artifact_inputs.get("input")
         if not hyp_path:
@@ -728,6 +737,9 @@ def main():
     parser.add_argument("--instrument", action="store_true", help="Enable instrumentation (timing/cost)")
     parser.add_argument("--price-table", help="Path to model pricing YAML (prompt_per_1k/completion_per_1k)")
     parser.add_argument("--settings", help="Optional settings YAML to snapshot for reproducibility")
+    parser.add_argument("--run-id", dest="run_id_override", help="Override run_id from recipe (useful for smoke runs)")
+    parser.add_argument("--output-dir", dest="output_dir_override", help="Override output_dir from recipe (useful for smoke runs / temp dirs)")
+    parser.add_argument("--input-pdf", dest="input_pdf_override", help="Override input.pdf from recipe (useful for smoke fixtures)")
     parser.add_argument("--start-from", dest="start_from", help="Start executing at this stage id (requires upstream artifacts present in state)")
     parser.add_argument("--end-at", dest="end_at", help="Stop after executing this stage id (inclusive)")
     args = parser.parse_args()
@@ -735,6 +747,28 @@ def main():
     registry = load_registry(args.registry)["modules"]
     recipe = load_recipe(args.recipe)
     recipe["recipe_path"] = args.recipe
+
+    # Optional settings merge (shallow-deep) for smoke/testing convenience
+    settings_path = args.settings or recipe.get("settings") or recipe.get("settings_path")
+    if settings_path and os.path.exists(settings_path):
+        with open(settings_path, "r", encoding="utf-8") as f:
+            settings_yaml = yaml.safe_load(f) or {}
+        def deep_merge(dst, src):
+            for k, v in src.items():
+                if isinstance(v, dict) and isinstance(dst.get(k), dict):
+                    deep_merge(dst[k], v)
+                else:
+                    dst[k] = v
+        deep_merge(recipe, settings_yaml)
+
+    # Apply CLI overrides for smoke/testing convenience
+    if args.input_pdf_override:
+        recipe.setdefault("input", {})
+        recipe["input"]["pdf"] = args.input_pdf_override
+    if args.run_id_override:
+        recipe["run_id"] = args.run_id_override
+    if args.output_dir_override:
+        recipe["output_dir"] = args.output_dir_override
 
     instr_conf = recipe.get("instrumentation", {}) or {}
     instrument_enabled = bool(instr_conf.get("enabled") or args.instrument)
@@ -1022,13 +1056,18 @@ def main():
                     raise SystemExit(f"Schema mismatch: {stage_id} expects {expected_schema} got {producer_schema} from {origin}")
             elif stage == "adapter":
                 if not needs:
-                    raise SystemExit(f"Stage {stage_id} missing adapter inputs")
-                artifact_inputs["inputs"] = [artifact_index[n]["path"] for n in needs]
-                expected_schema = node.get("input_schema")
-                for dep in needs:
-                    producer_schema = artifact_index[dep].get("schema")
-                    if expected_schema and producer_schema and expected_schema != producer_schema:
-                        raise SystemExit(f"Schema mismatch: {stage_id} expects {expected_schema} got {producer_schema} from {dep}")
+                    # Allow stub loaders with no upstream
+                    if node.get("module") == "load_stub_v1":
+                        pass
+                    else:
+                        raise SystemExit(f"Stage {stage_id} missing adapter inputs")
+                else:
+                    artifact_inputs["inputs"] = [artifact_index[n]["path"] for n in needs]
+                    expected_schema = node.get("input_schema")
+                    for dep in needs:
+                        producer_schema = artifact_index[dep].get("schema")
+                        if expected_schema and producer_schema and expected_schema != producer_schema:
+                            raise SystemExit(f"Schema mismatch: {stage_id} expects {expected_schema} got {producer_schema} from {dep}")
             else:
                 inputs_map = node.get("inputs", {}) or {}
                 origin = inputs_map.get("pages") or (needs[0] if needs else None)

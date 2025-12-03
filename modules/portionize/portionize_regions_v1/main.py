@@ -86,7 +86,18 @@ def main():
     parser.add_argument("--progress-file")
     parser.add_argument("--state-file")
     parser.add_argument("--run-id")
+    parser.add_argument("--skip-ai", action="store_true", help="Bypass region LLM and load stub regions.json")
+    parser.add_argument("--stub", help="Stub regions.json to use when --skip-ai")
     args = parser.parse_args()
+
+    if args.skip_ai:
+        if not args.stub:
+            raise SystemExit("--skip-ai set but no --stub provided for portionize_regions_v1")
+        ensure_dir(os.path.dirname(args.out) or ".")
+        data = json.load(open(args.stub, "r", encoding="utf-8"))
+        save_json(args.out, data)
+        print(f"[skip-ai] portionize_regions_v1 copied stub → {args.out}")
+        return
 
     pages = list(read_jsonl(args.pages))
     pages.sort(key=lambda p: p.get("page", 0))

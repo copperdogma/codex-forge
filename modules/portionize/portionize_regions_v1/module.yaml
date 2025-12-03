@@ -7,6 +7,7 @@ default_params:
   window: 6
   stride: 4
   model: gpt-5-nano
+  skip_ai: false
 param_schema:
   properties:
     pages:
@@ -20,6 +21,10 @@ param_schema:
       type: integer
       minimum: 1
     model:
+      type: string
+    skip_ai:
+      type: boolean
+    stub:
       type: string
   required: [pages, out]
 notes: "LLM coarse region detector (frontmatter/rules/game/backmatter) over pagelines."

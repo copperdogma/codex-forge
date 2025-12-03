@@ -7,6 +7,7 @@ default_params:
   model: gpt-4.1-mini
   boost_model: gpt-5
   min_conf: 0.6
+  skip_ai: false
 param_schema:
   properties:
     model:
@@ -17,5 +18,9 @@ param_schema:
       type: number
       minimum: 0
       maximum: 1
+    skip_ai:
+      type: boolean
+    stub:
+      type: string
   required: [model, min_conf]
 notes: "Clean: multimodal LLM fixes OCR errors and normalizes per-page text while keeping layout."

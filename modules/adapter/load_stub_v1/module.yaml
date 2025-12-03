@@ -1,0 +1,17 @@
+module_id: load_stub_v1
+stage: adapter
+entrypoint: modules/adapter/load_stub_v1/main.py
+input_schema: null
+output_schema: null
+default_params:
+  schema_version: null
+param_schema:
+  properties:
+    stub:
+      type: string
+    out:
+      type: string
+    schema_version:
+      type: string
+  required: [stub, out]
+notes: "Utility adapter: copy a stub JSON/JSONL file to the expected output, optionally overriding schema_version per row."

@@ -150,9 +150,22 @@ def main():
     parser.add_argument("--progress-file", help="Path to pipeline_events.jsonl")
     parser.add_argument("--state-file", help="Path to pipeline_state.json")
     parser.add_argument("--run-id", help="Run identifier for logging")
+    parser.add_argument("--skip-ai", action="store_true", help="Bypass AI extraction and load stub portions")
+    parser.add_argument("--stub", help="Stub enriched portions jsonl to use when --skip-ai")
     args = parser.parse_args()
 
     logger = ProgressLogger(state_path=args.state_file, progress_path=args.progress_file, run_id=args.run_id)
+
+    if args.skip_ai:
+        if not args.stub:
+            raise SystemExit("--skip-ai set but no --stub provided for portionize_ai_extract_v1")
+        stub_rows = list(read_jsonl(args.stub))
+        ensure_dir(os.path.dirname(args.out) or ".")
+        save_jsonl(args.out, stub_rows)
+        logger.log("portionize", "done", current=len(stub_rows), total=len(stub_rows),
+                   message="Loaded portion stubs", artifact=args.out, module_id="portionize_ai_extract_v1")
+        print(f"[skip-ai] portionize_ai_extract_v1 copied stubs → {args.out}")
+        return
 
     # Read elements and build index
     logger.log("portionize", "running", current=0, total=1,

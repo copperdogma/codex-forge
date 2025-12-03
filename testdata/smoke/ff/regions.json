@@ -1,0 +1,17 @@
+{
+  "regions": [
+    {
+      "type": "frontmatter",
+      "start_page": 1,
+      "end_page": 1,
+      "confidence": 0.9
+    },
+    {
+      "type": "game",
+      "start_page": 2,
+      "end_page": 8,
+      "confidence": 0.95
+    }
+  ],
+  "model": "stub"
+}

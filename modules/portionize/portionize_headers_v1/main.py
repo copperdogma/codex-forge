@@ -67,7 +67,18 @@ def main():
     parser.add_argument("--progress-file")
     parser.add_argument("--state-file")
     parser.add_argument("--run-id")
+    parser.add_argument("--skip-ai", action="store_true", help="Bypass LLM header detection and load stub portion hypotheses.")
+    parser.add_argument("--stub", help="Stub portion_hyp jsonl to use when --skip-ai")
     args = parser.parse_args()
+
+    if args.skip_ai:
+        if not args.stub:
+            raise SystemExit("--skip-ai set but no --stub provided for portionize_headers_v1")
+        stub_rows = list(read_jsonl(args.stub))
+        ensure_dir(os.path.dirname(args.out) or ".")
+        save_jsonl(args.out, stub_rows)
+        print(f"[skip-ai] portionize_headers_v1 copied stubs → {args.out}")
+        return
 
     pages = list(read_jsonl(args.pages))
     pages.sort(key=lambda p: p.get("page", 0))

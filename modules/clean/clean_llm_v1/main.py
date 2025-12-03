@@ -69,13 +69,27 @@ def main():
     parser.add_argument("--model", default="gpt-5-mini")
     parser.add_argument("--boost_model", default=None, help="Optional higher-tier model if confidence too low.")
     parser.add_argument("--min_conf", type=float, default=0.75, help="Boost if below this confidence.")
+    parser.add_argument("--skip-ai", action="store_true", help="Bypass LLM calls and load clean pages from stub.")
+    parser.add_argument("--stub", help="Stub clean_page jsonl to use when --skip-ai")
     parser.add_argument("--progress-file", help="Path to pipeline_events.jsonl")
     parser.add_argument("--state-file", help="Path to pipeline_state.json")
     parser.add_argument("--run-id", help="Run identifier for logging")
     args = parser.parse_args()
 
-    client = OpenAI()
     logger = ProgressLogger(state_path=args.state_file, progress_path=args.progress_file, run_id=args.run_id)
+
+    # Smoke/skip path
+    if args.skip_ai:
+        if not args.stub:
+            raise SystemExit("--skip-ai set but no --stub provided for clean_llm_v1")
+        stub_rows = list(read_jsonl(args.stub))
+        save_jsonl(args.out, stub_rows)
+        logger.log("clean", "done", current=len(stub_rows), total=len(stub_rows),
+                   message="Loaded clean stubs", artifact=args.out)
+        print(f"[skip-ai] clean_llm_v1 copied stubs → {args.out}")
+        return
+
+    client = OpenAI()
     pages = list(read_jsonl(args.pages))
 
     # attach base64 images
