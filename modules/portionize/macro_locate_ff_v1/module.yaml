@@ -1,0 +1,4 @@
+module_id: macro_locate_ff_v1
+stage: portionize
+entrypoint: modules/portionize/macro_locate_ff_v1/main.py
+description: Identify frontmatter/main_content/endmatter pages from minimal OCR text (Fighting Fantasy override).

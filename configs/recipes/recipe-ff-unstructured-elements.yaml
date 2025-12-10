@@ -1,3 +1,4 @@
+# DEPRECATED: superseded by recipe-ff-canonical.yaml
 # Fighting Fantasy pipeline using Unstructured intake with element-aware portionization
 #
 # This recipe uses the new element-aware portionizer that works directly with elements
@@ -87,4 +88,3 @@ stages:
     params:
       validator_dir: modules/validate/validate_ff_engine_node_v1/validator
       node_bin: node
-

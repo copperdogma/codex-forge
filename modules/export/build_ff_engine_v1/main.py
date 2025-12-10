@@ -193,6 +193,8 @@ def main():
     parser.add_argument("--author", help="Gamebook author")
     parser.add_argument("--start-section", "--start_section", default="1", dest="start_section", help="Starting section id")
     parser.add_argument("--format-version", "--format_version", default="1.0.0", dest="format_version", help="Format version string")
+    parser.add_argument("--allow-stubs", action="store_true", dest="allow_stubs",
+                        help="Permit stub backfill for missing targets (default: fail if stubs needed)")
     parser.add_argument("--progress-file")
     parser.add_argument("--state-file")
     parser.add_argument("--run-id")
@@ -224,6 +226,11 @@ def main():
     stub_targets = sorted(missing, key=lambda x: int(x))
     stub_count = len(stub_targets)
 
+    if stub_count and not args.allow_stubs:
+        logger.log("build_ff_engine", "failed", current=len(portions), total=len(portions),
+                   message=f"Stub backfill required ({stub_count}); failing per policy", module_id="build_ff_engine_v1")
+        raise SystemExit(f"Stub backfill required ({stub_count}); rerun after fixing upstream coverage or pass --allow-stubs")
+
     for mid in sorted(missing, key=lambda x: int(x) if str(x).isdigit() else x):
         sections[mid] = {
             "id": mid,
@@ -252,6 +259,7 @@ def main():
         "provenance": {
             "stub_targets": stub_targets[:20],
             "stub_count": stub_count,
+            "stubs_allowed": bool(args.allow_stubs),
         },
     }
 

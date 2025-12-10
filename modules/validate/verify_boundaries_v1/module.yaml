@@ -14,5 +14,11 @@ param_schema:
     model:
       type: string
       description: "OpenAI model for AI spot-checks"
+    skip_ai:
+      type: boolean
+      description: "Skip AI spot checks and optionally use stub output"
+    stub:
+      type: string
+      description: "Path to boundary_verification stub when skip_ai is true"
   required: []
 notes: "Verifies section_boundaries.jsonl with deterministic checks and optional AI spot-checks for mid-sentence/incorrect starts. Emits boundary_verification.json with errors/warnings."

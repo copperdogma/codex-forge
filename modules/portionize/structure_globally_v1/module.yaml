@@ -6,6 +6,7 @@ output_schema: sections_structured_v1
 default_params:
   model: gpt-4o
   max_tokens: 8000
+  min_sections: 300
 param_schema:
   properties:
     model:
@@ -14,6 +15,20 @@ param_schema:
     max_tokens:
       type: integer
       description: "Maximum tokens for LLM response"
+    min_sections:
+      type: integer
+      description: "Minimum number of gameplay sections required for coverage"
+    retry_model:
+      type: string
+      description: "Optional stronger model to retry if coverage fails"
+    max_retries:
+      type: integer
+      description: "Maximum retry attempts when coverage is low"
+    skip_ai:
+      type: boolean
+      description: "Skip AI call and use stub output instead"
+    stub:
+      type: string
+      description: "Path to sections_structured stub when skip_ai is true"
   required: []
 notes: "Stage 2: Global structuring from header candidates. Takes header_candidates.jsonl (all candidates from Stage 1) and performs a single AI call to create coherent global document structure with macro sections and game sections. Uses strong constraints to ensure proper ordering and conservatively marks uncertain sections. Outputs sections_structured.json."
-

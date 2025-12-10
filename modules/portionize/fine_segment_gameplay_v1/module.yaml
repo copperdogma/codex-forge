@@ -1,0 +1,38 @@
+module_id: fine_segment_gameplay_v1
+stage: portionize
+entrypoint: modules/portionize/fine_segment_gameplay_v1/main.py
+input_schema: element_core_v1
+output_schema: fine_segments_gameplay_v1
+description: Fine segmenter for gameplay - divides gameplay section into numbered sections (1, 2, 3, etc.).
+default_params:
+  model: gpt-4.1-mini
+  max_lines: 15
+  max_len: 150
+  max_retries: 2
+param_schema:
+  properties:
+    elements:
+      type: string
+    pages:
+      type: string
+      description: Alias for elements (driver compatibility)
+    coarse_segments:
+      type: string
+    out:
+      type: string
+    model:
+      type: string
+    retry_model:
+      type: string
+    max_lines:
+      type: integer
+    max_len:
+      type: integer
+    prompt:
+      type: string
+    max_retries:
+      type: integer
+  required: [elements, coarse_segments, out]
+
+
+

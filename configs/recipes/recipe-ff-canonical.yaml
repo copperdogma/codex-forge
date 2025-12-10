@@ -1,0 +1,252 @@
+# Canonical Fighting Fantasy Pipeline (2025-12)
+#
+# Design:
+# - Starts from Unstructured intake (elements IR) — current best-supported path for FF modules.
+# - Runs the redesigned header/structure/boundary stack, then AI extract, optional text clean, build, validate.
+# - Supports smoke runs via settings overrides (e.g., settings.smoke.yaml: input.pdf, models.default)
+#   and portionize_ai_extract_v1's skip_ai/stub parameters for offline stubs.
+#
+# Notes:
+# - All modules referenced exist in-repo as of 2025-12-06.
+# - Deprecated/legacy FF recipes remain for historical reference but should not be used.
+
+run_id: ff-canonical
+input:
+  pdf: input/06 deathtrap dungeon.pdf
+output_dir: output/runs/ff-canonical
+
+stages:
+  - id: intake
+    stage: extract
+    module: extract_ocr_ensemble_v1
+    out: pages_raw.jsonl
+    params:
+      dpi: 300
+      engines: ["tesseract", "apple"]  # easyocr temporarily disabled; see story-055-easyocr-reliability
+      write_engine_dumps: true
+      escalation_threshold: 0.15
+      start: 1
+      end: 20
+
+  - id: escalate_vision
+    stage: adapter
+    module: ocr_escalate_gpt4v_v1
+    needs: [intake]
+    inputs:
+      inputs: intake
+    params:
+      threshold: 0.4
+      max_pages: 40
+      budget_pages: 15  # Increased to catch edge cases like 007L (was 12)
+      model: gpt-4.1
+
+  - id: merge_ocr
+    stage: adapter
+    module: merge_ocr_escalated_v1
+    needs: [intake, escalate_vision]
+    inputs:
+      inputs: [intake, escalate_vision]
+
+  - id: reconstruct_text
+    stage: adapter
+    module: reconstruct_text_v1
+    needs: [merge_ocr]
+    out: pagelines_reconstructed.jsonl
+    inputs:
+      inputs: merge_ocr
+    params:
+      input: pagelines_final.jsonl
+      out: pagelines_reconstructed.jsonl
+
+  - id: reduce_ir
+    stage: intake
+    module: pagelines_to_elements_v1
+    needs: [reconstruct_text]
+    out: elements_core.jsonl
+    inputs:
+      pages: reconstruct_text
+    params:
+      inputs: reconstruct_text
+      out: elements_core.jsonl
+      columns_debug: columns_debug.jsonl
+
+  - id: coarse_segment
+    stage: portionize
+    module: coarse_segment_v1
+    needs: [reduce_ir]
+    out: coarse_segments.json
+    inputs:
+      elements: reduce_ir
+    params:
+      elements: elements_core.jsonl
+      out: coarse_segments.json
+      model: gpt-5
+      retry_model: gpt-5
+      max_retries: 2
+      max_lines: 8
+      max_len: 100
+
+  - id: fine_segment_frontmatter
+    stage: portionize
+    module: fine_segment_frontmatter_v1
+    needs: [reduce_ir, coarse_segment]
+    out: frontmatter_portions.json
+    inputs:
+      elements: reduce_ir
+    params:
+      elements: elements_core.jsonl
+      coarse_segments: coarse_segments.json
+      out: frontmatter_portions.json
+      model: gpt-4.1-mini
+      retry_model: gpt-5
+      max_retries: 2
+      max_lines: 10
+      max_len: 120
+
+  - id: classify_headers
+    stage: portionize
+    module: classify_headers_v1
+    needs: [reduce_ir]
+    out: header_candidates.jsonl
+    inputs:
+      pages: reduce_ir
+    params:
+      model: gpt-4.1
+      batch_size: 50
+      redundancy: forward_backward
+
+  - id: structure_globally
+    stage: portionize
+    module: structure_globally_v1
+    needs: [classify_headers, reduce_ir]
+    out: sections_structured.json
+    inputs:
+      pages: classify_headers
+      elements: reduce_ir
+    params:
+      skip_ai: true
+      stub: modules/portionize/structure_globally_v1/stub.empty.json
+
+  - id: assemble_boundaries
+    stage: portionize
+    module: detect_gameplay_numbers_v1
+    needs: [macro_locate, reduce_ir]
+    out: section_boundaries.jsonl
+    inputs:
+      pages: reduce_ir
+      macro: macro_locate
+
+  - id: ai_scan_fallback
+    stage: portionize
+    module: portionize_ai_scan_v1
+    needs: [reduce_ir]
+    out: section_boundaries_scan.jsonl
+    inputs:
+      pages: reduce_ir
+    params:
+      model: gpt-4.1-mini
+      max_tokens: 1000
+
+  - id: macro_locate
+    stage: portionize
+    module: macro_locate_ff_v1
+    needs: [reduce_ir]
+    out: macro_sections.json
+    inputs:
+      pages: reduce_ir
+    params:
+      pages: elements_core.jsonl
+      model: gpt-4.1
+      max_tokens: 400
+
+  - id: merge_boundaries
+    stage: adapter
+    module: merge_boundaries_pref_v1
+    needs: [assemble_boundaries, ai_scan_fallback]
+    out: section_boundaries_merged.jsonl
+    inputs:
+      primary: assemble_boundaries
+      fallback: ai_scan_fallback
+
+  - id: verify_boundaries
+    stage: validate
+    module: verify_boundaries_v1
+    needs: [merge_boundaries, reduce_ir]
+    out: boundary_verification.json
+    inputs:
+      boundaries: merge_boundaries
+      elements: reduce_ir
+    params:
+      sample_count: 8
+      model: gpt-4.1-nano
+
+  - id: coverage_boundaries
+    stage: validate
+    module: validate_boundary_coverage_v1
+    needs: [merge_boundaries]
+    out: boundary_coverage.json
+    inputs:
+      boundaries: merge_boundaries
+    params:
+      min_present: 320
+      range: "1-400"
+
+  - id: gate_boundaries
+    stage: validate
+    module: validate_boundaries_gate_v1
+    needs: [merge_boundaries, reduce_ir, coverage_boundaries]
+    out: boundary_gate.json
+    inputs:
+      boundaries: merge_boundaries
+      elements: reduce_ir
+    params:
+      min_count: 240
+      max_gap: null
+
+  - id: ai_extract
+    stage: portionize
+    module: portionize_ai_extract_v1
+    needs: [merge_boundaries, gate_boundaries, reduce_ir]
+    out: portions_enriched.jsonl
+    inputs:
+      pages: reduce_ir
+      boundaries: merge_boundaries
+    params:
+      model: gpt-4.1
+      max_tokens: 2000
+      skip_ai: false
+      # For smoke/offline runs: set skip_ai: true and provide stub path via params.stub
+
+  - id: strip_numbers
+    stage: clean
+    module: strip_section_numbers_v1
+    needs: [ai_extract]
+    out: portions_enriched_clean.jsonl
+    inputs:
+      portions: ai_extract
+
+  - id: build_ff_engine
+    stage: build
+    module: build_ff_engine_v1
+    needs: [strip_numbers]
+    out: gamebook.json
+    inputs:
+      portions: strip_numbers
+    params:
+      title: "Deathtrap Dungeon"
+      author: "Ian Livingstone"
+      start_section: "1"
+      format_version: "1.0.0"
+
+  - id: validate_ff_engine
+    stage: validate
+    module: validate_ff_engine_v2
+    needs: [build_ff_engine]
+    out: validation_report.json
+    inputs:
+      gamebook: build_ff_engine
+    params:
+      gamebook: placeholder  # populated dynamically by driver using stage inputs
+      out: placeholder       # populated dynamically by driver to artifact path
+      expected_range_start: 1
+      expected_range_end: 400

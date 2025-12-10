@@ -1,3 +1,4 @@
+# DEPRECATED: superseded by recipe-ff-canonical.yaml
 # Fighting Fantasy pipeline using Unstructured intake (elements IR)
 #
 # This recipe uses the new Unstructured-based Document IR architecture.

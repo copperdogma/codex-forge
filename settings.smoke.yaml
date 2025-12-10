@@ -14,3 +14,24 @@ smoke:
     regions: testdata/smoke/ff/regions.json
     portion_hyp: testdata/smoke/ff/portion_hyp.jsonl
     portions_resolved: testdata/smoke/ff/portions_resolved.jsonl
+
+# Stage-specific overrides for smoke runs (applied by driver.stage_params)
+stage_params:
+  validate_ff_engine:
+    expected_range_start: 3
+    expected_range_end: 8
+  classify_headers:
+    skip_ai: true
+    stub: testdata/smoke/ff/header_candidates_stub.jsonl
+  structure_globally:
+    skip_ai: true
+    stub: testdata/smoke/ff/sections_structured_stub.json
+  assemble_boundaries:
+    skip_ai: true
+    stub: testdata/smoke/ff/section_boundaries_stub.jsonl
+  verify_boundaries:
+    skip_ai: true
+    stub: testdata/smoke/ff/boundary_verification_stub.json
+  ai_extract:
+    skip_ai: true
+    stub: testdata/smoke/ff/portions_enriched_stub.jsonl

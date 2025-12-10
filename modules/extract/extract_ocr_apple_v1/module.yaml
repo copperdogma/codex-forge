@@ -1,0 +1,24 @@
+module_id: extract_ocr_apple_v1
+stage: extract
+entrypoint: modules/extract/extract_ocr_apple_v1/main.py
+input_schema: pdf_path
+output_schema: pagelines_v1
+default_params:
+  start: 1
+  end: null
+  lang: en-US
+  fast: false  # if true, use .fast recognitionLevel
+param_schema:
+  properties:
+    start:
+      type: integer
+      minimum: 1
+    end:
+      type: integer
+      minimum: 1
+    lang:
+      type: string
+    fast:
+      type: boolean
+  required: [start]
+notes: "macOS-only OCR using Vision VNRecognizeTextRequest. Converts PDF pages via PDFKit thumbnails and emits pagelines_v1 JSONL."

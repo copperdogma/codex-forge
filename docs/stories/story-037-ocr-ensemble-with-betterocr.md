@@ -263,7 +263,7 @@ Work Log
 	•	2025-11-30: Smoke run on pages 1–2 of `input/06 deathtrap dungeon.pdf` with BetterOCR missing → tesseract fallback. Outputs under `output/runs/ocr-ensemble-smoke/ocr_ensemble/`; quality report marks `fallback: true`. Page 1 text still garbled (needs BetterOCR install + multi-engine). Next: install `betterocr easyocr` and re-run full book.
 	•	2025-11-30: Added prompt drafts `prompts/ocr_line_reconcile.md` (text-only line adjudication) and `prompts/ocr_page_gpt4v.md` (strict page transcription for GPT-4V).
 	•	2025-11-30: Installed BetterOCR/EasyOCR into `.pip-packages/` and reran with full access. Successful run on full PDF (`input/06 deathtrap dungeon.pdf` → 113 pages) with both engines; output in `output/runs/ocr-ensemble-better/ocr_ensemble/`. Rebuilt quality report (113 entries): worst disagreements on pages 18 (0.98), 108 (0.97), 89 (0.95), 12 (0.95), 66 (0.95); page 1 still garbled (cover). Added `.pip-packages/` to `.gitignore` to avoid snapshot bloat.
-	•	2025-11-30: Added GPT-4V escalation module `escalate_gpt4v_v1` (adapter stage) with CLI/docs; ready to run once `OPENAI_API_KEY` is set.
+	•	2025-11-30: Added GPT-4V escalation module `ocr_escalate_gpt4v_v1` (adapter stage) with CLI/docs; ready to run once `OPENAI_API_KEY` is set.
 	•	2025-11-30: GPT-4V escalation batches:
 		• Batch1 → `output/runs/ocr-ensemble-better-gpt4v/` (pages 12, 18, 66, 89, 108).
 		• Batch2 (from Batch1 outputs) → `output/runs/ocr-ensemble-better-gpt4v-b3/` (pages 1, 8, 12, 18, 48, 66, 72, 89, 94, 108). Remaining max disagreement 0.8879; page 1 now clean.

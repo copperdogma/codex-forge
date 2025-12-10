@@ -14,7 +14,7 @@ stages:
 
   - id: escalate_gpt4v
     stage: adapter
-    module: escalate_gpt4v_v1
+    module: ocr_escalate_gpt4v_v1
     needs: [extract_ocr_ensemble]
     params:
       index: output/runs/deathtrap-ocr-ensemble-gpt4v/ocr_ensemble/pagelines_index.json

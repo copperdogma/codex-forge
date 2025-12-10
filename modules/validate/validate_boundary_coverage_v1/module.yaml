@@ -1,0 +1,4 @@
+module_id: validate_boundary_coverage_v1
+stage: validate
+entrypoint: modules/validate/validate_boundary_coverage_v1/main.py
+description: Ensure boundary set covers expected section ids and meets a minimum count.

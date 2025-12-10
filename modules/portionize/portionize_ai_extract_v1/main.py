@@ -7,7 +7,7 @@ from collections import defaultdict
 from openai import OpenAI
 from tqdm import tqdm
 
-from modules.common.utils import read_jsonl, append_jsonl, ensure_dir, ProgressLogger, log_llm_usage
+from modules.common.utils import read_jsonl, append_jsonl, ensure_dir, ProgressLogger, log_llm_usage, save_jsonl, save_json
 from schemas import EnrichedPortion, Choice, Combat, ItemEffect
 
 SYSTEM_PROMPT = """You are analyzing a Fighting Fantasy gamebook section to extract gameplay data.
@@ -106,6 +106,34 @@ def extract_text_from_elements(
     return "\n\n".join(text_parts), section_element_ids
 
 
+def extract_with_window(
+    elements_by_id: Dict[str, Dict],
+    element_sequence: List[str],
+    start_element_id: str,
+    window: int = 6,
+) -> tuple:
+    """
+    Fallback extractor: grab a fixed window of elements starting at start_element_id.
+    Useful when the boundary span is too tight and yields empty text.
+    """
+    if start_element_id not in element_sequence:
+        return "", []
+    start_idx = element_sequence.index(start_element_id)
+    end_idx = min(len(element_sequence), start_idx + window)
+    section_element_ids = element_sequence[start_idx:end_idx]
+    text_parts = []
+    for eid in section_element_ids:
+        elem = elements_by_id.get(eid)
+        if not elem:
+            continue
+        if elem.get("type") in ("Header", "Footer", "PageBreak"):
+            continue
+        text = (elem.get("text") or "").strip()
+        if text:
+            text_parts.append(text)
+    return "\n\n".join(text_parts), section_element_ids
+
+
 def call_extract_llm(client: OpenAI, model: str, section_text: str, max_tokens: int) -> Dict:
     """Call AI to extract gameplay data from section text."""
     user_prompt = f"""Here is the section text:
@@ -114,15 +142,20 @@ def call_extract_llm(client: OpenAI, model: str, section_text: str, max_tokens: 
 
 Please extract all gameplay data (choices, combat, luck tests, item effects)."""
 
-    completion = client.chat.completions.create(
+    create_kwargs = dict(
         model=model,
         messages=[
             {"role": "system", "content": SYSTEM_PROMPT},
             {"role": "user", "content": user_prompt}
         ],
         response_format={"type": "json_object"},
-        max_tokens=max_tokens
     )
+    if model.startswith("gpt-5"):
+        create_kwargs["max_completion_tokens"] = max_tokens
+    else:
+        create_kwargs["max_tokens"] = max_tokens
+
+    completion = client.chat.completions.create(**create_kwargs)
 
     # Log usage
     usage = getattr(completion, "usage", None)
@@ -147,11 +180,21 @@ def main():
     parser.add_argument("--out", required=True, help="Path to portions_enriched.jsonl")
     parser.add_argument("--model", default="gpt-4o", help="OpenAI model to use")
     parser.add_argument("--max_tokens", type=int, default=2000, help="Max tokens for AI response")
+    parser.add_argument("--fallback-window", type=int, default=6,
+                        help="Number of elements to include when widening empty spans")
     parser.add_argument("--progress-file", help="Path to pipeline_events.jsonl")
     parser.add_argument("--state-file", help="Path to pipeline_state.json")
     parser.add_argument("--run-id", help="Run identifier for logging")
-    parser.add_argument("--skip-ai", action="store_true", help="Bypass AI extraction and load stub portions")
+    parser.add_argument("--skip-ai", "--skip_ai", action="store_true", dest="skip_ai",
+                        help="Bypass AI extraction and load stub portions")
     parser.add_argument("--stub", help="Stub enriched portions jsonl to use when --skip-ai")
+    parser.add_argument("--retry-count", type=int, default=1, dest="retry_count",
+                        help="Number of retries on LLM errors per section")
+    parser.add_argument("--retry-model", default="gpt-5", dest="retry_model",
+                        help="Model to use on retry attempts")
+    parser.add_argument("--fail-on-empty", action="store_true", dest="fail_on_empty",
+                        help="Fail the stage if any section text remains empty after retries/widening")
+    parser.add_argument("--section-filter", help="Comma-separated list of section_ids to process (others skipped)")
     args = parser.parse_args()
 
     logger = ProgressLogger(state_path=args.state_file, progress_path=args.progress_file, run_id=args.run_id)
@@ -184,8 +227,15 @@ def main():
     if not boundaries:
         raise SystemExit("No section boundaries found in input file")
 
+    # Optional filter
+    allowed = None
+    if args.section_filter:
+        allowed = set([s.strip() for s in args.section_filter.split(",") if s.strip()])
+
     # Sort boundaries by section_id (numeric)
     boundaries_sorted = sorted(boundaries, key=lambda b: int(b["section_id"]) if b["section_id"].isdigit() else 999999)
+    if allowed is not None:
+        boundaries_sorted = [b for b in boundaries_sorted if b.get("section_id") in allowed]
 
     logger.log("portionize", "running", current=0, total=len(boundaries_sorted),
                message=f"Extracting {len(boundaries_sorted)} sections with AI",
@@ -196,6 +246,7 @@ def main():
 
     # Process each boundary
     client = OpenAI()
+    error_traces = []
     for idx, boundary in enumerate(tqdm(boundaries_sorted, desc="Extracting sections"), start=1):
         try:
             section_id = boundary["section_id"]
@@ -214,17 +265,62 @@ def main():
                 end_element_id
             )
 
+            gameplay_data = None
+            widened = False
             if not raw_text:
-                # Empty section, skip AI call
+                raw_text, element_ids = extract_with_window(
+                    elements_by_id,
+                    element_sequence,
+                    start_element_id,
+                    args.fallback_window
+                )
+                widened = True
+
+            if not raw_text:
+                # Unresolved empty text
                 gameplay_data = {
                     "choices": [],
                     "combat": None,
                     "test_luck": False,
-                    "item_effects": []
+                    "item_effects": [],
+                    "error": "empty_text"
                 }
+                error_traces.append({
+                    "section_id": section_id,
+                    "error": "empty_text",
+                    "start_element_id": start_element_id,
+                    "widened": widened,
+                    "run_id": args.run_id,
+                    "model_first": args.model,
+                    "model_retry": args.retry_model,
+                })
             else:
-                # Call AI to extract gameplay data
-                gameplay_data = call_extract_llm(client, args.model, raw_text, args.max_tokens)
+                attempts = args.retry_count + 1
+                last_err = None
+                for attempt in range(attempts):
+                    try:
+                        model_used = args.model if attempt == 0 else args.retry_model
+                        gameplay_data = call_extract_llm(client, model_used, raw_text, args.max_tokens)
+                        break
+                    except Exception as e:
+                        last_err = e
+                if gameplay_data is None:
+                    print(f"[warn] section {section_id}: LLM parse failed after retries: {last_err}")
+                    error_traces.append({
+                        "section_id": section_id,
+                        "error": str(last_err),
+                        "start_element_id": start_element_id,
+                        "run_id": args.run_id,
+                        "model_first": args.model,
+                        "model_retry": args.retry_model,
+                    })
+                    gameplay_data = {
+                        "choices": [],
+                        "combat": None,
+                        "test_luck": False,
+                        "item_effects": [],
+                        "error": str(last_err) if last_err else "unknown_error"
+                    }
 
             # Parse gameplay data into schema objects
             choices = []
@@ -305,6 +401,13 @@ def main():
                message=f"Extracted {len(boundaries_sorted)} sections",
                artifact=args.out, module_id="portionize_ai_extract_v1",
                schema_version="enriched_portion_v1")
+
+    if error_traces:
+        err_path = args.out + ".errors.json"
+        save_json(err_path, error_traces)
+        print(f"[warn] {len(error_traces)} sections unresolved; trace → {err_path}")
+        if args.fail_on_empty:
+            raise SystemExit(f"Extraction unresolved for {len(error_traces)} sections (empty or parse errors)")
 
     print(f"Extracted {len(boundaries_sorted)} sections → {args.out}")
 

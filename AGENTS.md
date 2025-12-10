@@ -11,6 +11,9 @@ This repo processes scanned (or text) books into structured JSON, using modular 
 - Default to `workspace-write` safe commands; avoid destructive ops (`rm -rf`, `git reset --hard`).
 - Preserve non-ASCII only if the file already contains it.
 - Do not patch artifacts by hand to hide upstream issues; fix the root cause and regenerate. Any temporary manual edit must be explicit, traceable, and leave original inputs untouched.
+- Never “fix” run artifacts by hand: all data corrections must be structural/code changes and reproducible; regenerate outputs instead of manual edits.
+- Every stage must resolve before the next runs: either reach its coverage/quality target or finish a defined escalate→validate loop and clearly mark unresolved items. Do not pass partially-resolved outputs downstream without explicit failure markers.
+- **Always inspect outputs, not just logs:** After every meaningful run, manually open the produced artifacts (JSON/JSONL) and check they match expectations (counts, sample content). A green or non-crashing run is not evidence of correctness; if outputs are empty/suspicious, stop and fix before proceeding.
 
 ## Critical AI Mindset: Think First, Verify Always
 
@@ -68,6 +71,14 @@ This is a **data pipeline** project. Every stage produces **artifacts** (JSONL f
 5. If issues found → return to step 1
 6. Only declare success when **data is correct**, not when **code runs**
 
+**Validation must be diagnostic:** For every missing/no-text/no-choice warning or error, emit a per-item provenance trace that walks upstream artifacts (OCR → elements/elements_core → boundaries → portions) and shows where content disappeared or was absent. The trace should make it obvious which stage caused loss (e.g., text present in elements but missing after portions ⇒ extraction issue; text absent from OCR ⇒ source/OCR issue; text truly absent ⇒ likely real empty section). Traces must include artifact paths, page/element IDs, and short text snippets where available. No manual artifact edits—fix code/logic and regenerate.
+
+**Stage resolution discipline:** A stage must resolve before the next runs. Resolution means either (a) it meets its coverage/quality goal (e.g., all sections found, ordering valid) or (b) it finishes a defined escalate→validate loop and records the unresolved items prominently in artifacts/metadata. Do not silently push partial “best-effort” outputs downstream. Examples:
+- Section splitting must complete its own escalation (retries, stronger models, focused re-reads) until coverage is acceptable or the cap is hit; only then assemble boundaries.
+- Boundary verification must pass or emit explicit failure markers before extraction starts.
+- Extraction must retry/repair flagged portions; unresolved portions must carry explicit error records (not empty text) so validators/builders surface them.
+- Stub-fatal policy: stub backfills are for forensics only. Default is **fatal on stubs**—pipelines must fail unless `allow_stubs` is explicitly set, and the allowance must be recorded in provenance/validation so missing content cannot be hidden.
+
 ### Escalate-to-success loop (applies to every stage)
 - Default pattern: **detect/code → validate → targeted escalate → validate**, repeat until 100% success or a retry/budget cap is hit.
 - Each pass must use the latest artifacts (hash/mtime guard to prevent stale inputs).
@@ -105,6 +116,7 @@ When designing prompts for AI API calls:
 - A module that runs without errors but produces garbage output is a **silent failure**.
 - Users trust the output. If the AI doesn't verify it, **bad data propagates downstream**.
 - The deep dive we did on story 031 revealed issues at every stage - **issues that only became obvious when we manually inspected artifacts**.
+- Validation must surface evidence automatically. On any validation failure or warning (missing text/choices/sections), emit traces that show where data was lost (e.g., boundary source, start element text/page, upstream artifact paths) so an AI or human can see the root cause without manual spelunking.
 
 **You own the quality of your output, not just the quality of your code.**
 

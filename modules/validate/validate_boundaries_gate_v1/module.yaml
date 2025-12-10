@@ -1,0 +1,4 @@
+module_id: validate_boundaries_gate_v1
+description: Sanity gate for boundary set before extraction (count & monotonicity).
+entrypoint: modules/validate/validate_boundaries_gate_v1/main.py
+stage: validate

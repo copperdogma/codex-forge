@@ -1,0 +1,6 @@
+stage_params:
+  intake:
+    strategy: fast
+
+# Usage:
+# python driver.py --recipe configs/recipes/recipe-ff-canonical.yaml --settings settings.fast-intake.yaml --run-id ... --output-dir ...

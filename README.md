@@ -37,7 +37,54 @@ The **Intermediate Representation (IR)** stays unchanged throughout; portionizat
 - Driver orchestrates stages, stamps artifacts with schema/module/run IDs, and tracks state in `pipeline_state.json`.
 - Swap modules by changing the recipe, e.g. OCR vs text ingest.
 
-Examples:
+### Two Ways to Run the Pipeline
+
+**1. Regular Production Runs** (output in `output/runs/`)
+- **Purpose**: Real pipeline runs that should be preserved and tracked
+- **Location**: Artifacts go to `output/runs/<run_id>/` (default or from recipe)
+- **When to use**: Actual book processing, production runs, runs you want to keep
+- **Manifest**: Automatically registered in `output/run_manifest.jsonl` for tracking
+- **Example**:
+  ```bash
+  # Full canonical FF recipe run
+  python driver.py --recipe configs/recipes/recipe-ff-canonical.yaml --run-id deathtrap-dungeon-20251208
+  
+  # With instrumentation
+  python driver.py --recipe configs/recipes/recipe-ff-canonical.yaml --run-id deathtrap-dungeon-20251208 --instrument
+  ```
+
+**2. Temporary Test Runs** (output in `/tmp` or `/private/tmp`)
+- **Purpose**: Quick testing, development, debugging, AI agent experimentation
+- **Location**: Artifacts go to `/tmp` or `/private/tmp` (via `--output-dir` override)
+- **When to use**: 
+  - Testing new modules or recipe changes
+  - Debugging pipeline issues
+  - AI agents doing temporary test runs during development
+  - Quick smoke tests on subsets
+- **Not tracked**: These runs are NOT registered in `output/run_manifest.jsonl` (they're temporary)
+- **Example**:
+  ```bash
+  # Temporary test run (AI agents use this for development/testing)
+  python driver.py --recipe configs/recipes/recipe-ff-canonical.yaml \
+    --run-id cf-ff-canonical-test \
+    --output-dir /private/tmp/cf-ff-canonical-test \
+    --force
+  
+  # Smoke test with subset
+  python driver.py --recipe configs/recipes/recipe-ff-canonical.yaml \
+    --settings settings.smoke.yaml \
+    --run-id ff-canonical-smoke \
+    --output-dir /tmp/cf-ff-canonical-smoke \
+    --force
+  ```
+
+**Key Differences:**
+- **Regular runs**: Use default `output/runs/<run_id>/` (or recipe `output_dir`), registered in manifest
+- **Temporary runs**: Use `--output-dir` to override to `/tmp` or `/private/tmp`, NOT registered in manifest
+- **AI Agents**: Should use temporary runs (`--output-dir /private/tmp/...`) for testing/development, and only use regular runs for actual production work
+
+### Common Driver Commands
+
 ```bash
 # Dry-run OCR recipe
 python driver.py --recipe configs/recipes/recipe-ocr.yaml --dry-run
@@ -56,6 +103,15 @@ python driver.py --recipe configs/recipes/recipe-ocr.yaml --skip-done --start-fr
 ```
 
 Runtime note: full non-mock OCR on the 113-page sample typically takes ~35–40 minutes for the portionize/LLM window stage (gpt-4.1-mini + boost gpt-5). Use `--skip-done` with `--start-from/--end-at` to resume or scope reruns without re-cleaning pages.
+
+### Apple Silicon vs x86_64 (intake quality)
+- Prefer the ARM64 Python env on Apple Silicon: `~/miniforge3/envs/codex-arm/bin/python` (reports `platform.machine() == "arm64"`). Unstructured `hi_res` runs successfully here and yields far better header/section recall.
+- On x86_64 (Rosetta) the TensorFlow build expects AVX and forces us to fall back to `strategy: fast`, which markedly reduces header detection and downstream section coverage.
+- Canonical FF recipe (`configs/recipes/recipe-ff-canonical.yaml`) defaults to `strategy: hi_res`; if you must stay on x86_64, pass `--settings settings.fast-intake.yaml` to override to `fast` and expect lower quality.
+- Keep the "hi_res first, fast fallback" knob: run ARM hi_res by default, and only flip to `settings.fast-intake.yaml` when the environment lacks ARM/AVX. Prior runs showed a large coverage drop when forced to fast, so treat fast as a compatibility fallback, not a peer mode.
+- Recommended full run on ARM:  
+  `~/miniforge3/envs/codex-arm/bin/python driver.py --recipe configs/recipes/recipe-ff-canonical.yaml --run-id <run> --output-dir <dir> --force`
+- macOS-only Vision OCR: a new module `extract_ocr_apple_v1` (and optional `apple` engine in `extract_ocr_ensemble_v1`) uses `VNRecognizeTextRequest`. It compiles a Swift helper at runtime; only available on macOS with Xcode CLTs installed.
 
 ### DAG recipes (coarse+fine merge example)
 ```bash

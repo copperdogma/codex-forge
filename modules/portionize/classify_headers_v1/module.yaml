@@ -25,5 +25,11 @@ param_schema:
       type: string
       enum: [none, forward_backward, multiple_calls]
       description: "Redundancy strategy: none, forward_backward (recommended), or multiple_calls"
+    skip_ai:
+      type: boolean
+      description: "Skip AI calls and use stub output instead"
+    stub:
+      type: string
+      description: "Path to header_candidates stub when skip_ai is true"
   required: []
 notes: "AI-powered header classification for Fighting Fantasy books. Batches elements_core.jsonl into chunks of 50-100 elements, uses AI to classify each element as macro header, game section header, or neither. Supports forward/backward pass redundancy for robustness. Outputs header_candidates.jsonl with all elements classified."

@@ -1,0 +1,23 @@
+module_id: pagelines_to_elements_v1
+entrypoint: modules/intake/pagelines_to_elements_v1/main.py
+description: Convert pagelines_v1 index (from OCR ensemble/vision) into elements.jsonl + elements_core.jsonl for downstream FF pipeline.
+output_schema: element_core_v1
+default_params:
+  index: ""
+  out: ""
+param_schema:
+  type: object
+  properties:
+    index:
+      type: string
+    out:
+      type: string
+    out_core:
+      type: string
+    inputs:
+      type: array
+      description: Optional driver-provided input list; if set, infer index/out paths from first input run dir.
+    columns_debug:
+      type: string
+      description: Optional JSONL debug output with per-page column stats.
+  required: []

@@ -1,0 +1,38 @@
+module_id: fine_segment_frontmatter_v1
+stage: portionize
+entrypoint: modules/portionize/fine_segment_frontmatter_v1/main.py
+input_schema: element_core_v1
+output_schema: fine_segments_frontmatter_v1
+description: Fine segmenter for frontmatter - divides frontmatter section into logical portions (title, copyright, TOC, rules, etc.).
+default_params:
+  model: gpt-4.1-mini
+  max_lines: 10
+  max_len: 120
+  max_retries: 2
+param_schema:
+  properties:
+    elements:
+      type: string
+    pages:
+      type: string
+      description: Alias for elements (driver compatibility)
+    coarse_segments:
+      type: string
+    out:
+      type: string
+    model:
+      type: string
+    retry_model:
+      type: string
+    max_lines:
+      type: integer
+    max_len:
+      type: integer
+    prompt:
+      type: string
+    max_retries:
+      type: integer
+  required: [elements, coarse_segments, out]
+
+
+

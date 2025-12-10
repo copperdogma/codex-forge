@@ -1,0 +1,4 @@
+module_id: validate_sections_coverage_v1
+description: Validate coverage/ordering of structured sections before boundary assembly.
+entrypoint: modules/validate/validate_sections_coverage_v1/main.py
+stage: validate

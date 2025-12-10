@@ -1,6 +1,7 @@
 input/
 output/
 .pip-packages/
+.pip-packages.bak/
 models/
 **/__pycache__/
 .venv/
@@ -9,3 +10,15 @@ models/
 
 # Local pip cache
 .pip-packages/
+
+# Debug and output artifacts
+*_debug.jsonl
+elements.jsonl
+elements_core.jsonl
+
+# Tool directories
+.playwright-mcp/
+
+# Local settings
+.claude/settings.local.json
+**/.claude/settings.local.json

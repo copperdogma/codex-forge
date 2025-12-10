@@ -16,6 +16,7 @@ from openai import OpenAI
 
 from modules.common.utils import read_jsonl, save_json, ensure_dir, ProgressLogger, log_llm_usage
 from schemas import HeaderCandidate, SectionsStructured, MacroSection, GameSectionStructured, ElementCore
+from .fixup import normalize_start_seq
 
 # CYOA Document Profile (same as Stage 1)
 CYOA_PROFILE = {
@@ -150,7 +151,7 @@ Header candidates:
     return prompt
 
 
-def call_structure_llm(client: OpenAI, model: str, prompt: str, max_tokens: int) -> Dict[str, Any]:
+def call_structure_llm(client: OpenAI, model: str, prompt: str, max_tokens: int, timeout: float = 45.0) -> Dict[str, Any]:
     """Call AI to create global structure."""
     try:
         # gpt-5 uses max_completion_tokens instead of max_tokens
@@ -161,15 +162,16 @@ def call_structure_llm(client: OpenAI, model: str, prompt: str, max_tokens: int)
                 {"role": "user", "content": prompt}
             ],
             "response_format": {"type": "json_object"},
-            "temperature": 0.0,  # Deterministic
         }
         # Use appropriate parameter based on model
         if model.startswith("gpt-5"):
             create_kwargs["max_completion_tokens"] = max_tokens
+            create_kwargs["temperature"] = 1  # gpt-5 disallows temperature=0
         else:
             create_kwargs["max_tokens"] = max_tokens
+            create_kwargs["temperature"] = 0.0  # deterministic where supported
         
-        completion = client.chat.completions.create(**create_kwargs)
+        completion = client.chat.completions.create(timeout=timeout, **create_kwargs)
         
         # Log usage
         usage = getattr(completion, "usage", None)
@@ -232,7 +234,7 @@ def validate_structure(structure: Dict[str, Any], max_seq: int) -> List[str]:
         errors.append("'game_sections' must be a list")
         return errors
     
-    # Validate game sections: strict ordering constraints
+    # Validate game sections: strict ordering constraints (certain only)
     certain_sections = [gs for gs in game_sections if gs.get("status") == "certain"]
     if certain_sections:
         # Sort by id
@@ -333,7 +335,7 @@ def enrich_with_text(structure: Dict[str, Any], elements_core_path: str) -> Dict
         # Ensure confidence exists (default to 0.5 if missing)
         if "confidence" not in enriched_gs:
             enriched_gs["confidence"] = 0.5
-        
+
         enriched_sections.append(enriched_gs)
     
     structure["game_sections"] = enriched_sections
@@ -356,6 +358,16 @@ def main():
                        help="OpenAI model to use (gpt-4o recommended for complex reasoning)")
     parser.add_argument("--max_tokens", type=int, default=16000,
                        help="Max tokens for AI response (increased for complex structures)")
+    parser.add_argument("--min_sections", type=int, default=300,
+                       help="Minimum total gameplay sections required to continue")
+    parser.add_argument("--retry_model", default=None,
+                       help="Optional stronger model to retry if coverage is below min_sections")
+    parser.add_argument("--max_retries", type=int, default=1,
+                       help="Maximum coverage retries with retry_model")
+    parser.add_argument("--skip-ai", "--skip_ai", action="store_true", dest="skip_ai",
+                       help="Skip AI call and copy stub instead")
+    parser.add_argument("--stub",
+                       help="Stub sections_structured.json to use when --skip-ai is set")
     parser.add_argument("--progress-file", help="Path to pipeline_events.jsonl")
     parser.add_argument("--state-file", help="Path to pipeline_state.json")
     parser.add_argument("--run-id", help="Run identifier for logging")
@@ -377,6 +389,18 @@ def main():
     )
     
     ensure_dir(os.path.dirname(args.out) or ".")
+
+    if args.skip_ai:
+        if not args.stub:
+            raise SystemExit("--skip-ai set but no --stub provided for structure_globally_v1")
+        with open(args.stub, "r", encoding="utf-8") as f:
+            stub_obj = json.load(f)
+        with open(args.out, "w", encoding="utf-8") as f:
+            json.dump(stub_obj, f, indent=2)
+        print(f"[skip-ai] structure_globally_v1 copied stub → {args.out}")
+        logger.log("portionize", "done", current=1, total=1,
+                   message="Loaded sections_structured stub", artifact=args.out, module_id="structure_globally_v1")
+        return
     
     # Read header candidates
     logger.log(
@@ -409,8 +433,22 @@ def main():
     summary = create_compact_summary(header_candidates, max_seq)
     print(f"Created summary with {len(summary['elements'])} header candidates (of {len(header_candidates)} total elements)")
     
-    # Create prompt
+    # Create prompt (optionally include macro hint if available)
+    macro_hint_path = os.path.join(os.path.dirname(args.pages), "macro_sections.json")
+    macro_hint = None
+    if os.path.exists(macro_hint_path):
+        try:
+            macro_hint = json.load(open(macro_hint_path))
+        except Exception:
+            macro_hint = None
     prompt = create_global_structure_prompt(summary)
+    if macro_hint and isinstance(macro_hint, dict):
+        hint_page = None
+        for sec in macro_hint.get("sections", []):
+            if sec.get("section_name") == "main_content":
+                hint_page = sec.get("page")
+        if hint_page:
+            prompt += f"\n\nSecondary hint: main content likely begins near page {hint_page}. Use this only as a tie-breaker; rely on text evidence."
     
     # Call AI
     logger.log(
@@ -424,8 +462,24 @@ def main():
     
     print(f"Calling {args.model} for global structure analysis...")
     client = OpenAI(timeout=120.0)  # Longer timeout for complex reasoning
-    
-    structure = call_structure_llm(client, args.model, prompt, args.max_tokens)
+
+    attempt = 0
+    structure = None
+    last_err = None
+    model_used = args.model
+    while attempt <= args.max_retries and structure is None:
+        try:
+            structure = call_structure_llm(client, model_used, prompt, args.max_tokens)
+        except Exception as e:
+            last_err = e
+            attempt += 1
+            if attempt > args.max_retries or not args.retry_model:
+                break
+            model_used = args.retry_model
+            print(f"[structure_globally] retrying with {model_used} (attempt {attempt}/{args.max_retries}) due to error: {e}")
+
+    if structure is None:
+        raise SystemExit(f"Global structure failed: {last_err}")
     
     # Validate structure
     errors = validate_structure(structure, max_seq)
@@ -446,6 +500,13 @@ def main():
     print(f"Enriching structure with full text from {elements_path}...")
     structure = enrich_with_text(structure, elements_path)
     
+    # Enforce monotonic start_seq ordering (certain first), then uncertain
+    certain = [gs for gs in structure.get("game_sections", []) if gs.get("status") == "certain"]
+    uncertain = [gs for gs in structure.get("game_sections", []) if gs.get("status") != "certain"]
+    certain_sorted = normalize_start_seq(certain)
+    uncertain_sorted = normalize_start_seq(uncertain)
+    structure["game_sections"] = certain_sorted + uncertain_sorted
+
     # Parse into schema
     try:
         structured = SectionsStructured(**structure)
@@ -459,6 +520,25 @@ def main():
     macro_count = len(structured.macro_sections)
     game_certain = sum(1 for gs in structured.game_sections if gs.status == "certain")
     game_uncertain = sum(1 for gs in structured.game_sections if gs.status == "uncertain")
+
+    total_sections = game_certain + game_uncertain
+    if total_sections < args.min_sections and args.retry_model and model_used != args.retry_model and attempt < args.max_retries:
+        # Coverage too low: try retry_model once for coverage (without re-enriching text to keep payload small)
+        attempt += 1
+        model_used = args.retry_model
+        print(f"[structure_globally] coverage {total_sections} < {args.min_sections}; retrying with {model_used}")
+        structure = call_structure_llm(client, model_used, prompt, args.max_tokens)
+        certain = [gs for gs in structure.get("game_sections", []) if gs.get("status") == "certain"]
+        uncertain = [gs for gs in structure.get("game_sections", []) if gs.get("status") != "certain"]
+        structure["game_sections"] = normalize_start_seq(certain) + normalize_start_seq(uncertain)
+        structured = SectionsStructured(**structure)
+        macro_count = len(structured.macro_sections)
+        game_certain = sum(1 for gs in structured.game_sections if gs.status == "certain")
+        game_uncertain = sum(1 for gs in structured.game_sections if gs.status == "uncertain")
+        total_sections = game_certain + game_uncertain
+
+    if total_sections < args.min_sections:
+        raise SystemExit(f"Global structure coverage too low: {total_sections} < min_sections={args.min_sections}")
     
     logger.log(
         "portionize",

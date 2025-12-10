@@ -4,6 +4,7 @@ import yaml
 from datetime import datetime
 from typing import Any, Dict, Optional, Tuple
 from pathlib import Path
+from functools import lru_cache
 
 # Progress event schema constants for lightweight validation/testing
 PROGRESS_EVENT_SCHEMA: Dict[str, Tuple[type, ...]] = {
@@ -35,6 +36,8 @@ def ensure_dir(path: str):
 
 
 def save_json(path: str, data: Any):
+    """Save JSON file, ensuring parent directory exists."""
+    Path(path).parent.mkdir(parents=True, exist_ok=True)
     with open(path, "w", encoding="utf-8") as f:
         json.dump(data, f, ensure_ascii=False, indent=2)
 
@@ -74,6 +77,24 @@ def _type_ok(val: Any, allowed: Tuple[type, ...]) -> bool:
         if isinstance(val, typ):
             return True
     return False
+
+
+@lru_cache(maxsize=1)
+def english_wordlist():
+    # Lightweight set; extend as needed for FF domain
+    return set([
+        "the", "and", "for", "with", "you", "your", "skill", "stamina", "luck",
+        "gold", "sword", "provisions", "attack", "strength", "weapon", "armour",
+        "deathtrap", "dungeon", "background", "equipment", "potions", "adventure",
+        "fight", "creature", "escape", "turn", "roll", "dice", "test", "walk",
+        "challenge", "champion", "trial", "fang", "labyrinth", "baron", "sukumvit",
+        "item", "items", "use", "drink", "potion", "left", "right", "north", "south",
+        "east", "west", "door", "hall", "tunnel", "room", "open", "close", "key",
+        "keys", "monster", "monsters", "health", "damage", "shield", "helm", "helmet",
+        "golden", "silver", "iron", "bronze", "treasure", "chest", "pack", "bag",
+        "food", "meal", "river", "boat", "bridge", "stairs", "ladder", "gate",
+        "rules", "combat", "spell", "magic", "turns", "page", "pages"
+    ])
 
 
 def validate_progress_event(event: Dict[str, Any]):

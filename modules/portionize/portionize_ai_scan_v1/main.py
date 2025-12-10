@@ -82,7 +82,7 @@ def format_elements_for_scan(elements: List[Dict]) -> str:
     return "\n".join(lines)
 
 
-def call_scan_llm(client: OpenAI, model: str, elements: List[Dict], max_tokens: int) -> List[Dict]:
+def call_scan_llm(client: OpenAI, model: str, elements: List[Dict], max_tokens: int, retry_model: str = "gpt-5") -> List[Dict]:
     """Call AI to scan elements and identify section boundaries."""
     elements_text = format_elements_for_scan(elements)
 
@@ -92,30 +92,43 @@ def call_scan_llm(client: OpenAI, model: str, elements: List[Dict], max_tokens: 
 
 Please identify ALL Fighting Fantasy gameplay section boundaries."""
 
-    completion = client.chat.completions.create(
-        model=model,
-        messages=[
-            {"role": "system", "content": SYSTEM_PROMPT},
-            {"role": "user", "content": user_prompt}
-        ],
-        response_format={"type": "json_object"},
-        max_tokens=max_tokens
-    )
+    def _once(selected_model: str):
+        kwargs = dict(
+            model=selected_model,
+            messages=[
+                {"role": "system", "content": SYSTEM_PROMPT},
+                {"role": "user", "content": user_prompt}
+            ],
+            response_format={"type": "json_object"},
+        )
+        if selected_model.startswith("gpt-5"):
+            kwargs["max_completion_tokens"] = max_tokens
+            kwargs["temperature"] = 1
+        else:
+            kwargs["max_tokens"] = max_tokens
+            kwargs["temperature"] = 0.0
 
-    # Log usage
-    usage = getattr(completion, "usage", None)
-    pt = getattr(usage, "prompt_tokens", 0) if usage else 0
-    ct = getattr(usage, "completion_tokens", 0) if usage else 0
-    log_llm_usage(
-        model=model,
-        prompt_tokens=pt,
-        completion_tokens=ct,
-        request_ms=None,
-    )
+        completion = client.chat.completions.create(**kwargs)
 
-    # Parse response
-    response_text = completion.choices[0].message.content
-    payload = json.loads(response_text)
+        usage = getattr(completion, "usage", None)
+        pt = getattr(usage, "prompt_tokens", 0) if usage else 0
+        ct = getattr(usage, "completion_tokens", 0) if usage else 0
+        log_llm_usage(model=selected_model, prompt_tokens=pt, completion_tokens=ct, request_ms=None)
+        return completion.choices[0].message.content or ""
+
+    response_text = _once(model)
+    try:
+        payload = json.loads(response_text)
+    except json.JSONDecodeError as e:
+        print(f"[ai_scan] JSON decode failed ({e}); retrying with {retry_model}")
+        print(f"[ai_scan] First 300 chars: {response_text[:300]}")
+        # Retry with stronger model; if it fails again, fall back to empty list
+        try:
+            response_text = _once(retry_model)
+            payload = json.loads(response_text)
+        except Exception as e2:
+            print(f"[ai_scan] Retry failed: {e2}. Proceeding with empty boundaries.")
+            return []
 
     # Extract boundaries array
     if isinstance(payload, dict) and "boundaries" in payload:
@@ -131,10 +144,12 @@ def main():
     parser.add_argument("--pages", required=True, help="Path to elements.jsonl (uses --pages for driver compatibility)")
     parser.add_argument("--out", required=True, help="Path to section_boundaries.jsonl")
     parser.add_argument("--model", default="gpt-4o-mini", help="OpenAI model to use")
-    parser.add_argument("--max_tokens", type=int, default=4000, help="Max tokens for AI response")
+    parser.add_argument("--max_tokens", type=int, default=2000, help="Max tokens (or max_completion_tokens) for AI response")
     parser.add_argument("--progress-file", help="Path to pipeline_events.jsonl")
     parser.add_argument("--state-file", help="Path to pipeline_state.json")
     parser.add_argument("--run-id", help="Run identifier for logging")
+    parser.add_argument("--retry-model", dest="retry_model", default="gpt-5",
+                        help="Model to retry with if JSON parsing fails")
     args = parser.parse_args()
 
     logger = ProgressLogger(state_path=args.state_file, progress_path=args.progress_file, run_id=args.run_id)
@@ -153,7 +168,7 @@ def main():
 
     # Call AI to scan for boundaries
     client = OpenAI()
-    boundaries_data = call_scan_llm(client, args.model, elements, args.max_tokens)
+    boundaries_data = call_scan_llm(client, args.model, elements, args.max_tokens, retry_model=args.retry_model)
 
     # Convert to SectionBoundary schema
     boundaries = []

@@ -30,10 +30,15 @@ def assemble_boundaries(structure: SectionsStructured, elements_by_seq: Dict[int
     """Create SectionBoundary records from structured sections."""
     # Sort by start_seq (document order) to compute boundaries correctly
     # Sections may be out of order by ID, but boundaries must respect document position
-    game_sections_by_seq = sorted(
-        [gs for gs in structure.game_sections if gs.status == "certain" and gs.start_seq is not None],
-        key=lambda gs: gs.start_seq,
-    )
+    # Sort by document position; drop duplicate section ids by keeping earliest start_seq
+    dedup_seen = set()
+    game_sections_by_seq = []
+    for gs in sorted([gs for gs in structure.game_sections if gs.start_seq is not None],
+                     key=lambda gs: gs.start_seq):
+        if gs.id in dedup_seen:
+            continue
+        dedup_seen.add(gs.id)
+        game_sections_by_seq.append(gs)
 
     boundaries: List[Dict[str, Any]] = []
 
@@ -112,8 +117,12 @@ def main():
     parser.add_argument("--elements", required=False, help="elements_core.jsonl path")
     parser.add_argument("--input", required=False, help="Alias for --elements (driver compatibility)")
     parser.add_argument("--out", required=True, help="Output section_boundaries.jsonl path")
-    parser.add_argument("--confidence-default", type=float, default=0.7,
+    parser.add_argument("--confidence-default", "--confidence_default", type=float, default=0.7,
+                        dest="confidence_default",
                         help="Fallback confidence when structure lacks confidence field")
+    parser.add_argument("--skip-ai", "--skip_ai", action="store_true", dest="skip_ai",
+                        help="Skip assembly logic and copy stub instead")
+    parser.add_argument("--stub", help="Stub section_boundaries.jsonl to use when --skip-ai is set")
     parser.add_argument("--progress-file", help="Path to pipeline_events.jsonl")
     parser.add_argument("--state-file", help="Path to pipeline_state.json")
     parser.add_argument("--run-id", help="Run identifier for logging")
@@ -141,6 +150,17 @@ def main():
     logger.log("portionize", "running", current=0, total=1,
                message="Loading structured sections", artifact=args.out, module_id="assemble_boundaries_v1")
 
+    if args.skip_ai:
+        if not args.stub:
+            raise SystemExit("--skip-ai set but no --stub provided for assemble_boundaries_v1")
+        stub_rows = list(read_jsonl(args.stub))
+        ensure_dir(os.path.dirname(args.out) or ".")
+        save_jsonl(args.out, stub_rows)
+        logger.log("portionize", "done", current=len(stub_rows), total=len(stub_rows),
+                   message="Loaded section_boundaries stubs", artifact=args.out, module_id="assemble_boundaries_v1")
+        print(f"[skip-ai] assemble_boundaries_v1 copied stubs → {args.out}")
+        return
+
     # Load inputs
     with open(structure_path, "r", encoding="utf-8") as f:
         structure_obj = SectionsStructured.model_validate_json(f.read())
@@ -150,6 +170,21 @@ def main():
                message="Assembling boundaries", artifact=args.out, module_id="assemble_boundaries_v1")
 
     boundaries = assemble_boundaries(structure_obj, elements_by_seq, args.confidence_default, run_id=args.run_id)
+
+    # Span widening guard: if a boundary would produce zero-length span, extend end by 1 when possible
+    widened = 0
+    id_to_seq = {elem.id: seq for seq, elem in elements_by_seq.items()}
+    seq_to_elem = {seq: elem for seq, elem in elements_by_seq.items()}
+    for b in boundaries:
+        start_seq = id_to_seq.get(b["start_element_id"])
+        end_seq = id_to_seq.get(b.get("end_element_id")) if b.get("end_element_id") else None
+        if end_seq is not None and start_seq is not None and end_seq == start_seq:
+            next_seq = end_seq + 1
+            if next_seq in seq_to_elem:
+                b["end_element_id"] = seq_to_elem[next_seq].id
+                widened += 1
+    if widened:
+        print(f"[assemble_boundaries] widened {widened} zero-length spans")
 
     errors = validate_boundaries(boundaries, elements_by_seq)
     if errors:

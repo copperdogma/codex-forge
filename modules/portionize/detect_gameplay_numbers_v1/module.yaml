@@ -1,0 +1,4 @@
+module_id: detect_gameplay_numbers_v1
+stage: portionize
+entrypoint: modules/portionize/detect_gameplay_numbers_v1/main.py
+description: Deterministic numeric gameplay header detector using elements + macro hint.

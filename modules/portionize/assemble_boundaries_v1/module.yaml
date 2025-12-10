@@ -10,5 +10,11 @@ param_schema:
     confidence_default:
       type: number
       description: "Fallback confidence to use when structure lacks confidence"
+    skip_ai:
+      type: boolean
+      description: "Skip assembly logic and use stub output instead"
+    stub:
+      type: string
+      description: "Path to section_boundaries stub when skip_ai is true"
   required: []
 notes: "Deterministically assembles section_boundaries.jsonl from sections_structured.json and elements_core.jsonl. Computes end_seq from next start_seq, maps seq→element IDs, enforces ordering/uniqueness, and emits SectionBoundary records for certain sections."

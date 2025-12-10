@@ -1,0 +1,6 @@
+module_id: merge_boundaries_pref_v1
+stage: adapter
+entrypoint: modules/adapter/merge_boundaries_pref_v1/main.py
+input_schema: section_boundary_v1
+output_schema: section_boundary_v1
+notes: "Merge two boundary sets preferring primary; fill gaps with fallback."

@@ -183,8 +183,12 @@ def main():
     parser.add_argument("--boundaries", required=True, help="section_boundaries.jsonl")
     parser.add_argument("--elements", required=True, help="elements_core.jsonl")
     parser.add_argument("--out", required=True, help="boundary_verification.json")
-    parser.add_argument("--sample-count", type=int, default=8, help="Number of AI samples to check")
+    parser.add_argument("--sample-count", "--sample_count", type=int, default=8, dest="sample_count",
+                        help="Number of AI samples to check")
     parser.add_argument("--model", default="gpt-4o-mini", help="OpenAI model for spot checks")
+    parser.add_argument("--skip-ai", "--skip_ai", action="store_true", dest="skip_ai",
+                        help="Skip AI spot checks and optionally copy stub report")
+    parser.add_argument("--stub", help="Stub boundary_verification.json to use when --skip-ai is set")
     parser.add_argument("--progress-file", help="Path to pipeline_events.jsonl")
     parser.add_argument("--state-file", help="Path to pipeline_state.json")
     parser.add_argument("--run-id", help="Run identifier for logging")
@@ -195,6 +199,16 @@ def main():
     logger.log("validate", "running", current=0, total=1,
                message="Loading inputs", artifact=args.out, module_id="verify_boundaries_v1")
 
+    if args.skip_ai and args.stub:
+        with open(args.stub, "r", encoding="utf-8") as f:
+            stub_obj = json.load(f)
+        save_json(args.out, stub_obj)
+        logger.log("validate", "done", current=1, total=1,
+                   message="Loaded boundary verification stub", artifact=args.out,
+                   module_id="verify_boundaries_v1", schema_version="boundary_verification_v1")
+        print(f"[skip-ai] verify_boundaries_v1 copied stub → {args.out}")
+        return
+
     boundaries = [SectionBoundary(**b) for b in read_jsonl(args.boundaries)]
     elements = load_elements(args.elements)
 
@@ -203,9 +217,15 @@ def main():
 
     deterministic_issues = deterministic_checks(boundaries, elements)
 
-    logger.log("validate", "running", current=0, total=1,
-               message=f"Running AI spot checks (n={args.sample_count})", artifact=args.out,
-               module_id="verify_boundaries_v1")
+    if args.skip_ai:
+        args.sample_count = 0
+        logger.log("validate", "running", current=0, total=1,
+                   message="Skipping AI spot checks (--skip-ai)", artifact=args.out,
+                   module_id="verify_boundaries_v1")
+    else:
+        logger.log("validate", "running", current=0, total=1,
+                   message=f"Running AI spot checks (n={args.sample_count})", artifact=args.out,
+                   module_id="verify_boundaries_v1")
 
     ai_results = []
     if args.sample_count > 0:

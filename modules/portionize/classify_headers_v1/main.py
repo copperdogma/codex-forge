@@ -231,16 +231,23 @@ def call_classify_llm(client: OpenAI, model: str, elements: List[Dict[str, Any]]
     calculated_max = min(max_tokens, max(200, num_elements * 50 + 100))  # At least 200, or 50 per element + buffer
     
     try:
-        completion = client.chat.completions.create(
+        kwargs = dict(
             model=model,
             messages=[
                 {"role": "system", "content": SYSTEM_PROMPT},
                 {"role": "user", "content": prompt}
             ],
             response_format={"type": "json_object"},
-            max_tokens=calculated_max,  # Use calculated reasonable limit
-            temperature=0.0,  # Deterministic for reproducibility
         )
+        # gpt-5 requires max_completion_tokens and does not allow temperature=0
+        if model.startswith("gpt-5"):
+            kwargs["max_completion_tokens"] = calculated_max
+            kwargs["temperature"] = 1
+        else:
+            kwargs["max_tokens"] = calculated_max
+            kwargs["temperature"] = 0.0
+
+        completion = client.chat.completions.create(**kwargs)
         
         # Log usage
         usage = getattr(completion, "usage", None)
@@ -363,11 +370,15 @@ def main():
     parser.add_argument("--redundancy", default="forward_backward",
                        choices=["none", "forward_backward", "multiple_calls"],
                        help="Redundancy strategy")
+    parser.add_argument("--skip-ai", "--skip_ai", action="store_true", dest="skip_ai",
+                       help="Skip AI calls and copy stub output instead")
+    parser.add_argument("--stub",
+                       help="Stub header_candidates.jsonl to use when --skip-ai is set")
     parser.add_argument("--progress-file", help="Path to pipeline_events.jsonl")
     parser.add_argument("--state-file", help="Path to pipeline_state.json")
     parser.add_argument("--run-id", help="Run identifier for logging")
     args = parser.parse_args()
-    
+
     logger = ProgressLogger(
         state_path=args.state_file,
         progress_path=args.progress_file,
@@ -375,6 +386,16 @@ def main():
     )
     
     ensure_dir(os.path.dirname(args.out) or ".")
+
+    if args.skip_ai:
+        if not args.stub:
+            raise SystemExit("--skip-ai set but no --stub provided for classify_headers_v1")
+        stub_rows = list(read_jsonl(args.stub))
+        save_jsonl(args.out, stub_rows)
+        print(f"[skip-ai] classify_headers_v1 copied stubs → {args.out}")
+        logger.log("portionize", "done", current=len(stub_rows), total=len(stub_rows),
+                   message="Loaded header_candidates stubs", artifact=args.out, module_id="classify_headers_v1")
+        return
     
     # Read input elements
     logger.log(
@@ -394,6 +415,13 @@ def main():
     
     total_elements = len(elements)
     
+    # Initialize OpenAI client with timeout
+    client = OpenAI(timeout=60.0)  # 60 second timeout per request
+    
+    # Batch elements
+    batches = batch_elements(elements, args.batch_size)
+    total_batches = len(batches)
+
     logger.log(
         "portionize",
         "running",
@@ -401,14 +429,8 @@ def main():
         total=total_elements,
         message=f"Loaded {total_elements} elements, starting classification",
         module_id="classify_headers_v1",
+        extra={"action": "start", "phase": "forward", "total_batches": total_batches},
     )
-    
-    # Initialize OpenAI client with timeout
-    client = OpenAI(timeout=60.0)  # 60 second timeout per request
-    
-    # Batch elements
-    batches = batch_elements(elements, args.batch_size)
-    total_batches = len(batches)
     
     print(f"Processing {total_elements} elements in {total_batches} batches of ~{args.batch_size}")
     print(f"Estimated time: ~{total_batches * 6} seconds for forward pass", flush=True)
@@ -424,6 +446,13 @@ def main():
             total=total_elements,
             message=f"Forward pass: batch {batch_idx + 1}/{total_batches}",
             module_id="classify_headers_v1",
+            extra={
+                "action": "start",
+                "phase": "forward",
+                "batch": batch_idx + 1,
+                "total_batches": total_batches,
+                "batch_size": len(batch),
+            },
         )
         
         import time
@@ -440,6 +469,23 @@ def main():
         forward_results.extend(batch_results)
         
         print(f"  ✓ Batch {batch_idx + 1}/{total_batches}: classified {len(batch_results)} elements in {elapsed:.1f}s", flush=True)
+        logger.log(
+            "portionize",
+            "running",
+            current=(batch_idx + 1) * args.batch_size,
+            total=total_elements,
+            message=f"Forward batch {batch_idx + 1}/{total_batches} done",
+            module_id="classify_headers_v1",
+            extra={
+                "action": "finish",
+                "phase": "forward",
+                "batch": batch_idx + 1,
+                "total_batches": total_batches,
+                "batch_size": len(batch),
+                "output_count": len(batch_results),
+                "duration_ms": int(elapsed * 1000),
+            },
+        )
     
     # Backward pass (if redundancy enabled)
     backward_results = []
@@ -456,8 +502,17 @@ def main():
                 total=total_elements,
                 message=f"Backward pass: batch {batch_idx + 1}/{total_batches}",
                 module_id="classify_headers_v1",
+                extra={
+                    "action": "start",
+                    "phase": "backward",
+                    "batch": batch_idx + 1,
+                    "total_batches": total_batches,
+                    "batch_size": len(batch),
+                },
             )
             
+            import time
+            start_time = time.time()
             batch_results = call_classify_llm(
                 client, args.model, batch, CYOA_PROFILE, args.max_tokens
             )
@@ -469,8 +524,25 @@ def main():
             # Reverse results back to original order
             batch_results_reversed = list(reversed(batch_results))
             backward_results.extend(batch_results_reversed)
-            
+            elapsed = time.time() - start_time
             print(f"  Backward batch {batch_idx + 1}/{total_batches}: classified {len(batch_results)} elements")
+            logger.log(
+                "portionize",
+                "running",
+                current=total_elements,
+                total=total_elements,
+                message=f"Backward batch {batch_idx + 1}/{total_batches} done",
+                module_id="classify_headers_v1",
+                extra={
+                    "action": "finish",
+                    "phase": "backward",
+                    "batch": batch_idx + 1,
+                    "total_batches": total_batches,
+                    "batch_size": len(batch),
+                    "output_count": len(batch_results),
+                    "duration_ms": int(elapsed * 1000),
+                },
+            )
     else:
         # No redundancy - use forward results as-is
         backward_results = forward_results

@@ -491,6 +491,7 @@ class ValidationReport(BaseModel):
     is_valid: bool  # True if no critical errors
     warnings: List[str] = Field(default_factory=list)
     errors: List[str] = Field(default_factory=list)
+    forensics: Optional[Dict[str, Any]] = None
 
 
 # ────────────────────────────────────────────────────────────────

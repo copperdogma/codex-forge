@@ -334,7 +334,11 @@ def build_plan(recipe: Dict[str, Any], registry: Dict[str, Any]) -> Dict[str, An
             needs = [prior_id] if prior_id else []
         needs = [n for n in needs if n]  # drop Nones
         inputs = conf.get("inputs", {})
-        params = _merge_params(entry.get("default_params", {}), conf.get("params") or {}, entry.get("param_schema"))
+        stage_overrides = (recipe.get("stage_params") or {}).get(stage_id, {})
+        merged_params = {}
+        merged_params.update(conf.get("params") or {})
+        merged_params.update(stage_overrides)
+        params = _merge_params(entry.get("default_params", {}), merged_params, entry.get("param_schema"))
         _validate_params(params, entry.get("param_schema"), stage_id, module_id)
         artifact_name = conf.get("out") or _artifact_name_for_stage(stage_id, stage_type, outputs_map)
         description = conf.get("description") or entry.get("notes") or entry.get("description")
@@ -461,7 +465,7 @@ def update_state(state_path: str, progress_path: str, stage_name: str, status: s
 
 def build_command(entrypoint: str, params: Dict[str, Any], stage_conf: Dict[str, Any], run_dir: str,
                   recipe_input: Dict[str, Any], state_path: str, progress_path: str, run_id: str,
-                  artifact_inputs: Dict[str, str]) -> (str, list, str):
+                  artifact_inputs: Dict[str, str], artifact_index: Dict[str, Any] = None) -> (str, list, str):
     """
     Returns (artifact_path, cmd_list, cwd)
     """
@@ -489,17 +493,32 @@ def build_command(entrypoint: str, params: Dict[str, Any], stage_conf: Dict[str,
             cmd += ["--images", recipe_input["images"]]; flags_added.add("--images")
         cmd += ["--outdir", run_dir]; flags_added.add("--outdir")
     elif stage_conf["stage"] == "clean":
-        pages_path = artifact_inputs.get("pages") or artifact_inputs.get("input")
-        if not pages_path:
-            raise SystemExit(f"Stage {stage_conf['id']} missing pages input")
-        cmd += ["--pages", pages_path]
+        portions_path = artifact_inputs.get("portions")
+        if portions_path:
+            cmd += ["--portions", portions_path]
+            flags_added.add("--portions")
+        else:
+            pages_path = artifact_inputs.get("pages") or artifact_inputs.get("input")
+            if not pages_path:
+                raise SystemExit(f"Stage {stage_conf['id']} missing pages/portions input")
+            cmd += ["--pages", pages_path]
+            flags_added.add("--pages")
         cmd += ["--out", artifact_path]
-        flags_added.update({"--pages", "--out"})
+        flags_added.add("--out")
     elif stage_conf["stage"] == "portionize":
-        pages_path = artifact_inputs.get("pages") or artifact_inputs.get("input")
+        # Handle various input names (pages, elements, input)
+        pages_path = artifact_inputs.get("pages") or artifact_inputs.get("elements") or artifact_inputs.get("input")
         if not pages_path:
-            raise SystemExit(f"Stage {stage_conf['id']} missing pages input")
+            raise SystemExit(f"Stage {stage_conf['id']} missing pages/elements input")
+        # Use --pages for compatibility (coarse_segment_v1 accepts both --pages and --elements)
         cmd += ["--pages", pages_path]
+        if "boundaries" in artifact_inputs:
+            cmd += ["--boundaries", artifact_inputs["boundaries"]]
+        # Handle coarse-segments for fine_segment_frontmatter_v1
+        if stage_conf["module"] == "fine_segment_frontmatter_v1" and artifact_index:
+            coarse_segments_path = artifact_index.get("coarse_segment", {}).get("path")
+            if coarse_segments_path:
+                cmd += ["--coarse-segments", coarse_segments_path]
         cmd += ["--out", artifact_path]
         flags_added.update({"--pages", "--out"})
     elif stage_conf["stage"] == "adapter":
@@ -511,6 +530,14 @@ def build_command(entrypoint: str, params: Dict[str, Any], stage_conf: Dict[str,
             if params.get("schema_version"):
                 cmd += ["--schema-version", str(params["schema_version"])]
             flags_added.update({"--stub", "--out"})
+        elif stage_conf["module"] == "merge_boundaries_pref_v1":
+            inputs_list = artifact_inputs.get("inputs")
+            if not inputs_list or len(inputs_list) < 2:
+                raise SystemExit(f"Stage {stage_conf['id']} missing primary/fallback inputs")
+            cmd += ["--inputs", *inputs_list, "--out", artifact_path]
+            if artifact_inputs.get("elements_core"):
+                cmd += ["--elements-core", artifact_inputs["elements_core"]]
+            flags_added.update({"--inputs", "--out"})
         else:
             input_paths = artifact_inputs.get("inputs")
             if not input_paths:
@@ -568,6 +595,28 @@ def build_command(entrypoint: str, params: Dict[str, Any], stage_conf: Dict[str,
             raise SystemExit(f"Stage {stage_conf['id']} missing enrich inputs (pages/portions)")
         cmd += ["--pages", pages_path, "--portions", portions_path, "--out", artifact_path]
         flags_added.update({"--pages", "--portions", "--out"})
+    elif stage_conf["stage"] == "validate":
+        # Validation stages typically want input artifact(s) and explicit out path.
+        gamebook_path = artifact_inputs.get("gamebook") or artifact_inputs.get("input")
+        if gamebook_path:
+            cmd += ["--gamebook", gamebook_path]; flags_added.add("--gamebook")
+        boundaries_path = artifact_inputs.get("boundaries")
+        if boundaries_path:
+            cmd += ["--boundaries", boundaries_path]; flags_added.add("--boundaries")
+        elements_path = artifact_inputs.get("elements")
+        if elements_path:
+            cmd += ["--elements", elements_path]; flags_added.add("--elements")
+        # Only validate_ff_engine_v2 supports forensics + extra inputs
+        if stage_conf["module"] == "validate_ff_engine_v2":
+            elements_core_path = artifact_inputs.get("elements_core")
+            if elements_core_path:
+                cmd += ["--elements-core", elements_core_path]; flags_added.add("--elements-core")
+            portions_path = artifact_inputs.get("portions")
+            if portions_path:
+                cmd += ["--portions", portions_path]; flags_added.add("--portions")
+            cmd += ["--forensics"]; flags_added.add("--forensics")
+        cmd += ["--out", artifact_path]
+        flags_added.add("--out")
 
     # Additional params from recipe (skip flags already added)
     # Additional params from recipe (skip flags already added)
@@ -599,14 +648,19 @@ def stamp_artifact(artifact_path: str, schema_name: str, module_id: str, run_id:
     model_cls = SCHEMA_MAP[schema_name]
     rows = []
     for row in read_jsonl(artifact_path):
-        row.setdefault("schema_version", schema_name)
-        if not row.get("module_id"):
-            row["module_id"] = module_id
-        if not row.get("run_id"):
-            row["run_id"] = run_id
-        if not row.get("created_at"):
-            row["created_at"] = datetime.utcnow().isoformat() + "Z"
-        rows.append(model_cls(**row).dict())
+        if isinstance(row, dict) and row.get("error"):
+            continue  # skip invalid rows
+        try:
+            row.setdefault("schema_version", schema_name)
+            if not row.get("module_id"):
+                row["module_id"] = module_id
+            if not row.get("run_id"):
+                row["run_id"] = run_id
+            if not row.get("created_at"):
+                row["created_at"] = datetime.utcnow().isoformat() + "Z"
+            rows.append(model_cls(**row).dict())
+        except Exception as e:
+            print(f"[stamp-skip] skipping row due to validation error: {e}")
     save_jsonl(artifact_path, rows)
     print(f"[stamp] {artifact_path} stamped with {schema_name} ({len(rows)} rows)")
 
@@ -731,7 +785,7 @@ def main():
     parser.add_argument("--dry-run", action="store_true", help="Print commands without running")
     parser.add_argument("--skip-done", action="store_true", help="Skip stages marked done in pipeline_state.json")
     parser.add_argument("--no-validate", action="store_true", help="Skip validation step after stamping")
-    parser.add_argument("--force", action="store_true", help="Run stages even if artifacts already exist (overwrites)")
+    parser.add_argument("--force", action="store_true", help="Run stages even if artifacts already exist (overwrites). Note: Expensive stages (OCR/extract) are protected from force-rerun; use --skip-done --start-from <stage> instead.")
     parser.add_argument("--mock", action="store_true", help="Use mock implementations for LLM stages to avoid API calls")
     parser.add_argument("--dump-plan", action="store_true", help="Print resolved DAG plan and exit")
     parser.add_argument("--instrument", action="store_true", help="Enable instrumentation (timing/cost)")
@@ -958,6 +1012,26 @@ def main():
         stage_wall_start = time.perf_counter()
         stage_cpu_start = _get_cpu_times()
 
+        # Guard: Prevent --force from re-running expensive stages unnecessarily
+        # Expensive stages: extract (OCR), escalate_vision (GPT-4V), intake (OCR ensemble)
+        if args.force and not args.dry_run and os.path.exists(state_path):
+            try:
+                with open(state_path, "r", encoding="utf-8") as f:
+                    state = json.load(f)
+                st = state.get("stages", {}).get(stage_id)
+                if st and st.get("status") == "done" and os.path.exists(st.get("artifact", "")):
+                    expensive_stages = {"extract", "intake", "escalate_vision"}
+                    if stage in expensive_stages or any(exp in stage_id.lower() for exp in ["ocr", "extract", "escalate", "intake"]):
+                        print(f"[force-guard] Skipping expensive stage {stage_id} (already done). Use --skip-done --start-from <stage> to resume from a specific stage instead.")
+                        logger.log(stage_id, "skipped", artifact=st.get("artifact"), module_id=module_id,
+                                   message="Skipped due to force-guard (expensive stage already done)", stage_description=stage_description)
+                        artifact_index[stage_id] = {"path": st.get("artifact"), "schema": st.get("schema_version")}
+                        record_stage_instrumentation(stage_id, module_id, "skipped", st.get("artifact"), st.get("schema_version"),
+                                                     stage_started_at, stage_wall_start, stage_cpu_start)
+                        continue
+            except Exception:
+                pass
+
         # Skip if already done and skip-done requested (state + artifact exists)
         if args.skip_done and os.path.exists(state_path):
             try:
@@ -986,7 +1060,7 @@ def main():
         # Input resolution
         artifact_inputs: Dict[str, str] = {}
         needs = node.get("needs", [])
-        if stage in {"clean", "portionize", "consensus", "dedupe", "normalize", "resolve", "build", "enrich", "adapter", "export", "app"}:
+        if stage in {"clean", "portionize", "consensus", "dedupe", "normalize", "resolve", "build", "enrich", "adapter", "export", "app", "validate"}:
             # adapters fall-through below
             if stage == "build":
                 inputs_map = node.get("inputs", {}) or {}
@@ -1068,6 +1142,30 @@ def main():
                         producer_schema = artifact_index[dep].get("schema")
                         if expected_schema and producer_schema and expected_schema != producer_schema:
                             raise SystemExit(f"Schema mismatch: {stage_id} expects {expected_schema} got {producer_schema} from {dep}")
+                if node.get("module") == "merge_boundaries_pref_v1":
+                    # Provide elements_core for filtering/sorting if available
+                    if "reduce_ir" in artifact_index:
+                        artifact_inputs["elements_core"] = artifact_index["reduce_ir"]["path"]
+            elif stage == "validate":
+                inputs_map = node.get("inputs", {}) or {}
+                for key, origin in inputs_map.items():
+                    if origin in artifact_index:
+                        artifact_inputs[key] = artifact_index[origin]["path"]
+                    else:
+                        artifact_inputs[key] = origin
+                # Provide defaults if not explicitly mapped
+                if "boundaries" not in artifact_inputs:
+                    if "assemble_boundaries" in artifact_index:
+                        artifact_inputs["boundaries"] = artifact_index["assemble_boundaries"]["path"]
+                if "elements" not in artifact_inputs:
+                    if "intake" in artifact_index:
+                        artifact_inputs["elements"] = artifact_index["intake"]["path"]
+                if "elements_core" not in artifact_inputs:
+                    if "reduce_ir" in artifact_index:
+                        artifact_inputs["elements_core"] = artifact_index["reduce_ir"]["path"]
+                if "portions" not in artifact_inputs:
+                    if "ai_extract" in artifact_index:
+                        artifact_inputs["portions"] = artifact_index["ai_extract"]["path"]
             else:
                 inputs_map = node.get("inputs", {}) or {}
                 origin = inputs_map.get("pages") or (needs[0] if needs else None)
@@ -1075,6 +1173,11 @@ def main():
                     raise SystemExit(f"Stage {stage_id} missing upstream input")
                 key = "pages" if stage in {"clean", "portionize"} else "input"
                 artifact_inputs[key] = artifact_index[origin]["path"] if origin in artifact_index else origin
+                # Capture any additional named inputs (e.g., boundaries) so modules can access them.
+                for extra_key, extra_origin in inputs_map.items():
+                    if extra_key == "pages":
+                        continue
+                    artifact_inputs[extra_key] = artifact_index.get(extra_origin, {}).get("path", extra_origin)
                 producer_schema = artifact_index[origin].get("schema") if origin in artifact_index else None
                 expected_schema = node.get("input_schema")
                 if expected_schema and producer_schema and expected_schema != producer_schema:
@@ -1082,7 +1185,7 @@ def main():
 
         artifact_path, cmd, cwd = build_command(entrypoint, node["params"], node, run_dir,
                                                 recipe.get("input", {}), state_path, progress_path, run_id,
-                                                artifact_inputs)
+                                                artifact_inputs, artifact_index)
 
         if args.dry_run:
             print(f"[dry-run] {stage_id} -> {' '.join(cmd)}")

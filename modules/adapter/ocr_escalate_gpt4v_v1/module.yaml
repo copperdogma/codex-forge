@@ -1,11 +1,12 @@
-module_id: escalate_gpt4v_v1
+module_id: ocr_escalate_gpt4v_v1
 stage: adapter
-entrypoint: modules/adapter/escalate_gpt4v_v1/main.py
+entrypoint: modules/adapter/ocr_escalate_gpt4v_v1/main.py
 input_schema: pagelines_v1
 output_schema: adapter_out
 default_params:
   threshold: 0.8
   max_pages: 10
+  budget_pages: null
   model: gpt-4.1
   prompt_file: prompts/ocr_page_gpt4v.md
   dry_run: false
@@ -24,6 +25,9 @@ param_schema:
       minimum: 0
       maximum: 1
     max_pages:
+      type: integer
+      minimum: 1
+    budget_pages:
       type: integer
       minimum: 1
     model:
