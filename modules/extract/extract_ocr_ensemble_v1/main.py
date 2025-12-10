@@ -227,6 +227,187 @@ def compute_enhanced_quality_metrics(lines: List[str], by_engine: Dict[str, Any]
     }
 
 
+def detect_form_page(lines: List[str], avg_line_len: float = None) -> Dict[str, Any]:
+    """
+    Detect if a page is a form-like page (Adventure Sheet, character sheet, etc.).
+    Form pages should NOT have column splitting applied.
+
+    Characteristics of form pages:
+    - High density of "=" characters (fill-in fields)
+    - Very short average line length (< 10 chars)
+    - Many lines with just labels/field names
+    - Repeated structural patterns
+
+    Returns:
+        Dict with is_form (bool), confidence (0-1), and reasons (list of str)
+    """
+    if not lines:
+        return {"is_form": False, "confidence": 0.0, "reasons": []}
+
+    non_empty_lines = [l.strip() for l in lines if l.strip()]
+    if not non_empty_lines:
+        return {"is_form": False, "confidence": 0.0, "reasons": []}
+
+    reasons = []
+    score = 0.0
+
+    # Calculate average line length if not provided
+    if avg_line_len is None:
+        avg_line_len = sum(len(l) for l in non_empty_lines) / len(non_empty_lines)
+
+    # Check 1: Very short average line length (< 8 chars suggests form)
+    if avg_line_len < 8:
+        score += 0.4
+        reasons.append(f"very_short_lines (avg {avg_line_len:.1f} chars)")
+    elif avg_line_len < 12:
+        score += 0.2
+        reasons.append(f"short_lines (avg {avg_line_len:.1f} chars)")
+
+    # Check 2: High density of "=" characters (form fields)
+    equals_count = sum(1 for l in non_empty_lines if '=' in l)
+    equals_ratio = equals_count / len(non_empty_lines)
+    if equals_ratio > 0.3:
+        score += 0.3
+        reasons.append(f"equals_pattern ({equals_ratio:.0%} of lines)")
+
+    # Check 3: Many all-caps labels (form headers)
+    uppercase_lines = sum(1 for l in non_empty_lines if l.isupper() and len(l) < 20)
+    uppercase_ratio = uppercase_lines / len(non_empty_lines)
+    if uppercase_ratio > 0.2:
+        score += 0.2
+        reasons.append(f"uppercase_labels ({uppercase_ratio:.0%} of lines)")
+
+    # Check 4: Keywords that indicate forms
+    form_keywords = ['SKILL', 'STAMINA', 'LUCK', 'EQUIPMENT', 'ITEMS', 'GOLD',
+                     'PROVISIONS', 'JEWELS', 'POTIONS', 'ADVENTURE', 'SHEET',
+                     'MONSTER', 'ENCOUNTER', 'BOXES', 'CARRIED']
+    text_upper = ' '.join(non_empty_lines).upper()
+    found_keywords = [kw for kw in form_keywords if kw in text_upper]
+    if len(found_keywords) >= 3:
+        score += 0.3
+        reasons.append(f"form_keywords: {', '.join(found_keywords[:5])}")
+    elif len(found_keywords) >= 1:
+        score += 0.1
+        reasons.append(f"form_keywords: {', '.join(found_keywords[:3])}")
+
+    # Check 5: Many lines with just numbers or very short words
+    fragment_lines = sum(1 for l in non_empty_lines if len(l) < 5 and not l.isdigit())
+    fragment_ratio = fragment_lines / len(non_empty_lines)
+    if fragment_ratio > 0.4:
+        score += 0.2
+        reasons.append(f"fragment_lines ({fragment_ratio:.0%})")
+
+    # Normalize score to 0-1
+    confidence = min(score, 1.0)
+    is_form = confidence >= 0.5
+
+    return {
+        "is_form": is_form,
+        "confidence": round(confidence, 3),
+        "reasons": reasons
+    }
+
+
+def detect_sentence_fragmentation(text: str) -> Dict[str, Any]:
+    """
+    Detect if text shows sentence fragmentation (sentences split mid-word/phrase).
+    This is a key indicator of bad column splitting.
+
+    Fragmentation indicators:
+    - Lines ending with incomplete words (< 3 chars, not punctuation)
+    - Lines starting with lowercase (mid-sentence continuation)
+    - Very high ratio of lines not ending with punctuation
+    - Average word length is unusually short
+
+    Returns:
+        Dict with is_fragmented (bool), confidence (0-1), and indicators (list)
+    """
+    if not text or not text.strip():
+        return {"is_fragmented": False, "confidence": 0.0, "indicators": []}
+
+    lines = [l.strip() for l in text.split('\n') if l.strip()]
+    if len(lines) < 3:
+        return {"is_fragmented": False, "confidence": 0.0, "indicators": []}
+
+    indicators = []
+    score = 0.0
+
+    # Common short words that are NOT fragments
+    common_short_words = {
+        'a', 'i', 'to', 'of', 'in', 'it', 'is', 'be', 'as', 'at', 'he', 'we',
+        'so', 'do', 'if', 'my', 'me', 'up', 'go', 'no', 'us', 'am', 'an', 'or',
+        'by', 'on', 'the', 'and', 'for', 'are', 'but', 'not', 'you', 'all',
+        'can', 'had', 'her', 'was', 'one', 'our', 'out', 'day', 'get', 'has',
+        'him', 'his', 'how', 'its', 'may', 'new', 'now', 'old', 'see', 'two',
+        'way', 'who', 'boy', 'did', 'own', 'say', 'she', 'too', 'use'
+    }
+
+    # Check 1: Lines ending with short incomplete words (fragments)
+    lines_with_incomplete_ending = 0
+    for line in lines:
+        words = line.split()
+        if words:
+            last_word = words[-1].strip('.,!?;:()[]"\'').lower()
+            # Short ending word that's not common and not a number
+            if (len(last_word) < 3 and
+                last_word not in common_short_words and
+                last_word.isalpha() and
+                not line.rstrip().endswith(('.', '!', '?', ':', ';'))):
+                lines_with_incomplete_ending += 1
+
+    incomplete_ratio = lines_with_incomplete_ending / len(lines)
+    if incomplete_ratio > 0.15:
+        score += 0.4
+        indicators.append(f"incomplete_endings: {incomplete_ratio:.0%}")
+    elif incomplete_ratio > 0.08:
+        score += 0.2
+        indicators.append(f"some_incomplete_endings: {incomplete_ratio:.0%}")
+
+    # Check 2: Lines starting with lowercase (mid-sentence)
+    # Skip first line and lines that are clearly headers/titles
+    lowercase_starts = 0
+    for i, line in enumerate(lines[1:], 1):
+        first_char = line[0] if line else ''
+        prev_line = lines[i-1] if i > 0 else ''
+        # If previous line ended mid-sentence and this starts with lowercase
+        if (first_char.islower() and
+            prev_line and
+            not prev_line.rstrip().endswith(('.', '!', '?', ':', ';'))):
+            lowercase_starts += 1
+
+    lowercase_ratio = lowercase_starts / max(1, len(lines) - 1)
+    if lowercase_ratio > 0.2:
+        score += 0.3
+        indicators.append(f"mid_sentence_starts: {lowercase_ratio:.0%}")
+
+    # Check 3: Very few lines end with proper punctuation
+    lines_with_punct = sum(1 for l in lines if l.rstrip()[-1:] in '.!?')
+    punct_ratio = lines_with_punct / len(lines)
+    if punct_ratio < 0.1 and len(lines) > 5:
+        score += 0.2
+        indicators.append(f"low_punctuation: {punct_ratio:.0%}")
+
+    # Check 4: Average word length is unusually short (fragmented words)
+    all_words = ' '.join(lines).split()
+    if all_words:
+        avg_word_len = sum(len(w.strip('.,!?;:()[]"\'')) for w in all_words) / len(all_words)
+        if avg_word_len < 3.0:
+            score += 0.3
+            indicators.append(f"short_avg_word_len: {avg_word_len:.1f}")
+        elif avg_word_len < 3.5:
+            score += 0.15
+            indicators.append(f"low_avg_word_len: {avg_word_len:.1f}")
+
+    confidence = min(score, 1.0)
+    is_fragmented = confidence >= 0.4
+
+    return {
+        "is_fragmented": is_fragmented,
+        "confidence": round(confidence, 3),
+        "indicators": indicators
+    }
+
+
 def infer_columns_from_lines(raw_lines, min_lines=6, min_gap=0.12, min_side=6):
     """
     Gap-based column detection using line bounding boxes.
@@ -296,16 +477,20 @@ def vote_lines_by_engine(primary_lines, alt_lines):
 def check_column_split_quality(image, spans, apple_lines_meta=None, tesseract_cols=None):
     """
     Check if column splits fragment words or create incomplete sentences.
-    Returns True if split quality is good, False if it fragments text.
-    
-    Checks:
-    - If Apple OCR lines exist, check if words are split across column boundaries
-    - If Tesseract column text exists, check for incomplete words/sentences at boundaries
-    - Look for very short lines at column boundaries (likely fragmented)
+    Returns tuple (is_good_quality: bool, rejection_reason: str or None).
+
+    Enhanced checks for:
+    - Sentence boundary fragmentation (new) - uses detect_sentence_fragmentation()
+    - Word splitting across column boundaries
+    - Very short lines at column boundaries
+    - Form-like page detection (Adventure Sheets) - uses detect_form_page()
+    - Per-column fragmentation analysis
     """
     if len(spans) <= 1:
-        return True  # Single column is always fine
-    
+        return True, None  # Single column is always fine
+
+    rejection_reasons = []
+
     # If we have Apple OCR lines with bboxes, check for word fragmentation
     if apple_lines_meta and isinstance(apple_lines_meta, list) and len(apple_lines_meta) > 0:
         if isinstance(apple_lines_meta[0], dict) and 'bbox' in apple_lines_meta[0]:
@@ -323,29 +508,45 @@ def check_column_split_quality(image, spans, apple_lines_meta=None, tesseract_co
                             text = ln.get('text', '').strip()
                             if text:
                                 boundary_lines.append(text)
-                
+
                 # If we have many very short lines at boundary, likely fragmented
                 if len(boundary_lines) > 0:
                     short_lines = sum(1 for ln in boundary_lines if len(ln) < 5)
                     if short_lines > len(boundary_lines) * 0.5:  # More than 50% are very short
-                        return False
-    
-    # Fallback: Check Tesseract column text for fragmentation patterns
+                        rejection_reasons.append("apple_boundary_short_lines")
+
+    # Check Tesseract column text for fragmentation patterns
     if tesseract_cols and isinstance(tesseract_cols, list) and len(tesseract_cols) >= 2:
-        # Combine all column text and check for fragmentation patterns
-        combined_text = ' '.join(tesseract_cols)
+        # NEW: Check if this looks like a form page - if so, reject column mode
+        combined_text = '\n'.join(tesseract_cols)
+        combined_lines = combined_text.split('\n')
+        form_check = detect_form_page(combined_lines)
+        if form_check["is_form"]:
+            rejection_reasons.append(f"form_page_detected: {', '.join(form_check['reasons'][:2])}")
+            return False, "; ".join(rejection_reasons)
+
+        # NEW: Use enhanced sentence fragmentation detection
+        for col_idx, col_text in enumerate(tesseract_cols):
+            frag_check = detect_sentence_fragmentation(col_text)
+            if frag_check["is_fragmented"] and frag_check["confidence"] >= 0.5:
+                rejection_reasons.append(f"column_{col_idx}_fragmented: {', '.join(frag_check['indicators'][:2])}")
+
+        # If any column is fragmented, reject
+        if any("fragmented" in r for r in rejection_reasons):
+            return False, "; ".join(rejection_reasons)
+
+        # Legacy checks with stricter thresholds
         words = combined_text.split()
-        
-        # Check for many very short words that aren't common short words
-        # Common short words: a, I, to, of, in, it, is, be, as, at, he, we, so, do, if, my, me, up, go, no, us, am, an, or, by
+
+        # Common short words that are NOT fragments
         common_short_words = {'a', 'i', 'to', 'of', 'in', 'it', 'is', 'be', 'as', 'at', 'he', 'we', 'so', 'do', 'if', 'my', 'me', 'up', 'go', 'no', 'us', 'am', 'an', 'or', 'by', 'on', 'the'}
-        
+
         very_short_words = []
         for word in words:
             word_clean = word.strip('.,!?;:()[]"\'').lower()
             if len(word_clean) < 3 and word_clean not in common_short_words and word_clean.isalpha():
                 very_short_words.append(word_clean)
-        
+
         # Check for lines ending with very short words (indicates word splitting)
         lines = combined_text.split('\n')
         lines_ending_short = 0
@@ -355,7 +556,7 @@ def check_column_split_quality(image, spans, apple_lines_meta=None, tesseract_co
                 last_word = line_words[-1].strip('.,!?;:()[]"\'').lower()
                 if len(last_word) < 3 and last_word not in common_short_words and last_word.isalpha():
                     lines_ending_short += 1
-        
+
         # Check for pairs of very short words that could be fragments (e.g., "ha them" -> "have")
         fragment_pairs = 0
         for i in range(len(words) - 1):
@@ -367,43 +568,46 @@ def check_column_split_quality(image, spans, apple_lines_meta=None, tesseract_co
                 combined = word1_clean + word2_clean
                 if len(combined) >= 4 and combined.isalpha():
                     fragment_pairs += 1
-        
-        # If >5% of words are very short fragments OR >10% of lines end with fragments OR >3 fragment pairs, likely fragmented
+
+        # STRICTER thresholds: >3% of words are fragments OR >8% of lines end with fragments OR >2 fragment pairs
         if len(words) > 0:
             fragment_ratio = len(very_short_words) / len(words)
-            lines_ratio = lines_ending_short / max(1, len([l for l in lines if l.strip()]))
-            
-            if fragment_ratio > 0.05 or lines_ratio > 0.10 or fragment_pairs > 3:
-                return False  # Text is fragmented
-        
+            non_empty_lines = [l for l in lines if l.strip()]
+            lines_ratio = lines_ending_short / max(1, len(non_empty_lines))
+
+            if fragment_ratio > 0.03:  # Was 0.05, now stricter
+                rejection_reasons.append(f"high_fragment_ratio: {fragment_ratio:.1%}")
+            if lines_ratio > 0.08:  # Was 0.10, now stricter
+                rejection_reasons.append(f"high_lines_ending_short: {lines_ratio:.1%}")
+            if fragment_pairs > 2:  # Was 3, now stricter
+                rejection_reasons.append(f"fragment_pairs: {fragment_pairs}")
+
         # Check for incomplete words at column boundaries
-        import re
         for i in range(len(tesseract_cols) - 1):
             col1_text = tesseract_cols[i].strip()
             col2_text = tesseract_cols[i + 1].strip()
-            
+
             # Check if col1 ends with very short word (likely fragment)
             col1_words = col1_text.split()
             col2_words = col2_text.split()
-            
+
             if col1_words and col2_words:
                 # Check if last word of col1 is very short (< 3 chars) and first word of col2 is also short
                 last_word_col1 = col1_words[-1].strip('.,!?;:')
                 first_word_col2 = col2_words[0].strip('.,!?;:')
-                
+
                 # If both are very short, likely a word was split
                 if len(last_word_col1) < 3 and len(first_word_col2) < 3:
                     # Check if they could form a valid word together
                     combined = last_word_col1 + first_word_col2
                     if len(combined) >= 4 and combined.isalpha():  # Could be a real word
-                        return False  # Word likely split across columns
-                
+                        rejection_reasons.append("word_split_at_boundary")
+
                 # Check for incomplete sentences (col1 ends mid-sentence, col2 starts mid-sentence)
-                # Pattern: col1 doesn't end with punctuation, col2 doesn't start with capital
                 if col1_text and col2_text:
                     col1_ends_punct = col1_text[-1] in '.!?'
                     col2_starts_cap = col2_text[0].isupper() or col2_text[0].isdigit()
-                    
+
                     # If col1 doesn't end properly and col2 doesn't start properly, likely fragmented
                     if not col1_ends_punct and not col2_starts_cap:
                         # Check if there are many very short lines
@@ -411,11 +615,16 @@ def check_column_split_quality(image, spans, apple_lines_meta=None, tesseract_co
                         col2_lines = [l.strip() for l in col2_text.split('\n') if l.strip()]
                         short_col1 = sum(1 for l in col1_lines if len(l) < 5)
                         short_col2 = sum(1 for l in col2_lines if len(l) < 5)
-                        
-                        if (short_col1 > len(col1_lines) * 0.3) or (short_col2 > len(col2_lines) * 0.3):
-                            return False  # Too many short lines, likely fragmented
-    
-    return True  # Pass quality check
+
+                        # STRICTER: 25% threshold (was 30%)
+                        if (len(col1_lines) > 0 and short_col1 > len(col1_lines) * 0.25) or \
+                           (len(col2_lines) > 0 and short_col2 > len(col2_lines) * 0.25):
+                            rejection_reasons.append("short_lines_at_boundary")
+
+    # Return result
+    if rejection_reasons:
+        return False, "; ".join(rejection_reasons)
+    return True, None  # Pass quality check
 
 
 def verify_columns_with_projection(image, spans, min_gap_frac=0.05, min_width=10, apple_lines_meta=None, tesseract_cols=None):
@@ -457,10 +666,11 @@ def verify_columns_with_projection(image, spans, min_gap_frac=0.05, min_width=10
     
     # Check if column splits fragment words (if we have OCR text to check)
     if tesseract_cols:
-        if not check_column_split_quality(image, spans, apple_lines_meta, tesseract_cols):
+        is_good, rejection_reason = check_column_split_quality(image, spans, apple_lines_meta, tesseract_cols)
+        if not is_good:
             # Column split fragments text, reject it
             return [(0.0, 1.0)]
-    
+
     return spans
 
 
@@ -922,7 +1132,7 @@ def main():
                 import numpy as np
                 w, h = img_obj.size
                 col_fusions = []
-                for span in col_spans:
+                for col_idx, span in enumerate(col_spans):
                     x0 = int(span[0] * w)
                     x1 = int(span[1] * w)
                     crop = img_obj.crop((x0, 0, x1, h))
@@ -935,7 +1145,20 @@ def main():
                     col_lines_this = split_lines(t_text)
                     alt_lines_col = []
                     if use_apple and apple_lines_meta:
-                        alt_lines_col = [ln["text"] for ln in apple_lines_meta if span[0] <= ln.get("bbox", [0, 0, 0, 0])[0] < span[1]]
+                        # Filter Apple OCR lines by column index (preferred) or bbox (fallback)
+                        # Apple OCR provides 'column' field when column detection is enabled
+                        alt_lines_col = []
+                        for ln in apple_lines_meta:
+                            # Prefer column field if available
+                            if "column" in ln:
+                                if ln["column"] == col_idx:
+                                    alt_lines_col.append(ln["text"])
+                            else:
+                                # Fallback to bbox matching (center of line within span)
+                                bbox = ln.get("bbox", [0, 0, 1, 1])
+                                line_center = (bbox[0] + bbox[2]) / 2.0
+                                if span[0] <= line_center < span[1]:
+                                    alt_lines_col.append(ln["text"])
                     fused_col, fusion_srcs_col, dist_col = align_and_vote(col_lines_this, alt_lines_col)
                     col_fusions.append((fused_col, fusion_srcs_col, dist_col))
                     col_lines.extend(fused_col)
@@ -955,60 +1178,13 @@ def main():
                 # Re-check column quality now that we have OCR text
                 # If columns fragment text, reject and re-OCR as single column
                 tesseract_cols_text = part_by_engine.get("tesseract_cols", [])
-                if not check_column_split_quality(img_obj, col_spans, apple_lines_meta=apple_lines_meta, tesseract_cols=tesseract_cols_text):
+                is_good_quality, rejection_reason = check_column_split_quality(img_obj, col_spans, apple_lines_meta=apple_lines_meta, tesseract_cols=tesseract_cols_text)
+                if not is_good_quality:
                     # Column split fragments text - reject it and re-OCR as single column
-                    logger.log("extract", "running", 
-                              message=f"Page {page_key}: Column split rejected (fragments text), re-OCRing as single column")
-                    # Re-OCR as single column
-                    text_single, part_by_engine_single, part_source_single = call_betterocr(
-                        img_path_part,
-                        args.engines,
-                        args.lang,
-                        use_llm=args.use_llm,
-                        llm_model=args.llm_model,
-                        allow_fallback=allow_fallback,
-                        psm=args.psm,
-                        oem=args.oem,
-                    )
-                    fused_before_post = split_lines(text_single)
-                    if use_apple and apple_text:
-                        alt_lines = apple_lines
-                        if alt_lines:
-                            ratio = difflib.SequenceMatcher(None, text_single, "\n".join(alt_lines), autojunk=False).ratio()
-                            if 1 - ratio > 0.35:
-                                part_by_engine_single["apple_dropped"] = True
-                                alt_lines = []
-                            fused, fusion_srcs, dist = align_and_vote(fused_before_post, alt_lines)
-                            fused_out = []
-                            fusion_srcs_out = []
-                            fusion_dist_out = []
-                            for f, s, d, p in zip(fused, fusion_srcs, dist, fused_before_post):
-                                if d > 0.35:
-                                    fused_out.append(p)
-                                    fusion_srcs_out.append("primary")
-                                    fusion_dist_out.append(d)
-                                else:
-                                    fused_out.append(f)
-                                    fusion_srcs_out.append(s)
-                                    fusion_dist_out.append(d)
-                            fused_before_post = fused_out
-                            if alt_lines and len("\n".join(alt_lines)) > len(text_single):
-                                part_source_single = "apple"
-                            part_by_engine_single["fusion_sources"] = fusion_srcs_out
-                            part_by_engine_single["fusion_distances"] = fusion_dist_out
-                    # Replace with single-column results
-                    part_lines = fused_before_post
-                    part_by_engine = part_by_engine_single
-                    part_source = part_source_single
-                    col_spans = [(0.0, 1.0)]  # Update to single column
-                
-                # Re-check column quality now that we have OCR text
-                # If columns fragment text, reject and re-OCR as single column
-                tesseract_cols_text = part_by_engine.get("tesseract_cols", [])
-                if not check_column_split_quality(img_obj, col_spans, apple_lines_meta=apple_lines_meta, tesseract_cols=tesseract_cols_text):
-                    # Column split fragments text - reject it and re-OCR as single column
-                    logger.log("extract", "running", 
-                              message=f"Page {page_key}: Column split rejected (fragments text), re-OCRing as single column")
+                    # Store rejection reason for confidence reporting
+                    part_by_engine["column_rejection_reason"] = rejection_reason
+                    logger.log("extract", "running",
+                              message=f"Page {page_key}: Column split rejected ({rejection_reason}), re-OCRing as single column")
                     # Re-OCR as single column
                     text_single, part_by_engine_single, part_source_single = call_betterocr(
                         img_path_part,
@@ -1205,6 +1381,8 @@ def main():
                     "gap_count": len(col_spans) - 1,
                     "line_count": len(part_lines),
                     "avg_line_length": avg_len,
+                    "column_mode": "multi" if len(col_spans) > 1 else "single",
+                    "rejection_reason": part_by_engine.get("column_rejection_reason"),
                 },
                 "ivr": ivr,
                 "spread_side": side,  # "L", "R", or None
