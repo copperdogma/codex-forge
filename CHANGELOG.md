@@ -1,3 +1,18 @@
+## [2025-12-10] - FF20 regression suite and quality guards
+
+### Added
+- 20-page Fighting Fantasy regression test suite (`tests/test_ff_20_page_regression.py`) with goldens in `testdata/ff-20-pages/`, covering counts, schemas, per-page hashes, fragmentation, column layouts, forbidden OCR tokens, choice counts, and long-line guards.
+- Fast local runner `scripts/tests/run_ff20_regression_fast.sh` with a 300s runtime budget.
+
+### Changed
+- `validate_artifact.py` now validates `element_core_v1`.
+- Removed obsolete portionization integration cases referencing deleted modules; legacy driver/plan tests now pass cleanly alongside the new regression suite.
+- Regression drift diagnostics now surface the first differing line on mismatch for easier debugging.
+
+### Tested
+- `python -m unittest discover -s tests -p '*test.py' -v`
+- `scripts/tests/run_ff20_regression_fast.sh`
+
 ## [2025-12-01] - OCR ensemble retries, resolver, and fuzzy headers
 
 ### Added
