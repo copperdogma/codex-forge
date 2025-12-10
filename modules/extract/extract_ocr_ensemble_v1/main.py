@@ -1,11 +1,12 @@
 import argparse
+import base64
 import os
 import difflib
 import sys
 import json
 import subprocess
 from pathlib import Path
-from typing import Dict, Any, List
+from typing import Dict, Any, List, Optional
 import numpy as np
 
 
@@ -54,6 +55,153 @@ def compute_disagreement(by_engine):
             ratio = difflib.SequenceMatcher(None, a, b).ratio()
             scores.append(1 - ratio)
     return round(sum(scores) / len(scores), 4) if scores else 0.0
+
+
+# ─── Inline Vision Escalation ────────────────────────────────────────────────
+# R6: Call GPT-4V inline for critical failures during OCR processing
+
+# Cache for OpenAI client to avoid repeated initialization
+_openai_client = None
+
+
+def _get_openai_client():
+    """Get or create OpenAI client (lazy initialization)."""
+    global _openai_client
+    if _openai_client is None:
+        try:
+            from openai import OpenAI
+            _openai_client = OpenAI()
+        except ImportError:
+            raise RuntimeError("openai package required for inline escalation; pip install openai")
+    return _openai_client
+
+
+def encode_image_base64(image_path: str) -> str:
+    """Encode image file to base64 data URL."""
+    with open(image_path, "rb") as f:
+        b64 = base64.b64encode(f.read()).decode("utf-8")
+    ext = os.path.splitext(image_path)[1].lower().lstrip(".") or "jpeg"
+    return f"data:image/{ext};base64,{b64}"
+
+
+def inline_vision_escalate(image_path: str, model: str = "gpt-4.1",
+                           prompt: Optional[str] = None) -> Dict[str, Any]:
+    """
+    Perform inline vision model escalation for a critical OCR failure.
+
+    Args:
+        image_path: Path to page image
+        model: Vision model to use (default gpt-4.1)
+        prompt: Custom prompt (uses default if not provided)
+
+    Returns:
+        Dict with:
+            - text: Transcribed text from vision model
+            - lines: List of line dicts with text and source
+            - success: Whether escalation succeeded
+            - error: Error message if failed
+    """
+    if prompt is None:
+        prompt = (
+            "Transcribe this single book page verbatim.\n"
+            "- Keep the original line breaks.\n"
+            "- Include section numbers, headers, and page numbers if visible.\n"
+            "- Do not normalize spelling.\n"
+            "- If something is unreadable, transcribe your best guess and move on.\n"
+            "Return plain text only."
+        )
+
+    try:
+        client = _get_openai_client()
+        image_data = encode_image_base64(image_path)
+
+        response = client.chat.completions.create(
+            model=model,
+            messages=[
+                {
+                    "role": "user",
+                    "content": [
+                        {"type": "text", "text": prompt},
+                        {"type": "image_url", "image_url": {"url": image_data}},
+                    ],
+                }
+            ],
+            max_tokens=4096,
+            temperature=0,
+        )
+
+        text = response.choices[0].message.content or ""
+        lines = [{"text": line, "source": "gpt4v"} for line in text.splitlines()]
+
+        return {
+            "text": text,
+            "lines": lines,
+            "success": True,
+            "error": None,
+        }
+    except Exception as e:
+        return {
+            "text": "",
+            "lines": [],
+            "success": False,
+            "error": str(e),
+        }
+
+
+def is_critical_failure(quality_metrics: Dict[str, Any],
+                        corruption_threshold: float = 0.8,
+                        disagree_threshold: float = 0.8,
+                        is_form_page: bool = False,
+                        ivr: float = None) -> bool:
+    """
+    Determine if a page has a critical OCR failure that warrants inline escalation.
+
+    Critical failure criteria (any of):
+    - corruption_score > corruption_threshold (default 0.8)
+    - disagree_rate > disagree_threshold (default 0.8)
+    - Very few lines AND high disagreement (possible blank/corrupt page)
+    - Form page with low IVR (in-vocab ratio) - uses lower thresholds
+
+    Args:
+        quality_metrics: Dict with quality scores from compute_enhanced_quality_metrics
+        corruption_threshold: Corruption score threshold (default 0.8)
+        disagree_threshold: Disagree rate threshold (default 0.8)
+        is_form_page: Whether the page was detected as a form (Adventure Sheet, etc.)
+        ivr: In-vocab ratio (0-1), lower values indicate more garbled text
+
+    Returns:
+        True if page should be escalated inline
+    """
+    corruption = quality_metrics.get("corruption_score", 0)
+    disagree_rate = quality_metrics.get("disagree_rate", 0)
+    line_count = quality_metrics.get("line_count", 0)
+    missing_content = quality_metrics.get("missing_content_score", 0)
+
+    # Critical: high corruption or very high disagreement
+    if corruption > corruption_threshold:
+        return True
+    if disagree_rate > disagree_threshold:
+        return True
+
+    # Critical: almost no content with high corruption/missing indicators
+    if line_count < 3 and (missing_content > 0.7 or corruption > 0.5):
+        return True
+
+    # Form pages use lower thresholds - they often have garbled OCR
+    # that doesn't show up in corruption metrics
+    if is_form_page:
+        # Form pages with very low IVR (< 0.15) are likely badly garbled
+        if ivr is not None and ivr < 0.15:
+            return True
+        # Form pages with moderate disagreement (> 0.5) and low IVR (< 0.4)
+        if ivr is not None and ivr < 0.4 and disagree_rate > 0.5:
+            return True
+        # Form pages with high fragmentation
+        fragmentation = quality_metrics.get("fragmentation_score", 0)
+        if fragmentation > 0.3 and (ivr is None or ivr < 0.5):
+            return True
+
+    return False
 
 
 def detect_corruption_patterns(text: str) -> Dict[str, Any]:
@@ -840,40 +988,350 @@ def needs_numeric_rescue(line: str) -> bool:
     return digits >= 1 and letters <= 2
 
 
-def align_and_vote(primary_lines, alt_lines, distance_drop=0.35):
+def fuse_characters(primary: str, alt: str) -> str:
     """
-    Align two line lists and pick a fused line per position.
+    Character-level fusion of two similar lines.
+
+    Uses edit distance alignment to find character correspondences,
+    then picks the most likely character at each position based on:
+    1. Agreement between engines (if same, use it)
+    2. Prefer alphabetic over numeric for letters (handles OCR digit confusion)
+    3. Prefer the character that makes a valid word context
+
+    This catches errors like "sTAMINA" vs "STAMINA" where one engine
+    gets a single character wrong.
+    """
+    from difflib import SequenceMatcher
+
+    if not primary or not alt:
+        return primary or alt or ""
+
+    # If they're identical, return as-is
+    if primary == alt:
+        return primary
+
+    # If lengths differ significantly, don't attempt character fusion
+    len_ratio = min(len(primary), len(alt)) / max(len(primary), len(alt))
+    if len_ratio < 0.8:
+        # Too different in length - pick longer one
+        return primary if len(primary) >= len(alt) else alt
+
+    # Character-level alignment using SequenceMatcher
+    sm = SequenceMatcher(None, primary, alt, autojunk=False)
+    result = []
+
+    for tag, i1, i2, j1, j2 in sm.get_opcodes():
+        if tag == "equal":
+            # Both agree - use primary
+            result.append(primary[i1:i2])
+        elif tag == "replace":
+            # Character mismatch - pick best character(s)
+            p_chars = primary[i1:i2]
+            a_chars = alt[j1:j2]
+
+            # If same length replacement, vote per-character
+            if len(p_chars) == len(a_chars):
+                for pc, ac in zip(p_chars, a_chars):
+                    # Prefer uppercase over lowercase for capitals
+                    if pc.lower() == ac.lower():
+                        # Same letter, different case - prefer uppercase if either is upper
+                        result.append(pc.upper() if pc.isupper() or ac.isupper() else pc)
+                    # Prefer letter over digit for common OCR confusions
+                    elif pc.isalpha() and ac.isdigit():
+                        result.append(pc)  # Prefer letter
+                    elif ac.isalpha() and pc.isdigit():
+                        result.append(ac)  # Prefer letter
+                    else:
+                        # No clear preference - use primary
+                        result.append(pc)
+            else:
+                # Different lengths - pick the one that looks more complete
+                result.append(p_chars if len(p_chars) >= len(a_chars) else a_chars)
+        elif tag == "delete":
+            # Extra chars in primary - include them
+            result.append(primary[i1:i2])
+        elif tag == "insert":
+            # Extra chars in alt - include them (alt may have caught something primary missed)
+            result.append(alt[j1:j2])
+
+    return "".join(result)
+
+
+def detect_outlier_engine(engine_outputs: Dict[str, str], outlier_threshold: float = 0.6) -> Dict[str, Any]:
+    """
+    Detect if one engine produced outlier/garbage output using pairwise Levenshtein distance.
+
+    When multiple engines are available, compute pairwise similarity between all pairs.
+    If one engine's output is significantly different from all others, mark it as an outlier.
+
+    This helps catch cases where one engine:
+    - Completely misread the page structure
+    - Produced garbled/corrupted output
+    - Had a different line break interpretation
+
+    Args:
+        engine_outputs: Dict mapping engine name to text output (e.g., {"tesseract": "...", "apple": "..."})
+        outlier_threshold: Distance threshold above which an engine is considered an outlier (default 0.6)
+
+    Returns:
+        Dict with:
+        - outliers: List of engine names marked as outliers
+        - pairwise_distances: Dict of (engine1, engine2) -> distance
+        - best_pair: Tuple of (engine1, engine2) with lowest distance
+        - best_pair_distance: Distance between best pair
+    """
+    from difflib import SequenceMatcher
+
+    # Filter to engines with actual text output
+    valid_engines = {k: v for k, v in engine_outputs.items()
+                     if isinstance(v, str) and v.strip() and not k.endswith('_error')}
+
+    if len(valid_engines) < 2:
+        return {
+            "outliers": [],
+            "pairwise_distances": {},
+            "best_pair": None,
+            "best_pair_distance": None
+        }
+
+    # Compute pairwise distances
+    engine_names = list(valid_engines.keys())
+    pairwise_distances = {}
+
+    for i, eng1 in enumerate(engine_names):
+        for eng2 in engine_names[i+1:]:
+            text1 = valid_engines[eng1]
+            text2 = valid_engines[eng2]
+            ratio = SequenceMatcher(None, text1, text2, autojunk=False).ratio()
+            distance = 1 - ratio
+            pairwise_distances[(eng1, eng2)] = round(distance, 4)
+
+    if not pairwise_distances:
+        return {
+            "outliers": [],
+            "pairwise_distances": {},
+            "best_pair": None,
+            "best_pair_distance": None
+        }
+
+    # Find best pair (lowest distance)
+    best_pair = min(pairwise_distances.keys(), key=lambda k: pairwise_distances[k])
+    best_pair_distance = pairwise_distances[best_pair]
+
+    # For each engine, compute average distance to all others
+    avg_distances = {}
+    for eng in engine_names:
+        distances_to_others = []
+        for (e1, e2), dist in pairwise_distances.items():
+            if eng == e1 or eng == e2:
+                distances_to_others.append(dist)
+        avg_distances[eng] = sum(distances_to_others) / len(distances_to_others) if distances_to_others else 0
+
+    # Mark engines as outliers if:
+    # 1. Their average distance exceeds threshold, AND
+    # 2. They're not part of the best pair (unless best pair is also bad)
+    outliers = []
+    for eng, avg_dist in avg_distances.items():
+        if avg_dist > outlier_threshold:
+            # Don't mark as outlier if it's part of the best agreeing pair
+            if eng not in best_pair or best_pair_distance > outlier_threshold:
+                outliers.append(eng)
+
+    return {
+        "outliers": outliers,
+        "pairwise_distances": pairwise_distances,
+        "best_pair": best_pair,
+        "best_pair_distance": round(best_pair_distance, 4),
+        "avg_distances": {k: round(v, 4) for k, v in avg_distances.items()}
+    }
+
+
+def filter_fragment_artifacts(lines: List[str], min_fragment_len: int = 4,
+                              fragment_cluster_threshold: float = 0.5) -> tuple:
+    """
+    Filter out fragment artifacts from two-column OCR output.
+
+    When OCR reads a two-column page, word endings from the right column edge
+    can appear as separate fragments (e.g., "his", "LL.", "ured", "ser").
+    These typically cluster at the end of the line list after the main content.
+
+    Detection criteria:
+    - Very short lines (< min_fragment_len chars)
+    - Clustered at the end of the list
+    - Not legitimate content (page numbers, headers like "Battles")
+
+    Args:
+        lines: List of text lines
+        min_fragment_len: Lines shorter than this are fragment candidates (default 4)
+        fragment_cluster_threshold: Fraction of short lines at end to trigger filter (default 0.5)
+
+    Returns:
+        (filtered_lines, removed_fragments, fragment_stats)
+    """
+    if not lines or len(lines) < 5:
+        return lines, [], {"filtered": False, "reason": "too_few_lines"}
+
+    # Identify potential fragments: very short lines that aren't common content
+    # Legitimate short content: page numbers (digits), headers (Title Case or ALL CAPS with >1 word)
+    def is_fragment_candidate(line: str) -> bool:
+        s = line.strip()
+        if len(s) >= min_fragment_len:
+            return False
+        if not s:
+            return False  # Empty lines are not fragments, keep them
+        # Pure digits are likely page numbers - keep them
+        if s.isdigit():
+            return False
+        # Very short but all caps could be abbreviation - keep if alphabetic
+        if len(s) <= 2 and s.isupper() and s.isalpha():
+            return False
+        # Common short words are not fragments
+        common_shorts = {'a', 'i', 'to', 'of', 'in', 'it', 'is', 'be', 'as', 'at',
+                        'he', 'we', 'so', 'do', 'if', 'my', 'me', 'up', 'go', 'no',
+                        'us', 'am', 'an', 'or', 'by', 'on'}
+        if s.lower() in common_shorts:
+            return False
+        # Remaining short items are fragment candidates
+        return True
+
+    # Mark each line as fragment candidate or not
+    fragment_flags = [is_fragment_candidate(l) for l in lines]
+
+    # Count trailing fragments (consecutive fragment candidates at end)
+    trailing_count = 0
+    for flag in reversed(fragment_flags):
+        if flag:
+            trailing_count += 1
+        else:
+            break
+
+    # Only filter if there's a significant cluster of fragments at the end
+    if trailing_count < 3:
+        return lines, [], {"filtered": False, "reason": "no_trailing_cluster"}
+
+    # Check if the trailing cluster is a significant fraction of all fragments
+    total_fragments = sum(fragment_flags)
+    if trailing_count / max(total_fragments, 1) < fragment_cluster_threshold:
+        return lines, [], {"filtered": False, "reason": "fragments_not_clustered",
+                          "trailing": trailing_count, "total": total_fragments}
+
+    # Remove the trailing fragment cluster
+    cutoff = len(lines) - trailing_count
+    filtered_lines = lines[:cutoff]
+    removed = lines[cutoff:]
+
+    return filtered_lines, removed, {
+        "filtered": True,
+        "removed_count": len(removed),
+        "original_count": len(lines),
+        "cutoff_index": cutoff
+    }
+
+
+def align_and_vote(primary_lines, alt_lines, distance_drop=0.35, enable_char_fusion=True,
+                   alt_confidences=None):
+    """
+    Align two line lists and pick/fuse a line per position.
+
+    Enhanced fusion strategy:
     - If alt missing, use primary.
-    - If distance > distance_drop, drop alt for that line.
-    - Choose longer trimmed line, record fusion_source.
-    Returns fused_lines, sources, disagree_flags.
+    - If distance > distance_drop, use primary only for that line.
+    - If lines are similar (distance <= 0.15), attempt character-level fusion.
+    - Otherwise, use confidence weighting if available, else choose longer trimmed line.
+
+    Args:
+        primary_lines: Lines from primary OCR engine (typically Tesseract)
+        alt_lines: Lines from alternate OCR engine (typically Apple Vision)
+        distance_drop: Max distance to consider alt line (default 0.35)
+        enable_char_fusion: Enable character-level fusion for similar lines
+        alt_confidences: Optional list of confidence scores (0-1) for alt_lines (from Apple Vision)
+
+    Returns:
+        fused_lines, sources, distances
     """
     from difflib import SequenceMatcher
     fused = []
     sources = []
     distances = []
+
+    if not alt_lines:
+        # No alt lines - return primary with metadata
+        return list(primary_lines), ["primary"] * len(primary_lines), [0.0] * len(primary_lines)
+
     sm = SequenceMatcher(a=primary_lines, b=alt_lines, autojunk=False)
     opcodes = sm.get_opcodes()
+
     for tag, i1, i2, j1, j2 in opcodes:
         if tag == "equal":
             for k in range(i2 - i1):
                 fused.append(primary_lines[i1 + k])
-                sources.append("primary")
+                sources.append("agree")  # Both engines agree
                 distances.append(0.0)
         elif tag == "replace":
             for k in range(max(i2 - i1, j2 - j1)):
                 p = primary_lines[i1 + k] if i1 + k < i2 else ""
                 a = alt_lines[j1 + k] if j1 + k < j2 else ""
-                ratio = SequenceMatcher(None, p, a, autojunk=False).ratio() if p and a else 0
-                dist = 1 - ratio
-                if a and dist <= distance_drop and len(a.strip()) > len(p.strip()):
-                    fused.append(a)
-                    sources.append("alt")
-                    distances.append(dist)
-                else:
+
+                if not p and not a:
+                    continue
+                elif not a:
                     fused.append(p)
                     sources.append("primary")
-                    distances.append(dist if p and a else 0.0)
+                    distances.append(0.0)
+                elif not p:
+                    fused.append(a)
+                    sources.append("alt")
+                    distances.append(0.0)
+                else:
+                    ratio = SequenceMatcher(None, p, a, autojunk=False).ratio()
+                    dist = 1 - ratio
+
+                    if dist > distance_drop:
+                        # Too different - use primary only
+                        fused.append(p)
+                        sources.append("primary")
+                        distances.append(dist)
+                    elif dist <= 0.15 and enable_char_fusion:
+                        # Very similar - attempt character-level fusion
+                        fused_line = fuse_characters(p, a)
+                        # Determine source based on which it's closer to
+                        if fused_line == p:
+                            sources.append("primary")
+                        elif fused_line == a:
+                            sources.append("alt")
+                        else:
+                            sources.append("fused")  # Character-level fusion occurred
+                        fused.append(fused_line)
+                        distances.append(dist)
+                    else:
+                        # Choose between primary and alt based on:
+                        # 1. Confidence score (if available for alt)
+                        # 2. Length (prefer longer line)
+                        alt_conf = None
+                        if alt_confidences and j1 + k < len(alt_confidences):
+                            alt_conf = alt_confidences[j1 + k]
+
+                        # Use confidence-weighted selection if we have confidence data
+                        if alt_conf is not None and alt_conf >= 0.8:
+                            # High confidence Apple line - prefer it
+                            fused.append(a)
+                            sources.append("alt_confident")
+                            distances.append(dist)
+                        elif alt_conf is not None and alt_conf < 0.5:
+                            # Low confidence Apple line - prefer primary
+                            fused.append(p)
+                            sources.append("primary")
+                            distances.append(dist)
+                        elif len(a.strip()) > len(p.strip()):
+                            # Alt is longer - prefer it
+                            fused.append(a)
+                            sources.append("alt")
+                            distances.append(dist)
+                        else:
+                            # Use primary
+                            fused.append(p)
+                            sources.append("primary")
+                            distances.append(dist)
         elif tag == "delete":
             for k in range(i1, i2):
                 fused.append(primary_lines[k])
@@ -884,6 +1342,7 @@ def align_and_vote(primary_lines, alt_lines, distance_drop=0.35):
                 fused.append(alt_lines[k])
                 sources.append("alt")
                 distances.append(1.0)
+
     return fused, sources, distances
 
 
@@ -955,6 +1414,25 @@ def main():
     parser.add_argument("--progress-file", help="Path to pipeline_events.jsonl")
     parser.add_argument("--state-file", help="Path to pipeline_state.json")
     parser.add_argument("--run-id", help="Run identifier for logging")
+    # R6: Inline escalation for critical failures
+    parser.add_argument("--inline-escalation", dest="inline_escalation", action="store_true",
+                        help="Enable inline GPT-4V escalation for critical failures")
+    parser.add_argument("--inline_escalation", dest="inline_escalation", action="store_true", help=argparse.SUPPRESS)
+    parser.add_argument("--inline-escalation-model", dest="inline_escalation_model", default="gpt-4.1",
+                        help="Vision model for inline escalation (default: gpt-4.1)")
+    parser.add_argument("--inline_escalation_model", dest="inline_escalation_model", default="gpt-4.1", help=argparse.SUPPRESS)
+    parser.add_argument("--critical-corruption-threshold", dest="critical_corruption_threshold",
+                        type=float, default=0.8, help="Corruption score threshold for critical failure (default: 0.8)")
+    parser.add_argument("--critical_corruption_threshold", dest="critical_corruption_threshold",
+                        type=float, default=0.8, help=argparse.SUPPRESS)
+    parser.add_argument("--critical-disagree-threshold", dest="critical_disagree_threshold",
+                        type=float, default=0.8, help="Disagree rate threshold for critical failure (default: 0.8)")
+    parser.add_argument("--critical_disagree_threshold", dest="critical_disagree_threshold",
+                        type=float, default=0.8, help=argparse.SUPPRESS)
+    parser.add_argument("--inline-escalation-budget", dest="inline_escalation_budget",
+                        type=int, default=5, help="Max pages to escalate inline per run (default: 5)")
+    parser.add_argument("--inline_escalation_budget", dest="inline_escalation_budget",
+                        type=int, default=5, help=argparse.SUPPRESS)
     args = parser.parse_args()
 
     # normalize engines if driver passed a single string like "['tesseract','easyocr','apple']"
@@ -999,6 +1477,9 @@ def main():
     total = len(image_paths)
     escalation_budget_pages = int(0.1 * total) if total else 0
     escalated_pages = 0
+    # R6: Inline escalation tracking
+    inline_escalation_count = 0
+    inline_escalation_budget = args.inline_escalation_budget if args.inline_escalation else 0
     quality_report = []
     index = {}
     page_rows = []
@@ -1101,31 +1582,52 @@ def main():
                     oem=args.oem,
                 )
                 fused_before_post = split_lines(text)
+
+                # Collect all engine outputs for outlier detection
+                engine_outputs_for_outlier = {"tesseract": text}
+                if use_apple and apple_text:
+                    engine_outputs_for_outlier["apple"] = apple_text
+
+                # Detect outlier engines (useful when 3+ engines available)
+                outlier_info = detect_outlier_engine(engine_outputs_for_outlier)
+                if outlier_info["outliers"]:
+                    part_by_engine["outlier_engines"] = outlier_info["outliers"]
+                    part_by_engine["outlier_info"] = {
+                        "best_pair": outlier_info["best_pair"],
+                        "best_pair_distance": outlier_info["best_pair_distance"],
+                        "avg_distances": outlier_info["avg_distances"]
+                    }
+
                 if use_apple and apple_text:
                     alt_lines = apple_lines
-                    if alt_lines:
+                    # Skip Apple OCR if marked as outlier
+                    if "apple" in outlier_info.get("outliers", []):
+                        part_by_engine["apple_excluded_as_outlier"] = True
+                        alt_lines = []
+                    elif alt_lines:
+                        # Calculate document-level similarity for logging
                         ratio = difflib.SequenceMatcher(None, text, "\n".join(alt_lines), autojunk=False).ratio()
-                        if 1 - ratio > 0.35:
-                            part_by_engine["apple_dropped"] = True
-                            alt_lines = []
-                    fused, fusion_srcs, dist = align_and_vote(fused_before_post, alt_lines)
-                    fused_out = []
-                    fusion_srcs_out = []
-                    fusion_dist_out = []
-                    for f, s, d, p in zip(fused, fusion_srcs, dist, fused_before_post):
-                        if d > 0.35:
-                            fused_out.append(p)
-                            fusion_srcs_out.append("primary")
-                            fusion_dist_out.append(d)
-                        else:
-                            fused_out.append(f)
-                            fusion_srcs_out.append(s)
-                            fusion_dist_out.append(d)
-                    fused_before_post = fused_out
-                    if alt_lines and len("\n".join(alt_lines)) > len(text):
-                        part_source = "apple"
-                    part_by_engine["fusion_sources"] = fusion_srcs_out
-                    part_by_engine["fusion_distances"] = fusion_dist_out
+                        part_by_engine["apple_doc_similarity"] = round(ratio, 3)
+                    # Extract confidence scores from Apple OCR metadata
+                    alt_confidences = None
+                    if apple_lines_meta:
+                        alt_confidences = [ln.get("confidence", 0.0) for ln in apple_lines_meta]
+                    # Always attempt per-line fusion - align_and_vote handles line-level thresholds
+                    fused, fusion_srcs, dist = align_and_vote(fused_before_post, alt_lines,
+                                                               alt_confidences=alt_confidences)
+                    # Track fusion statistics
+                    part_by_engine["fusion_sources"] = fusion_srcs
+                    part_by_engine["fusion_distances"] = dist
+                    if alt_confidences:
+                        part_by_engine["apple_confidences"] = alt_confidences
+                    fused_before_post = fused
+                    # Determine overall source based on which engine contributed more
+                    if fusion_srcs:
+                        alt_count = sum(1 for s in fusion_srcs if s in ("alt", "alt_confident", "fused"))
+                        if alt_count > len(fusion_srcs) / 2:
+                            part_source = "apple"
+                        elif any(s == "fused" for s in fusion_srcs):
+                            part_source = "fused"
                 part_lines = fused_before_post
             else:
                 col_lines = []
@@ -1144,22 +1646,27 @@ def main():
                     part_by_engine.setdefault("tesseract_cols", []).append(t_text)
                     col_lines_this = split_lines(t_text)
                     alt_lines_col = []
+                    alt_conf_col = []
                     if use_apple and apple_lines_meta:
                         # Filter Apple OCR lines by column index (preferred) or bbox (fallback)
                         # Apple OCR provides 'column' field when column detection is enabled
-                        alt_lines_col = []
                         for ln in apple_lines_meta:
                             # Prefer column field if available
                             if "column" in ln:
                                 if ln["column"] == col_idx:
                                     alt_lines_col.append(ln["text"])
+                                    alt_conf_col.append(ln.get("confidence", 0.0))
                             else:
                                 # Fallback to bbox matching (center of line within span)
                                 bbox = ln.get("bbox", [0, 0, 1, 1])
                                 line_center = (bbox[0] + bbox[2]) / 2.0
                                 if span[0] <= line_center < span[1]:
                                     alt_lines_col.append(ln["text"])
-                    fused_col, fusion_srcs_col, dist_col = align_and_vote(col_lines_this, alt_lines_col)
+                                    alt_conf_col.append(ln.get("confidence", 0.0))
+                    fused_col, fusion_srcs_col, dist_col = align_and_vote(
+                        col_lines_this, alt_lines_col,
+                        alt_confidences=alt_conf_col if alt_conf_col else None
+                    )
                     col_fusions.append((fused_col, fusion_srcs_col, dist_col))
                     col_lines.extend(fused_col)
                 text = "\n".join(col_lines)
@@ -1200,28 +1707,26 @@ def main():
                     if use_apple and apple_text:
                         alt_lines = apple_lines
                         if alt_lines:
+                            # Calculate document-level similarity for logging only
                             ratio = difflib.SequenceMatcher(None, text_single, "\n".join(alt_lines), autojunk=False).ratio()
-                            if 1 - ratio > 0.35:
-                                part_by_engine_single["apple_dropped"] = True
-                                alt_lines = []
-                            fused, fusion_srcs, dist = align_and_vote(fused_before_post, alt_lines)
-                            fused_out = []
-                            fusion_srcs_out = []
-                            fusion_dist_out = []
-                            for f, s, d, p in zip(fused, fusion_srcs, dist, fused_before_post):
-                                if d > 0.35:
-                                    fused_out.append(p)
-                                    fusion_srcs_out.append("primary")
-                                    fusion_dist_out.append(d)
-                                else:
-                                    fused_out.append(f)
-                                    fusion_srcs_out.append(s)
-                                    fusion_dist_out.append(d)
-                            fused_before_post = fused_out
-                            if alt_lines and len("\n".join(alt_lines)) > len(text_single):
+                            part_by_engine_single["apple_doc_similarity"] = round(ratio, 3)
+                        # Extract confidence scores
+                        alt_confidences = None
+                        if apple_lines_meta:
+                            alt_confidences = [ln.get("confidence", 0.0) for ln in apple_lines_meta]
+                        # Always attempt per-line fusion
+                        fused, fusion_srcs, dist = align_and_vote(fused_before_post, alt_lines,
+                                                                   alt_confidences=alt_confidences)
+                        part_by_engine_single["fusion_sources"] = fusion_srcs
+                        part_by_engine_single["fusion_distances"] = dist
+                        fused_before_post = fused
+                        # Determine overall source
+                        if fusion_srcs:
+                            alt_count = sum(1 for s in fusion_srcs if s in ("alt", "alt_confident", "fused"))
+                            if alt_count > len(fusion_srcs) / 2:
                                 part_source_single = "apple"
-                            part_by_engine_single["fusion_sources"] = fusion_srcs_out
-                            part_by_engine_single["fusion_distances"] = fusion_dist_out
+                            elif any(s == "fused" for s in fusion_srcs):
+                                part_source_single = "fused"
                     # Replace with single-column results
                     part_lines = fused_before_post
                     part_by_engine = part_by_engine_single
@@ -1346,6 +1851,73 @@ def main():
                                  f"other conditions not met (disagreement={disagreement:.3f}, corruption={quality_metrics['corruption_score']:.3f}, "
                                  f"missing={quality_metrics['missing_content_score']:.3f}, lines={len(part_lines)}, avg_len={avg_len:.1f})")
 
+            # R6: Inline escalation for critical failures
+            # Check if this is a CRITICAL failure (worse than normal escalation) and we have budget
+            inline_escalated = False
+
+            # Pre-compute IVR and form detection for inline escalation decision
+            ivr = in_vocab_ratio(part_lines)
+            form_check = detect_form_page(part_lines, avg_line_len=avg_len)
+            is_form = form_check["is_form"]
+
+            if args.inline_escalation and inline_escalation_count < inline_escalation_budget:
+                # Add disagree_rate to quality_metrics for is_critical_failure check
+                quality_metrics_with_rate = dict(quality_metrics)
+                quality_metrics_with_rate["disagree_rate"] = disagree_rate
+
+                if is_critical_failure(quality_metrics_with_rate,
+                                       args.critical_corruption_threshold,
+                                       args.critical_disagree_threshold,
+                                       is_form_page=is_form,
+                                       ivr=ivr):
+                    logger.log("extract", "running",
+                              message=f"Page {page_key}: CRITICAL failure detected - triggering inline GPT-4V escalation "
+                                     f"(corruption={quality_metrics['corruption_score']:.3f}, disagree_rate={disagree_rate:.3f}, "
+                                     f"is_form={is_form}, ivr={ivr:.3f}, "
+                                     f"budget: {inline_escalation_count + 1}/{inline_escalation_budget})")
+
+                    # Call vision model
+                    escalation_result = inline_vision_escalate(
+                        img_path_part,
+                        model=args.inline_escalation_model
+                    )
+
+                    if escalation_result["success"]:
+                        inline_escalation_count += 1
+                        inline_escalated = True
+                        # Replace OCR output with vision model output
+                        part_lines = [ln["text"] for ln in escalation_result["lines"]]
+                        part_source = "gpt4v_inline"
+                        # Update engines_raw to record the escalation
+                        part_by_engine["gpt4v_inline"] = escalation_result["text"]
+                        part_by_engine["inline_escalation"] = {
+                            "reason": "critical_failure",
+                            "corruption_score": quality_metrics["corruption_score"],
+                            "disagree_rate": disagree_rate,
+                            "original_source": part_source if part_source != "gpt4v_inline" else "ocr_ensemble",
+                        }
+                        # Reset quality metrics since we have fresh vision output
+                        needs_escalation = False
+                        disagreement = 0.0
+                        logger.log("extract", "running",
+                                  message=f"Page {page_key}: Inline escalation SUCCESS - replaced with {len(part_lines)} lines from GPT-4V")
+                    else:
+                        logger.log("extract", "running",
+                                  message=f"Page {page_key}: Inline escalation FAILED - {escalation_result['error']}")
+
+            # Task 5.2: Filter fragment artifacts from two-column pages
+            # These are word-ending fragments like "his", "LL.", "ured" that appear as separate lines
+            filtered_lines, removed_fragments, fragment_filter_stats = filter_fragment_artifacts(part_lines)
+            if fragment_filter_stats.get("filtered"):
+                logger.log("extract", "running",
+                          message=f"Page {page_key}: Filtered {len(removed_fragments)} trailing fragment artifacts: "
+                                 f"{removed_fragments[:5]}{'...' if len(removed_fragments) > 5 else ''}")
+                part_lines = filtered_lines
+                part_by_engine["fragment_filter"] = {
+                    "removed": removed_fragments,
+                    "stats": fragment_filter_stats
+                }
+
             # Create canonical line output - only the final decided text
             # All alternatives (raw, fused, etc.) remain in engines_raw for provenance
             line_rows = []
@@ -1354,7 +1926,7 @@ def main():
                 row = {"text": line, "source": part_source}
                 line_rows.append(row)
 
-            ivr = in_vocab_ratio(part_lines)
+            # Note: ivr and form_check already computed above for inline escalation
 
             # Virtual page key: use L/R suffix for spreads, plain number for single pages
             # Note: page_key is used for index/file mapping; page field in payload must be int for schema
@@ -1374,6 +1946,7 @@ def main():
                 "lines": line_rows,
                 "disagreement_score": disagreement,
                 "needs_escalation": needs_escalation,
+                "inline_escalated": inline_escalated,  # R6: True if GPT-4V was called inline
                 "quality_metrics": quality_metrics,  # Enhanced quality metrics
                 "engines_raw": part_by_engine,
                 "column_spans": col_spans,
@@ -1416,6 +1989,7 @@ def main():
                 "page": page_key,
                 "disagreement_score": disagreement,
                 "needs_escalation": needs_escalation,
+                "inline_escalated": inline_escalated,  # R6: True if GPT-4V was called inline
                 "quality_score": quality_metrics["quality_score"],
                 "corruption_score": quality_metrics["corruption_score"],
                 "corruption_patterns": quality_metrics["corruption_patterns"],
@@ -1445,13 +2019,17 @@ def main():
     # simple source histogram for quick sanity
     hist = {}
     col_pages = 0
+    inline_escalated_count = 0
     for row in page_rows:
         src = row.get("lines", [{}])[0].get("source", "unknown") if row.get("lines") else "unknown"
         hist[src] = hist.get(src, 0) + 1
         if row.get("column_spans") and len(row["column_spans"]) > 1:
             col_pages += 1
+        if row.get("inline_escalated"):
+            inline_escalated_count += 1
     save_json(os.path.join(ocr_dir, "ocr_source_histogram.json"),
-              {"histogram": hist, "column_pages": col_pages, "total_pages": total})
+              {"histogram": hist, "column_pages": col_pages, "total_pages": total,
+               "inline_escalated": inline_escalated_count})
 
     logger.log("extract", "done", current=total, total=total,
                message="OCR ensemble complete", artifact=index_path,

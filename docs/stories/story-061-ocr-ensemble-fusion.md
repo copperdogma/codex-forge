@@ -1,6 +1,6 @@
 # Story: OCR Ensemble Fusion Improvements
 
-**Status**: Open
+**Status**: Done
 **Created**: 2025-12-09
 **Parent Story**: story-057 (OCR quality - COMPLETE)
 
@@ -80,9 +80,9 @@ def align_and_vote(primary_lines, alt_lines, distance_drop=0.35):
 **Solution**: Always run `align_and_vote()` regardless of document-level similarity. The per-line threshold (0.35) already protects against bad merges.
 
 **Acceptance Criteria**:
-- [ ] Apple OCR is never discarded at document level
-- [ ] Per-line fusion still respects distance threshold
-- [ ] `apple_dropped` flag removed or repurposed to track per-line drops
+- [x] Apple OCR is never discarded at document level ✅
+- [x] Per-line fusion still respects distance threshold ✅
+- [x] `apple_dropped` flag removed or repurposed to track per-line drops ✅ (replaced with `apple_doc_similarity`)
 
 ### R2: Implement Character-Level Voting Within Lines
 
@@ -95,9 +95,9 @@ def align_and_vote(primary_lines, alt_lines, distance_drop=0.35):
 3. For disagreements, use confidence scores or voting (with 3 engines)
 
 **Acceptance Criteria**:
-- [ ] Character alignment function implemented
-- [ ] Per-character voting when engines disagree
-- [ ] Demonstrated improvement on test cases like "sTAMINA" vs "STAMINA"
+- [x] Character alignment function implemented ✅ (`fuse_characters()`)
+- [x] Per-character voting when engines disagree ✅
+- [x] Demonstrated improvement on test cases like "sTAMINA" vs "STAMINA" ✅ (test passes)
 
 ### R3: Enable EasyOCR as Third Engine
 
@@ -114,6 +114,8 @@ def align_and_vote(primary_lines, alt_lines, distance_drop=0.35):
 - [ ] `engines_raw` includes `easyocr` text for ≥95% of pages
 - [ ] Three-engine voting produces better results than two-engine
 
+**Status**: ⏸️ DEFERRED to story-063 (requires story-055 EasyOCR reliability first)
+
 ### R4: Implement Levenshtein Distance Outlier Detection
 
 **Problem**: No mechanism to detect when one engine produces garbage
@@ -125,9 +127,9 @@ def align_and_vote(primary_lines, alt_lines, distance_drop=0.35):
 3. Exclude outliers from voting
 
 **Acceptance Criteria**:
-- [ ] Pairwise distance calculation implemented
-- [ ] Outlier detection with configurable threshold
-- [ ] Outlier engine excluded from fusion for that page/line
+- [x] Pairwise distance calculation implemented ✅
+- [x] Outlier detection with configurable threshold ✅ (default 0.6)
+- [x] Outlier engine excluded from fusion for that page/line ✅
 
 ### R5: Add Confidence-Weighted Selection
 
@@ -140,9 +142,9 @@ def align_and_vote(primary_lines, alt_lines, distance_drop=0.35):
 3. Weight character/word votes by confidence
 
 **Acceptance Criteria**:
-- [ ] Extract confidence from Apple Vision output
-- [ ] Extract confidence from Tesseract (if available)
-- [ ] Confidence-weighted voting implemented
+- [x] Extract confidence from Apple Vision output ✅ (already in apple_helper.swift)
+- [ ] Extract confidence from Tesseract (if available) — DEFERRED to story-063
+- [x] Confidence-weighted voting implemented ✅
 
 ### R6: Inline Escalation for Critical Failures
 
@@ -155,36 +157,64 @@ def align_and_vote(primary_lines, alt_lines, distance_drop=0.35):
 3. Replace OCR output with vision model output
 
 **Acceptance Criteria**:
-- [ ] Critical failure threshold configurable
-- [ ] Inline escalation calls vision model
-- [ ] Budget tracking for inline escalation
-- [ ] Pages marked as escalated in output
+- [x] Critical failure threshold configurable ✅ (`--critical-corruption-threshold`, `--critical-disagree-threshold`)
+- [x] Inline escalation calls vision model ✅ (`inline_vision_escalate()`)
+- [x] Budget tracking for inline escalation ✅ (`--inline-escalation-budget`)
+- [x] Pages marked as escalated in output ✅ (`inline_escalated` flag)
 
 ## Tasks
 
 ### Phase 1: Fix Apple OCR Handling
-- [ ] Remove document-level discard check (lines 1104-1110)
-- [ ] Always run `align_and_vote()` for available engines
-- [ ] Update logging to track per-line source selection
-- [ ] Run regression test on 20-page dataset
+- [x] Remove document-level discard check (lines 1104-1110) ✅
+- [x] Always run `align_and_vote()` for available engines ✅
+- [x] Update logging to track per-line source selection ✅
+- [x] Run regression test on 20-page dataset ✅
 
-### Phase 2: Enable EasyOCR
+### Phase 2: Enable EasyOCR — ⏸️ DEFERRED to story-063
 - [ ] Implement fixes from story-055-easyocr-reliability.md
 - [ ] Add warmup/retry logic
 - [ ] Verify 3-engine output on full book
 - [ ] Update histogram to show EasyOCR contribution
 
 ### Phase 3: Improve Fusion Algorithm
-- [ ] Implement character-level alignment within lines
-- [ ] Add Levenshtein distance outlier detection
-- [ ] Implement voting with 3 engines
-- [ ] Add confidence weighting (where available)
+- [x] Implement character-level alignment within lines ✅
+- [x] Add Levenshtein distance outlier detection ✅
+- [ ] Implement voting with 3 engines (requires R3) — DEFERRED to story-063
+- [x] Add confidence weighting (where available) ✅
 
 ### Phase 4: Inline Escalation
-- [ ] Define critical failure thresholds
-- [ ] Implement inline vision model call
-- [ ] Add budget tracking
-- [ ] Test on high-disagreement pages
+- [x] Define critical failure thresholds ✅
+- [x] Implement inline vision model call ✅
+- [x] Add budget tracking ✅
+- [ ] Test on high-disagreement pages — DEFERRED to story-063
+
+### Phase 5: Quality Refinements (from manual inspection)
+
+#### Task 5.1: Lower Critical Failure Thresholds for Form Pages ✅
+**Problem**: Current thresholds (corruption > 0.8, disagree_rate > 0.8) are too high. Form pages like Adventure Sheets have severe OCR errors ("ADVENCURE SEEEC", "Shit =") but don't trigger inline escalation because corruption_score=0.
+
+**Solution**:
+- Add form page detection to `is_critical_failure()` check
+- Lower thresholds for pages detected as forms (corruption > 0.3 or disagree_rate > 0.5)
+- Consider IVR (in-vocab ratio) as additional signal - form pages have very low IVR
+
+**Acceptance Criteria**:
+- [x] Form pages with severe OCR errors trigger inline escalation ✅
+- [x] Non-form pages still use conservative thresholds ✅
+- [x] Test with Adventure Sheet page (011R) ✅
+
+#### Task 5.2: Filter Two-Column Fragment Artifacts ✅
+**Problem**: Two-column pages like 007L produce fragment artifacts ("his", "LL.", "ured", "ser") from right-column word endings being read separately. These fragments pollute the output.
+
+**Solution**:
+- Detect and filter very short lines (< 4 chars) that appear to be fragments
+- Only filter when they cluster at the end of the line list (column-edge pattern)
+- Preserve legitimate short lines (e.g., "10" page numbers, "Battles" headers)
+
+**Acceptance Criteria**:
+- [x] Fragment artifacts filtered from two-column pages ✅
+- [x] Legitimate short content (page numbers, headers) preserved ✅
+- [x] Fragmentation score reflects post-filtering quality ✅
 
 ## Research Sources
 
@@ -212,3 +242,156 @@ def align_and_vote(primary_lines, alt_lines, distance_drop=0.35):
   - Academic research shows 20-50% error reduction with consensus voting
   - Character-level fusion can catch errors like "sTAMINA" → "STAMINA"
 - **Next**: Implement R1 (remove document-level discard) as first step
+
+### 2025-12-10 — Implemented R1 and R2 (document-level fix + character fusion)
+- **Result**: Success - major improvement in Apple OCR utilization
+- **Changes**:
+  1. **Added `fuse_characters()` function** (`main.py:843-909`)
+     - Character-level alignment using SequenceMatcher
+     - Prefers uppercase over lowercase (fixes "sTAMINA" → "STAMINA")
+     - Prefers letters over digits for OCR confusions (fixes "cru5he5" → "crushes")
+     - Only triggers when lines are very similar (distance ≤ 0.15)
+
+  2. **Enhanced `align_and_vote()` function** (`main.py:912-1006`)
+     - Added `enable_char_fusion` parameter (default True)
+     - New source type "fused" for character-level fusion
+     - New source type "agree" when engines produce identical output
+     - Better handling of empty alt_lines
+
+  3. **Removed document-level Apple discard** (`main.py:1222-1243, 1313-1333`)
+     - No longer sets `apple_dropped = True` and clears alt_lines
+     - Added `apple_doc_similarity` metric for logging (still useful for stats)
+     - Always attempts per-line fusion regardless of document similarity
+     - Updated source attribution to track "fused" contributions
+
+  4. **Added 9 new tests** (`tests/test_ocr_quality_checks.py:357-436`)
+     - `fuse_characters`: identical, case difference, digit vs letter, empty, length
+     - `align_and_vote`: identical, empty alt, char fusion triggered, too different
+
+- **Regression Test Results** (20 pages / 40 sides):
+
+  | Metric | Before (story-057) | After (story-061) | Change |
+  |--------|-------------------|-------------------|--------|
+  | Apple selected | 9 pages (22.5%) | 26 pages (65%) | **+189%** |
+  | Tesseract selected | 25 pages | 12 pages | -52% |
+  | Fused (char-level) | 0 pages | 2 pages | New! |
+  | Lines from Apple | ~22% | **56.2%** | +155% |
+  | Lines where engines agree | Unknown | **20.4%** | New metric |
+  | Character-level fused lines | 0 | **11 (0.7%)** | New! |
+
+- **Sample verification**:
+  - Page 6R: Shows "fused" source with proper "SKILL and STAMINA scores" text
+  - Apple doc similarity now tracked (e.g., 0.978 for high agreement, 0.2 for low)
+  - Mixed source selection working: lines selected from agree/primary/alt/fused as appropriate
+
+- **All 24 tests pass**
+- **Next**: Consider R3 (EasyOCR) and R4 (outlier detection) for further improvements
+
+### 2025-12-10 — Implemented R4 (Levenshtein outlier detection)
+- **Result**: Success - outlier detection function added and integrated
+- **Changes**:
+  1. **Added `detect_outlier_engine()` function** (`main.py:912-998`)
+     - Computes pairwise Levenshtein distance between all engine outputs
+     - Identifies outlier engines (avg distance > threshold, default 0.6)
+     - Returns best agreeing pair, distances, and outlier list
+     - Useful when 3+ engines available to detect garbage output
+
+  2. **Integrated into main OCR flow** (`main.py:1313-1326`)
+     - Runs after collecting all engine outputs
+     - Records `outlier_engines`, `outlier_info` in part_by_engine
+     - If engine marked as outlier, excludes from fusion
+     - Added `apple_excluded_as_outlier` flag when Apple is outlier
+
+  3. **Added 5 new tests** (`tests/test_ocr_quality_checks.py:357-414`)
+     - Single engine: no outliers
+     - Two similar: no outliers
+     - Two very different: both can be outliers (correct behavior)
+     - Three engines with one garbage: detect outlier correctly
+     - Empty/error engines: properly ignored
+
+- **R3 (EasyOCR) blocked**: numpy version conflict (numpy 2.x vs 1.x)
+  - easyocr requires numpy<2 but was installed with numpy 2.x
+  - Fixed by downgrading to numpy 1.26.4
+  - EasyOCR dependency management deferred to story-055
+
+- **All 29 tests pass**
+
+### 2025-12-10 — Implemented R5 and R6 (confidence weighting + inline escalation)
+- **Result**: Success - both features implemented and tested
+
+- **R5: Confidence-Weighted Selection**:
+  1. **Modified `align_and_vote()` function** (`main.py:1038-1150`)
+     - Added `alt_confidences` parameter for Apple Vision confidence scores
+     - High confidence (≥0.8): prefer alt line, source="alt_confident"
+     - Low confidence (<0.5): prefer primary
+     - Otherwise: use length heuristic
+  2. **Updated all 3 callers** to extract and pass confidence from `apple_lines_meta`
+
+- **R6: Inline Escalation for Critical Failures**:
+  1. **Added `is_critical_failure()` function** (`main.py:151-185`)
+     - Detects critical OCR failures requiring immediate GPT-4V escalation
+     - Criteria: corruption_score > 0.8 OR disagree_rate > 0.8 OR (line_count < 3 AND missing_content > 0.7)
+
+  2. **Added `inline_vision_escalate()` function** (`main.py:87-148`)
+     - Encodes image to base64 and calls GPT-4V
+     - Returns transcribed text, lines, success status
+     - Lazy OpenAI client initialization
+
+  3. **New CLI arguments** (`main.py:1316-1334`):
+     - `--inline-escalation`: Enable inline GPT-4V escalation
+     - `--inline-escalation-model`: Vision model to use (default: gpt-4.1)
+     - `--critical-corruption-threshold`: Corruption threshold (default: 0.8)
+     - `--critical-disagree-threshold`: Disagree rate threshold (default: 0.8)
+     - `--inline-escalation-budget`: Max pages to escalate inline (default: 5)
+
+  4. **Integration into main OCR flow** (`main.py:1753-1796`):
+     - After quality metrics computed, check for critical failure
+     - If critical and budget available, call GPT-4V inline
+     - Replace OCR output with vision model output
+     - Track `inline_escalated` flag in page payload and quality report
+
+  5. **Updated histogram** (`main.py:1896-1909`):
+     - Added `inline_escalated` count to source histogram
+
+  6. **Added 7 new tests** (`tests/test_ocr_quality_checks.py:527-605`):
+     - `is_critical_failure`: high corruption, high disagree, few lines + missing, normal page, moderate issues, custom thresholds
+
+- **All 37 tests pass**
+- **Next**: R3 (EasyOCR) blocked by numpy conflict - deferred to story-055
+
+### 2025-12-10 — Implemented Phase 5 (Quality Refinements)
+- **Result**: Success - both refinement tasks completed based on manual inspection findings
+
+- **Manual Inspection Findings**:
+  - Pages 002L, 005L, 006L, etc. with 100% disagree_rate are blank/sparse pages (one engine finds nothing)
+  - Page 007L shows two-column fragment artifacts ("his", "LL.", "ured", etc.)
+  - Page 011R (Adventure Sheet) has severe OCR errors but doesn't trigger escalation
+
+- **Task 5.1: Lower Critical Thresholds for Form Pages**:
+  1. **Enhanced `is_critical_failure()` function** (`main.py:151-204`)
+     - Added `is_form_page` and `ivr` parameters
+     - Form pages with very low IVR (<0.15) trigger escalation
+     - Form pages with moderate disagree (>0.5) AND low IVR (<0.4) trigger escalation
+     - Form pages with high fragmentation (>0.3) AND low IVR (<0.5) trigger escalation
+  2. **Updated main OCR flow** (`main.py:1776-1790`)
+     - Pre-computes IVR and form detection before escalation check
+     - Passes `is_form_page` and `ivr` to `is_critical_failure()`
+  3. **Added 3 new tests** for form page escalation thresholds
+
+- **Task 5.2: Filter Two-Column Fragment Artifacts**:
+  1. **Added `filter_fragment_artifacts()` function** (`main.py:1149-1228`)
+     - Detects trailing clusters of very short lines (<4 chars)
+     - Preserves page numbers (digits), common short words, empty lines
+     - Only filters when 3+ fragments cluster at end (not scattered)
+  2. **Integrated into main OCR flow** (`main.py:1908-1919`)
+     - Runs after fusion, before creating line_rows
+     - Records removed fragments in `engines_raw` for provenance
+  3. **Added 6 new tests** for fragment filtering
+
+- **All 46 tests pass**
+
+### 2025-12-10 — Story marked DONE
+- **Completed**: R1, R2, R4, R5 (partial), R6, Task 5.1, Task 5.2
+- **Deferred to story-063**: R3 (EasyOCR), 3-engine voting, Tesseract confidence, inline escalation testing
+- **Reason**: R3 blocked by numpy version conflict requiring story-055 (EasyOCR reliability) to be completed first
+- **Deliverables**: 46 passing tests, 5 new functions, 6 CLI arguments for inline escalation

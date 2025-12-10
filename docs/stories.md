@@ -66,6 +66,9 @@ This index tracks stories in `/docs/stories/` for the codex-forge pipeline.
 || 058 | Post-OCR Text Quality & Error Correction | High | To Do | /docs/stories/story-058-post-ocr-text-quality.md |
 || 059 | Section Detection & Boundary Improvements | High | To Do | /docs/stories/story-059-section-detection-boundaries.md |
 || 060 | Pipeline Regression Testing Suite | High | Done | /docs/stories/story-060-pipeline-regression-testing.md |
+|| 061 | OCR Ensemble Fusion Improvements | High | Done | /docs/stories/story-061-ocr-ensemble-fusion.md |
+|| 062 | OCR Content Type Detection Module | Medium | Open | /docs/stories/story-062-ocr-content-type-detection.md |
+|| 063 | OCR Ensemble Three-Engine Voting | High | Open | /docs/stories/story-063-ocr-ensemble-three-engine.md |
 || 099 | Remove dev-only backcompat disclaimer | Low | To Do | /docs/stories/story-099-remove-dev-backcompat-note.md |
 
 ## Notes
