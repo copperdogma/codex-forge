@@ -138,3 +138,5 @@ Improve post-OCR text quality by adding spell-check, character confusion detecti
 - **Scope**: Focus on spell-check, character confusion detection, context-aware correction, and improving escalation logic to consider absolute quality.
 - **Next**: Implement spell-check integration into quality metrics, add character confusion detection, improve escalation logic.
 
+
+

@@ -224,3 +224,5 @@ corrected = corrector("The Hobgoblins ha them, so you decic")
 - Language models for OCR: GPT, BERT, T5 for text correction
 
 
+
+
