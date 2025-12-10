@@ -65,7 +65,7 @@ This index tracks stories in `/docs/stories/` for the codex-forge pipeline.
 || 057 | OCR Quality & Column Detection Improvements | High | To Do | /docs/stories/story-057-ocr-quality-column-detection.md |
 || 058 | Post-OCR Text Quality & Error Correction | High | To Do | /docs/stories/story-058-post-ocr-text-quality.md |
 || 059 | Section Detection & Boundary Improvements | High | To Do | /docs/stories/story-059-section-detection-boundaries.md |
-|| 060 | Pipeline Regression Testing Suite | High | To Do | /docs/stories/story-060-pipeline-regression-testing.md |
+|| 060 | Pipeline Regression Testing Suite | High | Done | /docs/stories/story-060-pipeline-regression-testing.md |
 || 099 | Remove dev-only backcompat disclaimer | Low | To Do | /docs/stories/story-099-remove-dev-backcompat-note.md |
 
 ## Notes
