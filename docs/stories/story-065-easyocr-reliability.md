@@ -30,3 +30,8 @@ Make easyocr a reliable third engine in the OCR ensemble (alongside tesseract an
 ### 20251208-?? — Story created
 - **Context:** Full runs still lack easyocr text; subset works. Need to make easyocr reliable at full scale.
 - **Next:** Add instrumentation/warmup/retry, then run full intake and check `engines_raw`/quality report.
+
+### 20251210-1307 — Reviewed current easyocr integration and story tasks
+- **Result:** Success (planning pass)
+- **Notes:** Verified tasks already present. Skimmed `modules/extract/extract_ocr_ensemble_v1/main.py`: easyocr reader cached via `get_easyocr_reader(lang)` with `download_enabled=True`, language hard-coded to `"en"` in `call_betterocr`, errors captured only as strings (no debug artifact). Canonical recipe still disables easyocr (`configs/recipes/recipe-ff-canonical.yaml`), while `recipe-ocr-ensemble-gpt4v.yaml` includes it. No per-run debug logging or warmup yet.
+- **Next:** Add per-run easyocr debug logging + warmup/retry logic in module; create smoke recipe; run subset then full intake and inspect artifacts for easyocr coverage.

@@ -52,6 +52,8 @@ This index tracks stories in `/docs/stories/` for the codex-forge pipeline.
 || 025 | Module pruning & registry hygiene | Medium | Done | /docs/stories/story-025-module-prune.md |
 || 026 | Onward to the Unknown — Arthur L'Heureux pilot | Medium | To Do | /docs/stories/story-026-onward-unknown-arthur-lheureux.md |
 || 027 | Contact-sheet intake for automatic book type planning | Medium | Done | /docs/stories/story-027-contact-sheet-auto-intake.md |
+|| 028 | Market Discovery for codex-forge | Medium | In Progress | /docs/stories/story-028-market-discovery.md |
+|| 029 | Audit model lineup vs latest OpenAI sheets | Medium | To Do | /docs/stories/story-029-model-audit-openai.md |
 || 030 | Fighting Fantasy Engine format export | High | Done | /docs/stories/story-030-ff-engine-format.md |
 || 031 | Fighting Fantasy output refinement | High | In Progress | /docs/stories/story-031-ff-output-refinement.md |
 || 032 | Unstructured intake & Document IR adoption | Medium | Done | /docs/stories/story-032-unstructured-intake-and-document-ir-adoption.md |
@@ -61,7 +63,12 @@ This index tracks stories in `/docs/stories/` for the codex-forge pipeline.
 || 036 | FF OCR Recovery & Text Repair | High | To Do | /docs/stories/story-036-ff-ocr-recovery-and-text-repair.md |
 || 037 | FF OCR Ensemble with BetterOCR | High | Done | /docs/stories/story-037-ocr-ensemble-with-betterocr.md |
 || 038 | Agentic Pipeline Coordinator | Medium | To Do | /docs/stories/story-038-agentic-pipeline-coordinator.md |
+|| 050 | FF Ending Detection Verification | Medium | Open | /docs/stories/story-050-ff-ending-detection.md |
+|| 051 | Text Quality Evaluation & Repair | High | Open | /docs/stories/story-051-text-quality-eval.md |
+|| 052 | Evaluate Apple Vision OCR Integration | Medium | Open | /docs/stories/story-052-apple-ocr-integration.md |
+|| 053 | Pipeline Smoke Test (Static Sample, No External Calls) | High | Open | /docs/stories/story-053-smoke-test-pipeline.md |
 || 054 | Canonical FF Recipe Consolidation | High | Done | /docs/stories/story-054-canonical-ff-recipe.md |
+|| 056 | Validation Forensics Automation | High | To Do | /docs/stories/story-056-validation-forensics.md |
 || 057 | OCR Quality & Column Detection Improvements | High | To Do | /docs/stories/story-057-ocr-quality-column-detection.md |
 || 058 | Post-OCR Text Quality & Error Correction | High | To Do | /docs/stories/story-058-post-ocr-text-quality.md |
 || 059 | Section Detection & Boundary Improvements | High | To Do | /docs/stories/story-059-section-detection-boundaries.md |
@@ -69,8 +76,11 @@ This index tracks stories in `/docs/stories/` for the codex-forge pipeline.
 || 061 | OCR Ensemble Fusion Improvements | High | Done | /docs/stories/story-061-ocr-ensemble-fusion.md |
 || 062 | OCR Content Type Detection Module | Medium | Open | /docs/stories/story-062-ocr-content-type-detection.md |
 || 063 | OCR Ensemble Three-Engine Voting | High | Open | /docs/stories/story-063-ocr-ensemble-three-engine.md |
+|| 064 | Apple Vision OCR (VNRecognizeTextRequest) Adapter | Medium | Open | /docs/stories/story-064-apple-vision-ocr.md |
+|| 065 | Stabilize EasyOCR as a Third OCR Engine | High | Open | /docs/stories/story-065-easyocr-reliability.md |
+|| 066 | FF Pipeline Accel + Accuracy Guardrails | High | To Do | /docs/stories/story-066-ff-pipeline-accel-accuracy.md |
 || 099 | Remove dev-only backcompat disclaimer | Low | To Do | /docs/stories/story-099-remove-dev-backcompat-note.md |
 
 ## Notes
-- Status “Done” reflects current working state in codex-forge. “To Do” items are planned next steps aligned with `docs/requirements.md` and `snapshot.md`.
+- Status "Done" reflects current working state in codex-forge. "To Do" items are planned next steps aligned with `docs/requirements.md` and `snapshot.md`.
 - Use existing files in `/docs/stories/` as templates for structure when creating these story documents.
