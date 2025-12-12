@@ -39,16 +39,16 @@
 - **Next:** Implement coarse pass module, merge stage, and continuation handling per expanded tasks.
 ### 20251123-1402 — Added coarse module and merge adapter draft
 - **Result:** Success; new `portionize_coarse_v1` module with large-window defaults and updated prompt; new `merge_coarse_fine_v1` adapter merging fine+coarse with uncovered threshold and continuation detection.
-- **Notes:** Updated DAG recipes (`configs/recipes/recipe-ocr-dag.yaml`, `configs/recipes/recipe-text-dag.yaml`) to use new modules; merge attaches continuation_of when spans touch/overlap within gap and titles align. No validation run yet.
-- **Next:** Run sample recipe to validate outputs against `portion_hyp_v1`, tune thresholds, and document merge rules in story/README.
+- **Notes:** Updated DAG recipes (`configs/recipes/recipe-text-dag.yaml`) to use new modules; merge attaches continuation_of when spans touch/overlap within gap and titles align. OCR DAG recipe is now deprecated in favor of the canonical pipeline.
+- **Next:** Run canonical pipeline (20-page) to validate outputs against `portion_hyp_v1`, tune thresholds, and document merge rules in story/README.
 ### 20251123-2038 — Ran text DAG recipe with coarse/fine merge
 - **Result:** Success; `python driver.py --recipe configs/recipes/recipe-text-dag.yaml --force` completed end-to-end. Coarse, fine, and merged outputs each validate with `portion_hyp_v1`.
 - **Notes:** Merge adapter now accepts driver `--inputs`; handles underscore/dash params. Sample run produced 1 portion; continuation heuristic exercised but simple input limited coverage. Validated `window_hypotheses_coarse.jsonl` and `adapter_out.jsonl` via `validate_artifact.py`.
 - **Next:** Run full PDF recipe (`recipe-ocr-dag.yaml`) to observe behavior on multi-page spans; document merge rules and add regression check for multi-page continuations.
-### 20251123-2055 — Ran full OCR DAG on deathtrap PDF
-- **Result:** Success; `python driver.py --recipe configs/recipes/recipe-ocr-dag.yaml --force` completed. Outputs: coarse 18 rows, fine 85 rows, merged 83 rows; locked/normalized/resolved 14 portions. Validated coarse and merged hypotheses with `validate_artifact.py --schema portion_hyp_v1`.
+### 20251123-2055 — Historical: OCR DAG run on deathtrap PDF
+- **Result:** Success; `python driver.py --recipe configs/recipes/recipe-ocr-dag.yaml --force` completed. Outputs: coarse 18 rows, fine 85 rows, merged 83 rows; locked/normalized/resolved 14 portions. (Recipe now deprecated.)
 - **Notes:** Continuation heuristic ran; need to inspect portions for long-span continuity and tune uncovered threshold if necessary. Runtime ~7.8 minutes (clean + portionize dominated).
-- **Next:** Document merge rules/tie-breaks, analyze merged coverage vs fine-only, and add regression for continuations.
+- **Next:** Use canonical pipeline (`recipe-ff-canonical.yaml`) for future runs; document merge rules/tie-breaks, analyze merged coverage vs fine-only, and add regression for continuations.
 ### 20251123-2105 — Inspection of merged artifacts (deathtrap run)
 - **Result:** Success; reviewed `adapter_out.jsonl` (83 rows, 36 with continuation_of) and resolved outputs.
 - **Notes:** Coverage complete for pages 1–20. Merge kept many duplicate hypotheses (e.g., multiple page 4 entries; repeated S14-17/S12-13) which consensus trimmed to 14 locked portions. Continuation links present in hypotheses but dropped after consensus/resolve (schema lacks continuation). Locked normalized portions show clean titles/types but no continuation metadata.

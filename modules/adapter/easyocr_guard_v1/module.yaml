@@ -1,0 +1,8 @@
+module_id: easyocr_guard_v1
+stage: adapter
+entrypoint: modules/adapter/easyocr_guard_v1/main.py
+input_schema: pagelines_v1
+output_schema: pagelines_v1
+default_params:
+  min_coverage: 1.0
+notes: "Guard: fail if easyocr text is missing/empty for more than the allowed fraction of pages."

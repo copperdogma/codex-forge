@@ -79,6 +79,7 @@ This index tracks stories in `/docs/stories/` for the codex-forge pipeline.
 || 064 | Apple Vision OCR (VNRecognizeTextRequest) Adapter | Medium | Open | /docs/stories/story-064-apple-vision-ocr.md |
 || 065 | Stabilize EasyOCR as a Third OCR Engine | High | Open | /docs/stories/story-065-easyocr-reliability.md |
 || 066 | FF Pipeline Accel + Accuracy Guardrails | High | To Do | /docs/stories/story-066-ff-pipeline-accel-accuracy.md |
+|| 067 | GPU Acceleration for OCR Pipeline | High | Done | /docs/stories/story-067-gpu-acceleration-ocr.md |
 || 099 | Remove dev-only backcompat disclaimer | Low | To Do | /docs/stories/story-099-remove-dev-backcompat-note.md |
 
 ## Notes

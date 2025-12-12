@@ -246,3 +246,4 @@ Improve OCR quality by fixing column detection issues, enhancing quality checks,
 - **Status**: Done
 - **Follow-on**: Analysis revealed Apple OCR dropped on 57.5% of pages due to aggressive document-level similarity check. Created **story-061-ocr-ensemble-fusion.md** to address multi-engine fusion improvements (separate concern from column detection).
 
+

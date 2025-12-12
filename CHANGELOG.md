@@ -1,3 +1,16 @@
+## [2025-12-12] - GPU “pit of success” for EasyOCR on Apple Silicon
+
+### Added
+- Metal-friendly constraints file (`constraints/metal.txt`) and GPU regression helper (`scripts/regression/check_easyocr_gpu.py`) plus one-shot smoke runner (`scripts/smoke_easyocr_gpu.sh`).
+- EasyOCR coverage guard warning when MPS is unavailable, keeping runs explicit about CPU fallback.
+
+### Changed
+- EasyOCR warmup and run defaults now force MPS when present; docs (README.md, AGENTS.md) updated to make `pip install ... -c constraints/metal.txt` the default bootstrap and to include GPU smoke + check commands.
+- Story 067 marked done; README/AGENTS include MPS troubleshooting and smoke guidance.
+
+### Tested
+- 5-page EasyOCR-only GPU smoke via `scripts/smoke_easyocr_gpu.sh` (intake only, MPS gpu:true, timing summary).
+
 ## [2025-12-10] - FF20 regression suite and quality guards
 
 ### Added
@@ -80,7 +93,7 @@
 
 ### Tested
 - `python driver.py --recipe configs/recipes/recipe-text.yaml --force` (passes; stamps/validates).
-- `python driver.py --recipe configs/recipes/recipe-ocr-1-20.yaml --skip-done` (passes; stamps/validates).
+- `python driver.py --recipe configs/recipes/recipe-ff-canonical.yaml --skip-done` (passes; stamps/validates) — replaces legacy 20-page OCR smoke.
 
 ## [2025-11-21] - Legacy cleanup and DAG-style recipes
 
@@ -91,7 +104,7 @@
 
 ### Tested
 - `python driver.py --recipe configs/recipes/recipe-text.yaml --force`
-- `python driver.py --recipe configs/recipes/recipe-ocr-1-20.yaml --force`
+- `python driver.py --recipe configs/recipes/recipe-ff-canonical.yaml --force`
 
 ## [2025-11-21] - Added modular pipeline story
 
@@ -105,7 +118,7 @@
 
 ### Added
 - DAG-capable driver plan/validation with schema-aware resume checks and adapter stage support.
-- `merge_portion_hyp_v1` adapter module plus DAG recipes (`recipe-ocr-dag.yaml`, `recipe-text-dag.yaml`) using coarse+fine portionize branches.
+- `merge_portion_hyp_v1` adapter module plus DAG recipes (`recipe-text-dag.yaml`) using coarse+fine portionize branches. (`recipe-ocr-dag.yaml` deprecated in favor of `recipe-ff-canonical.yaml`.)
 - GitHub Actions workflow `tests.yml` running driver unit tests; README badge and DAG usage notes.
 
 ### Fixed/Changed
@@ -130,7 +143,7 @@
 ### Tested
 - `python -m unittest discover -s tests -p 'driver_*test.py'` (passes; 9 tests).
 - `python driver.py --recipe configs/recipes/recipe-text-dag.yaml --force` (passes; artifacts stamped/validated).
-- `python driver.py --recipe configs/recipes/recipe-ocr-dag.yaml --skip-done` (passes; OCR pages 1–20 end-to-end).
+- `python driver.py --recipe configs/recipes/recipe-ff-canonical.yaml --skip-done` (passes; OCR pages 1–20 end-to-end).
 
 ## [2025-11-22] - Shared common package and module import cleanup
 

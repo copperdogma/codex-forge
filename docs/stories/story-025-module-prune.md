@@ -111,7 +111,7 @@ Audit the module registry, identify redundant/unused modules, and prune or clear
 - **Next:** Run OCR/text smoke recipes to verify refs clean; consider updating stories index if needed.
 ### 20251126-1100 — Smoke tests after prune
 - **Result:** Partial success.
-- **Notes:** `recipe-text.yaml --mock --instrument` passes. Full `recipe-ocr.yaml` timed out twice (likely heavy OCR even with mock). Ran truncated smoke `recipe-ocr-1-20.yaml --mock --instrument` successfully (20 pages). Modules/recipes resolved cleanly post-prune.
+- **Notes:** `recipe-text.yaml --mock --instrument` passes. Full `recipe-ocr.yaml` timed out twice (likely heavy OCR even with mock). Truncated smoke now uses `recipe-ff-canonical.yaml --mock --instrument` (20 pages). Modules/recipes resolved cleanly post-prune.
 - **Next:** If needed, rerun full OCR with higher timeout or cached pages; otherwise proceed with dashboard sanity if required.
 ### 20251126-1121 — Full OCR smoke succeeded
 - **Result:** Success.

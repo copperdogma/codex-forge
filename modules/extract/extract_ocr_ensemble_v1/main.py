@@ -5,6 +5,7 @@ import difflib
 import sys
 import json
 import subprocess
+from datetime import datetime
 from pathlib import Path
 from typing import Dict, Any, List, Optional
 import numpy as np
@@ -17,8 +18,15 @@ VENDOR = ROOT / ".pip-packages"
 if VENDOR.exists() and os.environ.get("CODEX_SKIP_VENDOR") != "1":
     sys.path.insert(0, str(VENDOR))
 
+# Mitigate libomp SHM failures in sandboxed environments (EasyOCR/torch)
+os.environ.setdefault("KMP_USE_SHMEM", "0")
+os.environ.setdefault("KMP_CREATE_SHMEM", "FALSE")
+os.environ.setdefault("OMP_NUM_THREADS", "1")
+os.environ.setdefault("KMP_AFFINITY", "disabled")
+os.environ.setdefault("KMP_INIT_AT_FORK", "FALSE")
+
 from modules.common import render_pdf, run_ocr, ensure_dir, save_json, save_jsonl, ProgressLogger
-from modules.common.utils import english_wordlist
+from modules.common.utils import english_wordlist, append_jsonl
 from modules.common.image_utils import (
     sample_spread_decision, split_spread_at_gutter, deskew_image,
     detect_spread_and_split,  # kept for backward compatibility
@@ -32,16 +40,105 @@ def split_lines(text: str):
     # Preserve blank lines to keep paragraph breaks visible downstream
     return text.splitlines()
 
+def _mps_available() -> bool:
+    try:
+        import torch
+        return bool(torch.backends.mps.is_available() and torch.backends.mps.is_built())
+    except Exception:
+        return False
+
+
 # cache easyocr readers to avoid repeated downloads
-_easyocr_readers = {}
+_easyocr_readers: Dict[Any, Any] = {}
 
 
-def get_easyocr_reader(lang: str):
+def get_easyocr_reader(lang: str, *, download_enabled: bool = True, reset: bool = False, gpu: bool = False):
     import easyocr
-    key = lang.lower()
+    # Force torch default device to MPS when available so EasyOCR truly uses GPU
+    try:
+        import torch  # noqa: WPS433
+        if gpu and torch.backends.mps.is_available():
+            torch.set_default_device("mps")
+    except Exception:
+        pass
+
+    key = (lang.lower(), bool(download_enabled), bool(gpu))
+    if reset and key in _easyocr_readers:
+        _easyocr_readers.pop(key, None)
     if key not in _easyocr_readers:
-        _easyocr_readers[key] = easyocr.Reader([key], gpu=False, download_enabled=True)
+        _easyocr_readers[key] = easyocr.Reader([lang], gpu=gpu, download_enabled=download_enabled)
     return _easyocr_readers[key]
+
+
+class EasyOcrRunState:
+    """
+    Per-run recorder for easyocr attempts, model metadata, and the first failure.
+    """
+
+    def __init__(self, debug_path: Optional[str], run_id: Optional[str] = None):
+        self.debug_path = debug_path
+        self.run_id = run_id
+        self.first_error_logged = False
+
+    def _now(self) -> str:
+        return datetime.utcnow().isoformat() + "Z"
+
+    def log(self, event: str, **kwargs):
+        if not self.debug_path:
+            return
+        payload = {"ts": self._now(), "event": event, "run_id": self.run_id}
+        payload.update(kwargs)
+        append_jsonl(self.debug_path, payload)
+
+    def log_first_error(self, **kwargs):
+        if self.first_error_logged:
+            return
+        self.first_error_logged = True
+        self.log("first_error", **kwargs)
+
+
+def warmup_easyocr(
+    sample_image: Optional[str],
+    langs: List[str],
+    state: Optional[EasyOcrRunState],
+    gpu: bool = False,
+):
+    """
+    Run a single easyocr read on a sample image to surface model download or init failures early.
+    """
+    if not state or not sample_image:
+        return
+    for lang in langs:
+        try:
+            reader = get_easyocr_reader(lang, download_enabled=True, reset=False, gpu=gpu)
+            state.log(
+                "easyocr_warmup_start",
+                lang=lang,
+                image=os.path.basename(sample_image),
+                model_dir=getattr(reader, "model_storage_directory", None),
+                user_network_dir=getattr(reader, "user_network_directory", None),
+                download_enabled=True,
+                gpu=gpu,
+            )
+            reader.readtext(sample_image, detail=0, paragraph=False, batch_size=1)
+            state.log(
+                "easyocr_warmup_success",
+                lang=lang,
+                image=os.path.basename(sample_image),
+            )
+            return
+        except Exception as ex:
+            err = str(ex)
+            state.log(
+                "easyocr_warmup_error",
+                lang=lang,
+                image=os.path.basename(sample_image),
+                error=err,
+            )
+            state.log_first_error(lang=lang, error=err, image=os.path.basename(sample_image))
+            # reset cache for next attempt in case reader is in bad state
+            _easyocr_readers.pop((lang.lower(), True), None)
+    state.log("easyocr_warmup_failed_all", langs=langs, image=os.path.basename(sample_image))
 
 
 def compute_disagreement(by_engine):
@@ -899,7 +996,13 @@ def call_apple(pdf_path: str, page: int, lang: str, fast: bool, helper_path: Pat
 
 
 def call_betterocr(image_path: str, engines, lang: str, *, use_llm: bool, llm_model: str,
-                   allow_fallback: bool, psm: int, oem: int):
+                   allow_fallback: bool, psm: int, oem: int,
+                   easyocr_state: Optional[EasyOcrRunState] = None,
+                   easyocr_langs: Optional[List[str]] = None,
+                   easyocr_gpu: bool = False,
+                   easyocr_retry_hi_res: bool = False,
+                   pdf_path: Optional[str] = None,
+                   page_num: Optional[int] = None):
     """
     Lightweight ensemble:
     - tesseract via pytesseract (run_ocr)
@@ -916,16 +1019,106 @@ def call_betterocr(image_path: str, engines, lang: str, *, use_llm: bool, llm_mo
         by_engine["tesseract_error"] = str(ex)
 
     easy_text = ""
+    easy_error = None
+    attempted_langs = easyocr_langs or ["en", "en_legacy"]
     if "easyocr" in engines:
-        try:
-            import easyocr
-            easy_lang = "en"  # force to en for stability
-            reader = get_easyocr_reader(easy_lang)
-            result = reader.readtext(image_path, detail=0, paragraph=False)
-            easy_text = "\n".join(result)
-            by_engine["easyocr"] = easy_text
-        except Exception as ex:
-            by_engine["easyocr_error"] = str(ex)
+        for attempt_lang in attempted_langs:
+            try:
+                easyocr_state and easyocr_state.log(
+                    "easyocr_attempt",
+                    scope="page",
+                    image=os.path.basename(image_path),
+                    lang=attempt_lang,
+                )
+                reader = get_easyocr_reader(attempt_lang, download_enabled=True, gpu=easyocr_gpu)
+                easyocr_state and easyocr_state.log(
+                    "easyocr_reader_ready",
+                    scope="page",
+                    image=os.path.basename(image_path),
+                    lang=attempt_lang,
+                    model_dir=getattr(reader, "model_storage_directory", None),
+                    user_network_dir=getattr(reader, "user_network_directory", None),
+                    download_enabled=True,
+                    gpu=easyocr_gpu,
+                )
+                result = reader.readtext(image_path, detail=0, paragraph=False)
+                easy_text = "\n".join(result)
+                is_empty = not easy_text.strip()
+                by_engine["easyocr"] = easy_text
+                by_engine["easyocr_lang"] = attempt_lang
+                easyocr_state and easyocr_state.log(
+                    "easyocr_success",
+                    scope="page",
+                    image=os.path.basename(image_path),
+                    lang=attempt_lang,
+                    lines=len(result),
+                    chars=len(easy_text),
+                    empty=is_empty,
+                    gpu=easyocr_gpu,
+                )
+                if is_empty and easyocr_retry_hi_res:
+                    # Try a hi-res re-render and second EasyOCR pass
+                    hi_path = image_path
+                    try:
+                        base_dir = Path(image_path).parent
+                        hi_path = base_dir / (Path(image_path).stem + "-hi.png")
+                        from modules.common import render_pdf
+                        target_pdf = pdf_path or str(Path(image_path).parents[2] / "input/06 deathtrap dungeon.pdf")
+                        target_page = page_num
+                        if target_page is None:
+                            import re
+                            m = re.search(r"page-(\\d+)", os.path.basename(image_path))
+                            target_page = int(m.group(1)) if m else None
+                        if target_page:
+                            rendered = render_pdf(target_pdf, str(base_dir), dpi=400, start_page=target_page, end_page=target_page)
+                            if rendered:
+                                hi_path = rendered[0]
+                        result_hi = reader.readtext(str(hi_path), detail=0, paragraph=False)
+                        hi_text = "\\n".join(result_hi)
+                        if hi_text.strip():
+                            easy_text = hi_text
+                            is_empty = False
+                            by_engine["easyocr_retry"] = {"path": str(hi_path), "lines": len(result_hi), "chars": len(hi_text)}
+                            by_engine["easyocr"] = easy_text  # promote retry text to primary output
+                    except Exception as retry_ex:
+                        easyocr_state and easyocr_state.log(
+                            "easyocr_retry_error",
+                            scope="page",
+                            image=os.path.basename(image_path),
+                            lang=attempt_lang,
+                            error=str(retry_ex),
+                        )
+                if is_empty:
+                    # Treat empty result as failure and try next language
+                    easyocr_state and easyocr_state.log(
+                        "easyocr_empty",
+                        scope="page",
+                        image=os.path.basename(image_path),
+                        lang=attempt_lang,
+                    )
+                    _easyocr_readers.pop((attempt_lang.lower(), True, easyocr_gpu), None)
+                    easy_text = ""
+                    continue
+                break
+            except Exception as ex:
+                easy_error = str(ex)
+                by_engine.setdefault("easyocr_errors", []).append({"lang": attempt_lang, "error": easy_error})
+                easyocr_state and easyocr_state.log(
+                    "easyocr_attempt_error",
+                    scope="page",
+                    image=os.path.basename(image_path),
+                    lang=attempt_lang,
+                    error=easy_error,
+                )
+                easyocr_state and easyocr_state.log_first_error(
+                    lang=attempt_lang,
+                    error=easy_error,
+                    image=os.path.basename(image_path),
+                )
+                # Clear cached reader to allow clean retry on next language
+                _easyocr_readers.pop((attempt_lang.lower(), True), None)
+        if not easy_text and easy_error:
+            by_engine["easyocr_error"] = easy_error
 
     candidates = []
     if tess_text:
@@ -1461,13 +1654,24 @@ def main():
     ocr_dir = os.path.join(args.outdir, "ocr_ensemble")
     pages_dir = os.path.join(ocr_dir, "pages")
     engines_dir = os.path.join(ocr_dir, "ocr_engines")
+    easyocr_debug_path = os.path.join(ocr_dir, "easyocr_debug.jsonl") if "easyocr" in args.engines else None
+    easyocr_state = EasyOcrRunState(easyocr_debug_path, run_id=args.run_id) if easyocr_debug_path else None
+    easyocr_langs = ["en"]  # keep to supported English model on this host
+    easyocr_gpu = _mps_available()
     ensure_dir(images_dir)
     ensure_dir(pages_dir)
     if args.write_engine_dumps:
         ensure_dir(engines_dir)
+    if "easyocr" in args.engines and not easyocr_gpu:
+        logger.log("extract", "warning",
+                   message="EasyOCR GPU unavailable (MPS not available); running EasyOCR on CPU.")
 
     image_paths = render_pdf(args.pdf, images_dir, dpi=args.dpi,
                              start_page=args.start, end_page=args.end)
+
+    # Warmup easyocr once to surface model download or init failures before the page loop
+    if "easyocr" in args.engines and image_paths:
+        warmup_easyocr(image_paths[0], easyocr_langs, easyocr_state, gpu=easyocr_gpu)
 
     apple_helper = None
     if use_apple:
@@ -1542,6 +1746,12 @@ def main():
                 pil_img = reduce_noise(pil_img, method="morphological", kernel_size=2)
 
         for part_idx, (img_obj, img_path_part, side) in enumerate(images_to_ocr):
+            # Virtual page key: use L/R suffix for spreads, plain number for single pages
+            if side:
+                page_key = f"{idx:03d}{side}"  # e.g., "001L", "001R"
+            else:
+                page_key = idx  # plain integer for non-spread pages
+
             col_spans = []
             apple_lines_meta = []
             apple_text = ""
@@ -1580,6 +1790,12 @@ def main():
                     allow_fallback=allow_fallback,
                     psm=args.psm,
                     oem=args.oem,
+                    easyocr_state=easyocr_state,
+                    easyocr_langs=easyocr_langs,
+                    easyocr_gpu=easyocr_gpu,
+                    easyocr_retry_hi_res=True,
+                    pdf_path=args.pdf,
+                    page_num=idx,
                 )
                 fused_before_post = split_lines(text)
 
@@ -1608,6 +1824,7 @@ def main():
                         # Calculate document-level similarity for logging
                         ratio = difflib.SequenceMatcher(None, text, "\n".join(alt_lines), autojunk=False).ratio()
                         part_by_engine["apple_doc_similarity"] = round(ratio, 3)
+                        part_by_engine["apple"] = apple_text  # persist Apple text for provenance
                     # Extract confidence scores from Apple OCR metadata
                     alt_confidences = None
                     if apple_lines_meta:
@@ -1634,6 +1851,8 @@ def main():
                 import numpy as np
                 w, h = img_obj.size
                 col_fusions = []
+                if apple_text:
+                    part_by_engine["apple"] = apple_text  # persist Apple OCR text even in multi-column path
                 for col_idx, span in enumerate(col_spans):
                     x0 = int(span[0] * w)
                     x1 = int(span[1] * w)
@@ -1702,6 +1921,10 @@ def main():
                         allow_fallback=allow_fallback,
                         psm=args.psm,
                         oem=args.oem,
+                        easyocr_state=easyocr_state,
+                        easyocr_langs=easyocr_langs,
+                        easyocr_gpu=easyocr_gpu,
+                        easyocr_retry_hi_res=True,
                     )
                     fused_before_post = split_lines(text_single)
                     if use_apple and apple_text:
@@ -1928,14 +2151,8 @@ def main():
 
             # Note: ivr and form_check already computed above for inline escalation
 
-            # Virtual page key: use L/R suffix for spreads, plain number for single pages
             # Note: page_key is used for index/file mapping; page field in payload must be int for schema
-            if side:
-                page_key = f"{idx:03d}{side}"  # e.g., "001L", "001R"
-                page_filename = f"page-{idx:03d}{side}.json"
-            else:
-                page_key = idx  # plain integer for non-spread pages
-                page_filename = f"page-{idx:03d}.json"
+            page_filename = f"page-{idx:03d}{side or ''}.json"
 
             page_payload = {
                 "schema_version": "pagelines_v1",

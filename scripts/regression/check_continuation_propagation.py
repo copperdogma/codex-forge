@@ -1,11 +1,11 @@
 """
 Lightweight regression guard to ensure continuation metadata survives the pipeline.
 
-Usage:
+Usage (canonical 20-page smoke):
   python scripts/regression/check_continuation_propagation.py \\
-    --hypotheses output/runs/deathtrap-ocr-dag/adapter_out.jsonl \\
-    --locked output/runs/deathtrap-ocr-dag/portions_locked_merged.jsonl \\
-    --resolved output/runs/deathtrap-ocr-dag/portions_resolved.jsonl
+    --hypotheses output/runs/ff-canonical/adapter_out.jsonl \\
+    --locked output/runs/ff-canonical/portions_locked.jsonl \\
+    --resolved output/runs/ff-canonical/portions_resolved.jsonl
 
 Checks:
 - Schemas can be parsed.

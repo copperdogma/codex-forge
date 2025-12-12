@@ -12,7 +12,7 @@ default_params:
   use_llm: false
   llm_model: gpt-4.1-mini
   escalation_threshold: 0.15
-  write_engine_dumps: false
+  write_engine_dumps: true
   disable_fallback: false
   psm: 4
   oem: 3

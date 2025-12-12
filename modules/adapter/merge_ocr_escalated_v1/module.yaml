@@ -2,5 +2,4 @@ module_id: merge_ocr_escalated_v1
 stage: adapter
 entrypoint: modules/adapter/merge_ocr_escalated_v1/main.py
 description: Merge original OCR output with escalated pages into unified index
-output_schema: pagelines_v1
-
+output_schema: adapter_out

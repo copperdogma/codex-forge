@@ -140,11 +140,12 @@ Before portionization, automatically flag pages for high-fidelity re-OCR if eith
 - Driver: `driver.py` (executes recipes, stamps/validates artifacts).
 - Schemas: `schemas.py`; validator: `validate_artifact.py`.
 - Settings samples: `settings.example.yaml`, `settings.smoke.yaml`
+- FF smoke (20pp run-only check): `configs/settings.ff-canonical-smoke.yaml` with canonical recipe; use `--settings` instead of a separate recipe.
 - Docs: `README.md`, `snapshot.md`, `docs/stories/` (story tracker in `docs/stories.md`)
 - Inputs: `input/` (PDF, images, text); Outputs: `output/` (git-ignored)
 
 ## Current Pipeline (modules + driver)
-- Use `driver.py` with recipes in `configs/recipes/` (DAG-style ids/needs). Examples: `recipe-ocr.yaml`, `recipe-text.yaml`, `recipe-ocr-1-20.yaml`.
+- Use `driver.py` with recipes in `configs/recipes/`. Examples: `recipe-ff-canonical.yaml`, `recipe-ocr.yaml`, `recipe-text.yaml`.
 - Legacy linear scripts were removed; use modules only.
 
 ## Modular Plan (story 015)
@@ -153,6 +154,7 @@ Before portionization, automatically flag pages for high-fidelity re-OCR if eith
 
 ## Key Files/Paths
 - Artifacts live under `output/runs/<run_id>/`.
+- Driver now auto-generates a fresh `run_id`/output directory per run; reuse is opt-in via `--allow-run-id-reuse` (or explicit `--run-id`).
 - Input PDF: `input/06 deathtrap dungeon.pdf`; images: `input/images/`.
 - Story work logs: bottom of each `docs/stories/story-XXX-*.md`.
 - Change log: `CHANGELOG.md`.
@@ -169,28 +171,29 @@ Before portionization, automatically flag pages for high-fidelity re-OCR if eith
 
 ## Environment Awareness
 
-**Before assuming x86_64/Rosetta, check for ARM64 environment:**
+**Always run on ARM64 + MPS (GPU) by default**
 
-On Apple Silicon (M-series) Macs, check which Python architecture you're using:
-
-```bash
-# Check current environment
-python -c "import platform; print(f'Machine: {platform.machine()}')"
-# ARM64: "arm64" → use hi_res strategy, ARM64 environment
-# x86_64: "x86_64" → use ocr_only strategy, or check if ARM64 env exists
-
-# Check if ARM64 environment exists (even if not currently active)
-ls ~/miniforge3/envs/codex-arm/bin/python 2>/dev/null && echo "ARM64 env available - activate it!"
-```
-
-**Key point**: Don't assume x86_64 just because the current shell shows x86_64. On M-series Macs, check for ARM64 environment first - it's faster and supports `hi_res` OCR strategy.
+- Create/refresh env (Metal-friendly pins live in requirements.txt + constraints/metal.txt):
+  - `conda create -n codex-arm-mps python=3.11`
+  - `conda activate codex-arm-mps`
+  - `pip install --no-cache-dir -r requirements.txt -c constraints/metal.txt` (pulls torch==2.9.1 / torchvision==0.24.1 / Pillow<13)
+- Activate env: `source ~/miniforge3/bin/activate codex-arm-mps`
+- Guard: `python scripts/check_arm_mps.py` (fails if not arm64 or MPS unavailable)
+- SHM-safe env (EasyOCR): `KMP_USE_SHMEM=0 KMP_CREATE_SHMEM=FALSE OMP_NUM_THREADS=1 KMP_AFFINITY=disabled KMP_INIT_AT_FORK=FALSE`
+- GPU sanity (5pp EasyOCR-only): `python driver.py --recipe configs/recipes/recipe-ff-canonical.yaml --settings configs/settings.easyocr-gpu-test.yaml --end-at intake --run-id cf-easyocr-mps-5 --output-dir /tmp/cf-easyocr-mps-5 --force`
+- After any GPU smoke, verify EasyOCR actually ran on GPU:  
+  `python scripts/regression/check_easyocr_gpu.py --debug-file /tmp/cf-easyocr-mps-5/ocr_ensemble/easyocr_debug.jsonl`
+- Shortcut: `./scripts/smoke_easyocr_gpu.sh /tmp/cf-easyocr-mps-5` (run + check in one step)
+- Smoke pipeline (5pp quick run): `python driver.py --recipe configs/recipes/recipe-ff-canonical.yaml --settings configs/settings.ff-canonical-smoke-5.yaml --run-id ff-canonical-smoke-5 --output-dir /tmp/cf-ff-canonical-smoke-5 --force`
+- If EasyOCR debug shows `gpu: false`, you are on the wrong env or missing Metal torch—switch to `codex-arm-mps`.
+- Expected warning: `pin_memory not supported on MPS` from torch DataLoader is benign.
 
 ## Safe Command Examples
 - Inspect status: `git status --short`
 - List files: `ls`, `rg --files`
 - View docs: `sed -n '1,120p' docs/stories/story-015-modular-pipeline.md`
 - Run validator: `python validate_artifact.py --schema portion_hyp_v1 --file output/...jsonl`
-- Dry-run a DAG recipe: `python driver.py --recipe configs/recipes/recipe-ocr-dag.yaml --dry-run`
+- Dry-run the canonical 20-page recipe: `python driver.py --recipe configs/recipes/recipe-ff-canonical.yaml --dry-run`
 - Section coverage check (map + backfill + fail on missing): `python modules/adapter/section_target_guard_v1/main.py --inputs output/runs/ocr-enrich-sections-noconsensus/portions_enriched.jsonl --out /tmp/portions_enriched_guard.jsonl --report /tmp/section_target_report.json`
 - Legacy map/backfill adapters are obsolete; use `section_target_guard_v1` (no backward compatibility maintained).
 - **Dashboard Testing**: Serve from repo root (`python -m http.server 8000`) and access via `http://localhost:8000/docs/pipeline-visibility.html`. Do not use `file://` URIs as they block CORS/fetch.

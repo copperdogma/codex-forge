@@ -57,9 +57,9 @@
 - **Result:** Success — added input resolution rule (schema-based inference plus optional `inputs` map) to Plan.
 - **Notes:** Still need concrete mapping for build stage argument names and how to surface errors for ambiguous schemas.
 - **Next:** Draft updated recipe example with ids/needs/inputs for coarse+fine portionize merge to consensus.
-### 20251121-1815 — Added DAG sample recipes
-- **Result:** Success — created `configs/recipes/recipe-ocr-dag.yaml` and `configs/recipes/recipe-text-dag.yaml` with full ids/needs/inputs and output overrides, illustrating coarse+fine portionizers merged into consensus then resolve/build.
-- **Notes:** Current consensus CLI only accepts a single hypotheses file; will require concat or adapter step when DAG executor is built. Driver still linear; recipes are reference fixtures for upcoming DAG implementation.
+### 20251121-1815 — Added DAG sample recipes (historical)
+- **Result:** Success — created `configs/recipes/recipe-text-dag.yaml` with full ids/needs/inputs and output overrides, illustrating coarse+fine portionizers merged into consensus then resolve/build. (Former `recipe-ocr-dag.yaml` is now deprecated in favor of the canonical pipeline.)
+- **Notes:** Current consensus CLI only accepts a single hypotheses file; will require concat or adapter step when DAG executor is built. Driver still linear; recipe served as a reference fixture for upcoming DAG implementation.
 - **Next:** Scaffold driver DAG planner/validator to load these recipes, detect multi-input consensus need, and design adapter/concat strategy.
 ### 20251121-1850 — Scaffolded DAG executor path in driver
 - **Result:** Success — added plan builder (ids/needs, outputs map, toposort, validation) and new driver execution path keyed by stage ids with `--dump-plan`. Input resolution wired for single-input stages and build’s multi-input via `inputs` map; consensus currently errors on multi-input to enforce adapter merge.

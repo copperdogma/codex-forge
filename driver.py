@@ -456,6 +456,18 @@ def load_recipe(path: str) -> Dict[str, Any]:
         return yaml.safe_load(f)
 
 
+def _default_run_id(base: str = "run") -> str:
+    """
+    Generate a timestamped run_id to avoid reuse of stale state/artifacts.
+    Format: <base>-YYYYMMDD-HHMMSS-<6hex>
+    """
+    import uuid
+    from datetime import datetime
+    ts = datetime.now().strftime("%Y%m%d-%H%M%S")
+    rand = uuid.uuid4().hex[:6]
+    return f"{base}-{ts}-{rand}"
+
+
 def update_state(state_path: str, progress_path: str, stage_name: str, status: str, artifact: str, run_id: str = None,
                  module_id: str = None, schema_version: str = None, stage_description: str = None):
     logger = ProgressLogger(state_path=state_path, progress_path=progress_path, run_id=run_id)
@@ -518,7 +530,7 @@ def build_command(entrypoint: str, params: Dict[str, Any], stage_conf: Dict[str,
         if stage_conf["module"] == "fine_segment_frontmatter_v1" and artifact_index:
             coarse_segments_path = artifact_index.get("coarse_segment", {}).get("path")
             if coarse_segments_path:
-                cmd += ["--coarse-segments", coarse_segments_path]
+                cmd += ["--coarse-segments", os.path.abspath(coarse_segments_path)]
         cmd += ["--out", artifact_path]
         flags_added.update({"--pages", "--out"})
     elif stage_conf["stage"] == "adapter":
@@ -623,6 +635,15 @@ def build_command(entrypoint: str, params: Dict[str, Any], stage_conf: Dict[str,
     seen_flags = set(flags_added)
     for key, val in (params or {}).items():
         flag = f"--{key}"
+        # Special-case param flag normalization for modules that expect hyphens
+        if stage_conf.get("module") == "fine_segment_frontmatter_v1" and key == "coarse_segments":
+            flag = "--coarse-segments"
+            # Prefer artifact from coarse_segment stage if available
+            coarse_art = artifact_index.get("coarse_segment", {}).get("path")
+            if coarse_art and os.path.exists(coarse_art):
+                val = coarse_art
+            else:
+                val = os.path.abspath(val) if not os.path.isabs(str(val)) else val
         if flag in seen_flags:
             continue
         if val is None:
@@ -791,7 +812,10 @@ def main():
     parser.add_argument("--instrument", action="store_true", help="Enable instrumentation (timing/cost)")
     parser.add_argument("--price-table", help="Path to model pricing YAML (prompt_per_1k/completion_per_1k)")
     parser.add_argument("--settings", help="Optional settings YAML to snapshot for reproducibility")
-    parser.add_argument("--run-id", dest="run_id_override", help="Override run_id from recipe (useful for smoke runs)")
+    parser.add_argument("--run-id", dest="run_id_override",
+                        help="Use a specific run_id (default: auto-generate unique run_id/output_dir per run).")
+    parser.add_argument("--allow-run-id-reuse", action="store_true",
+                        help="Allow reusing the run_id/output_dir from the recipe; default is to auto-generate a fresh one to avoid stale artifacts.")
     parser.add_argument("--output-dir", dest="output_dir_override", help="Override output_dir from recipe (useful for smoke runs / temp dirs)")
     parser.add_argument("--input-pdf", dest="input_pdf_override", help="Override input.pdf from recipe (useful for smoke fixtures)")
     parser.add_argument("--start-from", dest="start_from", help="Start executing at this stage id (requires upstream artifacts present in state)")
@@ -831,8 +855,13 @@ def main():
         price_table_path = "configs/pricing.default.yaml"
     pricing = _load_pricing(price_table_path) if (instrument_enabled and price_table_path) else None
 
-    run_id = recipe.get("run_id")
-    run_dir = recipe.get("output_dir", os.path.join("output", "runs", run_id))
+    base_run = args.run_id_override or recipe.get("run_id") or os.path.splitext(os.path.basename(args.recipe))[0]
+    if args.allow_run_id_reuse:
+        run_id = base_run
+        run_dir = recipe.get("output_dir") or os.path.join("output", "runs", run_id)
+    else:
+        run_id = _default_run_id(base_run)
+        run_dir = recipe.get("output_dir") or os.path.join("output", "runs", run_id)
     instrumentation_paths = None
     instr_json_path = os.path.join(run_dir, "instrumentation.json")
     instr_md_path = os.path.join(run_dir, "instrumentation.md")
@@ -993,6 +1022,7 @@ def main():
         _render_instrumentation_md(instrumentation_run, instr_md_path)
 
     start_gate_reached = not bool(args.start_from)
+    stage_timings = {}
     for stage_id in plan["topo"]:
         if args.start_from and not start_gate_reached:
             if stage_id == args.start_from:
@@ -1251,12 +1281,25 @@ def main():
             env["INSTRUMENT_STAGE"] = stage_id
             env["RUN_ID"] = run_id or ""
             env["INSTRUMENT_ENABLED"] = "1"
+        # Mitigate libomp SHM failures for EasyOCR/torch by forcing file-backed registration.
+        if module_id == "extract_ocr_ensemble_v1":
+            env.setdefault("KMP_USE_SHMEM", "0")
+            env.setdefault("KMP_CREATE_SHMEM", "FALSE")
+            env.setdefault("OMP_NUM_THREADS", "1")
+            env.setdefault("KMP_AFFINITY", "disabled")
+            env.setdefault("KMP_INIT_AT_FORK", "FALSE")
         result = subprocess.run(cmd, cwd=cwd, env=env)
         if result.returncode != 0:
             update_state(state_path, progress_path, stage_id, "failed", artifact_path, run_id, module_id, out_schema,
                          stage_description=stage_description)
             record_stage_instrumentation(stage_id, module_id, "failed", artifact_path, out_schema,
                                          stage_started_at, stage_wall_start, stage_cpu_start)
+            try:
+                elapsed = time.perf_counter() - stage_wall_start
+                logger.log(stage_id, "failed", artifact=artifact_path, module_id=module_id,
+                           message=f"Stage failed after {elapsed:.2f}s", extra={"elapsed_seconds": round(elapsed, 2)})
+            except Exception:
+                pass
             raise SystemExit(f"Stage {stage_id} failed with code {result.returncode}")
         # Stamp and validate if schema known
         if out_schema:
@@ -1284,6 +1327,13 @@ def main():
         artifact_index[stage_id] = {"path": artifact_path, "schema": out_schema}
         record_stage_instrumentation(stage_id, module_id, "done", artifact_path, out_schema,
                                      stage_started_at, stage_wall_start, stage_cpu_start)
+        stage_timings[stage_id] = time.perf_counter() - stage_wall_start
+        try:
+            logger.log(stage_id, "done", artifact=artifact_path, module_id=module_id,
+                       message=f"Stage completed in {stage_timings[stage_id]:.2f}s",
+                       extra={"elapsed_seconds": round(stage_timings[stage_id], 2)})
+        except Exception:
+            pass
 
         if args.end_at and stage_id == args.end_at:
             print(f"[end-at] stopping after {stage_id} per --end-at")
@@ -1299,6 +1349,31 @@ def main():
                 instrumentation_run["cpu_system_seconds"] = round(end_cpu_run[1] - run_cpu_start[1], 6)
         save_json(instr_json_path, instrumentation_run)
         _render_instrumentation_md(instrumentation_run, instr_md_path)
+
+    # Lightweight timing summary (always emit, even on failure)
+    timing_summary = {}
+    for sid, seconds in stage_timings.items():
+        timing_summary[sid] = {"wall_seconds": round(seconds, 2)}
+    try:
+        # Add pages/min for intake/extract when possible
+        for sid, node in plan["nodes"].items():
+            if node["stage"] in ("intake", "extract"):
+                art_path = artifact_index.get(sid, {}).get("path")
+                if art_path and os.path.exists(art_path):
+                    with open(art_path, "r", encoding="utf-8") as f:
+                        pages = sum(1 for _ in f if _.strip())
+                    if pages and sid in timing_summary and timing_summary[sid]["wall_seconds"] > 0:
+                        minutes = timing_summary[sid]["wall_seconds"] / 60.0
+                        timing_summary[sid]["pages"] = pages
+                        timing_summary[sid]["pages_per_min"] = round(pages / minutes, 2)
+    except Exception:
+        pass
+    try:
+        timing_path = os.path.join(run_dir, "timing_summary.json")
+        save_json(timing_path, timing_summary)
+        print("[timing] summary:", json.dumps(timing_summary, indent=2))
+    except Exception:
+        pass
 
     print("Recipe complete.")
 

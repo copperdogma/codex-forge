@@ -123,7 +123,6 @@ def call_llm_segment(client: OpenAI, model: str, pages: List[Dict], prompt: str)
             {"role": "user", "content": user_content}
         ],
         response_format={"type": "json_object"},
-        temperature=0.3,
     )
     
     response_text = completion.choices[0].message.content
@@ -310,4 +309,3 @@ def main():
 
 if __name__ == "__main__":
     main()
-

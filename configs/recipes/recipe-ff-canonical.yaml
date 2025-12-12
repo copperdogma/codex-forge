@@ -22,11 +22,11 @@ stages:
     out: pages_raw.jsonl
     params:
       dpi: 300
-      engines: ["tesseract", "apple"]  # easyocr temporarily disabled; see story-055-easyocr-reliability
+      engines: ["tesseract", "easyocr", "apple"]
       write_engine_dumps: true
       escalation_threshold: 0.15
       start: 1
-      end: 20
+      end: 113  # full book; override to 20 via settings for smoke runs
 
   - id: escalate_vision
     stage: adapter
@@ -46,6 +46,7 @@ stages:
     needs: [intake, escalate_vision]
     inputs:
       inputs: [intake, escalate_vision]
+    out: adapter_out.jsonl
 
   - id: reconstruct_text
     stage: adapter
@@ -237,6 +238,7 @@ stages:
       author: "Ian Livingstone"
       start_section: "1"
       format_version: "1.0.0"
+      # default: fail on stubs; set allow-stubs: true for smoke/debug if needed
 
   - id: validate_ff_engine
     stage: validate

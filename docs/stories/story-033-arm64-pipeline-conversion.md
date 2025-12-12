@@ -59,7 +59,7 @@ Establish a documented, reproducible ARM64-native Python environment for codex-f
 ### Tasks
 - [x] **Baseline the current x86_64/Rosetta environment**
   - [x] Record current Python version, conda distribution (Miniconda vs Miniforge), env name, and key packages relevant to OCR and JAX.
-  - [ ] Capture a timing baseline for one end-to-end OCR-heavy recipe (e.g., `recipe-ocr.yaml` or `recipe-ocr-dag.yaml`) on `06 deathtrap dungeon` (pages/minute and total runtime). *Deferred until ARM64 env ready for side-by-side comparison.*
+  - [ ] Capture a timing baseline for one end-to-end OCR-heavy recipe (e.g., `recipe-ocr.yaml` or canonical 20-page) on `06 deathtrap dungeon` (pages/minute and total runtime). *Deferred until ARM64 env ready for side-by-side comparison.*
 - [x] **Design ARM64 migration plan (non-destructive)**
   - [x] Specify the recommended ARM64 stack (Miniforge installer URL, `osx-arm64` target, Python version).
   - [x] Define a new environment name (e.g., `codex-arm`) and document the creation commands.
@@ -131,7 +131,7 @@ Establish a documented, reproducible ARM64-native Python environment for codex-f
       - Switch back: `conda deactivate` then `conda activate base` (or set `CONDA_DEFAULT_ENV=base`)
       - Miniforge and Miniconda can coexist; they use separate install directories
       - If issues arise, simply don't activate `codex-arm` and continue using x86_64 environment
-    - **Timing baseline:** Deferred until ARM64 env is ready for side-by-side comparison. Will capture pages/minute for `recipe-ocr-1-20.yaml` (20 pages) on both architectures.
+    - **Timing baseline:** Deferred until ARM64 env is ready for side-by-side comparison. Will capture pages/minute for the 20-page canonical recipe (`recipe-ff-canonical.yaml`) on both architectures.
   - **Next:** Prototype ARM64 environment creation (install Miniforge, create `codex-arm` env, install dependencies).
 
 - 20251128-2340 — ARM64 environment prototype: Miniforge installed, `codex-arm` env created and configured.
@@ -189,5 +189,3 @@ Establish a documented, reproducible ARM64-native Python environment for codex-f
     - **Guidance:** Clear recommendations on when to use each environment
     - **Future work noted:** Docker images and CI matrix expansion if ARM64 becomes primary target
   - **Next:** Story complete. All acceptance criteria met. ARM64 environment validated, hi_res tested, documentation complete.
-
-

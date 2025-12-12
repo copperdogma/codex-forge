@@ -46,7 +46,8 @@ The **Intermediate Representation (IR)** stays unchanged throughout; portionizat
 - **Manifest**: Automatically registered in `output/run_manifest.jsonl` for tracking
 - **Example**:
   ```bash
-  # Full canonical FF recipe run
+  # Full canonical FF recipe run (GPU default: arm64 env)
+  source ~/miniforge3/bin/activate codex-arm-mps
   python driver.py --recipe configs/recipes/recipe-ff-canonical.yaml --run-id deathtrap-dungeon-20251208
   
   # With instrumentation
@@ -70,9 +71,10 @@ The **Intermediate Representation (IR)** stays unchanged throughout; portionizat
     --output-dir /private/tmp/cf-ff-canonical-test \
     --force
   
-  # Smoke test with subset
+  # Smoke test with subset (GPU default: arm64 env)
+  source ~/miniforge3/bin/activate codex-arm-mps
   python driver.py --recipe configs/recipes/recipe-ff-canonical.yaml \
-    --settings settings.smoke.yaml \
+    --settings configs/settings.ff-canonical-smoke.yaml \
     --run-id ff-canonical-smoke \
     --output-dir /tmp/cf-ff-canonical-smoke \
     --force
@@ -92,8 +94,11 @@ python driver.py --recipe configs/recipes/recipe-ocr.yaml --dry-run
 # Text ingest with mock LLM stages (for tests without API calls)
 python driver.py --recipe configs/recipes/recipe-text.yaml --mock --skip-done
 
-# OCR pages 1–20 real run
-python driver.py --recipe configs/recipes/recipe-ocr-1-20.yaml --force
+# OCR pages 1–20 real run (auto-generated run_id/output_dir by default)
+python driver.py --recipe configs/recipes/recipe-ff-canonical.yaml --force
+
+# Reuse a specific run_id/output_dir (opt-in)
+python driver.py --recipe configs/recipes/recipe-ff-canonical.yaml --run-id myrun --allow-run-id-reuse
 
 # Resume long OCR run from portionize onward (reuses cached clean pages)
 python driver.py --recipe configs/recipes/recipe-ocr.yaml --skip-done --start-from portionize_fine
@@ -104,10 +109,32 @@ python driver.py --recipe configs/recipes/recipe-ocr.yaml --skip-done --start-fr
 
 Runtime note: full non-mock OCR on the 113-page sample typically takes ~35–40 minutes for the portionize/LLM window stage (gpt-4.1-mini + boost gpt-5). Use `--skip-done` with `--start-from/--end-at` to resume or scope reruns without re-cleaning pages.
 
-### Apple Silicon vs x86_64 (intake quality)
+Each run emits a lightweight `timing_summary.json` in the run directory with wall seconds per stage (and pages/min for intake/extract when available).
+
+### Apple Silicon vs x86_64 (intake quality + GPU)
 - Prefer the ARM64 Python env on Apple Silicon: `~/miniforge3/envs/codex-arm/bin/python` (reports `platform.machine() == "arm64"`). Unstructured `hi_res` runs successfully here and yields far better header/section recall.
 - On x86_64 (Rosetta) the TensorFlow build expects AVX and forces us to fall back to `strategy: fast`, which markedly reduces header detection and downstream section coverage.
 - Canonical FF recipe (`configs/recipes/recipe-ff-canonical.yaml`) defaults to `strategy: hi_res`; if you must stay on x86_64, pass `--settings settings.fast-intake.yaml` to override to `fast` and expect lower quality.
+- EasyOCR now auto-uses GPU when Metal/MPS is available (Apple Silicon) and falls back to CPU otherwise; no flags needed. Use `--allow-run-id-reuse` only if you explicitly want to reuse an existing run directory; defaults now auto-generate a fresh run_id/output_dir per run.
+- Metal-friendly env recipe (pins torch 2.9.1 / torchvision 0.24.1 / Pillow<13):
+  ```bash
+  conda create -n codex-arm-mps python=3.11
+  conda activate codex-arm-mps
+  pip install --no-cache-dir -r requirements.txt -c constraints/metal.txt
+  python - <<'PY'
+  import torch; print(torch.__version__, torch.backends.mps.is_available())
+  PY
+  ```
+  If `mps.is_available()` is false, you are on the wrong arch or missing the Metal wheel.
+  After a GPU smoke run, sanity-check that EasyOCR used MPS:
+  ```bash
+  python scripts/regression/check_easyocr_gpu.py --debug-file /tmp/cf-easyocr-mps-5/ocr_ensemble/easyocr_debug.jsonl
+  ```
+  One-shot local smoke + check:
+  ```bash
+  ./scripts/smoke_easyocr_gpu.sh /tmp/cf-easyocr-mps-5
+  ```
+  MPS troubleshooting: ensure `platform.machine() == "arm64"`, Xcode CLTs installed, and you’re using the arm64 Python from the `codex-arm-mps` env. Reinstall with the Metal constraints if torch shows `mps.is_available() == False`.
 - Keep the "hi_res first, fast fallback" knob: run ARM hi_res by default, and only flip to `settings.fast-intake.yaml` when the environment lacks ARM/AVX. Prior runs showed a large coverage drop when forced to fast, so treat fast as a compatibility fallback, not a peer mode.
 - Recommended full run on ARM:  
   `~/miniforge3/envs/codex-arm/bin/python driver.py --recipe configs/recipes/recipe-ff-canonical.yaml --run-id <run> --output-dir <dir> --force`
@@ -116,7 +143,7 @@ Runtime note: full non-mock OCR on the 113-page sample typically takes ~35–40 
 ### DAG recipes (coarse+fine merge example)
 ```bash
 # Dry-run DAG OCR with adapter merge
-python driver.py --recipe configs/recipes/recipe-ocr-dag.yaml --dry-run
+python driver.py --recipe configs/recipes/recipe-ff-canonical.yaml --dry-run
 
 # Text ingest DAG with mock LLM stages (fast, no API calls)
 python driver.py --recipe configs/recipes/recipe-text-dag.yaml --mock --skip-done
