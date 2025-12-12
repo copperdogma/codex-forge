@@ -23,6 +23,8 @@ from modules.common.utils import ensure_dir, save_json, save_jsonl, ProgressLogg
 
 def load_index(index_path: str) -> Dict[str, str]:
     """Load pagelines index (keys are strings like "001L"/"001R")."""
+    if not index_path or not os.path.exists(index_path):
+        return {}
     data = json.load(open(index_path, "r", encoding="utf-8"))
     return {str(k): v for k, v in data.items()}
 
@@ -77,8 +79,8 @@ def main():
         # Ensure outdir is absolute and normalized
         args.outdir = os.path.abspath(args.outdir)
     
-    if not args.original_index or not args.escalated_index or not args.outdir:
-        raise SystemExit("original-index, escalated-index, and outdir are required (or infer via --inputs)")
+    if not args.original_index or not args.outdir:
+        raise SystemExit("original-index and outdir are required (or infer via --inputs)")
 
     logger = ProgressLogger(state_path=args.state_file, progress_path=args.progress_file, run_id=args.run_id)
     
@@ -155,14 +157,20 @@ def main():
             with open(page_path, "r", encoding="utf-8") as f:
                 page_data = json.load(f)
             
-            # Clean up lines: keep only canonical text and source
-            # All alternatives remain in engines_raw for provenance
+            # Clean up lines: keep canonical text/source and preserve bbox/meta when present.
+            # All alternatives remain in engines_raw for provenance.
             cleaned_lines = []
             for line in page_data.get("lines", []):
                 cleaned_line = {
                     "text": line.get("text", ""),
                     "source": line.get("source", "unknown"),
                 }
+                bbox = line.get("bbox")
+                if isinstance(bbox, list) and len(bbox) >= 4:
+                    cleaned_line["bbox"] = bbox[:4]
+                meta = line.get("meta")
+                if isinstance(meta, dict) and meta:
+                    cleaned_line["meta"] = meta
                 cleaned_lines.append(cleaned_line)
             
             # Create cleaned page data
@@ -205,4 +213,3 @@ def main():
 
 if __name__ == "__main__":
     main()
-

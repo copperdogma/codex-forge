@@ -1,6 +1,8 @@
 ## [2025-12-12] - GPU “pit of success” for EasyOCR on Apple Silicon
 
 ### Added
+- DocLayNet-style content tagging stage (`elements_content_type_v1`) and canonical FF recipe wiring to produce/use `elements_core_typed.jsonl` (Story 062).
+- Content-type validation fixtures and tests (`tests/fixtures/elements_core_content_types_rubric_v1.jsonl`, `tests/test_elements_content_type_v1.py`) to prevent silent regressions.
 - Metal-friendly constraints file (`constraints/metal.txt`) and GPU regression helper (`scripts/regression/check_easyocr_gpu.py`) plus one-shot smoke runner (`scripts/smoke_easyocr_gpu.sh`).
 - EasyOCR coverage guard warning when MPS is unavailable, keeping runs explicit about CPU fallback.
 - Canonical FF recipe now includes `easyocr_guard_v1` (min coverage 0.95) to fail fast if EasyOCR stops contributing.
@@ -9,6 +11,8 @@
 - Tesseract word-data extraction helper for confidence auditing (`modules.common.ocr.run_ocr_with_word_data`).
 
 ### Changed
+- OCR ensemble now emits/propagates per-line bboxes (tesseract best-effort; apple when available), preserving bbox/meta through merge + reconstruction for geometry-aware tagging.
+- Story 062 marked Done; story 059 updated to treat content-type tags as a first-class section-detection signal.
 - EasyOCR warmup and run defaults now force MPS when present; docs (README.md, AGENTS.md) updated to make `pip install ... -c constraints/metal.txt` the default bootstrap and to include GPU smoke + check commands.
 - Story 067 marked done; README/AGENTS include MPS troubleshooting and smoke guidance.
 - OCR ensemble now records Apple helper build/run failures in `apple_errors.jsonl` and continues without Apple rather than silently dropping pages.
@@ -17,12 +21,15 @@
 - Story index and open stories consolidated/re‑sequenced: merged Story 036 → 035, Story 051 → 058, refreshed Story 063 checklist, clarified dependencies (066→035, 026→009), and rebuilt Recommended Order around “OCR‑first, FF‑first”.
 
 ### Fixed
+- Content-type heuristics: avoid mislabeling page-range markers as titles; avoid mislabeling noisy `=` form lines as titles; whitelist `key_value` extraction by default.
 - Progress event schema now supports status `warning` without overwriting stage lifecycle status in `pipeline_state.json`.
 - Apple Vision OCR ROI clamp to avoid Vision Code=14 errors on column ROIs; spread-aware filtering prevents Apple text from being incorrectly excluded as an outlier.
 - Inline vision escalation now records per-call usage and refuses to overwrite OCR output on refusal responses (provenance recorded instead).
 - Test suite regression fixes: snapshot/manifest integration tests align with driver run-id reuse behavior; FF20 regression guards handle reused `output/` baseline dirs; `section_target_guard_v1` missing imports fixed.
 
 ### Tested
+- `python -m pytest -q tests/test_elements_content_type_v1.py tests/test_reconstruct_text_bbox.py`
+- `python driver.py --recipe configs/recipes/recipe-ff-canonical.yaml --settings configs/settings.story062-deathtrap-20-content-types.yaml --end-at content_types --force`
 - 5-page EasyOCR-only GPU smoke via `scripts/smoke_easyocr_gpu.sh` (intake only, MPS gpu:true, timing summary).
 - Apple Vision OCR smoke on `testdata/tbotb-mini.pdf` page 1; ensemble baseline vs Apple on Deathtrap Dungeon pages 1–40 with artifact inspection.
 - `PYTHONPATH=. pytest -q modules/common/tests/test_progress_logger_warning.py`

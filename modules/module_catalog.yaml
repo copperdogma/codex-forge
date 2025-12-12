@@ -38,6 +38,9 @@ modules:
   - id: reconstruct_text_v1
     stage: adapter
     capabilities: ["cyoa", "images"]
+  - id: elements_content_type_v1
+    stage: adapter
+    capabilities: ["cyoa", "narrative"]
   - id: escalate_gpt4v_iter_v1
     stage: adapter
     capabilities: ["cyoa", "images"]

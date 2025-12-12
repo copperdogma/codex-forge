@@ -78,6 +78,7 @@ class PageLine(BaseModel):
     text: str
     source: Optional[str] = None  # e.g., "betterocr", "gpt4v", "llm_reconcile"
     meta: Optional[Dict[str, Any]] = None  # engine-level details, confidences, alignment notes
+    bbox: Optional[List[float]] = None  # Optional normalized bbox [x0,y0,x1,y1] when available (0-1)
 
 
 class PageLines(BaseModel):
@@ -530,6 +531,10 @@ class ElementCore(BaseModel):
     kind: str  # "text" | "image" | "table" | "other"
     text: str  # Raw text, normalized whitespace only (non-empty after filtering)
     layout: Optional[ElementLayout] = None  # Layout hints if available
+    layout_role: Optional[str] = None  # Optional upstream-provided role hint (e.g., TITLE, HEADER, FOOTER)
+    content_type: Optional[str] = None  # DocLayNet label (or compatible), when available
+    content_type_confidence: Optional[float] = None  # 0.0-1.0
+    content_subtype: Optional[Dict[str, Any]] = None  # Small optional subtype payload (e.g., heading_level)
 
 
 class HeaderCandidate(BaseModel):

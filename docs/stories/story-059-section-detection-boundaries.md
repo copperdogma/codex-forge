@@ -13,6 +13,7 @@ Improve section detection and boundary metadata quality. Fix issues where sectio
 - [ ] OCR errors in section numbers are handled (e.g., "in 4" → "4")
 - [ ] Section detection works with various formats (standalone, bold, at start of line)
 - [ ] Section coverage validation ensures expected number of sections are found
+- [ ] Section detection uses `content_type`/`content_subtype` from `elements_core_typed.jsonl` to reduce header/footer/TOC false positives (DocLayNet tags from story-062)
 
 ## Context
 
@@ -73,6 +74,13 @@ Improve section detection and boundary metadata quality. Fix issues where sectio
     - Context-aware extraction: use LLM to identify section numbers in context
     - Test: verify section numbers are extracted correctly even when merged with text
 
+- [ ] **Use content tags to improve boundary detection (from story-062)**
+  - **Goal:** Use `content_type`/`content_subtype` to reduce false positives and increase gameplay header recall.
+  - [ ] Filter candidates: ignore `Page-header` / `Page-footer` / `List-item` when searching for gameplay section starts
+  - [ ] Prefer strong signals: `content_type=Section-header` with `content_subtype.number` when present
+  - [ ] Add debug evidence: for each boundary candidate, record which tag/rule included or excluded it
+  - [ ] Validate on Deathtrap pages 1-20: compare boundary artifacts before/after (counts + 10 spot-checks)
+
 ### Medium Priority
 
 - [ ] **Section Header Detection Improvements**
@@ -129,3 +137,12 @@ Improve section detection and boundary metadata quality. Fix issues where sectio
 - **Scope**: Focus on fixing boundary metadata bugs, improving section detection recall, and handling OCR errors in section numbers.
 - **Next**: Fix `portionize_ai_scan_v1` to populate required boundary fields, improve section detection to find all expected sections, add section number extraction.
 
+### 20251212-1258 — Folded content-type-aware sectionizing into story 059
+- **Result:** Success.
+- **Notes:** Merged the “use content tags in sectionizers” scope (previously drafted as story 068) into this story to avoid doing section detection without the strong `content_type`/`content_subtype` signals from story 062.
+- **Next:** Implement tag-aware filters and scoring in the boundary modules (`portionize_ai_scan_v1`, `detect_gameplay_numbers_v1`, etc.) and validate on Deathtrap pages 1-20.
+
+### 20251212-1301 — Deleted story 068 after merge into 059
+- **Result:** Success.
+- **Notes:** Per user request, removed the temporary story 068 document and its index entries after fully merging its scope into this story (to avoid split tracking).
+- **Next:** Continue section detection improvements here using content tags as a first-class signal.

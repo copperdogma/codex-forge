@@ -1,0 +1,52 @@
+module_id: elements_content_type_v1
+stage: adapter
+entrypoint: modules/adapter/elements_content_type_v1/main.py
+input_schema: element_core_v1
+output_schema: element_core_v1
+default_params:
+  disabled: false
+  use_llm: false
+  model: gpt-4.1-mini
+  batch_size: 200
+  context_window: 1
+  llm_threshold: 0.65
+  coarse_only: false
+  allow_extensions: false
+  allow_unknown_kv_keys: false
+param_schema:
+  type: object
+  properties:
+    inputs:
+      type: array
+      items:
+        type: string
+      description: Driver-provided input list; first file is used.
+    out:
+      type: string
+    debug_out:
+      type: string
+    disabled:
+      type: boolean
+    use_llm:
+      type: boolean
+    model:
+      type: string
+    batch_size:
+      type: integer
+      minimum: 1
+    context_window:
+      type: integer
+      minimum: 0
+      maximum: 3
+    llm_threshold:
+      type: number
+      minimum: 0
+      maximum: 1
+    coarse_only:
+      type: boolean
+    allow_extensions:
+      type: boolean
+    allow_unknown_kv_keys:
+      type: boolean
+  required: [out]
+notes: "Text-first DocLayNet-style content type tagging for elements_core.jsonl."

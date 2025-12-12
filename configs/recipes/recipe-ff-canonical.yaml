@@ -81,15 +81,28 @@ stages:
       out: elements_core.jsonl
       columns_debug: columns_debug.jsonl
 
+  - id: content_types
+    stage: adapter
+    module: elements_content_type_v1
+    needs: [reduce_ir]
+    out: elements_core_typed.jsonl
+    inputs:
+      inputs: reduce_ir
+    params:
+      out: elements_core_typed.jsonl
+      debug_out: elements_content_type_debug.jsonl
+      disabled: false
+      use_llm: false
+
   - id: coarse_segment
     stage: portionize
     module: coarse_segment_v1
-    needs: [reduce_ir]
+    needs: [content_types]
     out: coarse_segments.json
     inputs:
-      elements: reduce_ir
+      elements: content_types
     params:
-      elements: elements_core.jsonl
+      elements: elements_core_typed.jsonl
       out: coarse_segments.json
       model: gpt-5
       retry_model: gpt-5
@@ -100,12 +113,12 @@ stages:
   - id: fine_segment_frontmatter
     stage: portionize
     module: fine_segment_frontmatter_v1
-    needs: [reduce_ir, coarse_segment]
+    needs: [content_types, coarse_segment]
     out: frontmatter_portions.json
     inputs:
-      elements: reduce_ir
+      elements: content_types
     params:
-      elements: elements_core.jsonl
+      elements: elements_core_typed.jsonl
       coarse_segments: coarse_segments.json
       out: frontmatter_portions.json
       model: gpt-4.1-mini
@@ -117,10 +130,10 @@ stages:
   - id: classify_headers
     stage: portionize
     module: classify_headers_v1
-    needs: [reduce_ir]
+    needs: [content_types]
     out: header_candidates.jsonl
     inputs:
-      pages: reduce_ir
+      pages: content_types
     params:
       model: gpt-4.1
       batch_size: 50
@@ -129,11 +142,11 @@ stages:
   - id: structure_globally
     stage: portionize
     module: structure_globally_v1
-    needs: [classify_headers, reduce_ir]
+    needs: [classify_headers, content_types]
     out: sections_structured.json
     inputs:
       pages: classify_headers
-      elements: reduce_ir
+      elements: content_types
     params:
       skip_ai: true
       stub: modules/portionize/structure_globally_v1/stub.empty.json
@@ -141,19 +154,19 @@ stages:
   - id: assemble_boundaries
     stage: portionize
     module: detect_gameplay_numbers_v1
-    needs: [macro_locate, reduce_ir]
+    needs: [macro_locate, content_types]
     out: section_boundaries.jsonl
     inputs:
-      pages: reduce_ir
+      pages: content_types
       macro: macro_locate
 
   - id: ai_scan_fallback
     stage: portionize
     module: portionize_ai_scan_v1
-    needs: [reduce_ir]
+    needs: [content_types]
     out: section_boundaries_scan.jsonl
     inputs:
-      pages: reduce_ir
+      pages: content_types
     params:
       model: gpt-4.1-mini
       max_tokens: 1000
@@ -161,12 +174,12 @@ stages:
   - id: macro_locate
     stage: portionize
     module: macro_locate_ff_v1
-    needs: [reduce_ir]
+    needs: [content_types]
     out: macro_sections.json
     inputs:
-      pages: reduce_ir
+      pages: content_types
     params:
-      pages: elements_core.jsonl
+      pages: elements_core_typed.jsonl
       model: gpt-4.1
       max_tokens: 400
 
@@ -182,11 +195,11 @@ stages:
   - id: verify_boundaries
     stage: validate
     module: verify_boundaries_v1
-    needs: [merge_boundaries, reduce_ir]
+    needs: [merge_boundaries, content_types]
     out: boundary_verification.json
     inputs:
       boundaries: merge_boundaries
-      elements: reduce_ir
+      elements: content_types
     params:
       sample_count: 8
       model: gpt-4.1-nano
@@ -205,11 +218,11 @@ stages:
   - id: gate_boundaries
     stage: validate
     module: validate_boundaries_gate_v1
-    needs: [merge_boundaries, reduce_ir, coverage_boundaries]
+    needs: [merge_boundaries, content_types, coverage_boundaries]
     out: boundary_gate.json
     inputs:
       boundaries: merge_boundaries
-      elements: reduce_ir
+      elements: content_types
     params:
       min_count: 240
       max_gap: null
@@ -217,10 +230,10 @@ stages:
   - id: ai_extract
     stage: portionize
     module: portionize_ai_extract_v1
-    needs: [merge_boundaries, gate_boundaries, reduce_ir]
+    needs: [merge_boundaries, gate_boundaries, content_types]
     out: portions_enriched.jsonl
     inputs:
-      pages: reduce_ir
+      pages: content_types
       boundaries: merge_boundaries
     params:
       model: gpt-4.1

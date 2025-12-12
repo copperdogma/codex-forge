@@ -1,0 +1,9 @@
+{"id":"p1-0000","seq":0,"page":1,"kind":"text","text":"DEATHTRAP DUNGEON","layout":{"h_align":"center","y":0.03}}
+{"id":"p1-0001","seq":1,"page":1,"kind":"text","text":"You are about to enter the dungeon.","layout":{"h_align":"left","y":0.30}}
+{"id":"p1-0002","seq":2,"page":1,"kind":"text","text":"1","layout":{"h_align":"center","y":0.95}}
+{"id":"p2-0000","seq":3,"page":2,"kind":"text","text":"DEATHTRAP DUNGEON","layout":{"h_align":"center","y":0.03}}
+{"id":"p2-0001","seq":4,"page":2,"kind":"text","text":"You light a torch and continue.","layout":{"h_align":"left","y":0.30}}
+{"id":"p2-0002","seq":5,"page":2,"kind":"text","text":"2","layout":{"h_align":"center","y":0.95}}
+{"id":"p3-0000","seq":6,"page":3,"kind":"text","text":"DEATHTRAP DUNGEON","layout":{"h_align":"center","y":0.03}}
+{"id":"p3-0001","seq":7,"page":3,"kind":"text","text":"A goblin appears!","layout":{"h_align":"left","y":0.30}}
+{"id":"p3-0002","seq":8,"page":3,"kind":"text","text":"3","layout":{"h_align":"center","y":0.95}}

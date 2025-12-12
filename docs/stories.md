@@ -3,11 +3,11 @@
 ## Recommended Order (next up)
 Guiding priorities: **perfect OCR first**, then move downstream stage‑by‑stage. **Finish Fighting Fantasy to ~100% quality/coverage before starting Onward to the Unknown.**
 
-1. **065 — Stabilize EasyOCR as a Third OCR Engine**  
+1. DONE: **065 — Stabilize EasyOCR as a Third OCR Engine**  
    Finish full‑book EasyOCR coverage and performance on Deathtrap Dungeon. (Blocks true 3‑engine voting.)
-2. **063 — OCR Ensemble Three‑Engine Voting**  *(Done)*
+2. DONE: **063 — OCR Ensemble Three‑Engine Voting**  *(Done)*
    Implement real 3‑way fusion + Tesseract confidences + inline escalation tuning once 065 is stable.
-3. **062 — OCR Content Type Detection Module**  
+3. DONE: **062 — OCR Content Type Detection Module**  
    Tag OCR lines/elements with DocLayNet‑style content types to guide downstream routing and preserve layout intent.
 4. **058 — Post‑OCR Text Quality & Error Correction**  
    Add generic spell/garble detection + repair loop so OCR output is readable even when engines agree on bad text.
@@ -89,7 +89,7 @@ This index tracks stories in `/docs/stories/` for the codex-forge pipeline.
 || 059 | Section Detection & Boundary Improvements | High | To Do | /docs/stories/story-059-section-detection-boundaries.md |
 || 060 | Pipeline Regression Testing Suite | High | Done | /docs/stories/story-060-pipeline-regression-testing.md |
 || 061 | OCR Ensemble Fusion Improvements | High | Done | /docs/stories/story-061-ocr-ensemble-fusion.md |
-|| 062 | OCR Content Type Detection Module | Medium | Open | /docs/stories/story-062-ocr-content-type-detection.md |
+|| 062 | OCR Content Type Detection Module | Medium | Done | /docs/stories/story-062-ocr-content-type-detection.md |
 || 063 | OCR Ensemble Three-Engine Voting | High | Done | /docs/stories/story-063-ocr-ensemble-three-engine.md |
 || 064 | Apple Vision OCR (VNRecognizeTextRequest) Adapter | Medium | Done | /docs/stories/story-064-apple-vision-ocr.md |
 || 065 | Stabilize EasyOCR as a Third OCR Engine | High | Done | /docs/stories/story-065-easyocr-reliability.md |

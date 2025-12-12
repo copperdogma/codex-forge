@@ -238,6 +238,20 @@ def reconstruct_page_lines(lines: List[Dict]) -> List[Dict]:
     reconstructed = []
     current_section_content = []  # All content for current section
     in_section = False  # Track if we're currently collecting content for a section
+
+    def union_bbox(rows: List[Dict]) -> Optional[List[float]]:
+        boxes = []
+        for r in rows:
+            b = r.get("bbox")
+            if isinstance(b, list) and len(b) >= 4 and all(isinstance(x, (int, float)) for x in b[:4]):
+                boxes.append([float(b[0]), float(b[1]), float(b[2]), float(b[3])])
+        if not boxes:
+            return None
+        x0 = min(b[0] for b in boxes)
+        y0 = min(b[1] for b in boxes)
+        x1 = max(b[2] for b in boxes)
+        y1 = max(b[3] for b in boxes)
+        return [x0, y0, x1, y1]
     
     for i, line in enumerate(lines):
         # Get text from line
@@ -261,6 +275,9 @@ def reconstruct_page_lines(lines: List[Dict]) -> List[Dict]:
                     if merged_text:
                         merged_line = current_section_content[0].copy()
                         merged_line["text"] = merged_text
+                        bbox = union_bbox(current_section_content)
+                        if bbox is not None:
+                            merged_line["bbox"] = bbox
                         if "source" not in merged_line:
                             merged_line["source"] = merged_line.get("source", "reconstructed")
                         reconstructed.append(merged_line)
@@ -284,6 +301,9 @@ def reconstruct_page_lines(lines: List[Dict]) -> List[Dict]:
                 if merged_text:
                     merged_line = current_section_content[0].copy()
                     merged_line["text"] = merged_text
+                    bbox = union_bbox(current_section_content)
+                    if bbox is not None:
+                        merged_line["bbox"] = bbox
                     if "source" not in merged_line:
                         merged_line["source"] = merged_line.get("source", "reconstructed")
                     reconstructed.append(merged_line)
@@ -305,6 +325,9 @@ def reconstruct_page_lines(lines: List[Dict]) -> List[Dict]:
                 if merged_text:
                     merged_line = current_section_content[0].copy()
                     merged_line["text"] = merged_text
+                    bbox = union_bbox(current_section_content)
+                    if bbox is not None:
+                        merged_line["bbox"] = bbox
                     if "source" not in merged_line:
                         merged_line["source"] = merged_line.get("source", "reconstructed")
                     reconstructed.append(merged_line)
@@ -326,6 +349,7 @@ def reconstruct_page_lines(lines: List[Dict]) -> List[Dict]:
             if (l.get("text", "").strip() or l.get("post", "").strip() or l.get("raw", "").strip())
         ])
         if merged_text:
+            bbox = union_bbox(current_section_content)
             # Guard: If text is extremely fragmented, don't create one huge line
             # Instead, break it into smaller chunks based on sentence boundaries
             if is_fragmented and len(merged_text) > 500:
@@ -365,6 +389,8 @@ def reconstruct_page_lines(lines: List[Dict]) -> List[Dict]:
                     if chunk:
                         chunk_line = current_section_content[0].copy()
                         chunk_line["text"] = chunk
+                        if bbox is not None:
+                            chunk_line["bbox"] = bbox
                         if "source" not in chunk_line:
                             chunk_line["source"] = chunk_line.get("source", "reconstructed")
                         reconstructed.append(chunk_line)
@@ -372,6 +398,8 @@ def reconstruct_page_lines(lines: List[Dict]) -> List[Dict]:
                 # Normal merge
                 merged_line = current_section_content[0].copy()
                 merged_line["text"] = merged_text
+                if bbox is not None:
+                    merged_line["bbox"] = bbox
                 if "source" not in merged_line:
                     merged_line["source"] = merged_line.get("source", "reconstructed")
                 reconstructed.append(merged_line)
@@ -523,4 +551,3 @@ def main():
 
 if __name__ == "__main__":
     main()
-

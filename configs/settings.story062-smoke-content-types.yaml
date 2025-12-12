@@ -1,0 +1,12 @@
+input:
+  pdf: testdata/tbotb-mini.pdf
+
+stage_params:
+  intake:
+    start: 1
+    end: 2
+    engines: ["tesseract"]
+    write_engine_dumps: false
+  content_types:
+    disabled: false
+    use_llm: false

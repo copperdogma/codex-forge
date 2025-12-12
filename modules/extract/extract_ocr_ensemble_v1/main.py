@@ -145,6 +145,178 @@ def _tesseract_line_confidences_for_text(text: str, data: Dict[str, Any]) -> Dic
         "match_rate": matched / max(1, len([l for l in ocr_lines if l.strip()])),
     }
 
+
+def _tesseract_line_bboxes_for_text(text: str, data: Dict[str, Any], image_w: int, image_h: int) -> Dict[str, Any]:
+    """
+    Derive per-line bboxes aligned to `split_lines(text)`, from pytesseract word data.
+
+    Returns:
+        {
+          "line_bboxes": List[Optional[List[float]]],  # normalized [x0,y0,x1,y1]
+          "match_rate": float,                        # 0..1
+        }
+    """
+    try:
+        texts = data.get("text") or []
+        lefts = data.get("left") or []
+        tops = data.get("top") or []
+        widths = data.get("width") or []
+        heights = data.get("height") or []
+        blocks = data.get("block_num") or []
+        pars = data.get("par_num") or []
+        lines = data.get("line_num") or []
+    except Exception:
+        return {"line_bboxes": [], "match_rate": 0.0}
+
+    if not texts or not lefts or not widths or image_w <= 0 or image_h <= 0:
+        return {"line_bboxes": [], "match_rate": 0.0}
+
+    line_groups: Dict[Any, Dict[str, Any]] = {}
+    for i in range(
+        min(len(texts), len(lefts), len(tops), len(widths), len(heights), len(blocks), len(pars), len(lines))
+    ):
+        w = (texts[i] or "").strip()
+        if not w:
+            continue
+        try:
+            x = float(lefts[i])
+            y = float(tops[i])
+            ww = float(widths[i])
+            hh = float(heights[i])
+        except Exception:
+            continue
+        if ww <= 0 or hh <= 0:
+            continue
+        key = (blocks[i], pars[i], lines[i])
+        grp = line_groups.setdefault(key, {"words": [], "bbox": None})
+        grp["words"].append(w)
+        x0 = x
+        y0 = y
+        x1 = x + ww
+        y1 = y + hh
+        if grp["bbox"] is None:
+            grp["bbox"] = [x0, y0, x1, y1]
+        else:
+            bb = grp["bbox"]
+            bb[0] = min(bb[0], x0)
+            bb[1] = min(bb[1], y0)
+            bb[2] = max(bb[2], x1)
+            bb[3] = max(bb[3], y1)
+
+    if not line_groups:
+        return {"line_bboxes": [], "match_rate": 0.0}
+
+    data_lines = []
+    for grp in line_groups.values():
+        words = grp.get("words") or []
+        bbox = grp.get("bbox")
+        if not words or not bbox:
+            continue
+        x0, y0, x1, y1 = bbox
+        data_lines.append(
+            {
+                "text": " ".join(words),
+                "norm": _normalize_line_for_match(" ".join(words)),
+                "bbox": [
+                    max(0.0, min(1.0, x0 / image_w)),
+                    max(0.0, min(1.0, y0 / image_h)),
+                    max(0.0, min(1.0, x1 / image_w)),
+                    max(0.0, min(1.0, y1 / image_h)),
+                ],
+            }
+        )
+
+    ocr_lines = split_lines(text)
+    if not ocr_lines:
+        return {"line_bboxes": [], "match_rate": 0.0}
+
+    from difflib import SequenceMatcher
+
+    line_bboxes: List[Optional[List[float]]] = []
+    matched = 0
+    for ln in ocr_lines:
+        n = _normalize_line_for_match(ln)
+        if not n:
+            line_bboxes.append(None)
+            continue
+        best = None
+        best_ratio = 0.0
+        for dl in data_lines:
+            if not dl["norm"]:
+                continue
+            r = SequenceMatcher(None, n, dl["norm"], autojunk=False).ratio()
+            if r > best_ratio:
+                best_ratio = r
+                best = dl
+        if best is not None and best_ratio >= 0.6:
+            line_bboxes.append(list(best["bbox"]))
+            matched += 1
+        else:
+            line_bboxes.append(None)
+
+    return {
+        "line_bboxes": line_bboxes,
+        "match_rate": matched / max(1, len([l for l in ocr_lines if l.strip()])),
+    }
+
+
+def _align_bboxes_to_lines(
+    target_lines: List[str],
+    source_lines: List[str],
+    source_bboxes: List[Optional[List[float]]],
+    *,
+    min_ratio: float = 0.6,
+) -> Dict[str, Any]:
+    """
+    Align `source_bboxes` to `target_lines` by fuzzy text matching.
+
+    This is intentionally best-effort: it helps retain bboxes even when we post-process
+    lines (e.g., fragment filtering) or when `align_and_vote` produces slightly edited text.
+    """
+    if not target_lines:
+        return {"bboxes": [], "match_rate": 0.0}
+    if not source_lines or not source_bboxes:
+        return {"bboxes": [None for _ in target_lines], "match_rate": 0.0}
+
+    n = min(len(source_lines), len(source_bboxes))
+    if n <= 0:
+        return {"bboxes": [None for _ in target_lines], "match_rate": 0.0}
+
+    source_norm = [_normalize_line_for_match(s) for s in source_lines[:n]]
+    candidates = [i for i in range(n) if source_norm[i] and source_bboxes[i]]
+    if not candidates:
+        return {"bboxes": [None for _ in target_lines], "match_rate": 0.0}
+
+    from difflib import SequenceMatcher
+
+    used = set()
+    out: List[Optional[List[float]]] = []
+    matched = 0
+    for ln in target_lines:
+        tn = _normalize_line_for_match(ln)
+        if not tn:
+            out.append(None)
+            continue
+        best_i = None
+        best_r = 0.0
+        for i in candidates:
+            if i in used:
+                continue
+            r = SequenceMatcher(None, tn, source_norm[i], autojunk=False).ratio()
+            if r > best_r:
+                best_r = r
+                best_i = i
+        if best_i is not None and best_r >= min_ratio:
+            used.add(best_i)
+            out.append(source_bboxes[best_i])
+            matched += 1
+        else:
+            out.append(None)
+
+    denom = max(1, len([l for l in target_lines if (l or "").strip()]))
+    return {"bboxes": out, "match_rate": matched / denom}
+
+
 def _mps_available() -> bool:
     try:
         import torch
@@ -1179,6 +1351,16 @@ def call_betterocr(image_path: str, engines, lang: str, *, use_llm: bool, llm_mo
             if conf_info.get("page_confidence") is not None:
                 by_engine["tesseract_page_confidence"] = conf_info["page_confidence"]
             by_engine["tesseract_confidence_match_rate"] = conf_info.get("match_rate", 0.0)
+            try:
+                from PIL import Image
+                with Image.open(image_path) as _img:
+                    w, h = _img.size
+                bbox_info = _tesseract_line_bboxes_for_text(tess_text, tess_data, w, h)
+                if bbox_info.get("line_bboxes"):
+                    by_engine["tesseract_line_bboxes"] = bbox_info["line_bboxes"]
+                by_engine["tesseract_bbox_match_rate"] = bbox_info.get("match_rate", 0.0)
+            except Exception:
+                pass
     except Exception as ex:
         by_engine["tesseract_error"] = str(ex)
 
@@ -2217,6 +2399,7 @@ def main():
             apple_lines_meta = []
             apple_text = ""
             apple_lines = []
+            apple_line_bboxes = []
             apple_error = None
             if use_apple:
                 try:
@@ -2232,6 +2415,7 @@ def main():
                     if side and apple_lines_meta:
                         filtered_meta = []
                         filtered_lines = []
+                        filtered_bboxes = []
                         for ln in apple_lines_meta:
                             bbox = ln.get("bbox", None)
                             if not bbox or not isinstance(bbox, list) or len(bbox) < 4:
@@ -2239,13 +2423,26 @@ def main():
                             cx = (bbox[0] + bbox[2]) / 2.0
                             if side == "L" and cx < gutter_position:
                                 filtered_meta.append(ln)
-                                filtered_lines.append(ln.get("text", ""))
+                                txt = ln.get("text", "")
+                                if txt:
+                                    filtered_lines.append(txt)
+                                    filtered_bboxes.append(bbox[:4])
                             elif side == "R" and cx >= gutter_position:
                                 filtered_meta.append(ln)
-                                filtered_lines.append(ln.get("text", ""))
+                                txt = ln.get("text", "")
+                                if txt:
+                                    filtered_lines.append(txt)
+                                    filtered_bboxes.append(bbox[:4])
                         apple_lines_meta = filtered_meta
-                        apple_lines = [t for t in filtered_lines if t]
+                        apple_lines = filtered_lines
+                        apple_line_bboxes = filtered_bboxes
                         apple_text = "\n".join(apple_lines)
+                    else:
+                        apple_line_bboxes = [
+                            ln.get("bbox")[:4]
+                            for ln in apple_lines_meta
+                            if isinstance(ln, dict) and ln.get("text") and isinstance(ln.get("bbox"), list) and len(ln.get("bbox")) >= 4
+                        ]
                 except Exception as e:
                     err_str = str(e)
                     apple_error = err_str
@@ -2320,6 +2517,8 @@ def main():
                 if use_apple and apple_text and "apple" not in outlier_info.get("outliers", []):
                     engine_lines_by_engine["apple"] = list(apple_lines or [])
                     part_by_engine["apple"] = apple_text  # persist Apple text for provenance
+                    if apple_line_bboxes and len(apple_line_bboxes) == len(engine_lines_by_engine["apple"]):
+                        part_by_engine["apple_line_bboxes"] = list(apple_line_bboxes)
                     if apple_lines_meta:
                         alt_confidences = [ln.get("confidence", 0.0) for ln in apple_lines_meta]
                         part_by_engine["apple_confidences"] = alt_confidences
@@ -2734,9 +2933,38 @@ def main():
             # Create canonical line output - only the final decided text
             # All alternatives (raw, fused, etc.) remain in engines_raw for provenance
             line_rows = []
+            per_line_sources = None
+            if isinstance(part_by_engine.get("fusion_sources"), list) and len(part_by_engine["fusion_sources"]) == len(part_lines):
+                per_line_sources = part_by_engine["fusion_sources"]
+
+            aligned_bboxes_by_engine: Dict[str, List[Optional[List[float]]]] = {}
+            if isinstance(part_by_engine.get("tesseract"), str) and isinstance(part_by_engine.get("tesseract_line_bboxes"), list):
+                src_lines = split_lines(part_by_engine.get("tesseract", ""))
+                src_bboxes = part_by_engine.get("tesseract_line_bboxes") or []
+                aligned_bboxes_by_engine["tesseract"] = _align_bboxes_to_lines(part_lines, src_lines, src_bboxes)["bboxes"]
+            if isinstance(part_by_engine.get("apple"), str) and isinstance(part_by_engine.get("apple_line_bboxes"), list):
+                src_lines = split_lines(part_by_engine.get("apple", ""))
+                src_bboxes = part_by_engine.get("apple_line_bboxes") or []
+                aligned_bboxes_by_engine["apple"] = _align_bboxes_to_lines(part_lines, src_lines, src_bboxes)["bboxes"]
+
             for i, line in enumerate(part_lines):
                 # Canonical output: only the final decided text and source
                 row = {"text": line, "source": part_source}
+                if per_line_sources is not None and i < len(per_line_sources):
+                    ls = per_line_sources[i]
+                    if ls and ls != part_source:
+                        row["meta"] = {"line_source": ls}
+
+                bbox_engine = None
+                if per_line_sources is not None and i < len(per_line_sources):
+                    bbox_engine = per_line_sources[i]
+                elif part_source in aligned_bboxes_by_engine:
+                    bbox_engine = part_source
+
+                if bbox_engine in aligned_bboxes_by_engine and i < len(aligned_bboxes_by_engine[bbox_engine]):
+                    bb = aligned_bboxes_by_engine[bbox_engine][i]
+                    if bb:
+                        row["bbox"] = bb
                 line_rows.append(row)
 
             # Note: ivr and form_check already computed above for inline escalation

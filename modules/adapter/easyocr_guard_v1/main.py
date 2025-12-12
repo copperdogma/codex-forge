@@ -45,6 +45,8 @@ def main():
                         help=argparse.SUPPRESS)  # alias for driver defaults
     parser.add_argument("--allow-missing", dest="allow_missing", action="store_true",
                         help="Exit 0 even if coverage is below threshold")
+    parser.add_argument("--allow_missing", dest="allow_missing", action="store_true",
+                        help=argparse.SUPPRESS)  # alias for driver params
     parser.add_argument("--report", help="Optional JSON report path")
     args = parser.parse_args()
 
