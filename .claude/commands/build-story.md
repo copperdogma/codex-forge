@@ -1,0 +1,1 @@
+/Users/cam/Documents/Projects/codex-forge/.cursor/commands/build-story.md

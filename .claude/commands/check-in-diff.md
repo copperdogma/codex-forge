@@ -1,0 +1,1 @@
+/Users/cam/Documents/Projects/codex-forge/.cursor/commands/check-in-diff.md
