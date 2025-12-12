@@ -3,13 +3,16 @@
 ### Added
 - Metal-friendly constraints file (`constraints/metal.txt`) and GPU regression helper (`scripts/regression/check_easyocr_gpu.py`) plus one-shot smoke runner (`scripts/smoke_easyocr_gpu.sh`).
 - EasyOCR coverage guard warning when MPS is unavailable, keeping runs explicit about CPU fallback.
+- macOS Apple Vision OCR engine (`extract_ocr_apple_v1`) and optional `apple` engine support in the OCR ensemble, with graceful non‑macOS no‑op and error artifacts.
 
 ### Changed
 - EasyOCR warmup and run defaults now force MPS when present; docs (README.md, AGENTS.md) updated to make `pip install ... -c constraints/metal.txt` the default bootstrap and to include GPU smoke + check commands.
 - Story 067 marked done; README/AGENTS include MPS troubleshooting and smoke guidance.
+- OCR ensemble now records Apple helper build/run failures in `apple_errors.jsonl` and continues without Apple rather than silently dropping pages.
 
 ### Tested
 - 5-page EasyOCR-only GPU smoke via `scripts/smoke_easyocr_gpu.sh` (intake only, MPS gpu:true, timing summary).
+- Apple Vision OCR smoke on `testdata/tbotb-mini.pdf` page 1; ensemble baseline vs Apple on Deathtrap Dungeon pages 1–40 with artifact inspection.
 
 ## [2025-12-10] - FF20 regression suite and quality guards
 

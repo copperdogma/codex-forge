@@ -69,7 +69,6 @@ func run(pdfPath: String, start: Int, end: Int?, lang: String, fast: Bool, colum
     recogReq.recognitionLevel = recogLevel
     recogReq.recognitionLanguages = [lang]
     recogReq.usesLanguageCorrection = true
-    recogReq.usesCPUOnly = false
 
     let encoder = JSONEncoder()
     for pageIndex in max(0, start-1)..<min(lastPage, pageCount) {

@@ -45,7 +45,6 @@ func run(pdfPath: String, start: Int, end: Int?, lang: String, fast: Bool) throw
     recogReq.recognitionLevel = recogLevel
     recogReq.recognitionLanguages = [lang]
     recogReq.usesLanguageCorrection = true
-    recogReq.usesCPUOnly = false
 
     let outEncoder = JSONEncoder()
     for pageIndex in max(0, start-1)..<min(lastPage, pageCount) {
@@ -72,7 +71,6 @@ func run(pdfPath: String, start: Int, end: Int?, lang: String, fast: Bool) throw
         if let jsonStr = String(data: data, encoding: .utf8) {
             print(jsonStr)
         }
-        recogReq.results = nil
     }
 }
 
@@ -130,13 +128,32 @@ def main():
     out_index = os.path.join(args.outdir, "ocr_apple")
     ensure_dir(out_index)
     pagelines_path = os.path.join(out_index, "pagelines.jsonl")
+    error_path = os.path.join(out_index, "error.json")
+
+    # Platform guard: Apple Vision OCR only supported on macOS
+    if sys.platform != "darwin":
+        msg = f"Apple Vision OCR unsupported on platform {sys.platform}; skipping."
+        logger.log("extract", "warning", message=msg, artifact=pagelines_path, module_id="extract_ocr_apple_v1")
+        # Write an explicit skip/error artifact plus empty pagelines for downstream safety.
+        with open(error_path, "w", encoding="utf-8") as f:
+            json.dump({"error": msg, "platform": sys.platform, "skipped": True}, f, indent=2)
+        save_jsonl(pagelines_path, [])
+        print(f"[apple-ocr] {msg}")
+        return
 
     bin_path = Path(out_index) / "vision_ocr"
     if not bin_path.exists():
         logger.log("extract", "running", current=0, total=1,
                    message="Compiling Vision OCR helper", artifact=str(bin_path),
                    module_id="extract_ocr_apple_v1")
-        build_swift_helper(bin_path)
+        try:
+            build_swift_helper(bin_path)
+        except Exception as e:
+            msg = f"Failed to compile Vision OCR helper: {e}"
+            logger.log("extract", "failed", message=msg, artifact=str(bin_path), module_id="extract_ocr_apple_v1")
+            with open(error_path, "w", encoding="utf-8") as f:
+                json.dump({"error": msg, "stage": "build", "bin": str(bin_path)}, f, indent=2)
+            raise
 
     cmd = [str(bin_path), args.pdf, str(args.start), str(args.end or 0), args.lang, "1" if args.fast else "0"]
     logger.log("extract", "running", current=args.start, total=args.end or 0,
@@ -145,8 +162,14 @@ def main():
     proc = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
     out_lines, err = proc.communicate()
     if proc.returncode != 0:
+        msg = f"Vision OCR failed with code {proc.returncode}"
+        logger.log("extract", "failed", message=msg, artifact=pagelines_path,
+                   module_id="extract_ocr_apple_v1", extra={"stderr_tail": err[-2000:]})
+        with open(error_path, "w", encoding="utf-8") as f:
+            json.dump({"error": msg, "stage": "run", "cmd": cmd, "returncode": proc.returncode,
+                       "stderr_tail": err[-2000:]}, f, indent=2)
         sys.stderr.write(err)
-        raise SystemExit(f"Vision OCR failed with code {proc.returncode}")
+        raise SystemExit(msg)
 
     page_objs = list(parse_swift_output(out_lines.splitlines()))
     pages = []

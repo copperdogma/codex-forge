@@ -956,6 +956,8 @@ def ensure_apple_helper(bin_path: Path):
     """
     Build the Swift Vision OCR helper if missing.
     """
+    if sys.platform != "darwin":
+        raise RuntimeError(f"Apple Vision OCR unsupported on platform {sys.platform}")
     if bin_path.exists():
         return
     src = bin_path.with_suffix(".swift")
@@ -1674,9 +1676,19 @@ def main():
         warmup_easyocr(image_paths[0], easyocr_langs, easyocr_state, gpu=easyocr_gpu)
 
     apple_helper = None
+    apple_errors_path = os.path.join(ocr_dir, "apple_errors.jsonl") if use_apple else None
     if use_apple:
         apple_helper = Path(ocr_dir) / "vision_ocr"
-        ensure_apple_helper(apple_helper)
+        try:
+            ensure_apple_helper(apple_helper)
+        except Exception as e:
+            msg = f"Apple Vision helper unavailable; disabling apple engine: {e}"
+            logger.log("extract", "warning", message=msg, artifact=str(apple_helper),
+                       module_id="extract_ocr_ensemble_v1")
+            if apple_errors_path:
+                append_jsonl(apple_errors_path, {"stage": "build", "error": str(e)})
+            use_apple = False
+            apple_helper = None
 
     total = len(image_paths)
     escalation_budget_pages = int(0.1 * total) if total else 0
@@ -1770,7 +1782,14 @@ def main():
                     by_engine_local["apple"] = apple_text
                     by_engine_local["apple_lines"] = apple_lines_meta  # Save for potential use
                 except Exception as e:
-                    by_engine_local = {"apple_error": str(e)}
+                    err_str = str(e)
+                    logger.log("extract", "warning",
+                               message=f"Apple Vision OCR failed on page {idx}; continuing without apple",
+                               module_id="extract_ocr_ensemble_v1",
+                               extra={"page": idx, "error": err_str})
+                    if apple_errors_path:
+                        append_jsonl(apple_errors_path, {"stage": "run", "page": idx, "error": err_str})
+                    by_engine_local = {"apple_error": err_str}
 
             if not col_spans:
                 col_spans = detect_column_splits(img_obj)
