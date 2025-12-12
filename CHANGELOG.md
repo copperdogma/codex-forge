@@ -9,6 +9,7 @@
 - EasyOCR warmup and run defaults now force MPS when present; docs (README.md, AGENTS.md) updated to make `pip install ... -c constraints/metal.txt` the default bootstrap and to include GPU smoke + check commands.
 - Story 067 marked done; README/AGENTS include MPS troubleshooting and smoke guidance.
 - OCR ensemble now records Apple helper build/run failures in `apple_errors.jsonl` and continues without Apple rather than silently dropping pages.
+- Story 052 evaluation checklist updated to reflect completed Apple OCR adoption (see Story 064).
 
 ### Tested
 - 5-page EasyOCR-only GPU smoke via `scripts/smoke_easyocr_gpu.sh` (intake only, MPS gpu:true, timing summary).
