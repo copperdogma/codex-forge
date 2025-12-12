@@ -185,3 +185,7 @@ _Note: Text-repair loop (iterative) deferred to Story 053._
 ### 2025-12-02-1825 — Follow-up stories
 - **Result:** Spun off Story 050 (ending detection verification) and Story 051 (text-quality evaluation/repair) to keep this story focused on OCR recovery and core pipeline loops.
 - **Next:** Continue text-quality deep dive in Story 051; use Story 050 only for verification metrics, not tuning. Text-repair loop work is **deferred to Story 051**.
+### 20251212-1310 — Story merged into 035
+- **Result:** Success; administrative merge.
+- **Notes:** Remaining work items from this story are now owned by `story-035-ff-pipeline-optimization.md` (Priority 1/2c). This file remains as historical record of the recovery phase.
+- **Next:** None.

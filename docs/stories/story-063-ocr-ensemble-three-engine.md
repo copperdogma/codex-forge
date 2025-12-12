@@ -3,7 +3,7 @@
 **Status**: Open
 **Created**: 2025-12-10
 **Parent Story**: story-061 (OCR Ensemble Fusion - DONE)
-**Depends On**: story-055 (EasyOCR Reliability)
+**Depends On**: story-065 (EasyOCR Reliability)  _(formerly referenced as story-055)_
 
 ## Goal
 
@@ -93,8 +93,10 @@ However, EasyOCR integration was blocked by a numpy version conflict (numpy 2.x 
 ## Tasks
 
 ### Phase 1: Enable EasyOCR (requires story-055)
-- [ ] Verify EasyOCR installs and runs after story-055 fixes
-- [ ] Add warmup/retry logic to OCR module
+- [x] Verify EasyOCR installs and runs after story-065 fixes.  
+  _Done in Story 065/067 via smoke runs and SHM/GPU hardening; see `docs/stories/story-065-easyocr-reliability.md` work log._
+- [x] Add warmup/retry logic to OCR module.  
+  _Done in Story 065 in `extract_ocr_ensemble_v1` (warmup + retries + debug logging)._
 - [ ] Test on full book (113 pages)
 - [ ] Update histogram to show EasyOCR contribution
 
@@ -126,3 +128,7 @@ However, EasyOCR integration was blocked by a numpy version conflict (numpy 2.x 
 - **Context**: Created to track work deferred from story-061 due to EasyOCR numpy conflict
 - **Deferred items**: R3 (EasyOCR), 3-engine voting, Tesseract confidence, inline escalation testing
 - **Blocking**: Requires story-055 (EasyOCR reliability) to be completed first
+### 20251212-1325 — Checklist sync with completed work
+- **Result:** Success; checked off Phase 1 warmup/retry/install items already delivered in Story 065/067. 
+- **Notes:** Full-book EasyOCR coverage and all true 3‑engine voting work remain open here.
+- **Next:** Resume after Story 065 completes a full‑book coverage validation.

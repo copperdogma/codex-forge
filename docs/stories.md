@@ -1,25 +1,40 @@
 # Project Stories — codex-forge
 
 ## Recommended Order (next up)
-- 031 Fighting Fantasy output refinement — fix quality and correctness issues in FF output modules.
-- 036 FF OCR recovery & text repair — recover missing headers and repair garbled text after story-035.
-- 030 Fighting Fantasy Engine format export — retarget FF recipe to the engine schema while keeping provenance/images.
-- DONE: 016 Driver DAG & schema compatibility — unlocks arbitrary workflows, coarse+fine branches, safer schema wiring.
-- DONE: 017 Module UX polish (params & outputs) — catches bad configs early; allows custom outputs for varied runs.
-- DONE: 018 Enrichment & alternate modules — delivers gameplay semantics and demonstrates swap breadth.
-- DONE: 019 Pipeline visibility dashboard — live stage/state view + artifact inspection for ops.
-- DONE: 006 Enrichment pass (choices/combat/items/endings) — core value for gamebooks; builds on 018 modules.
-- DONE: 007 Turn-to validator — sanity for CYOA cross-refs once enriched data exists.
-- DONE: 022 Pipeline instrumentation (timing & cost) — measure LLM/local time and API spend; add estimates.
-- DONE: 023 Consolidate section target adapters — simplify map/backfill into one guard.
-- DONE: 010 Coarse+fine portionizer & continuation merge — improves coverage quality for long spans.
-- DONE: 008 Image cropper/mapper — map images to portions; leverage source_images.
-- DONE: 012 Automation wrapper (driver snapshots) — run configs + snapshot for reproducibility.
-- DONE: 013 Cost/perf benchmarking — tune presets after instrumentation lands.
-- 021 Dashboard UI polish (highlighting & pane) — follow-up UI tweaks after visibility foundation.
-- 025 Module pruning & registry hygiene — audit/remove redundant modules and mark experimental variants.
-- 011 AI planner to assemble pipelines — optional; depends on stabilized modules/recipes.
-- ~~020 Module encapsulation & shared common~~
+Guiding priorities: **perfect OCR first**, then move downstream stage‑by‑stage. **Finish Fighting Fantasy to ~100% quality/coverage before starting Onward to the Unknown.**
+
+1. **065 — Stabilize EasyOCR as a Third OCR Engine**  
+   Finish full‑book EasyOCR coverage and performance on Deathtrap Dungeon. (Blocks true 3‑engine voting.)
+2. **063 — OCR Ensemble Three‑Engine Voting**  
+   Implement real 3‑way fusion + Tesseract confidences + inline escalation tuning once 065 is stable.
+3. **062 — OCR Content Type Detection Module**  
+   Tag OCR lines/elements with DocLayNet‑style content types to guide downstream routing and preserve layout intent.
+4. **058 — Post‑OCR Text Quality & Error Correction**  
+   Add generic spell/garble detection + repair loop so OCR output is readable even when engines agree on bad text.
+
+5. **059 — Section Detection & Boundary Improvements**  
+   Use improved OCR + content‑types to harden boundary/header detection for FF.
+6. **035 — Fighting Fantasy Pipeline Optimization**  
+   Drive missing/no‑text/no‑choice to targets using the new OCR + boundary stack.
+7. **050 — FF Ending Detection Verification**  
+   Verify ending/dead‑end classification quality on FF outputs (no book‑specific tuning).
+8. **056 — Validation Forensics Automation (remaining items)**  
+   Finish ending‑aware traces, boundary‑source reasoning, toggles/docs, optional HTML/CSV view.
+9. **066 — FF Pipeline Accel + Accuracy Guardrails**  
+   Only after 035 is Done; speed up clean/extract with hard regression guards.
+
+10. **009 — Layout‑Preserving Extractor**  
+    Build layout/table preservation needed for non‑FF books.
+11. **026 — Onward to the Unknown pilot (Arthur L'Heureux)**  
+    Run end‑to‑end with layout‑aware table handling once 009 lands.
+
+Later / non‑blocking:
+- 024 Image cropper follow‑up (image extraction quality)
+- 053 Pipeline smoke test (static, no external calls)  
+- 021 Dashboard UI polish
+- 038 Agentic pipeline coordinator
+- 011 AI planner to assemble pipelines
+- 028 Market discovery, 029 Model audit, 099 Remove dev backcompat note
 
 This index tracks stories in `/docs/stories/` for the codex-forge pipeline.
 
@@ -55,21 +70,21 @@ This index tracks stories in `/docs/stories/` for the codex-forge pipeline.
 || 028 | Market Discovery for codex-forge | Medium | In Progress | /docs/stories/story-028-market-discovery.md |
 || 029 | Audit model lineup vs latest OpenAI sheets | Medium | To Do | /docs/stories/story-029-model-audit-openai.md |
 || 030 | Fighting Fantasy Engine format export | High | Done | /docs/stories/story-030-ff-engine-format.md |
-|| 031 | Fighting Fantasy output refinement | High | In Progress | /docs/stories/story-031-ff-output-refinement.md |
+|| 031 | Fighting Fantasy output refinement | High | Done | /docs/stories/story-031-ff-output-refinement.md |
 || 032 | Unstructured intake & Document IR adoption | Medium | Done | /docs/stories/story-032-unstructured-intake-and-document-ir-adoption.md |
 || 033 | ARM64-native pipeline environment & perforecipe-pagelines-repair-choices.yamlrmance | Medium | Done | /docs/stories/story-033-arm64-pipeline-conversion.md |
 || 034 | FF Unstructured follow-ups (elements, helpers, graph quality) | High | Done | /docs/stories/story-034-ff-unstructured-followups.md |
 || 035 | Fighting Fantasy Pipeline Optimization | High | In Progress | /docs/stories/story-035-ff-pipeline-optimization.md |
-|| 036 | FF OCR Recovery & Text Repair | High | To Do | /docs/stories/story-036-ff-ocr-recovery-and-text-repair.md |
+|| 036 | FF OCR Recovery & Text Repair | High | Done | /docs/stories/story-036-ff-ocr-recovery-and-text-repair.md |
 || 037 | FF OCR Ensemble with BetterOCR | High | Done | /docs/stories/story-037-ocr-ensemble-with-betterocr.md |
 || 038 | Agentic Pipeline Coordinator | Medium | To Do | /docs/stories/story-038-agentic-pipeline-coordinator.md |
 || 050 | FF Ending Detection Verification | Medium | Open | /docs/stories/story-050-ff-ending-detection.md |
-|| 051 | Text Quality Evaluation & Repair | High | Open | /docs/stories/story-051-text-quality-eval.md |
-|| 052 | Evaluate Apple Vision OCR Integration | Medium | Open | /docs/stories/story-052-apple-ocr-integration.md |
+|| 051 | Text Quality Evaluation & Repair | High | Done | /docs/stories/story-051-text-quality-eval.md |
+|| 052 | Evaluate Apple Vision OCR Integration | Medium | Done | /docs/stories/story-052-apple-ocr-integration.md |
 || 053 | Pipeline Smoke Test (Static Sample, No External Calls) | High | Open | /docs/stories/story-053-smoke-test-pipeline.md |
 || 054 | Canonical FF Recipe Consolidation | High | Done | /docs/stories/story-054-canonical-ff-recipe.md |
 || 056 | Validation Forensics Automation | High | To Do | /docs/stories/story-056-validation-forensics.md |
-|| 057 | OCR Quality & Column Detection Improvements | High | To Do | /docs/stories/story-057-ocr-quality-column-detection.md |
+|| 057 | OCR Quality & Column Detection Improvements | High | Done | /docs/stories/story-057-ocr-quality-column-detection.md |
 || 058 | Post-OCR Text Quality & Error Correction | High | To Do | /docs/stories/story-058-post-ocr-text-quality.md |
 || 059 | Section Detection & Boundary Improvements | High | To Do | /docs/stories/story-059-section-detection-boundaries.md |
 || 060 | Pipeline Regression Testing Suite | High | Done | /docs/stories/story-060-pipeline-regression-testing.md |

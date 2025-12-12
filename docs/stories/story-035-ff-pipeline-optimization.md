@@ -142,6 +142,10 @@ Optimize the redesigned Fighting Fantasy pipeline to achieve near-perfect sectio
 ---
 
 ## Work Log
+### 20251212-1305 — Scope consolidation
+- **Result:** Success; merged overlapping work from Story 036 into this story.
+- **Notes:** Story 036’s remaining OCR/header recovery + text-repair objectives are already represented here as Priority 1 (missing sections) and Priority 2c (garble/typo repair). Story 036 is now treated as historical context only.
+- **Next:** Continue Priority 1–3 work in this story; no separate 036 execution needed.
 
 ### 2025-11-30 — Story Created
 

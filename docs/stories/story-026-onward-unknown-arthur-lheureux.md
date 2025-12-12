@@ -3,6 +3,7 @@
 **Status**: To Do
 
 ---
+**Depends On**: story-009 (layout‑preserving extractor / table capture capability)
 
 ## Acceptance Criteria
 - Images under `input/onward-to-the-unknown-images/Image027.jpg`–`Image036.jpg` are treated as the authoritative source for Arthur L'Heureux and processed end-to-end through the modular pipeline.
@@ -30,3 +31,7 @@
 - **Result:** Captured user requirements for Arthur L'Heureux pilot. No code changes yet.
 - **Notes:** Scans preferred over PDF; two subsection types (narrative vs genealogy table) need separate handling. Genealogy table format undecided; must preserve layout accurately, possibly as HTML.
 - **Next:** Lock the target output format for genealogy tables and define sectioning/recipe plan before implementing modules.
+### 20251212-1335 — Added explicit dependency
+- **Result:** Success.
+- **Notes:** This pilot requires layout/table preservation work tracked in Story 009; added dependency for sequencing clarity.
+- **Next:** Implement Story 009, then return here.

@@ -10,6 +10,7 @@
 - Story 067 marked done; README/AGENTS include MPS troubleshooting and smoke guidance.
 - OCR ensemble now records Apple helper build/run failures in `apple_errors.jsonl` and continues without Apple rather than silently dropping pages.
 - Story 052 evaluation checklist updated to reflect completed Apple OCR adoption (see Story 064).
+- Story index and open stories consolidated/re‑sequenced: merged Story 036 → 035, Story 051 → 058, refreshed Story 063 checklist, clarified dependencies (066→035, 026→009), and rebuilt Recommended Order around “OCR‑first, FF‑first”.
 
 ### Tested
 - 5-page EasyOCR-only GPU smoke via `scripts/smoke_easyocr_gpu.sh` (intake only, MPS gpu:true, timing summary).

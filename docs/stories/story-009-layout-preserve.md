@@ -14,7 +14,7 @@
 - [ ] Dual export (plain + layout)
 
 ## Notes
-- 
+- Supports table/layout pilots like Story 026 (Onward to the Unknown).
 
 ## Work Log
 - Pending

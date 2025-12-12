@@ -13,6 +13,7 @@ Improve post-OCR text quality by adding spell-check, character confusion detecti
 - [ ] Escalation logic considers absolute quality, not just engine disagreement
 - [ ] Context-aware post-processing available (BERT/T5) for fixing fragmented sentences
 - [ ] OCR errors like "sxrLL", "otk", "y0u 4re f0110win9" are caught and corrected
+- [ ] Generic text-quality reporting and repair loop shipped and validated (merged from Story 051).
 
 ## Context
 
@@ -116,6 +117,15 @@ Improve post-OCR text quality by adding spell-check, character confusion detecti
   - Fine-tuned language models (ByT5) for semantic-aware correction
   - Apply corrections while preserving original OCR text
 
+### Merged From Story 051 (Generic Text Quality)
+- [ ] Add a spell/garble detection module that flags low-confidence text (short, low-alpha, high OCR noise, dictionary misses).
+- [ ] Add an evaluation report summarizing counts and top‑N worst sections; output JSON + human‑readable summary.
+- [ ] Integrate a repair loop (detect → validate → targeted multimodal LLM with “do not invent”) capped by budget; skip end_game unless text is empty.
+- [ ] Record before/after samples (min 10) and quality deltas in the story log.
+- [ ] Ensure modules are generic (no book‑specific heuristics); document knobs (thresholds, models).
+- [ ] Wrap text repair in detect→validate→escalate→validate loop until thresholds met or cap hit.
+- [ ] Extend debug/contrast bundles to text‑repair/build stages.
+
 ## Related Work
 
 **Previous Improvements** (from story-054):
@@ -137,7 +147,10 @@ Improve post-OCR text quality by adding spell-check, character confusion detecti
 - **Action**: Extracted post-OCR text quality & error correction tasks from story-054 into this focused story.
 - **Scope**: Focus on spell-check, character confusion detection, context-aware correction, and improving escalation logic to consider absolute quality.
 - **Next**: Implement spell-check integration into quality metrics, add character confusion detection, improve escalation logic.
-
+### 20251212-1315 — Merged Story 051 into this story
+- **Result:** Success; consolidation to avoid duplicate text‑quality efforts.
+- **Notes:** Story 051’s generic evaluation/repair tasks are now captured above under “Merged From Story 051.” Story 051 will be marked Done/merged.
+- **Next:** Execute merged tasks here; update both FF‑specific stories once generic modules exist.
 
 
 

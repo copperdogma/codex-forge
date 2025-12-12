@@ -2,6 +2,7 @@
 
 **Status**: To Do  
 **Created**: 2025-12-04  
+**Depends On**: story-035 (FF Pipeline Optimization must complete quality targets first)
 
 ## Goal
 Speed up the Fighting Fantasy pipeline (especially per-page clean + extraction) while preserving or improving accuracy (section recall, text integrity, choices completeness).
@@ -21,3 +22,7 @@ Speed up the Fighting Fantasy pipeline (especially per-page clean + extraction) 
 - [ ] Target OCR + clean as highest-cost stages: reduce redundant reruns, consider page-level skip when downstream unchanged, and explore OCR quality/psm tuning for speed without recall loss.
 
 ## Work Log
+### 20251212-1330 — Dependency clarified
+- **Result:** Success.
+- **Notes:** This acceleration/guardrails work should start only after Story 035 achieves stable section/choice quality, to avoid optimizing a moving target.
+- **Next:** Revisit once Story 035 is marked Done.

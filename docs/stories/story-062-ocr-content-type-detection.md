@@ -6,7 +6,11 @@
 
 ## Goal
 
-Add a content type detection module to the OCR pipeline that automatically tags OCR output with semantic content types (heading, TOC, table, paragraph, list, etc.). This will enable downstream modules to make smarter decisions about text processing, layout handling, and structure extraction.
+Add a content type detection module to the OCR pipeline that automatically tags OCR output with semantic content/layout types. This provides two benefits:
+1) **Downstream routing hints** for frontmatter/gameplay/endmatter detection and the frontmatter/gameplay sectionizers.  
+2) **Layout‑intent preservation** so future exporters can reconstruct richer outputs (e.g., HTML) without guessing from flattened text.
+
+Default to an industry‑standard layout taxonomy rather than ad‑hoc HTML tags.
 
 ## Success Criteria
 
@@ -40,6 +44,20 @@ Add a content type detection module to the OCR pipeline that automatically tags 
 - Research SOTA approaches from modern OCR engines (Google Cloud Vision, AWS Textract, Azure Form Recognizer, etc.)
 - Implement a module that can be inserted into the OCR pipeline to enrich output with content type tags
 
+**Recommended baseline taxonomy (industry‑standard)**:
+- **DocLayNet (11 labels)** is a common, cross‑domain layout analysis label set used by SOTA models:
+  - `Title`, `Section-header`, `Text`, `List-item`, `Table`, `Picture`, `Caption`, `Formula`, `Footnote`, `Page-header`, `Page-footer`.
+  - Rationale: richer than PubLayNet, directly supports our needs (headings vs body, lists, tables, figures/captions, headers/footers), and maps cleanly to HTML later.
+- **PubLayNet (5 labels)** is a simpler academic‑paper taxonomy often used in layout models:
+  - `Title`, `Text`, `List`, `Table`, `Figure`.
+  - Useful as a fallback or for lightweight models, but too coarse for FF books.
+
+**Mapping for pipeline use (examples)**:
+- `Title` / `Section-header` → strong positive signal for section starts; candidates for gameplay/frontmatter headers.
+- `Text` → default narrative/rules paragraphs.
+- `List-item` → likely TOC entries, bullets, numbered instructions; should not be misread as gameplay headers.
+- `Table` / `Picture` / `Caption` / `Formula` / `Footnote` / `Page-header/footer` → non‑gameplay structural regions; preserve for export and avoid false boundaries.
+
 ## Tasks
 
 ### Phase 1: Research SOTA OCR Content Type Detection
@@ -58,6 +76,7 @@ Add a content type detection module to the OCR pipeline that automatically tags 
   - Identify common patterns (heading detection, table detection, list detection)
   - Document layout-based vs. text-based detection approaches
   - Confidence scoring approaches
+  - **Prioritize DocLayNet/PubLayNet labels as our default** and document any gaps for gamebooks (e.g., “adventure sheet/form” as a specialization of Table/Form).
 
 - [ ] **Research Output**
   - Create research document with findings
@@ -68,21 +87,21 @@ Add a content type detection module to the OCR pipeline that automatically tags 
 ### Phase 2: Module Design
 
 - [ ] **Define Content Type Taxonomy**
-  - Core types: heading, paragraph, table, list, TOC, form, image_caption, footnote, etc.
-  - Hierarchical types (e.g., heading_1, heading_2, heading_3)
+  - Adopt DocLayNet labels as core.
+  - Add minimal codex‑forge extensions only if evidence demands (e.g., `Form` or `Adventure-sheet`), with explicit mapping to DocLayNet + HTML.
+  - Optional hierarchical subtype field (e.g., `heading_level`) derived from size/position for downstream use.
   - Confidence scores for each type
   - Edge cases: mixed content, ambiguous regions
 
 - [ ] **Design Module Interface**
   - Input: OCR output (pagelines or elements with text + bounding boxes)
-  - Output: Same structure with added `content_type` field per element/line
-  - Parameters: Detection thresholds, model selection, confidence requirements
+  - Output: Same structure with added `content_type` and `content_type_confidence` per line/element, plus optional `content_subtype`.
+  - Parameters: Model selection, thresholds, `allow_extensions`, and a `coarse_only` mode (PubLayNet‑style) for fast runs.
   - Schema: Define output schema for content type tags
 
 - [ ] **Choose Implementation Approach**
-  - Rule-based heuristics (text patterns, layout analysis)
-  - LLM-based classification (GPT-4V for layout understanding)
-  - Hybrid approach (heuristics + LLM for ambiguous cases)
+  - Start with a hybrid: lightweight layout heuristics + LLM classifier for ambiguous regions.
+  - Track a follow‑up path for a trained detector (LayoutLMv3 / YOLO‑DocLayNet) if cost/perf warrants.
   - Consider cost/performance tradeoffs
 
 ### Phase 3: Module Implementation
@@ -112,6 +131,7 @@ Add a content type detection module to the OCR pipeline that automatically tags 
   - Add module to OCR recipes (after OCR extraction, before or after text reconstruction)
   - Update schemas to include `content_type` field
   - Test with existing recipes (recipe-ff-canonical, recipe-ocr)
+  - Ensure downstream portionizers/guards read and exploit tags (header detection, TOC filtering, table avoidance).
 
 - [ ] **Validation Testing**
   - Test on known pages: headings (section headers), TOC pages, tables, forms
@@ -132,6 +152,8 @@ Add a content type detection module to the OCR pipeline that automatically tags 
 - Azure Form Recognizer: [Layout Analysis](https://learn.microsoft.com/en-us/azure/applied-ai-services/form-recognizer/concept-layout)
 - Adobe PDF Services API: [Content Extraction](https://developer.adobe.com/document-services/docs/overview/pdf-services-api/)
 - Academic: Document structure detection papers, layout analysis research
+  - DocLayNet dataset / label set (11 classes) and common finetuned models (YOLO/ LayoutLMv3).
+  - PubLayNet label set (5 classes) and LayoutLMv3 layout‑analysis results.
 
 ## Related Stories
 
@@ -147,3 +169,7 @@ Add a content type detection module to the OCR pipeline that automatically tags 
 - **Scope**: Research SOTA approaches first, then design and implement module
 - **Priority**: Medium (enhances pipeline but not blocking)
 - **Next**: Begin Phase 1 research on modern OCR engines and their content type detection approaches
+### 20251212-1355 — Taxonomy direction clarified
+- **Result:** Success.
+- **Notes:** Based on SOTA layout analysis practice, default taxonomy should follow DocLayNet (11 labels) rather than HTML‑only tags; PubLayNet (5 labels) noted as coarse fallback. Added mapping notes to guide downstream sectionizers and future HTML export.
+- **Next:** Execute Phase 1 research with DocLayNet/PubLayNet comparison, then design module interface around these labels.
