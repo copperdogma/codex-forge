@@ -10,7 +10,7 @@ from .utils import (
     PROGRESS_STATUS_VALUES,
     validate_progress_event,
 )
-from .ocr import render_pdf, run_ocr
+from .ocr import render_pdf, run_ocr, run_ocr_with_word_data
 
 __all__ = [
     "load_settings",
@@ -25,4 +25,5 @@ __all__ = [
     "validate_progress_event",
     "render_pdf",
     "run_ocr",
+    "run_ocr_with_word_data",
 ]

@@ -523,6 +523,39 @@ class TestFusionFunctions:
         assert fused[0] == primary[0], f"Expected primary with low alt confidence: {fused}"
         assert sources[0] == "primary"
 
+    def test_align_and_vote_three_engine_majority(self):
+        """Two engines agreeing should win over a third differing engine."""
+        _, align_and_vote = self.get_fusion_functions()
+        engines = {
+            "tesseract": ["STAMINA score is twelve"],
+            "apple": ["STAMINA score is twelve"],
+            "easyocr": ["STAMIN score is twelve"],
+        }
+        fused, sources, distances = align_and_vote(
+            engines,
+            None,
+            confidences_by_engine={"tesseract": [0.7], "apple": [0.9]},
+        )
+        assert fused[0] == "STAMINA score is twelve"
+        assert sources[0] in ("tesseract", "apple")
+        assert distances[0] <= 0.2
+
+    def test_align_and_vote_three_engine_confidence_breaks_tie(self):
+        """When all three differ, confidence should drive the selection."""
+        _, align_and_vote = self.get_fusion_functions()
+        engines = {
+            "tesseract": ["STAMIN4 score is twelve"],
+            "apple": ["STAMINA score is twelve"],
+            "easyocr": ["STAMINA score is twelue"],
+        }
+        fused, sources, _ = align_and_vote(
+            engines,
+            None,
+            confidences_by_engine={"tesseract": [0.4], "apple": [0.95]},
+        )
+        assert fused[0] == "STAMINA score is twelve"
+        assert sources[0] == "apple"
+
 
 class TestInlineEscalation:
     """Tests for R6: inline vision escalation functions."""

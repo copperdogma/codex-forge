@@ -88,7 +88,18 @@ func run(pdfPath: String, start: Int, end: Int?, lang: String, fast: Bool, colum
 
         var lines: [Line] = []
         for (colIdx, span) in columnSpans.enumerated() {
-            let roi = CGRect(x: CGFloat(span[0]), y: 0, width: CGFloat(span[1] - span[0]), height: 1.0)
+            // Vision can throw if ROI is even slightly outside [0,1] due to float rounding.
+            // Clamp conservatively to avoid Code=14 ROI errors.
+            var x = CGFloat(span[0])
+            var w = CGFloat(span[1] - span[0])
+            if x.isNaN || w.isNaN { continue }
+            if x < 0 { x = 0 }
+            if x > 1 { x = 1 }
+            if w < 0 { continue }
+            let epsilon: CGFloat = 0.0001
+            if w > (1.0 - x - epsilon) { w = max(0, 1.0 - x - epsilon) }
+            if w <= 0 { continue }
+            let roi = CGRect(x: x, y: 0, width: w, height: 1.0)
             recogReq.regionOfInterest = roi
             let handler = VNImageRequestHandler(cgImage: img, options: [:])
             try handler.perform([recogReq])

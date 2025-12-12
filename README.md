@@ -139,6 +139,7 @@ Each run emits a lightweight `timing_summary.json` in the run directory with wal
 - Recommended full run on ARM:  
   `~/miniforge3/envs/codex-arm/bin/python driver.py --recipe configs/recipes/recipe-ff-canonical.yaml --run-id <run> --output-dir <dir> --force`
 - macOS-only Vision OCR: a new module `extract_ocr_apple_v1` (and optional `apple` engine in `extract_ocr_ensemble_v1`) uses `VNRecognizeTextRequest`. It compiles a Swift helper at runtime; only available on macOS with Xcode CLTs installed.
+  - **Sandbox caveat:** In restricted/sandboxed execution, Apple Vision can fail with errors like `sysctlbyname for kern.hv_vmm_present failed` (and emit empty/no `apple` text). If you hit this, run the OCR stage outside the sandbox / with full host permissions, or disable `apple` for that run.
 
 ### DAG recipes (coarse+fine merge example)
 ```bash

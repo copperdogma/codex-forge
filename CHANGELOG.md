@@ -5,21 +5,28 @@
 - EasyOCR coverage guard warning when MPS is unavailable, keeping runs explicit about CPU fallback.
 - Canonical FF recipe now includes `easyocr_guard_v1` (min coverage 0.95) to fail fast if EasyOCR stops contributing.
 - macOS Apple Vision OCR engine (`extract_ocr_apple_v1`) and optional `apple` engine support in the OCR ensemble, with graceful non‑macOS no‑op and error artifacts.
+- OCR ensemble 3-engine fusion (tesseract/easyocr/apple) with majority voting and confidence-aware tie-breaking (Story 063).
+- Tesseract word-data extraction helper for confidence auditing (`modules.common.ocr.run_ocr_with_word_data`).
 
 ### Changed
 - EasyOCR warmup and run defaults now force MPS when present; docs (README.md, AGENTS.md) updated to make `pip install ... -c constraints/metal.txt` the default bootstrap and to include GPU smoke + check commands.
 - Story 067 marked done; README/AGENTS include MPS troubleshooting and smoke guidance.
 - OCR ensemble now records Apple helper build/run failures in `apple_errors.jsonl` and continues without Apple rather than silently dropping pages.
+- OCR ensemble histogram now reports spread-aware totals and engine coverage stats for EasyOCR/Apple presence.
 - Story 052 evaluation checklist updated to reflect completed Apple OCR adoption (see Story 064).
 - Story index and open stories consolidated/re‑sequenced: merged Story 036 → 035, Story 051 → 058, refreshed Story 063 checklist, clarified dependencies (066→035, 026→009), and rebuilt Recommended Order around “OCR‑first, FF‑first”.
 
 ### Fixed
 - Progress event schema now supports status `warning` without overwriting stage lifecycle status in `pipeline_state.json`.
+- Apple Vision OCR ROI clamp to avoid Vision Code=14 errors on column ROIs; spread-aware filtering prevents Apple text from being incorrectly excluded as an outlier.
+- Inline vision escalation now records per-call usage and refuses to overwrite OCR output on refusal responses (provenance recorded instead).
+- Test suite regression fixes: snapshot/manifest integration tests align with driver run-id reuse behavior; FF20 regression guards handle reused `output/` baseline dirs; `section_target_guard_v1` missing imports fixed.
 
 ### Tested
 - 5-page EasyOCR-only GPU smoke via `scripts/smoke_easyocr_gpu.sh` (intake only, MPS gpu:true, timing summary).
 - Apple Vision OCR smoke on `testdata/tbotb-mini.pdf` page 1; ensemble baseline vs Apple on Deathtrap Dungeon pages 1–40 with artifact inspection.
 - `PYTHONPATH=. pytest -q modules/common/tests/test_progress_logger_warning.py`
+- `python -m pytest -q` (96 passed, 3 skipped).
 
 ## [2025-12-10] - FF20 regression suite and quality guards
 

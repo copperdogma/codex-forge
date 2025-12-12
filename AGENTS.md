@@ -197,6 +197,7 @@ Before portionization, automatically flag pages for high-fidelity re-OCR if eith
 - Section coverage check (map + backfill + fail on missing): `python modules/adapter/section_target_guard_v1/main.py --inputs output/runs/ocr-enrich-sections-noconsensus/portions_enriched.jsonl --out /tmp/portions_enriched_guard.jsonl --report /tmp/section_target_report.json`
 - Legacy map/backfill adapters are obsolete; use `section_target_guard_v1` (no backward compatibility maintained).
 - **Dashboard Testing**: Serve from repo root (`python -m http.server 8000`) and access via `http://localhost:8000/docs/pipeline-visibility.html`. Do not use `file://` URIs as they block CORS/fetch.
+- **Sandbox caveat (Apple Vision OCR):** On some setups, Apple Vision OCR may fail under restricted/sandboxed execution with `sysctlbyname for kern.hv_vmm_present failed`. If that happens, rerun outside the sandbox / with full host permissions, or disable the `apple` engine for that run.
 
 ## Open Questions / WIP
 - Enrichment stage not implemented (Story 018).

@@ -69,3 +69,7 @@ Add a native macOS OCR path using `VNRecognizeTextRequest` (Vision framework) an
 ### 20251212-1235 — Marked story complete
 - **Result:** Success; all Tasks and Success Criteria met, story status set to Done and index updated.
 - **Next:** None.
+### 20251212-0913 — Documented sandbox permission caveat (sysctl)
+- **Result:** Success; clarified that Apple Vision OCR can fail under restricted/sandboxed execution with `sysctlbyname for kern.hv_vmm_present failed`, producing no `apple` text.
+- **Notes:** Reproduced locally: helper fails in restricted mode, succeeds with full host permissions (`sysctl kern.hv_vmm_present: 0` and helper emits JSON).
+- **Next:** If we want Apple Vision to work in sandboxed runners, create a dedicated story to (a) detect the restricted mode early and auto-disable `apple`, or (b) restructure execution so Vision calls run with the necessary permissions.

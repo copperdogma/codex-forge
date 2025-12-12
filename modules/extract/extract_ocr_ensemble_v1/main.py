@@ -25,7 +25,7 @@ os.environ.setdefault("OMP_NUM_THREADS", "1")
 os.environ.setdefault("KMP_AFFINITY", "disabled")
 os.environ.setdefault("KMP_INIT_AT_FORK", "FALSE")
 
-from modules.common import render_pdf, run_ocr, ensure_dir, save_json, save_jsonl, ProgressLogger
+from modules.common import render_pdf, run_ocr, run_ocr_with_word_data, ensure_dir, save_json, save_jsonl, ProgressLogger
 from modules.common.utils import english_wordlist, append_jsonl
 from modules.common.image_utils import (
     sample_spread_decision, split_spread_at_gutter, deskew_image,
@@ -39,6 +39,111 @@ def split_lines(text: str):
         return []
     # Preserve blank lines to keep paragraph breaks visible downstream
     return text.splitlines()
+
+
+def _normalize_line_for_match(s: str) -> str:
+    return " ".join((s or "").strip().lower().split())
+
+
+def _tesseract_line_confidences_for_text(text: str, data: Dict[str, Any]) -> Dict[str, Any]:
+    """
+    Derive per-line confidences aligned to `split_lines(text)`, from pytesseract word data.
+
+    Returns:
+        {
+          "line_confidences": List[Optional[float]],  # 0..1
+          "page_confidence": Optional[float],         # 0..1
+          "match_rate": float,                        # 0..1
+        }
+    """
+    try:
+        texts = data.get("text") or []
+        confs = data.get("conf") or []
+        blocks = data.get("block_num") or []
+        pars = data.get("par_num") or []
+        lines = data.get("line_num") or []
+    except Exception:
+        return {"line_confidences": [], "page_confidence": None, "match_rate": 0.0}
+
+    if not texts or not confs:
+        return {"line_confidences": [], "page_confidence": None, "match_rate": 0.0}
+
+    line_groups: Dict[Any, Dict[str, Any]] = {}
+    all_word_confs: List[float] = []
+
+    for i in range(min(len(texts), len(confs), len(blocks), len(pars), len(lines))):
+        w = (texts[i] or "").strip()
+        if not w:
+            continue
+        try:
+            c = float(confs[i])
+        except Exception:
+            continue
+        if c < 0:
+            continue
+        c01 = max(0.0, min(1.0, c / 100.0))
+        all_word_confs.append(c01)
+
+        key = (blocks[i], pars[i], lines[i])
+        if key not in line_groups:
+            line_groups[key] = {"words": [], "confs": []}
+        line_groups[key]["words"].append(w)
+        line_groups[key]["confs"].append(c01)
+
+    if not all_word_confs or not line_groups:
+        return {"line_confidences": [], "page_confidence": None, "match_rate": 0.0}
+
+    # Preserve insertion order (dict is ordered) for "data lines"
+    data_lines = []
+    for grp in line_groups.values():
+        wds = grp["words"]
+        cs = grp["confs"]
+        if not wds or not cs:
+            continue
+        data_lines.append({
+            "text": " ".join(wds),
+            "conf": sum(cs) / len(cs),
+            "norm": _normalize_line_for_match(" ".join(wds)),
+        })
+
+    ocr_lines = split_lines(text)
+    if not ocr_lines:
+        return {
+            "line_confidences": [],
+            "page_confidence": sum(all_word_confs) / len(all_word_confs),
+            "match_rate": 0.0,
+        }
+
+    # Map each OCR line to the best-matching data-derived line.
+    from difflib import SequenceMatcher
+
+    line_confidences: List[Optional[float]] = []
+    matched = 0
+    for ln in ocr_lines:
+        n = _normalize_line_for_match(ln)
+        if not n:
+            line_confidences.append(None)
+            continue
+        best = None
+        best_ratio = 0.0
+        for dl in data_lines:
+            if not dl["norm"]:
+                continue
+            r = SequenceMatcher(None, n, dl["norm"], autojunk=False).ratio()
+            if r > best_ratio:
+                best_ratio = r
+                best = dl
+        if best is not None and best_ratio >= 0.6:
+            line_confidences.append(float(best["conf"]))
+            matched += 1
+        else:
+            line_confidences.append(None)
+
+    return {
+        "line_confidences": line_confidences,
+        "page_confidence": sum(all_word_confs) / len(all_word_confs),
+        "match_rate": matched / max(1, len([l for l in ocr_lines if l.strip()])),
+    }
 
 def _mps_available() -> bool:
     try:
@@ -227,7 +332,48 @@ def inline_vision_escalate(image_path: str, model: str = "gpt-4.1",
             temperature=0,
         )
 
+        usage_obj = getattr(response, "usage", None)
+        usage = None
+        try:
+            if usage_obj is not None:
+                if hasattr(usage_obj, "model_dump"):
+                    usage = usage_obj.model_dump()
+                elif hasattr(usage_obj, "to_dict"):
+                    usage = usage_obj.to_dict()
+                elif isinstance(usage_obj, dict):
+                    usage = usage_obj
+                else:
+                    usage = {
+                        k: getattr(usage_obj, k)
+                        for k in ("prompt_tokens", "completion_tokens", "total_tokens", "input_tokens", "output_tokens")
+                        if getattr(usage_obj, k, None) is not None
+                    }
+        except Exception:
+            usage = None
+
         text = response.choices[0].message.content or ""
+        refusal_markers = (
+            "sorry, i can't",
+            "sorry, i cannot",
+            "i can't help with that",
+            "i cannot help with that",
+            "i can't assist with that",
+            "i cannot assist with that",
+            "i can't comply",
+            "i cannot comply",
+            "i'm sorry, but i can't",
+            "i'm sorry, but i cannot",
+        )
+        lowered = text.strip().lower()
+        if lowered and any(m in lowered for m in refusal_markers):
+            return {
+                "text": "",
+                "lines": [],
+                "success": False,
+                "error": "refusal",
+                "model": model,
+                "usage": usage,
+            }
         lines = [{"text": line, "source": "gpt4v"} for line in text.splitlines()]
 
         return {
@@ -235,6 +381,8 @@ def inline_vision_escalate(image_path: str, model: str = "gpt-4.1",
             "lines": lines,
             "success": True,
             "error": None,
+            "model": model,
+            "usage": usage,
         }
     except Exception as e:
         return {
@@ -242,6 +390,8 @@ def inline_vision_escalate(image_path: str, model: str = "gpt-4.1",
             "lines": [],
             "success": False,
             "error": str(e),
+            "model": model,
+            "usage": None,
         }
 
 
@@ -1015,8 +1165,20 @@ def call_betterocr(image_path: str, engines, lang: str, *, use_llm: bool, llm_mo
 
     tess_text = ""
     try:
-        tess_text = run_ocr(image_path, lang="eng" if lang == "en" else lang, psm=psm, oem=oem)
+        tess_text, tess_data = run_ocr_with_word_data(
+            image_path,
+            lang="eng" if lang == "en" else lang,
+            psm=psm,
+            oem=oem,
+        )
         by_engine["tesseract"] = tess_text
+        if tess_data:
+            conf_info = _tesseract_line_confidences_for_text(tess_text, tess_data)
+            if conf_info.get("line_confidences"):
+                by_engine["tesseract_confidences"] = conf_info["line_confidences"]
+            if conf_info.get("page_confidence") is not None:
+                by_engine["tesseract_page_confidence"] = conf_info["page_confidence"]
+            by_engine["tesseract_confidence_match_rate"] = conf_info.get("match_rate", 0.0)
     except Exception as ex:
         by_engine["tesseract_error"] = str(ex)
 
@@ -1183,7 +1345,7 @@ def needs_numeric_rescue(line: str) -> bool:
     return digits >= 1 and letters <= 2
 
 
-def fuse_characters(primary: str, alt: str) -> str:
+def fuse_characters(primary: str, alt) -> str:
     """
     Character-level fusion of two similar lines.
 
@@ -1197,6 +1359,35 @@ def fuse_characters(primary: str, alt: str) -> str:
     gets a single character wrong.
     """
     from difflib import SequenceMatcher
+
+    # Multi-engine convenience: allow `alt` to be a list/tuple of additional candidates.
+    if isinstance(alt, (list, tuple)):
+        candidates = [primary] + [a for a in alt if isinstance(a, str)]
+        candidates = [c for c in candidates if c]
+        if not candidates:
+            return ""
+        if len(candidates) == 1:
+            return candidates[0]
+        # Majority exact match wins immediately.
+        counts: Dict[str, int] = {}
+        for c in candidates:
+            counts[c] = counts.get(c, 0) + 1
+        best_exact = max(counts.items(), key=lambda kv: kv[1])
+        if best_exact[1] >= 2:
+            return best_exact[0]
+        # Otherwise, fuse the best-agreeing pair (fallback).
+        best_pair = None
+        best_ratio = -1.0
+        for i in range(len(candidates)):
+            for j in range(i + 1, len(candidates)):
+                r = SequenceMatcher(None, candidates[i], candidates[j], autojunk=False).ratio()
+                if r > best_ratio:
+                    best_ratio = r
+                    best_pair = (candidates[i], candidates[j])
+        if best_pair and best_ratio >= 0.8:
+            return fuse_characters(best_pair[0], best_pair[1])
+        # Too different: pick the longest (most complete).
+        return max(candidates, key=lambda s: len(s.strip()))
 
     if not primary or not alt:
         return primary or alt or ""
@@ -1423,8 +1614,234 @@ def filter_fragment_artifacts(lines: List[str], min_fragment_len: int = 4,
     }
 
 
+def _align_spine_rows_with_engine(
+    rows: List[Dict[str, Any]],
+    spine_text: List[str],
+    engine: str,
+    engine_lines: List[str],
+    engine_confs: Optional[List[float]] = None,
+) -> tuple:
+    """
+    Align an existing "spine" (rows + spine_text) with a new engine's line list.
+
+    Returns: (new_rows, new_spine_text)
+    """
+    from difflib import SequenceMatcher
+
+    def conf_at(j: int) -> Optional[float]:
+        if not engine_confs or j < 0 or j >= len(engine_confs):
+            return None
+        try:
+            v = engine_confs[j]
+            return float(v) if v is not None else None
+        except Exception:
+            return None
+
+    sm = SequenceMatcher(a=spine_text, b=engine_lines, autojunk=False)
+    new_rows: List[Dict[str, Any]] = []
+    new_spine: List[str] = []
+
+    def best_spine_text(row: Dict[str, Any]) -> str:
+        best = ""
+        for v in row.values():
+            if not isinstance(v, dict):
+                continue
+            t = (v.get("text") or "").strip()
+            if len(t) > len(best):
+                best = t
+        return best
+
+    for tag, i1, i2, j1, j2 in sm.get_opcodes():
+        if tag == "equal":
+            for k in range(i2 - i1):
+                row = dict(rows[i1 + k])
+                txt = engine_lines[j1 + k] if (j1 + k) < j2 else ""
+                row[engine] = {"text": txt, "conf": conf_at(j1 + k)}
+                new_rows.append(row)
+                new_spine.append(best_spine_text(row))
+        elif tag == "replace":
+            width = max(i2 - i1, j2 - j1)
+            for k in range(width):
+                row = dict(rows[i1 + k]) if (i1 + k) < i2 else {}
+                txt = engine_lines[j1 + k] if (j1 + k) < j2 else ""
+                row[engine] = {"text": txt, "conf": conf_at(j1 + k) if (j1 + k) < j2 else None}
+                new_rows.append(row)
+                new_spine.append(best_spine_text(row))
+        elif tag == "delete":
+            for k in range(i1, i2):
+                row = dict(rows[k])
+                row[engine] = {"text": "", "conf": None}
+                new_rows.append(row)
+                new_spine.append(best_spine_text(row))
+        elif tag == "insert":
+            for k in range(j1, j2):
+                row = {engine: {"text": engine_lines[k], "conf": conf_at(k)}}
+                new_rows.append(row)
+                new_spine.append(best_spine_text(row))
+
+    return new_rows, new_spine
+
+
+def _choose_fused_line(
+    row: Dict[str, Any],
+    *,
+    distance_drop: float,
+    enable_char_fusion: bool,
+) -> tuple:
+    """
+    Decide the fused output line for a multi-engine aligned row.
+
+    Returns: (text, source, dist)
+    """
+    from difflib import SequenceMatcher
+
+    candidates = []
+    for eng, payload in row.items():
+        if not isinstance(payload, dict):
+            continue
+        txt = (payload.get("text") or "")
+        if not txt.strip():
+            continue
+        candidates.append((eng, txt, payload.get("conf")))
+
+    if not candidates:
+        return "", "none", 0.0
+    if len(candidates) == 1:
+        eng, txt, _ = candidates[0]
+        return txt, eng, 0.0
+
+    # Pairwise similarity stats
+    best_ratio = 0.0
+    best_pair = None
+    for i in range(len(candidates)):
+        for j in range(i + 1, len(candidates)):
+            r = SequenceMatcher(None, candidates[i][1], candidates[j][1], autojunk=False).ratio()
+            if r > best_ratio:
+                best_ratio = r
+                best_pair = (candidates[i], candidates[j])
+    dist = 1 - best_ratio
+
+    # Majority exact match (whitespace-normalized) wins.
+    groups: Dict[str, List[tuple]] = {}
+    for eng, txt, conf in candidates:
+        norm = " ".join(txt.strip().split())
+        groups.setdefault(norm, []).append((eng, txt, conf))
+
+    best_group = max(groups.values(), key=lambda g: len(g))
+    if len(best_group) >= 2:
+        # Prefer the variant with the best confidence (if available), else keep stable order.
+        def score(item):
+            conf = item[2]
+            return (-1.0 if conf is None else float(conf))
+        winner = max(best_group, key=score)
+        winner_eng, winner_txt, _ = winner
+        # If variants differ (e.g., casing), fuse them for small corrections.
+        variants = [t for _, t, _ in best_group]
+        fused_txt = winner_txt
+        if enable_char_fusion and len(variants) > 1:
+            fused_txt = fuse_characters(variants[0], variants[1:])
+        return fused_txt, winner_eng, max(0.0, min(1.0, dist))
+
+    # No majority across 3+ engines: prefer confidence when available.
+    if len(candidates) >= 3 and any(c[2] is not None for c in candidates):
+        def conf_score(item):
+            conf = item[2]
+            return -1.0 if conf is None else float(conf)
+        eng, txt, _ = max(candidates, key=conf_score)
+        return txt, eng, max(0.0, min(1.0, dist))
+
+    # No majority: if very similar, attempt character fusion on the best pair.
+    if enable_char_fusion and best_pair and dist <= 0.15:
+        (e1, t1, _), (e2, t2, _) = best_pair
+        return fuse_characters(t1, t2), "fused", max(0.0, min(1.0, dist))
+
+    # Too different overall: prefer the highest-confidence line if present; else longest.
+    if dist > distance_drop:
+        scored = []
+        for eng, txt, conf in candidates:
+            c = -1.0 if conf is None else float(conf)
+            scored.append((c, len(txt.strip()), eng, txt))
+        scored.sort(reverse=True)
+        _, _, eng, txt = scored[0]
+        return txt, eng, max(0.0, min(1.0, dist))
+
+    # Moderate disagreement: pick best confidence, else longer.
+    best = None
+    for eng, txt, conf in candidates:
+        c = -1.0 if conf is None else float(conf)
+        s = (c, len(txt.strip()))
+        if best is None or s > best[0]:
+            best = (s, eng, txt)
+    assert best is not None
+    _, eng, txt = best
+    return txt, eng, max(0.0, min(1.0, dist))
+
+
+def _align_and_vote_multi(
+    engine_lines_by_engine: Dict[str, List[str]],
+    *,
+    confidences_by_engine: Optional[Dict[str, List[float]]] = None,
+    distance_drop: float = 0.35,
+    enable_char_fusion: bool = True,
+) -> tuple:
+    # Filter to engines with any content.
+    filtered = {}
+    for eng, lines in (engine_lines_by_engine or {}).items():
+        if not isinstance(lines, list):
+            continue
+        if any((ln or "").strip() for ln in lines):
+            filtered[eng] = lines
+
+    if not filtered:
+        return [], [], []
+    if len(filtered) == 1:
+        eng = next(iter(filtered.keys()))
+        lines = list(filtered[eng])
+        return lines, [eng] * len(lines), [0.0] * len(lines)
+
+    # Choose a stable base: most total characters (tends to preserve content).
+    base_engine = max(filtered.keys(), key=lambda e: sum(len((ln or "").strip()) for ln in filtered[e]))
+    base_lines = list(filtered[base_engine])
+    base_confs = (confidences_by_engine or {}).get(base_engine) if confidences_by_engine else None
+
+    rows: List[Dict[str, Any]] = []
+    for i, ln in enumerate(base_lines):
+        conf = None
+        if base_confs and i < len(base_confs):
+            try:
+                conf = float(base_confs[i]) if base_confs[i] is not None else None
+            except Exception:
+                conf = None
+        rows.append({base_engine: {"text": ln, "conf": conf}})
+    spine_text = list(base_lines)
+
+    for eng in sorted(filtered.keys()):
+        if eng == base_engine:
+            continue
+        rows, spine_text = _align_spine_rows_with_engine(
+            rows,
+            spine_text,
+            eng,
+            filtered[eng],
+            (confidences_by_engine or {}).get(eng) if confidences_by_engine else None,
+        )
+
+    fused_lines: List[str] = []
+    sources: List[str] = []
+    distances: List[float] = []
+    for row in rows:
+        txt, src, dist = _choose_fused_line(row, distance_drop=distance_drop, enable_char_fusion=enable_char_fusion)
+        if txt == "" and src == "none":
+            continue
+        fused_lines.append(txt)
+        sources.append(src)
+        distances.append(dist)
+
+    return fused_lines, sources, distances
+
+
 def align_and_vote(primary_lines, alt_lines, distance_drop=0.35, enable_char_fusion=True,
-                   alt_confidences=None):
+                   alt_confidences=None, primary_confidences=None, confidences_by_engine=None):
     """
     Align two line lists and pick/fuse a line per position.
 
@@ -1448,6 +1865,15 @@ def align_and_vote(primary_lines, alt_lines, distance_drop=0.35, enable_char_fus
     fused = []
     sources = []
     distances = []
+
+    # Multi-engine mode: pass a dict {engine_name: [lines]} as the first arg.
+    if isinstance(primary_lines, dict):
+        return _align_and_vote_multi(
+            primary_lines,
+            confidences_by_engine=confidences_by_engine,
+            distance_drop=distance_drop,
+            enable_char_fusion=enable_char_fusion,
+        )
 
     if not alt_lines:
         # No alt lines - return primary with metadata
@@ -1501,13 +1927,25 @@ def align_and_vote(primary_lines, alt_lines, distance_drop=0.35, enable_char_fus
                     else:
                         # Choose between primary and alt based on:
                         # 1. Confidence score (if available for alt)
+                        # 1b. Confidence score for primary (if available)
                         # 2. Length (prefer longer line)
                         alt_conf = None
                         if alt_confidences and j1 + k < len(alt_confidences):
                             alt_conf = alt_confidences[j1 + k]
+                        primary_conf = None
+                        if primary_confidences and i1 + k < len(primary_confidences):
+                            primary_conf = primary_confidences[i1 + k]
 
                         # Use confidence-weighted selection if we have confidence data
-                        if alt_conf is not None and alt_conf >= 0.8:
+                        if alt_conf is not None and primary_conf is not None and (alt_conf - primary_conf) >= 0.15:
+                            fused.append(a)
+                            sources.append("alt_confident")
+                            distances.append(dist)
+                        elif alt_conf is not None and primary_conf is not None and (primary_conf - alt_conf) >= 0.15:
+                            fused.append(p)
+                            sources.append("primary")
+                            distances.append(dist)
+                        elif alt_conf is not None and alt_conf >= 0.8:
                             # High confidence Apple line - prefer it
                             fused.append(a)
                             sources.append("alt_confident")
@@ -1659,7 +2097,8 @@ def main():
     easyocr_debug_path = os.path.join(ocr_dir, "easyocr_debug.jsonl") if "easyocr" in args.engines else None
     easyocr_state = EasyOcrRunState(easyocr_debug_path, run_id=args.run_id) if easyocr_debug_path else None
     easyocr_langs = ["en"]  # keep to supported English model on this host
-    easyocr_gpu = _mps_available()
+    # Importing torch can abort on misconfigured environments; only probe MPS when EasyOCR is enabled.
+    easyocr_gpu = _mps_available() if "easyocr" in args.engines else False
     ensure_dir(images_dir)
     ensure_dir(pages_dir)
     if args.write_engine_dumps:
@@ -1778,7 +2217,7 @@ def main():
             apple_lines_meta = []
             apple_text = ""
             apple_lines = []
-            by_engine_local = {}
+            apple_error = None
             if use_apple:
                 try:
                     # Let Apple OCR detect columns on its own for all pages
@@ -1789,10 +2228,27 @@ def main():
                     )
                     # Use Apple's column detection if available (works for both spread and non-spread pages)
                     col_spans = infer_columns_from_lines(apple_lines_meta) or apple_cols or []
-                    by_engine_local["apple"] = apple_text
-                    by_engine_local["apple_lines"] = apple_lines_meta  # Save for potential use
+                    # For spread books, filter Apple lines into the current half (L/R) so we vote on comparable text.
+                    if side and apple_lines_meta:
+                        filtered_meta = []
+                        filtered_lines = []
+                        for ln in apple_lines_meta:
+                            bbox = ln.get("bbox", None)
+                            if not bbox or not isinstance(bbox, list) or len(bbox) < 4:
+                                continue
+                            cx = (bbox[0] + bbox[2]) / 2.0
+                            if side == "L" and cx < gutter_position:
+                                filtered_meta.append(ln)
+                                filtered_lines.append(ln.get("text", ""))
+                            elif side == "R" and cx >= gutter_position:
+                                filtered_meta.append(ln)
+                                filtered_lines.append(ln.get("text", ""))
+                        apple_lines_meta = filtered_meta
+                        apple_lines = [t for t in filtered_lines if t]
+                        apple_text = "\n".join(apple_lines)
                 except Exception as e:
                     err_str = str(e)
+                    apple_error = err_str
                     logger.log(
                         "extract",
                         "running",
@@ -1802,7 +2258,6 @@ def main():
                     )
                     if apple_errors_path:
                         append_jsonl(apple_errors_path, {"stage": "run", "page": idx, "error": err_str})
-                    by_engine_local = {"apple_error": err_str}
 
             if not col_spans:
                 col_spans = detect_column_splits(img_obj)
@@ -1830,9 +2285,15 @@ def main():
                     page_num=idx,
                 )
                 fused_before_post = split_lines(text)
+                if apple_error:
+                    part_by_engine["apple_error"] = apple_error
 
                 # Collect all engine outputs for outlier detection
-                engine_outputs_for_outlier = {"tesseract": text}
+                engine_outputs_for_outlier = {}
+                if isinstance(part_by_engine.get("tesseract"), str) and part_by_engine["tesseract"].strip():
+                    engine_outputs_for_outlier["tesseract"] = part_by_engine["tesseract"]
+                if isinstance(part_by_engine.get("easyocr"), str) and part_by_engine["easyocr"].strip():
+                    engine_outputs_for_outlier["easyocr"] = part_by_engine["easyocr"]
                 if use_apple and apple_text:
                     engine_outputs_for_outlier["apple"] = apple_text
 
@@ -1846,37 +2307,57 @@ def main():
                         "avg_distances": outlier_info["avg_distances"]
                     }
 
-                if use_apple and apple_text:
-                    alt_lines = apple_lines
-                    # Skip Apple OCR if marked as outlier
-                    if "apple" in outlier_info.get("outliers", []):
-                        part_by_engine["apple_excluded_as_outlier"] = True
-                        alt_lines = []
-                    elif alt_lines:
-                        # Calculate document-level similarity for logging
-                        ratio = difflib.SequenceMatcher(None, text, "\n".join(alt_lines), autojunk=False).ratio()
-                        part_by_engine["apple_doc_similarity"] = round(ratio, 3)
-                        part_by_engine["apple"] = apple_text  # persist Apple text for provenance
-                    # Extract confidence scores from Apple OCR metadata
-                    alt_confidences = None
+                # Build multi-engine voting inputs (tesseract + easyocr + apple, minus outliers)
+                engine_lines_by_engine = {}
+                confidences_by_engine = {}
+
+                if "tesseract" in engine_outputs_for_outlier and "tesseract" not in outlier_info.get("outliers", []):
+                    engine_lines_by_engine["tesseract"] = split_lines(part_by_engine.get("tesseract", ""))
+                    if isinstance(part_by_engine.get("tesseract_confidences"), list):
+                        confidences_by_engine["tesseract"] = part_by_engine["tesseract_confidences"]
+                if "easyocr" in engine_outputs_for_outlier and "easyocr" not in outlier_info.get("outliers", []):
+                    engine_lines_by_engine["easyocr"] = split_lines(part_by_engine.get("easyocr", ""))
+                if use_apple and apple_text and "apple" not in outlier_info.get("outliers", []):
+                    engine_lines_by_engine["apple"] = list(apple_lines or [])
+                    part_by_engine["apple"] = apple_text  # persist Apple text for provenance
                     if apple_lines_meta:
                         alt_confidences = [ln.get("confidence", 0.0) for ln in apple_lines_meta]
-                    # Always attempt per-line fusion - align_and_vote handles line-level thresholds
-                    fused, fusion_srcs, dist = align_and_vote(fused_before_post, alt_lines,
-                                                               alt_confidences=alt_confidences)
-                    # Track fusion statistics
+                        part_by_engine["apple_confidences"] = alt_confidences
+                        confidences_by_engine["apple"] = alt_confidences
+                    # Calculate document-level similarity for logging (tesseract vs apple when available)
+                    if isinstance(part_by_engine.get("tesseract"), str) and part_by_engine["tesseract"].strip():
+                        ratio = difflib.SequenceMatcher(
+                            None, part_by_engine["tesseract"], "\n".join(engine_lines_by_engine["apple"]), autojunk=False
+                        ).ratio()
+                        part_by_engine["apple_doc_similarity"] = round(ratio, 3)
+                elif use_apple and apple_text:
+                    part_by_engine["apple_excluded_as_outlier"] = True
+                if "easyocr" in outlier_info.get("outliers", []):
+                    part_by_engine["easyocr_excluded_as_outlier"] = True
+                if "tesseract" in outlier_info.get("outliers", []):
+                    part_by_engine["tesseract_excluded_as_outlier"] = True
+
+                if engine_lines_by_engine:
+                    fused, fusion_srcs, dist = align_and_vote(
+                        engine_lines_by_engine,
+                        None,
+                        distance_drop=0.35,
+                        enable_char_fusion=True,
+                        confidences_by_engine=confidences_by_engine or None,
+                    )
                     part_by_engine["fusion_sources"] = fusion_srcs
                     part_by_engine["fusion_distances"] = dist
-                    if alt_confidences:
-                        part_by_engine["apple_confidences"] = alt_confidences
                     fused_before_post = fused
-                    # Determine overall source based on which engine contributed more
-                    if fusion_srcs:
-                        alt_count = sum(1 for s in fusion_srcs if s in ("alt", "alt_confident", "fused"))
-                        if alt_count > len(fusion_srcs) / 2:
-                            part_source = "apple"
-                        elif any(s == "fused" for s in fusion_srcs):
-                            part_source = "fused"
+
+                    # Determine overall source from per-line sources (ignore "fused"/unknown).
+                    counts = {}
+                    for s in fusion_srcs:
+                        if s in engine_lines_by_engine:
+                            counts[s] = counts.get(s, 0) + 1
+                    if counts:
+                        part_source = max(counts.keys(), key=lambda k: counts[k])
+                    elif any(s == "fused" for s in fusion_srcs):
+                        part_source = "fused"
                 part_lines = fused_before_post
             else:
                 col_lines = []
@@ -1889,13 +2370,27 @@ def main():
                     x0 = int(span[0] * w)
                     x1 = int(span[1] * w)
                     crop = img_obj.crop((x0, 0, x1, h))
-                    crop_path = None
-                    if args.write_engine_dumps:
-                        crop_path = os.path.join(ocr_dir, f"col-{idx:03d}-{part_idx}-{x0}-{x1}.png")
-                        crop.save(crop_path)
-                    t_text = run_ocr(crop_path or img_path_part, lang="eng" if args.lang == "en" else args.lang, psm=args.psm, oem=args.oem)
-                    part_by_engine.setdefault("tesseract_cols", []).append(t_text)
-                    col_lines_this = split_lines(t_text)
+                    # Always write a crop file so both Tesseract and EasyOCR can read it.
+                    crop_path = os.path.join(ocr_dir, f"col-{idx:03d}-{part_idx}-{col_idx:02d}-{x0}-{x1}.png")
+                    crop.save(crop_path)
+
+                    _text_col, by_engine_col, _src_col = call_betterocr(
+                        crop_path,
+                        args.engines,
+                        args.lang,
+                        use_llm=args.use_llm,
+                        llm_model=args.llm_model,
+                        allow_fallback=allow_fallback,
+                        psm=args.psm,
+                        oem=args.oem,
+                        easyocr_state=easyocr_state,
+                        easyocr_langs=easyocr_langs,
+                        easyocr_gpu=easyocr_gpu,
+                        easyocr_retry_hi_res=False,
+                    )
+                    part_by_engine.setdefault("tesseract_cols", []).append(by_engine_col.get("tesseract", ""))
+                    if isinstance(by_engine_col.get("easyocr"), str):
+                        part_by_engine.setdefault("easyocr_cols", []).append(by_engine_col.get("easyocr", ""))
                     alt_lines_col = []
                     alt_conf_col = []
                     if use_apple and apple_lines_meta:
@@ -1914,10 +2409,40 @@ def main():
                                 if span[0] <= line_center < span[1]:
                                     alt_lines_col.append(ln["text"])
                                     alt_conf_col.append(ln.get("confidence", 0.0))
-                    fused_col, fusion_srcs_col, dist_col = align_and_vote(
-                        col_lines_this, alt_lines_col,
-                        alt_confidences=alt_conf_col if alt_conf_col else None
-                    )
+
+                    # Column-level multi-engine vote (tesseract + easyocr + apple).
+                    engine_outputs_col = {}
+                    if isinstance(by_engine_col.get("tesseract"), str) and by_engine_col["tesseract"].strip():
+                        engine_outputs_col["tesseract"] = by_engine_col["tesseract"]
+                    if isinstance(by_engine_col.get("easyocr"), str) and by_engine_col["easyocr"].strip():
+                        engine_outputs_col["easyocr"] = by_engine_col["easyocr"]
+                    if alt_lines_col:
+                        engine_outputs_col["apple"] = "\n".join(alt_lines_col)
+                    outliers_col = detect_outlier_engine(engine_outputs_col).get("outliers", [])
+
+                    engine_lines_col = {}
+                    confs_col = {}
+                    if "tesseract" in engine_outputs_col and "tesseract" not in outliers_col:
+                        engine_lines_col["tesseract"] = split_lines(by_engine_col.get("tesseract", ""))
+                        if isinstance(by_engine_col.get("tesseract_confidences"), list):
+                            confs_col["tesseract"] = by_engine_col["tesseract_confidences"]
+                    if "easyocr" in engine_outputs_col and "easyocr" not in outliers_col:
+                        engine_lines_col["easyocr"] = split_lines(by_engine_col.get("easyocr", ""))
+                    if "apple" in engine_outputs_col and "apple" not in outliers_col:
+                        engine_lines_col["apple"] = alt_lines_col
+                        if alt_conf_col:
+                            confs_col["apple"] = alt_conf_col
+
+                    if engine_lines_col:
+                        fused_col, fusion_srcs_col, dist_col = align_and_vote(
+                            engine_lines_col,
+                            None,
+                            confidences_by_engine=confs_col or None,
+                        )
+                    else:
+                        fused_col = split_lines(_text_col or "")
+                        fusion_srcs_col = ["ensemble"] * len(fused_col)
+                        dist_col = [0.0] * len(fused_col)
                     col_fusions.append((fused_col, fusion_srcs_col, dist_col))
                     col_lines.extend(fused_col)
                 text = "\n".join(col_lines)
@@ -1959,29 +2484,53 @@ def main():
                         easyocr_retry_hi_res=True,
                     )
                     fused_before_post = split_lines(text_single)
+
+                    engine_outputs_for_outlier = {}
+                    if isinstance(part_by_engine_single.get("tesseract"), str) and part_by_engine_single["tesseract"].strip():
+                        engine_outputs_for_outlier["tesseract"] = part_by_engine_single["tesseract"]
+                    if isinstance(part_by_engine_single.get("easyocr"), str) and part_by_engine_single["easyocr"].strip():
+                        engine_outputs_for_outlier["easyocr"] = part_by_engine_single["easyocr"]
                     if use_apple and apple_text:
-                        alt_lines = apple_lines
-                        if alt_lines:
-                            # Calculate document-level similarity for logging only
-                            ratio = difflib.SequenceMatcher(None, text_single, "\n".join(alt_lines), autojunk=False).ratio()
-                            part_by_engine_single["apple_doc_similarity"] = round(ratio, 3)
-                        # Extract confidence scores
-                        alt_confidences = None
+                        engine_outputs_for_outlier["apple"] = apple_text
+
+                    outlier_info = detect_outlier_engine(engine_outputs_for_outlier)
+                    if outlier_info.get("outliers"):
+                        part_by_engine_single["outlier_engines"] = outlier_info["outliers"]
+
+                    engine_lines_by_engine = {}
+                    confidences_by_engine = {}
+                    if "tesseract" in engine_outputs_for_outlier and "tesseract" not in outlier_info.get("outliers", []):
+                        engine_lines_by_engine["tesseract"] = split_lines(part_by_engine_single.get("tesseract", ""))
+                        if isinstance(part_by_engine_single.get("tesseract_confidences"), list):
+                            confidences_by_engine["tesseract"] = part_by_engine_single["tesseract_confidences"]
+                    if "easyocr" in engine_outputs_for_outlier and "easyocr" not in outlier_info.get("outliers", []):
+                        engine_lines_by_engine["easyocr"] = split_lines(part_by_engine_single.get("easyocr", ""))
+                    if use_apple and apple_text and "apple" not in outlier_info.get("outliers", []):
+                        engine_lines_by_engine["apple"] = list(apple_lines or [])
+                        part_by_engine_single["apple"] = apple_text
                         if apple_lines_meta:
                             alt_confidences = [ln.get("confidence", 0.0) for ln in apple_lines_meta]
-                        # Always attempt per-line fusion
-                        fused, fusion_srcs, dist = align_and_vote(fused_before_post, alt_lines,
-                                                                   alt_confidences=alt_confidences)
+                            part_by_engine_single["apple_confidences"] = alt_confidences
+                            confidences_by_engine["apple"] = alt_confidences
+
+                    if engine_lines_by_engine:
+                        fused, fusion_srcs, dist = align_and_vote(
+                            engine_lines_by_engine,
+                            None,
+                            confidences_by_engine=confidences_by_engine or None,
+                        )
                         part_by_engine_single["fusion_sources"] = fusion_srcs
                         part_by_engine_single["fusion_distances"] = dist
                         fused_before_post = fused
-                        # Determine overall source
-                        if fusion_srcs:
-                            alt_count = sum(1 for s in fusion_srcs if s in ("alt", "alt_confident", "fused"))
-                            if alt_count > len(fusion_srcs) / 2:
-                                part_source_single = "apple"
-                            elif any(s == "fused" for s in fusion_srcs):
-                                part_source_single = "fused"
+
+                        counts = {}
+                        for s in fusion_srcs:
+                            if s in engine_lines_by_engine:
+                                counts[s] = counts.get(s, 0) + 1
+                        if counts:
+                            part_source_single = max(counts.keys(), key=lambda k: counts[k])
+                        elif any(s == "fused" for s in fusion_srcs):
+                            part_source_single = "fused"
                     # Replace with single-column results
                     part_lines = fused_before_post
                     part_by_engine = part_by_engine_single
@@ -2150,6 +2699,8 @@ def main():
                             "corruption_score": quality_metrics["corruption_score"],
                             "disagree_rate": disagree_rate,
                             "original_source": part_source if part_source != "gpt4v_inline" else "ocr_ensemble",
+                            "model": escalation_result.get("model"),
+                            "usage": escalation_result.get("usage"),
                         }
                         # Reset quality metrics since we have fresh vision output
                         needs_escalation = False
@@ -2159,6 +2710,13 @@ def main():
                     else:
                         logger.log("extract", "running",
                                   message=f"Page {page_key}: Inline escalation FAILED - {escalation_result['error']}")
+                        part_by_engine["inline_escalation_failed"] = {
+                            "error": escalation_result.get("error"),
+                            "model": escalation_result.get("model"),
+                            "usage": escalation_result.get("usage"),
+                            "corruption_score": quality_metrics["corruption_score"],
+                            "disagree_rate": disagree_rate,
+                        }
 
             # Task 5.2: Filter fragment artifacts from two-column pages
             # These are word-ending fragments like "his", "LL.", "ured" that appear as separate lines
@@ -2266,9 +2824,14 @@ def main():
     save_jsonl(jsonl_root_path, page_rows)
 
     # simple source histogram for quick sanity
+    # Note: for spread books, one PDF page can emit multiple outputs (L/R); `page_rows` is the true output count.
     hist = {}
     col_pages = 0
     inline_escalated_count = 0
+    easyocr_pages_with_text = 0
+    apple_pages_with_text = 0
+    output_count = len(page_rows)
+    pdf_page_count = total
     for row in page_rows:
         src = row.get("lines", [{}])[0].get("source", "unknown") if row.get("lines") else "unknown"
         hist[src] = hist.get(src, 0) + 1
@@ -2276,9 +2839,25 @@ def main():
             col_pages += 1
         if row.get("inline_escalated"):
             inline_escalated_count += 1
+        engines_raw = row.get("engines_raw") or {}
+        if isinstance(engines_raw.get("easyocr"), str) and engines_raw["easyocr"].strip():
+            easyocr_pages_with_text += 1
+        if isinstance(engines_raw.get("apple"), str) and engines_raw["apple"].strip():
+            apple_pages_with_text += 1
     save_json(os.path.join(ocr_dir, "ocr_source_histogram.json"),
-              {"histogram": hist, "column_pages": col_pages, "total_pages": total,
-               "inline_escalated": inline_escalated_count})
+              {
+                  "histogram": hist,
+                  "column_pages": col_pages,
+                  "total_pages": output_count,
+                  "total_pdf_pages": pdf_page_count,
+                  "inline_escalated": inline_escalated_count,
+                  "engine_coverage": {
+                      "easyocr_pages_with_text": easyocr_pages_with_text,
+                      "easyocr_text_pct": (easyocr_pages_with_text / output_count) if output_count else 0.0,
+                      "apple_pages_with_text": apple_pages_with_text,
+                      "apple_text_pct": (apple_pages_with_text / output_count) if output_count else 0.0,
+                  },
+              })
 
     logger.log("extract", "done", current=total, total=total,
                message="OCR ensemble complete", artifact=index_path,

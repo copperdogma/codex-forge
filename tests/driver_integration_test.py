@@ -37,6 +37,7 @@ class DriverIntegrationTests(unittest.TestCase):
                 "--mock",
                 "--registry", "modules",
                 "--skip-done",
+                "--allow-run-id-reuse",
             ]
             result = subprocess.run(cmd, cwd=str(Path(__file__).resolve().parents[1]))
             self.assertEqual(result.returncode, 0)
@@ -88,6 +89,7 @@ class DriverIntegrationTests(unittest.TestCase):
                 "--mock",
                 "--registry", "modules",
                 "--skip-done",
+                "--allow-run-id-reuse",
             ]
             repo_root = Path(__file__).resolve().parents[1]
             result = subprocess.run(cmd, cwd=str(repo_root))
@@ -149,6 +151,7 @@ class DriverIntegrationTests(unittest.TestCase):
                 "--registry",
                 "modules",
                 "--skip-done",
+                "--allow-run-id-reuse",
                 "--instrument",
                 "--price-table",
                 str(pricing_path),

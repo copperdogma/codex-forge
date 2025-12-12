@@ -1,5 +1,7 @@
 import argparse
 import json
+import os
+import sys
 from typing import List, Set, Tuple, Dict, Any
 
 from modules.common.utils import read_jsonl, append_jsonl, ensure_dir

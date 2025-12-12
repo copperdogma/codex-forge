@@ -5,7 +5,7 @@ Guiding priorities: **perfect OCR first**, then move downstream stage‑by‑sta
 
 1. **065 — Stabilize EasyOCR as a Third OCR Engine**  
    Finish full‑book EasyOCR coverage and performance on Deathtrap Dungeon. (Blocks true 3‑engine voting.)
-2. **063 — OCR Ensemble Three‑Engine Voting**  
+2. **063 — OCR Ensemble Three‑Engine Voting**  *(Done)*
    Implement real 3‑way fusion + Tesseract confidences + inline escalation tuning once 065 is stable.
 3. **062 — OCR Content Type Detection Module**  
    Tag OCR lines/elements with DocLayNet‑style content types to guide downstream routing and preserve layout intent.
@@ -90,7 +90,7 @@ This index tracks stories in `/docs/stories/` for the codex-forge pipeline.
 || 060 | Pipeline Regression Testing Suite | High | Done | /docs/stories/story-060-pipeline-regression-testing.md |
 || 061 | OCR Ensemble Fusion Improvements | High | Done | /docs/stories/story-061-ocr-ensemble-fusion.md |
 || 062 | OCR Content Type Detection Module | Medium | Open | /docs/stories/story-062-ocr-content-type-detection.md |
-|| 063 | OCR Ensemble Three-Engine Voting | High | Open | /docs/stories/story-063-ocr-ensemble-three-engine.md |
+|| 063 | OCR Ensemble Three-Engine Voting | High | Done | /docs/stories/story-063-ocr-ensemble-three-engine.md |
 || 064 | Apple Vision OCR (VNRecognizeTextRequest) Adapter | Medium | Done | /docs/stories/story-064-apple-vision-ocr.md |
 || 065 | Stabilize EasyOCR as a Third OCR Engine | High | Done | /docs/stories/story-065-easyocr-reliability.md |
 || 066 | FF Pipeline Accel + Accuracy Guardrails | High | To Do | /docs/stories/story-066-ff-pipeline-accel-accuracy.md |
