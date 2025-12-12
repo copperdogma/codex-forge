@@ -3,6 +3,7 @@
 ### Added
 - Metal-friendly constraints file (`constraints/metal.txt`) and GPU regression helper (`scripts/regression/check_easyocr_gpu.py`) plus one-shot smoke runner (`scripts/smoke_easyocr_gpu.sh`).
 - EasyOCR coverage guard warning when MPS is unavailable, keeping runs explicit about CPU fallback.
+- Canonical FF recipe now includes `easyocr_guard_v1` (min coverage 0.95) to fail fast if EasyOCR stops contributing.
 - macOS Apple Vision OCR engine (`extract_ocr_apple_v1`) and optional `apple` engine support in the OCR ensemble, with graceful non‑macOS no‑op and error artifacts.
 
 ### Changed
@@ -12,9 +13,13 @@
 - Story 052 evaluation checklist updated to reflect completed Apple OCR adoption (see Story 064).
 - Story index and open stories consolidated/re‑sequenced: merged Story 036 → 035, Story 051 → 058, refreshed Story 063 checklist, clarified dependencies (066→035, 026→009), and rebuilt Recommended Order around “OCR‑first, FF‑first”.
 
+### Fixed
+- Progress event schema now supports status `warning` without overwriting stage lifecycle status in `pipeline_state.json`.
+
 ### Tested
 - 5-page EasyOCR-only GPU smoke via `scripts/smoke_easyocr_gpu.sh` (intake only, MPS gpu:true, timing summary).
 - Apple Vision OCR smoke on `testdata/tbotb-mini.pdf` page 1; ensemble baseline vs Apple on Deathtrap Dungeon pages 1–40 with artifact inspection.
+- `PYTHONPATH=. pytest -q modules/common/tests/test_progress_logger_warning.py`
 
 ## [2025-12-10] - FF20 regression suite and quality guards
 

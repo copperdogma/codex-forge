@@ -1665,8 +1665,12 @@ def main():
     if args.write_engine_dumps:
         ensure_dir(engines_dir)
     if "easyocr" in args.engines and not easyocr_gpu:
-        logger.log("extract", "warning",
-                   message="EasyOCR GPU unavailable (MPS not available); running EasyOCR on CPU.")
+        logger.log(
+            "extract",
+            "running",
+            message="EasyOCR GPU unavailable (MPS not available); running EasyOCR on CPU.",
+            extra={"level": "warning"},
+        )
 
     image_paths = render_pdf(args.pdf, images_dir, dpi=args.dpi,
                              start_page=args.start, end_page=args.end)
@@ -1683,8 +1687,14 @@ def main():
             ensure_apple_helper(apple_helper)
         except Exception as e:
             msg = f"Apple Vision helper unavailable; disabling apple engine: {e}"
-            logger.log("extract", "warning", message=msg, artifact=str(apple_helper),
-                       module_id="extract_ocr_ensemble_v1")
+            logger.log(
+                "extract",
+                "running",
+                message=msg,
+                artifact=str(apple_helper),
+                module_id="extract_ocr_ensemble_v1",
+                extra={"level": "warning"},
+            )
             if apple_errors_path:
                 append_jsonl(apple_errors_path, {"stage": "build", "error": str(e)})
             use_apple = False
@@ -1783,10 +1793,13 @@ def main():
                     by_engine_local["apple_lines"] = apple_lines_meta  # Save for potential use
                 except Exception as e:
                     err_str = str(e)
-                    logger.log("extract", "warning",
-                               message=f"Apple Vision OCR failed on page {idx}; continuing without apple",
-                               module_id="extract_ocr_ensemble_v1",
-                               extra={"page": idx, "error": err_str})
+                    logger.log(
+                        "extract",
+                        "running",
+                        message=f"Apple Vision OCR failed on page {idx}; continuing without apple",
+                        module_id="extract_ocr_ensemble_v1",
+                        extra={"level": "warning", "page": idx, "error": err_str},
+                    )
                     if apple_errors_path:
                         append_jsonl(apple_errors_path, {"stage": "run", "page": idx, "error": err_str})
                     by_engine_local = {"apple_error": err_str}

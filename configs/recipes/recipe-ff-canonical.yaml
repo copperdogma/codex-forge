@@ -28,12 +28,22 @@ stages:
       start: 1
       end: 113  # full book; override to 20 via settings for smoke runs
 
-  - id: escalate_vision
+  - id: easyocr_guard
     stage: adapter
-    module: ocr_escalate_gpt4v_v1
+    module: easyocr_guard_v1
     needs: [intake]
     inputs:
       inputs: intake
+    out: pages_raw_guarded.jsonl
+    params:
+      min_coverage: 0.95
+
+  - id: escalate_vision
+    stage: adapter
+    module: ocr_escalate_gpt4v_v1
+    needs: [easyocr_guard]
+    inputs:
+      inputs: easyocr_guard
     params:
       threshold: 0.4
       max_pages: 40
@@ -43,9 +53,9 @@ stages:
   - id: merge_ocr
     stage: adapter
     module: merge_ocr_escalated_v1
-    needs: [intake, escalate_vision]
+    needs: [easyocr_guard, escalate_vision]
     inputs:
-      inputs: [intake, escalate_vision]
+      inputs: [easyocr_guard, escalate_vision]
     out: adapter_out.jsonl
 
   - id: reconstruct_text

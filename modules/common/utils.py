@@ -22,7 +22,9 @@ PROGRESS_EVENT_SCHEMA: Dict[str, Tuple[type, ...]] = {
     "stage_description": (str, type(None)),
     "extra": (dict,),
 }
-PROGRESS_STATUS_VALUES = {"running", "done", "failed", "skipped", "queued"}
+# Note: `warning` is an event-level status used to surface non-fatal issues while a stage is still running.
+# Pipeline state should still reflect the stage lifecycle (running/done/failed/skipped/queued).
+PROGRESS_STATUS_VALUES = {"running", "done", "failed", "skipped", "queued", "warning"}
 
 
 def load_settings(path: str) -> Dict[str, Any]:
@@ -170,8 +172,14 @@ class ProgressLogger:
             if self.run_id:
                 state["run_id"] = self.run_id
             stage_state = stages.get(stage, {})
+            # Keep pipeline_state stage lifecycle statuses stable.
+            # Warnings are recorded via events, but should not overwrite the stage lifecycle.
+            state_status = status
+            if status == "warning":
+                prev = stage_state.get("status")
+                state_status = prev if prev in {"done", "failed", "skipped"} else "running"
             stage_state.update({
-                "status": status,
+                "status": state_status,
                 "artifact": artifact or stage_state.get("artifact"),
                 "updated_at": now,
                 "module_id": module_id or stage_state.get("module_id"),
