@@ -23,9 +23,12 @@ Context clues for REAL sections:
 - They may contain choices like "If you want to turn left, turn to 42"
 - They appear in roughly sequential order (though PDF layout may shuffle)
 - They are typically in the range 1-400
+- **Elements tagged with Content:Section-header are strong candidates (especially if Num matches the section number)**
 
 Context clues for FALSE positives (NOT sections):
 - Page numbers (usually small, in headers/footers)
+- **Elements tagged with Content:Page-header or Content:Page-footer should be ignored**
+- **Elements tagged with Content:List-item are usually NOT section headers**
 - Dice roll results ("Roll 2 dice, if you roll 7 or less...")
 - Stat values (SKILL 7, STAMINA 12)
 - Dates or years in narrative text
@@ -45,6 +48,7 @@ Important:
 - Be conservative: when in doubt, prefer high confidence over catching everything
 - If you see multiple elements that might be the same section, report only the first occurrence
 - Section numbers should be in the range 1-400 for typical Fighting Fantasy books
+- **Use Content tags to boost confidence: Section-header increases confidence, Page-header/Page-footer/List-item should be ignored**
 
 Output format:
 Return a JSON object with a "boundaries" array containing section boundary objects:
@@ -63,28 +67,66 @@ Return a JSON object with a "boundaries" array containing section boundary objec
 Return ONLY the JSON, no other text."""
 
 
-def format_elements_for_scan(elements: List[Dict]) -> str:
-    """Format elements into a compact representation for AI scanning."""
+def should_skip_element(elem: Dict) -> bool:
+    """
+    Pre-filter elements to reduce LLM prompt size and false positives.
+    Returns True if element should be skipped.
+    """
+    content_type = elem.get("content_type")
+
+    # Skip known false positive content types
+    if content_type in ["Page-header", "Page-footer", "List-item"]:
+        return True
+
+    return False
+
+
+def format_elements_for_scan(elements: List[Dict]) -> tuple[str, int]:
+    """
+    Format elements into a compact representation for AI scanning.
+    Returns: (formatted_text, skipped_count)
+    """
     lines = []
+    skipped = 0
+
     for idx, elem in enumerate(elements):
+        # Pre-filter obvious false positives
+        if should_skip_element(elem):
+            skipped += 1
+            continue
+
         elem_id = elem.get("id", f"unknown_{idx}")
         elem_type = elem.get("type", "Unknown")
         text = elem.get("text", "").strip()
-        page = elem.get("metadata", {}).get("page_number", "?")
+        page = elem.get("metadata", {}).get("page_number") or elem.get("page", "?")
+
+        # Include content_type if available (helps LLM identify headers vs body text)
+        content_type = elem.get("content_type")
+        content_subtype = elem.get("content_subtype")
 
         # Truncate very long text to keep prompt size manageable
         if len(text) > 200:
             text = text[:200] + "..."
 
-        # Format: [ID:abc123 | Type:Title | Page:5] Text content here
-        lines.append(f"[ID:{elem_id} | Type:{elem_type} | Page:{page}] {text}")
+        # Format: [ID:abc123 | Type:Title | Page:5 | Content:Section-header] Text content here
+        parts = [f"ID:{elem_id}", f"Type:{elem_type}", f"Page:{page}"]
+        if content_type:
+            parts.append(f"Content:{content_type}")
+            if content_subtype and isinstance(content_subtype, dict) and "number" in content_subtype:
+                parts.append(f"Num:{content_subtype['number']}")
 
-    return "\n".join(lines)
+        header = " | ".join(parts)
+        lines.append(f"[{header}] {text}")
+
+    return "\n".join(lines), skipped
 
 
-def call_scan_llm(client: OpenAI, model: str, elements: List[Dict], max_tokens: int, retry_model: str = "gpt-5") -> List[Dict]:
-    """Call AI to scan elements and identify section boundaries."""
-    elements_text = format_elements_for_scan(elements)
+def call_scan_llm(client: OpenAI, model: str, elements: List[Dict], max_tokens: int, retry_model: str = "gpt-5") -> tuple[List[Dict], int]:
+    """
+    Call AI to scan elements and identify section boundaries.
+    Returns: (boundaries, skipped_count)
+    """
+    elements_text, skipped_count = format_elements_for_scan(elements)
 
     user_prompt = f"""Here are all the elements from the document:
 
@@ -101,12 +143,9 @@ Please identify ALL Fighting Fantasy gameplay section boundaries."""
             ],
             response_format={"type": "json_object"},
         )
-        if selected_model.startswith("gpt-5"):
-            kwargs["max_completion_tokens"] = max_tokens
-            kwargs["temperature"] = 1
-        else:
-            kwargs["max_tokens"] = max_tokens
-            kwargs["temperature"] = 0.0
+        # Use max_tokens for all models (max_completion_tokens is gpt-5 specific but may not be available)
+        kwargs["max_tokens"] = max_tokens
+        kwargs["temperature"] = 0.0 if not selected_model.startswith("gpt-5") else 1.0
 
         completion = client.chat.completions.create(**kwargs)
 
@@ -128,15 +167,16 @@ Please identify ALL Fighting Fantasy gameplay section boundaries."""
             payload = json.loads(response_text)
         except Exception as e2:
             print(f"[ai_scan] Retry failed: {e2}. Proceeding with empty boundaries.")
-            return []
+            return [], skipped_count
 
     # Extract boundaries array
+    boundaries = []
     if isinstance(payload, dict) and "boundaries" in payload:
-        return payload["boundaries"]
+        boundaries = payload["boundaries"]
     elif isinstance(payload, list):
-        return payload
-    else:
-        return []
+        boundaries = payload
+
+    return boundaries, skipped_count
 
 
 def main():
@@ -168,7 +208,12 @@ def main():
 
     # Call AI to scan for boundaries
     client = OpenAI()
-    boundaries_data = call_scan_llm(client, args.model, elements, args.max_tokens, retry_model=args.retry_model)
+    boundaries_data, skipped_by_content_type = call_scan_llm(client, args.model, elements, args.max_tokens, retry_model=args.retry_model)
+
+    if skipped_by_content_type > 0:
+        logger.log("portionize", "running", current=0, total=1,
+                   message=f"Skipped {skipped_by_content_type} elements by content_type filtering",
+                   artifact=args.out, module_id="portionize_ai_scan_v1")
 
     # Convert to SectionBoundary schema
     boundaries = []
@@ -194,6 +239,8 @@ def main():
                schema_version="section_boundary_v1")
 
     print(f"Found {len(boundaries)} section boundaries → {args.out}")
+    if skipped_by_content_type > 0:
+        print(f"[ai_scan] skipped {skipped_by_content_type} elements by content_type filtering")
 
 
 if __name__ == "__main__":

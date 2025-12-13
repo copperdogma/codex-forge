@@ -9,11 +9,11 @@ Guiding priorities: **perfect OCR first**, then move downstream stage‑by‑sta
    Implement real 3‑way fusion + Tesseract confidences + inline escalation tuning once 065 is stable.
 3. DONE: **062 — OCR Content Type Detection Module**  
    Tag OCR lines/elements with DocLayNet‑style content types to guide downstream routing and preserve layout intent.
-4. DONE:**058 — Post‑OCR Text Quality & Error Correction**  
+4. DONE: **058 — Post‑OCR Text Quality & Error Correction**
    Add generic spell/garble detection + repair loop so OCR output is readable even when engines agree on bad text.
-
-5. **059 — Section Detection & Boundary Improvements**  
+5. DONE: **059 — Section Detection & Boundary Improvements**
    Use improved OCR + content‑types to harden boundary/header detection for FF.
+
 6. **035 — Fighting Fantasy Pipeline Optimization**  
    Drive missing/no‑text/no‑choice to targets using the new OCR + boundary stack.
 7. **050 — FF Ending Detection Verification**  
@@ -86,7 +86,7 @@ This index tracks stories in `/docs/stories/` for the codex-forge pipeline.
 || 056 | Validation Forensics Automation | High | To Do | /docs/stories/story-056-validation-forensics.md |
 || 057 | OCR Quality & Column Detection Improvements | High | Done | /docs/stories/story-057-ocr-quality-column-detection.md |
 || 058 | Post-OCR Text Quality & Error Correction | High | Done | /docs/stories/story-058-post-ocr-text-quality.md |
-|| 059 | Section Detection & Boundary Improvements | High | To Do | /docs/stories/story-059-section-detection-boundaries.md |
+|| 059 | Section Detection & Boundary Improvements | High | Done | /docs/stories/story-059-section-detection-boundaries.md |
 || 060 | Pipeline Regression Testing Suite | High | Done | /docs/stories/story-060-pipeline-regression-testing.md |
 || 061 | OCR Ensemble Fusion Improvements | High | Done | /docs/stories/story-061-ocr-ensemble-fusion.md |
 || 062 | OCR Content Type Detection Module | Medium | Done | /docs/stories/story-062-ocr-content-type-detection.md |

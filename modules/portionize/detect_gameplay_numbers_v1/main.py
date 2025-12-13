@@ -40,6 +40,34 @@ CHAR_OPTIONS = {
     "%": ["", "2"],  # rare OCR swap for a 2
 }
 
+# OCR error patterns: (pattern, replacement) for common OCR corruption
+# These handle cases like "in 4" → "4", "Section1" → "1", etc.
+OCR_EXTRACTION_PATTERNS = [
+    (r'\bin\s+(\d+)', r'\1'),  # "in 4" → "4"
+    (r'\bm\s+(\d+)', r'\1'),   # "m 4" → "4" (in → m OCR error)
+    (r'\b[a-zA-Z]+\s*(\d{1,3})\b', r'\1'),  # "Section4" → "4", "para 42" → "42"
+    (r'\b(\d{1,3})\s*[a-zA-Z]+\b', r'\1'),  # "4th" → "4", "12a" → "12"
+]
+
+
+def extract_numbers_from_ocr_errors(text: str) -> List[str]:
+    """
+    Extract potential section numbers from OCR-corrupted text.
+    Handles cases like "in 4" → "4", "Section42" → "42", etc.
+
+    Returns list of unique extracted number strings (includes original text).
+    """
+    candidates = [text]  # Always include original
+
+    for pattern, replacement in OCR_EXTRACTION_PATTERNS:
+        match = re.search(pattern, text, re.IGNORECASE)
+        if match:
+            extracted = re.sub(pattern, replacement, text, flags=re.IGNORECASE).strip()
+            if extracted and extracted != text and extracted not in candidates:
+                candidates.append(extracted)
+
+    return candidates
+
 
 def expand_candidates(token: str, max_combos: int = 32) -> List[int]:
     """
@@ -90,42 +118,89 @@ def starts_new_sentence(text: str) -> bool:
     return text and text[0].isupper()
 
 
+def should_skip_by_content_type(elem: Dict) -> bool:
+    """
+    Check if element should be skipped based on content_type tagging.
+    Returns True if element should be skipped, False otherwise.
+
+    Filters out:
+    - Page-header / Page-footer (reduce false positives from page numbers)
+    - List-item (reduce false positives from numbered lists)
+    """
+    content_type = elem.get("content_type")
+    if not content_type:
+        return False  # No tag - don't skip
+
+    # Skip known false positive types
+    if content_type in ["Page-header", "Page-footer", "List-item"]:
+        return True
+
+    return False
+
+
+def get_content_type_confidence_boost(elem: Dict, section_id: int) -> tuple[float, list[str]]:
+    """
+    Calculate confidence boost and evidence based on content_type/content_subtype.
+
+    Returns: (confidence_boost, evidence_parts)
+    - confidence_boost: 0.0 to 0.2 additional confidence
+    - evidence_parts: list of strings describing content_type signals
+    """
+    content_type = elem.get("content_type")
+    content_subtype = elem.get("content_subtype")
+    confidence_boost = 0.0
+    evidence = []
+
+    if content_type == "Section-header":
+        confidence_boost += 0.1
+        evidence.append("content_type=Section-header")
+
+        # Check if content_subtype.number matches section_id
+        if content_subtype and isinstance(content_subtype, dict):
+            tagged_number = content_subtype.get("number")
+            if tagged_number == section_id:
+                confidence_boost += 0.1
+                evidence.append(f"content_subtype.number={tagged_number}")
+
+    return confidence_boost, evidence
+
+
 def validate_context(elem: Dict, all_elements: List[Dict], page: int) -> bool:
     """
     Validate that a candidate number is standalone (not embedded in sentence).
     Returns True if valid (standalone), False if embedded.
     """
     # Group elements by page and sort by element ID to get order
-    page_elements = [e for e in all_elements 
+    page_elements = [e for e in all_elements
                      if (e.get("metadata", {}).get("page_number") or e.get("page")) == page]
     page_elements.sort(key=lambda e: e.get("id", ""))
-    
+
     # Find current element index
     try:
         current_idx = next(i for i, e in enumerate(page_elements) if e.get("id") == elem.get("id"))
     except StopIteration:
         return True  # Can't validate, allow it
-    
+
     # Get previous element
     prev_elem = page_elements[current_idx - 1] if current_idx > 0 else None
     prev_text = (prev_elem.get("text") or "").strip() if prev_elem else ""
-    
+
     # Get next element
     next_elem = page_elements[current_idx + 1] if current_idx < len(page_elements) - 1 else None
     next_text = (next_elem.get("text") or "").strip() if next_elem else ""
-    
+
     # Validate: previous should end sentence OR be empty, next should start sentence OR be empty
     prev_valid = is_sentence_ending(prev_text) or not prev_text
     next_valid = starts_new_sentence(next_text) or not next_text
-    
+
     # If both are valid, it's standalone
     if prev_valid and next_valid:
         return True
-    
+
     # If previous doesn't end sentence AND next doesn't start sentence, it's embedded
     if not prev_valid and not next_valid:
         return False
-    
+
     # Edge case: if one is valid but other isn't, be lenient (might be OCR corruption)
     # But if both are invalid, definitely reject
     return True  # Be lenient for edge cases
@@ -296,6 +371,7 @@ def main():
                        module_id="detect_gameplay_numbers_v1", artifact=args.out)
     
     # Process elements with context validation and optional centering check
+    skipped_by_content_type = 0
     for elem in all_elements:
         text = (elem.get("text") or "").strip()
         if not text:
@@ -304,10 +380,28 @@ def main():
             continue  # navigation text, not a header
         if range_re.search(text):
             continue  # page header like "171-172"
-        if text.count(" ") > 1 or len(text) > 12:
+
+        # Skip elements with known false-positive content_type tags
+        if should_skip_by_content_type(elem):
+            skipped_by_content_type += 1
             continue
-        token = "".join(text.split())  # drop internal spaces
-        candidates = expand_candidates(token)
+
+        # Apply OCR error extraction to get multiple text variants
+        # This handles cases like "in 4" → "4", "Section42" → "42"
+        text_variants = extract_numbers_from_ocr_errors(text)
+
+        # Try each variant to find valid section number candidates
+        candidates = []
+        for variant in text_variants:
+            # Skip if variant is too long or complex (after OCR extraction)
+            if variant.count(" ") > 1 or len(variant) > 12:
+                continue
+            token = "".join(variant.split())  # drop internal spaces
+            variant_candidates = expand_candidates(token)
+            candidates.extend(variant_candidates)
+
+        # Remove duplicates and sort
+        candidates = sorted(set(candidates))
         if not candidates:
             continue
         page = elem.get("metadata", {}).get("page_number") or elem.get("page")
@@ -318,16 +412,17 @@ def main():
                 continue  # skip frontmatter
             if sid in seen_ids:
                 continue  # keep first occurrence
-            
+
             # Context validation: check if number is standalone (not embedded in sentence)
             if not validate_context(elem, all_elements, page):
                 continue  # Reject embedded numbers
-            
-            # Centering check: if enabled and bbox data available, verify header is centered
+
+            # Base confidence and evidence
             is_centered = False
             confidence = 0.7
             evidence_parts = [f"numeric-or-OCR-glitch line page={page} text='{text[:40]}'"]
-            
+
+            # Centering check: if enabled and bbox data available, verify header is centered
             if args.use_centering and pagelines_data:
                 is_centered = check_centering(elem, pagelines_data, page)
                 if is_centered:
@@ -335,7 +430,12 @@ def main():
                     evidence_parts.append("centered")
                 # Don't reject non-centered - centering is a boost, not a requirement
                 # (some headers might be slightly off-center due to OCR bbox errors)
-            
+
+            # Content type confidence boost and evidence
+            content_boost, content_evidence = get_content_type_confidence_boost(elem, sid)
+            confidence = min(1.0, confidence + content_boost)
+            evidence_parts.extend(content_evidence)
+
             boundary = SectionBoundary(
                 section_id=str(sid),
                 start_element_id=elem["id"],
@@ -354,10 +454,19 @@ def main():
 
     ensure_dir(os.path.dirname(args.out) or ".")
     save_jsonl(args.out, boundaries)
+
+    # Log content_type filtering stats
+    if skipped_by_content_type > 0:
+        logger.log("portionize", "running", current=count, total=count,
+                   message=f"Skipped {skipped_by_content_type} elements by content_type filtering",
+                   module_id="detect_gameplay_numbers_v1", artifact=args.out)
+
     logger.log("portionize", "done", current=count, total=count,
                message=f"Detected {count} numeric headers", module_id="detect_gameplay_numbers_v1",
                artifact=args.out, schema_version="section_boundary_v1")
     print(f"[detect_gameplay_numbers] wrote {len(boundaries)} boundaries → {args.out}")
+    if skipped_by_content_type > 0:
+        print(f"[detect_gameplay_numbers] skipped {skipped_by_content_type} elements by content_type filtering")
 
 
 if __name__ == "__main__":
