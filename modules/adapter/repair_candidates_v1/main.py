@@ -92,7 +92,8 @@ def select_candidates(
         "flagged_pages": sorted(flagged_pages),
     }
     flagged_so_far = 0
-    for portion in portions:
+    reason_counts: Dict[str, int] = {}
+    for idx, portion in enumerate(portions, 1):
         portion_id = str(portion.get("portion_id") or portion.get("section_id") or "")
         section_pages = _portion_pages(portion)
         intersect = section_pages & flagged_pages
@@ -114,10 +115,22 @@ def select_candidates(
         if should_flag and can_flag:
             portion["repair_hints"] = hints
             flagged_so_far += 1
+            # Track reasons for summary
+            for reason in hints.get("escalation_reasons") or []:
+                reason_counts[reason] = reason_counts.get(reason, 0) + 1
         else:
             portion.setdefault("repair_hints", hints)
         annotated.append(portion)
+        
+        # Progress reporting every 50 portions
+        if idx % 50 == 0 or idx == len(portions):
+            from modules.common.utils import ProgressLogger
+            logger = ProgressLogger()  # Will use globals if available
+            logger.log("repair", "running", current=idx, total=len(portions),
+                      message="Scanning portions for garble",
+                      module_id="repair_candidates_v1")
     stats["candidate_count"] = flagged_so_far
+    stats["reason_counts"] = reason_counts
     return annotated, stats
 
 
@@ -167,12 +180,18 @@ def main():
     ensure_dir(os.path.dirname(args.out) or ".")
     save_jsonl(args.out, candidates)
 
+    # Build reason summary for observability
+    flagged = stats.get("candidate_count", 0)
+    reason_counts = stats.get("reason_counts", {})
+    reason_summary = ", ".join(f"{r}({c})" for r, c in sorted(reason_counts.items())) if reason_counts else "no_reasons"
+    
     logger.log("repair_candidates", "done", current=len(portions), total=len(portions),
-               message=f"Candidates: {len(candidates)} portions flagged", artifact=args.out,
+               message=f"Flagged {flagged} portions: {reason_summary}", artifact=args.out,
                module_id="repair_candidates_v1", schema_version="enriched_portion_v1")
 
-    flagged = stats.get("candidate_count", 0)
     print(f"Flagged {flagged} portions (from {len(portions)} scanned)")
+    if reason_counts:
+        print(f"  Reasons: {reason_summary}")
     print(f"Flagged pages: {stats['flagged_pages']}")
 
 

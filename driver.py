@@ -884,6 +884,24 @@ def main():
         print(json.dumps({"topo": plan["topo"], "nodes": plan["nodes"]}, indent=2))
         return
 
+    # Validate output directory to prevent artifact mixing
+    if os.path.exists(run_dir) and os.listdir(run_dir):
+        if not (args.force or args.allow_run_id_reuse):
+            print(f"\n❌ ERROR: Output directory already exists and contains files:", file=sys.stderr)
+            print(f"  {run_dir}\n", file=sys.stderr)
+            print("Reusing directories can mix artifacts from different runs, causing silent", file=sys.stderr)
+            print("data corruption and hard-to-debug failures.\n", file=sys.stderr)
+            print("Options:", file=sys.stderr)
+            print("  --force              Delete existing directory and start fresh", file=sys.stderr)
+            print("  --allow-run-id-reuse Continue/append to existing run (for resuming failed runs)", file=sys.stderr)
+            print("  (or remove 'run_id:' from recipe to auto-generate unique timestamped IDs)\n", file=sys.stderr)
+            sys.exit(1)
+        elif args.force:
+            # Delete and recreate directory
+            import shutil
+            print(f"⚠️  --force: Deleting existing directory: {run_dir}")
+            shutil.rmtree(run_dir)
+
     ensure_dir(run_dir)
     state_path = os.path.join(run_dir, "pipeline_state.json")
     progress_path = os.path.join(run_dir, "pipeline_events.jsonl")

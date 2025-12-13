@@ -168,6 +168,7 @@ def main():
 
     client = OpenAI()
     repaired = 0
+    repair_reasons: Dict[str, int] = {}
     for idx, row in enumerate(rows, start=1):
         section_id = str(row.get("section_id") or row.get("portion_id") or idx)
         text = row.get("raw_text") or row.get("text") or ""
@@ -184,6 +185,10 @@ def main():
             reasons = reasons or ["forced"]
 
         if reasons and repaired < args.max_repairs:
+            # Track reasons for summary
+            for reason in reasons:
+                repair_reasons[reason] = repair_reasons.get(reason, 0) + 1
+            
             try:
                 clean_text, conf, meta = call_llm(client, row, section_id, args.model, reasons, args.max_images)
                 if conf < args.min_confidence and args.boost_model:
@@ -214,16 +219,22 @@ def main():
                 "reason": reasons,
             }
 
-        if idx % 25 == 0:
+        if idx % 25 == 0 or idx == len(rows):
             logger.log("repair", "running", current=idx, total=len(rows),
-                       message=f"Processed {idx}/{len(rows)} portions (repairs so far: {repaired})",
+                       message=f"Repaired {repaired}/{idx} portions",
                        artifact=args.out, module_id="repair_portions_v1")
 
     save_portions(rows, fmt, args.out)
+    
+    # Build reason summary for observability
+    reason_summary = ", ".join(f"{r}({c})" for r, c in sorted(repair_reasons.items())) if repair_reasons else "none"
+    
     logger.log("repair", "done", current=len(rows), total=len(rows),
-               message=f"Completed repairs: {repaired}/{len(rows)}", artifact=args.out,
+               message=f"Repaired {repaired} portions: {reason_summary}", artifact=args.out,
                module_id="repair_portions_v1", schema_version="repair_portion_v1")
     print(f"Saved repaired portions → {args.out} (repairs attempted: {repaired})")
+    if repair_reasons:
+        print(f"  Reasons: {reason_summary}")
 
 
 if __name__ == "__main__":

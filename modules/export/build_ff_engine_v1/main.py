@@ -227,9 +227,26 @@ def main():
     stub_count = len(stub_targets)
 
     if stub_count and not args.allow_stubs:
+        # Explicit failure message for observability
+        missing_ids_preview = ", ".join(stub_targets[:10])
+        if stub_count > 10:
+            missing_ids_preview += f" (and {stub_count - 10} more)"
+        
+        error_msg = (
+            f"\n❌ BUILD FAILED: {stub_count} sections require stub backfill\n\n"
+            f"Missing section IDs: {missing_ids_preview}\n\n"
+            f"Root cause: Pipeline detected section boundaries but extraction failed, "
+            f"or boundaries are missing entirely for these sections.\n\n"
+            f"Next steps:\n"
+            f"  1. Check boundary detection: Are these sections in section_boundaries_merged.jsonl?\n"
+            f"  2. Check extraction: Did portionize_ai_extract_v1 fail on these boundaries?\n"
+            f"  3. For debugging: Use --allow-stubs to build with placeholders and inspect validation_report.json\n"
+            f"  4. To fix: Improve boundary detection (Priority 1) or extraction quality (Priority 2)\n"
+        )
+        
         logger.log("build_ff_engine", "failed", current=len(portions), total=len(portions),
                    message=f"Stub backfill required ({stub_count}); failing per policy", module_id="build_ff_engine_v1")
-        raise SystemExit(f"Stub backfill required ({stub_count}); rerun after fixing upstream coverage or pass --allow-stubs")
+        raise SystemExit(error_msg)
 
     for mid in sorted(missing, key=lambda x: int(x) if str(x).isdigit() else x):
         sections[mid] = {

@@ -14,18 +14,20 @@ Guiding priorities: **perfect OCR first**, then move downstream stage‑by‑sta
 5. DONE: **059 — Section Detection & Boundary Improvements**
    Use improved OCR + content‑types to harden boundary/header detection for FF.
 
-6. **035 — Fighting Fantasy Pipeline Optimization**  
-   Drive missing/no‑text/no‑choice to targets using the new OCR + boundary stack.
-7. **050 — FF Ending Detection Verification**  
+6. **068 — Fighting Fantasy Boundary Detection Improvements** *(Active)*
+   Improve boundary detection from 87% to >95% coverage (remaining work from 035).
+7. **035 — Fighting Fantasy Pipeline Optimization** *(Paused)*
+   Drive missing/no‑text/no‑choice to targets using the new OCR + boundary stack. (Resume after 068.)
+8. **050 — FF Ending Detection Verification**  
    Verify ending/dead‑end classification quality on FF outputs (no book‑specific tuning).
-8. **056 — Validation Forensics Automation (remaining items)**  
+9. **056 — Validation Forensics Automation (remaining items)**  
    Finish ending‑aware traces, boundary‑source reasoning, toggles/docs, optional HTML/CSV view.
-9. **066 — FF Pipeline Accel + Accuracy Guardrails**  
-   Only after 035 is Done; speed up clean/extract with hard regression guards.
+10. **066 — FF Pipeline Accel + Accuracy Guardrails**  
+    Only after 035 is Done; speed up clean/extract with hard regression guards.
 
-10. **009 — Layout‑Preserving Extractor**  
+11. **009 — Layout‑Preserving Extractor**  
     Build layout/table preservation needed for non‑FF books.
-11. **026 — Onward to the Unknown pilot (Arthur L'Heureux)**  
+12. **026 — Onward to the Unknown pilot (Arthur L'Heureux)**  
     Run end‑to‑end with layout‑aware table handling once 009 lands.
 
 Later / non‑blocking:
@@ -74,7 +76,7 @@ This index tracks stories in `/docs/stories/` for the codex-forge pipeline.
 || 032 | Unstructured intake & Document IR adoption | Medium | Done | /docs/stories/story-032-unstructured-intake-and-document-ir-adoption.md |
 || 033 | ARM64-native pipeline environment & perforecipe-pagelines-repair-choices.yamlrmance | Medium | Done | /docs/stories/story-033-arm64-pipeline-conversion.md |
 || 034 | FF Unstructured follow-ups (elements, helpers, graph quality) | High | Done | /docs/stories/story-034-ff-unstructured-followups.md |
-|| 035 | Fighting Fantasy Pipeline Optimization | High | In Progress | /docs/stories/story-035-ff-pipeline-optimization.md |
+|| 035 | Fighting Fantasy Pipeline Optimization | High | Paused | /docs/stories/story-035-ff-pipeline-optimization.md |
 || 036 | FF OCR Recovery & Text Repair | High | Done | /docs/stories/story-036-ff-ocr-recovery-and-text-repair.md |
 || 037 | FF OCR Ensemble with BetterOCR | High | Done | /docs/stories/story-037-ocr-ensemble-with-betterocr.md |
 || 038 | Agentic Pipeline Coordinator | Medium | To Do | /docs/stories/story-038-agentic-pipeline-coordinator.md |
@@ -95,6 +97,7 @@ This index tracks stories in `/docs/stories/` for the codex-forge pipeline.
 || 065 | Stabilize EasyOCR as a Third OCR Engine | High | Done | /docs/stories/story-065-easyocr-reliability.md |
 || 066 | FF Pipeline Accel + Accuracy Guardrails | High | To Do | /docs/stories/story-066-ff-pipeline-accel-accuracy.md |
 || 067 | GPU Acceleration for OCR Pipeline | High | Done | /docs/stories/story-067-gpu-acceleration-ocr.md |
+|| 068 | Fighting Fantasy Boundary Detection Improvements | High | Active | /docs/stories/story-068-ff-boundary-detection.md |
 || 099 | Remove dev-only backcompat disclaimer | Low | To Do | /docs/stories/story-099-remove-dev-backcompat-note.md |
 
 ## Notes
