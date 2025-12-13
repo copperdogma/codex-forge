@@ -369,3 +369,17 @@
 
 ### Tested
 - `python driver.py --recipe configs/recipes/recipe-pagelines-repair-choices-r6.yaml`
+## [2025-12-13] - Story 058 post-OCR quality finalized
+
+### Added
+- `context_aware_post_process_v1` and `context_aware_t5_v1` adapters for post-OCR smoothing plus section-number/truncation validators to capture remaining warnings.
+- Regression helper `scripts/regression/update_repair_table.py` that rebuilds `repair_table.md` and reruns `scripts/regression/check_suspicious_tokens.py` per smoke run; canonical 20-page run artifacts now include the regenerated table and validator outputs.
+- AGENTS guidance about generality/impact reporting and the rebuild/verifications, plus new story log entries documenting the repair loop and validator rationale.
+
+### Changed
+- `configs/recipes/recipe-ff-canonical.yaml` now wires the context/T5 adapters, new validators, pick-best-engine, and repair loop before the build stage.
+- `docs/stories/story-058-post-ocr-text-quality.md` updated with the repair/regression records, validator explanations, and final status now marked “Done”.
+- Story index `docs/stories.md` now shows Story 058 status `Done`.
+
+### Fixed
+- Documented that the 20-page smoke is the verification target so we no longer require a full-book run; validators now capture source artifacts for traceability.

@@ -1,0 +1,18 @@
+input:
+  pdf: input/06 deathtrap dungeon.pdf
+
+models:
+  default: gpt-4.1-mini
+
+stage_params:
+  intake:
+    dpi: 200
+    engines: ["tesseract", "easyocr"]
+    write_engine_dumps: false
+    start: 1
+    end: 20
+  easyocr_guard:
+    min_coverage: 0.80
+    allow_missing: false
+  escalate_vision:
+    budget_pages: 10

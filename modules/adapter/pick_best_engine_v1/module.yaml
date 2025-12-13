@@ -1,0 +1,11 @@
+module_id: pick_best_engine_v1
+stage: adapter
+entrypoint: modules/adapter/pick_best_engine_v1/main.py
+description: Choose the best OCR engine output per page (no LLM) and write a picked pagelines index for downstream merge.
+input_schema: pagelines_v1
+output_schema: pagelines_v1
+default_params:
+  preferred_engines: ["easyocr", "tesseract", "apple"]
+  min_chars: 40
+  max_pages: null
+notes: "Writes a new pagelines_index.json and page JSONs under outdir; preserves original engines_raw for provenance."

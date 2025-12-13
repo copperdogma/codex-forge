@@ -1,0 +1,32 @@
+module_id: repair_candidates_v1
+stage: clean
+entrypoint: modules/adapter/repair_candidates_v1/main.py
+description: "Detect portions likely affected by OCR char/digit confusion so downstream repair stages can target them."
+input_schema: enriched_portion_v1
+output_schema: enriched_portion_v1
+default_params:
+  pagelines: pagelines_final.jsonl
+  char_confusion_threshold: 0.25
+  dictionary_oov_threshold: 0.35
+  max_candidates: 40
+param_schema:
+  properties:
+    pagelines:
+      type: string
+      description: Path (relative to run dir) to the canonical pagelines_final.jsonl artifact.
+    char_confusion_threshold:
+      type: number
+    dictionary_oov_threshold:
+      type: number
+    max_candidates:
+      type: integer
+    force_pages:
+      type: string
+      description: Comma-separated page numbers that should always be considered.
+    force_portions:
+      type: string
+      description: Comma-separated portion IDs that should always be emitted.
+    include_escalation_reasons:
+      type: boolean
+  required: []
+notes: "Filters enriched portions by OCR pages flagged for char confusion or dictionary OOV, adding repair_hints metadata."

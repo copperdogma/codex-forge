@@ -1,0 +1,25 @@
+module_id: context_aware_post_process_v1
+stage: adapter
+entrypoint: modules/adapter/context_aware_post_process_v1/main.py
+description: "Context-aware post-processing that uses LLM evaluation to fix fragmented sentences and missing words while preserving provenance."
+input_schema: enriched_portion_v1
+output_schema: enriched_portion_v1
+default_params:
+  dictionary_threshold: 0.15
+  char_confusion_threshold: 0.25
+  min_chars: 80
+  max_corrections: 32
+param_schema:
+  properties:
+    dictionary_threshold:
+      type: number
+    char_confusion_threshold:
+      type: number
+    min_chars:
+      type: integer
+    max_corrections:
+      type: integer
+    dry_run:
+      type: boolean
+  required: []
+notes: "Runs gpt-5 to catch fragmented OCR sections flagged by dictionary or char-confusion scores, producing context_correction metadata."

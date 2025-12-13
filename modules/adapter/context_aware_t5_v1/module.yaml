@@ -1,0 +1,24 @@
+module_id: context_aware_t5_v1
+module_type: adapter
+entrypoint: modules/adapter/context_aware_t5_v1/main.py
+description: "T5-based context-aware refinement that rewrites flagged portions using transformers text2text generation."
+input_schema: enriched_portion_v1
+output_schema: enriched_portion_v1
+default_params:
+  dictionary_threshold: 0.2
+  char_confusion_threshold: 0.3
+  max_corrections: 24
+param_schema:
+  properties:
+    dictionary_threshold:
+      type: number
+    char_confusion_threshold:
+      type: number
+    max_corrections:
+      type: integer
+    dry_run:
+      type: boolean
+    model:
+      type: string
+  required: []
+notes: "Runs transformers pipeline (e.g., google/t5-small-lm-adapt) to fix fragmented lines detected by dictionary/char-confusion signals. Falls back gracefully if transformers is unavailable."

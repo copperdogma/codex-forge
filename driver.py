@@ -1285,6 +1285,10 @@ def main():
         if module_id == "extract_ocr_ensemble_v1":
             env.setdefault("KMP_USE_SHMEM", "0")
             env.setdefault("KMP_CREATE_SHMEM", "FALSE")
+            # Some libomp builds use alternate env var names.
+            env.setdefault("KMP_USE_SHM", "0")
+            env.setdefault("KMP_CREATE_SHM", "0")
+            env.setdefault("KMP_DISABLE_SHM", "1")
             env.setdefault("OMP_NUM_THREADS", "1")
             env.setdefault("KMP_AFFINITY", "disabled")
             env.setdefault("KMP_INIT_AT_FORK", "FALSE")

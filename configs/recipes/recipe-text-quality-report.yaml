@@ -1,0 +1,21 @@
+# Generic single-stage recipe to generate a text-quality report from an existing JSONL artifact.
+#
+# Usage example:
+#   python driver.py --recipe configs/recipes/recipe-text-quality-report.yaml \
+#     --settings configs/settings.text-quality-report-smoke.yaml \
+#     --run-id tq-smoke --output-dir /tmp/tq-smoke --force
+#
+# Then override stage_params.report.in with your artifact path.
+
+run_id: text-quality-report
+
+stages:
+  - id: report
+    stage: adapter
+    module: text_quality_report_v1
+    out: text_quality_rows.jsonl
+    params:
+      # Required: path to JSONL artifact to analyze. Override via settings:
+      # stage_params.report.in: /path/to/artifact.jsonl
+      in: ""
+      report: text_quality_report.json

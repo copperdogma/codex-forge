@@ -21,12 +21,17 @@ if VENDOR.exists() and os.environ.get("CODEX_SKIP_VENDOR") != "1":
 # Mitigate libomp SHM failures in sandboxed environments (EasyOCR/torch)
 os.environ.setdefault("KMP_USE_SHMEM", "0")
 os.environ.setdefault("KMP_CREATE_SHMEM", "FALSE")
+# Some libomp builds use alternate env var names.
+os.environ.setdefault("KMP_USE_SHM", "0")
+os.environ.setdefault("KMP_CREATE_SHM", "0")
+os.environ.setdefault("KMP_DISABLE_SHM", "1")
 os.environ.setdefault("OMP_NUM_THREADS", "1")
 os.environ.setdefault("KMP_AFFINITY", "disabled")
 os.environ.setdefault("KMP_INIT_AT_FORK", "FALSE")
 
 from modules.common import render_pdf, run_ocr, run_ocr_with_word_data, ensure_dir, save_json, save_jsonl, ProgressLogger
 from modules.common.utils import english_wordlist, append_jsonl
+from modules.common.text_quality import spell_garble_metrics
 from modules.common.image_utils import (
     sample_spread_decision, split_spread_at_gutter, deskew_image,
     detect_spread_and_split,  # kept for backward compatibility
@@ -638,12 +643,13 @@ def detect_corruption_patterns(text: str) -> Dict[str, Any]:
     """
     if not text:
         return {
-            "corruption_score": 1.0,
+            # Empty text is missing content; not itself a corruption pattern.
+            "corruption_score": 0.0,
             "vertical_bar_corruption": 0,
             "fused_text": 0,
             "low_alpha_ratio": 0,
             "suspicious_chars": 0,
-            "patterns": []
+            "patterns": ["empty_text"]
         }
     
     patterns = []
@@ -716,6 +722,8 @@ def compute_enhanced_quality_metrics(lines: List[str], by_engine: Dict[str, Any]
     # Combine all text for corruption detection
     combined_text = "\n".join(lines)
     corruption = detect_corruption_patterns(combined_text)
+
+    spell = spell_garble_metrics(lines)
     
     # Check for fragmentation (very short lines indicate missing words)
     # Count lines with < 5 characters (likely fragmented)
@@ -752,7 +760,7 @@ def compute_enhanced_quality_metrics(lines: List[str], by_engine: Dict[str, Any]
     # - Very few lines (< 5 for a text page)
     # - Very short average line length (< 10 chars)
     # - High corruption score
-    missing_content_score = 0.0
+    missing_content_score = 1.0 if not non_empty_lines else 0.0
     if line_count < 5:
         missing_content_score += 0.4
     if avg_line_len < 10:
@@ -767,7 +775,9 @@ def compute_enhanced_quality_metrics(lines: List[str], by_engine: Dict[str, Any]
         disagreement * 0.3,  # Engine disagreement
         corruption["corruption_score"] * 0.25,  # Corruption patterns
         missing_content_score * 0.25,  # Missing content
-        fragmentation_score * 0.2  # Fragmentation (new)
+        fragmentation_score * 0.2,  # Fragmentation (new)
+        spell["dictionary_score"] * 0.25,  # Dictionary/OOV (new)
+        spell["char_confusion_score"] * 0.2,  # Digit/letter confusions (new)
     )
     
     return {
@@ -777,6 +787,21 @@ def compute_enhanced_quality_metrics(lines: List[str], by_engine: Dict[str, Any]
         "corruption_patterns": corruption["patterns"],
         "missing_content_score": round(missing_content_score, 4),
         "fragmentation_score": round(fragmentation_score, 4),
+        "dictionary_score": spell["dictionary_score"],
+        "dictionary_oov_ratio": spell["dictionary_oov_ratio"],
+        "dictionary_total_words": spell["dictionary_total_words"],
+        "dictionary_oov_words": spell["dictionary_oov_words"],
+        "dictionary_oov_examples": spell["dictionary_oov_examples"],
+        "dictionary_suspicious_oov_words": spell["dictionary_suspicious_oov_words"],
+        "dictionary_suspicious_oov_examples": spell["dictionary_suspicious_oov_examples"],
+        "char_confusion_score": spell["char_confusion_score"],
+        "char_confusion_mixed_ratio": spell["char_confusion_mixed_ratio"],
+        "char_confusion_examples": spell["char_confusion_examples"],
+        "char_confusion_suspicious_examples": spell.get("char_confusion_suspicious_examples", []),
+        "char_confusion_digit_fixed_words": spell.get("char_confusion_digit_fixed_words", 0),
+        "char_confusion_digit_fixed_examples": spell.get("char_confusion_digit_fixed_examples", []),
+        "char_confusion_alpha_fixed_words": spell.get("char_confusion_alpha_fixed_words", 0),
+        "char_confusion_alpha_fixed_examples": spell.get("char_confusion_alpha_fixed_examples", []),
         "fragmentation_details": {
             "very_short_lines": len(very_short_lines),
             "total_lines": len(non_empty_lines),
@@ -792,6 +817,56 @@ def compute_enhanced_quality_metrics(lines: List[str], by_engine: Dict[str, Any]
             "suspicious_chars": corruption["suspicious_chars"]
         }
     }
+
+
+def compute_escalation_reasons(*,
+                              disagreement: float,
+                              disagree_rate: float,
+                              quality_metrics: Dict[str, Any],
+                              line_count: int,
+                              avg_len: float,
+                              escalation_threshold: float) -> List[str]:
+    cond_disagreement = disagreement > escalation_threshold
+    cond_disagree_rate = disagree_rate > 0.25
+    cond_corruption = quality_metrics.get("corruption_score", 0) > 0.5
+    cond_missing = quality_metrics.get("missing_content_score", 0) > 0.6
+    cond_fragmentation = quality_metrics.get("fragmentation_score", 0) > 0.3  # >30% very short lines
+
+    # Dictionary-based triggers can false-positive heavily on very short pages (credits, dedication)
+    # and on proper nouns. Use suspicious-fragment triggers even on short pages, but gate the
+    # high-OOV-ratio condition on having enough words to be meaningful.
+    dict_total_words = int(quality_metrics.get("dictionary_total_words", 0) or 0)
+    dict_oov_ratio = float(quality_metrics.get("dictionary_oov_ratio", 0) or 0)
+    dict_suspicious = int(quality_metrics.get("dictionary_suspicious_oov_words", 0) or 0)
+    cond_dictionary = (dict_suspicious > 0) or (dict_total_words >= 25 and dict_oov_ratio > 0.45)
+
+    cond_char_confusion = quality_metrics.get("char_confusion_score", 0) > 0.25
+
+    # Avoid escalating sparse/short pages unless other stronger signals fired.
+    has_substantial_text = dict_total_words >= 40
+    cond_line_count = line_count < 8 and has_substantial_text
+    cond_avg_len = avg_len < 12 and has_substantial_text
+
+    reasons: List[str] = []
+    if cond_disagreement:
+        reasons.append("high_disagreement")
+    if cond_disagree_rate:
+        reasons.append("high_disagree_rate")
+    if cond_corruption:
+        reasons.append("high_corruption")
+    if cond_missing:
+        reasons.append("missing_content")
+    if cond_fragmentation:
+        reasons.append("fragmented")
+    if cond_dictionary:
+        reasons.append("dictionary_oov")
+    if cond_char_confusion:
+        reasons.append("char_confusion")
+    if cond_line_count:
+        reasons.append("low_line_count")
+    if cond_avg_len:
+        reasons.append("short_avg_line_len")
+    return reasons
 
 
 def detect_form_page(lines: List[str], avg_line_len: float = None) -> Dict[str, Any]:
@@ -2795,37 +2870,35 @@ def main():
             avg_len = sum(len(l) for l in part_lines) / max(1, len(part_lines))
             
             # Calculate escalation conditions individually for debugging
-            cond_disagreement = disagreement > args.escalation_threshold
-            cond_disagree_rate = disagree_rate > 0.25
-            cond_corruption = quality_metrics["corruption_score"] > 0.5
-            cond_missing = quality_metrics["missing_content_score"] > 0.6
-            cond_fragmentation = quality_metrics["fragmentation_score"] > 0.3  # >30% very short lines
-            cond_line_count = len(part_lines) < 8
-            cond_avg_len = avg_len < 12
-            
-            needs_escalation = (
-                cond_disagreement or 
-                cond_disagree_rate or
-                cond_corruption or
-                cond_missing or
-                cond_fragmentation or  # New: flag fragmented pages
-                cond_line_count or 
-                cond_avg_len
+            escalation_reasons = compute_escalation_reasons(
+                disagreement=disagreement,
+                disagree_rate=disagree_rate,
+                quality_metrics=quality_metrics,
+                line_count=len(part_lines),
+                avg_len=avg_len,
+                escalation_threshold=args.escalation_threshold,
             )
+            needs_escalation = bool(escalation_reasons)
             
             # Detailed logging for escalation decisions
             if disagree_rate > 0.25 or needs_escalation:
-                logger.log("extract", "running",
-                          message=f"Page {page_key}: Escalation check - "
-                                 f"disagree_rate={disagree_rate:.3f} (>{0.25}={cond_disagree_rate}), "
-                                 f"disagreement={disagreement:.3f} (>{args.escalation_threshold}={cond_disagreement}), "
-                                 f"corruption={quality_metrics['corruption_score']:.3f} (>{0.5}={cond_corruption}), "
-                                 f"missing={quality_metrics['missing_content_score']:.3f} (>{0.6}={cond_missing}), "
-                                 f"fragmentation={quality_metrics['fragmentation_score']:.3f} (>{0.3}={cond_fragmentation}), "
-                                 f"lines={len(part_lines)} (<8={cond_line_count}), "
-                                 f"avg_len={avg_len:.1f} (<12={cond_avg_len}), "
-                                 f"needs_escalation={needs_escalation}, "
-                                 f"budget={escalated_pages}/{escalation_budget_pages}")
+                logger.log(
+                    "extract",
+                    "running",
+                    message=f"Page {page_key}: Escalation check - "
+                            f"disagree_rate={disagree_rate:.3f}, "
+                            f"disagreement={disagreement:.3f}, "
+                            f"corruption={quality_metrics['corruption_score']:.3f}, "
+                            f"missing={quality_metrics['missing_content_score']:.3f}, "
+                            f"fragmentation={quality_metrics['fragmentation_score']:.3f}, "
+                            f"dict_oov={quality_metrics.get('dictionary_oov_ratio', 0):.3f}, "
+                            f"char_conf={quality_metrics.get('char_confusion_score', 0):.3f}, "
+                            f"lines={len(part_lines)}, "
+                            f"avg_len={avg_len:.1f}, "
+                            f"needs_escalation={needs_escalation}, "
+                            f"reasons={','.join(escalation_reasons) if escalation_reasons else 'none'}, "
+                            f"budget={escalated_pages}/{escalation_budget_pages}",
+                )
             
             # Debug logging for escalation decisions
             if disagree_rate > 0.25 and not needs_escalation:
@@ -2849,10 +2922,15 @@ def main():
                               message=f"Page {page_key}: Escalation triggered (disagree_rate={disagree_rate:.3f}, budget: {escalated_pages}/{escalation_budget_pages})")
             elif disagree_rate > 0.25:
                 # Log why escalation didn't trigger despite high disagree_rate
-                logger.log("extract", "running",
-                          message=f"Page {page_key}: disagree_rate={disagree_rate:.3f} > 0.25 but needs_escalation=False - "
-                                 f"other conditions not met (disagreement={disagreement:.3f}, corruption={quality_metrics['corruption_score']:.3f}, "
-                                 f"missing={quality_metrics['missing_content_score']:.3f}, lines={len(part_lines)}, avg_len={avg_len:.1f})")
+                logger.log(
+                    "extract",
+                    "running",
+                    message=f"Page {page_key}: disagree_rate={disagree_rate:.3f} > 0.25 but needs_escalation=False - "
+                            f"other conditions not met (disagreement={disagreement:.3f}, corruption={quality_metrics['corruption_score']:.3f}, "
+                            f"missing={quality_metrics['missing_content_score']:.3f}, dict_oov={quality_metrics.get('dictionary_oov_ratio', 0):.3f}, "
+                            f"char_conf={quality_metrics.get('char_confusion_score', 0):.3f}, "
+                            f"lines={len(part_lines)}, avg_len={avg_len:.1f})",
+                )
 
             # R6: Inline escalation for critical failures
             # Check if this is a CRITICAL failure (worse than normal escalation) and we have budget
@@ -2994,6 +3072,7 @@ def main():
                 },
                 "ivr": ivr,
                 "spread_side": side,  # "L", "R", or None
+                "escalation_reasons": escalation_reasons,
             }
 
             page_path = os.path.join(pages_dir, page_filename)
@@ -3029,12 +3108,18 @@ def main():
                 "corruption_score": quality_metrics["corruption_score"],
                 "corruption_patterns": quality_metrics["corruption_patterns"],
                 "missing_content_score": quality_metrics["missing_content_score"],
+                "dictionary_score": quality_metrics.get("dictionary_score", 0.0),
+                "dictionary_oov_ratio": quality_metrics.get("dictionary_oov_ratio", 0.0),
+                "dictionary_suspicious_oov_words": quality_metrics.get("dictionary_suspicious_oov_words", 0),
+                "char_confusion_score": quality_metrics.get("char_confusion_score", 0.0),
+                "char_confusion_suspicious_examples": quality_metrics.get("char_confusion_suspicious_examples", []),
                 "corruption_details": quality_metrics["corruption_details"],
                 "engines": list(part_by_engine.keys()),
                 "source": part_source,
                 "fallback": part_source != "betterocr",
                 "ivr": ivr,
                 "disagree_rate": disagree_rate,
+                "escalation_reasons": escalation_reasons,
             })
 
             logger.log("extract", "running", current=len(quality_report), total=total,

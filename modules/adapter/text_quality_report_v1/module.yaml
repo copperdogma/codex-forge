@@ -1,0 +1,10 @@
+module_id: text_quality_report_v1
+stage: adapter
+entrypoint: modules/adapter/text_quality_report_v1/main.py
+description: "Generate a lightweight text-quality report (dictionary OOV + confusion signals) from a JSONL artifact."
+input_schema: unknown_v0
+output_schema: text_quality_report_v1
+inputs:
+  - inputs
+outputs:
+  - out

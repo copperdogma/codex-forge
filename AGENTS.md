@@ -15,6 +15,16 @@ This repo processes scanned (or text) books into structured JSON, using modular 
 - Every stage must resolve before the next runs: either reach its coverage/quality target or finish a defined escalate→validate loop and clearly mark unresolved items. Do not pass partially-resolved outputs downstream without explicit failure markers.
 - **Always inspect outputs, not just logs:** After every meaningful run, manually open the produced artifacts (JSON/JSONL) and check they match expectations (counts, sample content). A green or non-crashing run is not evidence of correctness; if outputs are empty/suspicious, stop and fix before proceeding.
 
+## Generality & Non-Overfitting (Read First)
+- Optimize for an input *category* (e.g., Fighting Fantasy scans), not a single PDF/run.
+- Do not hard-code page IDs, book-specific strings, or one-off replacements (e.g., `staMTNA→STAMINA`) in pipeline code.
+- Specialization must be explicit and scoped:
+  - Prefer recipe/module params (knobs) over branching logic.
+  - If something truly is recipe-specific, keep it in a clearly scoped module and document the scope + knobs.
+- Prefer *signals and loops* over brittle fixes: detect → validate → targeted escalate → validate.
+- If adding deterministic corrections, they must be generic (class-based, conservative), opt-in by default, and preserve original text/provenance.
+- Validate across multiple pages/runs; add regression checks on *patterns* (coverage, bad-token occurrence, empty text rate), not exact strings.
+
 ## Critical AI Mindset: Think First, Verify Always
 
 ### Before Building: Question the Approach
@@ -87,29 +97,11 @@ This is a **data pipeline** project. Every stage produces **artifacts** (JSONL f
 
 ### Prompt Design: Trust AI Intelligence, Don't Over-Engineer
 
-**The AI models are as smart as you. Treat them as intelligent partners, not dumb pattern matchers.**
-
-When designing prompts for AI API calls:
-1. **Describe the structure clearly** - Tell the AI what you expect in natural language
-   - ✅ "This is a Fighting Fantasy gamebook with front matter, rules, then numbered gameplay sections 1-400"
-   - ❌ Complex regex patterns, nested conditionals, exhaustive edge case handling
-2. **Trust the AI to understand context** - The models understand document structure, formatting, and semantics
-   - ✅ "Identify section headers - standalone numbers that mark gameplay sections"
-   - ❌ "If text matches regex `^(\d{1,3})$` AND previous element doesn't contain 'dice' AND confidence > 0.7..."
-3. **Simple prompts work better** - Clear descriptions outperform complex heuristics
-   - ✅ "Find all numbered gameplay sections. Numbers in rules instructions are not sections."
-   - ❌ Multi-stage filtering with keyword lists, confidence thresholds, and pattern matching
-
-**Key principle**: If you can describe what you want in a sentence, the AI can understand it. Don't code what the AI can infer.
-
-**Real example from Story 031**:
-- **Before**: Complex numeric detection with regex, rules keyword filtering, confidence boosting, colon prefix handling, etc. (50+ lines of heuristics)
-- **After**: "This book has front matter, rules, then numbered sections 1-400. Find the section headers." (Simple description)
-- **Result**: +16 more sections detected, 26 fewer missing sections
-
-**When to use code vs AI**:
-- **Use code for**: Data transformation, file I/O, deterministic operations, simple filtering
-- **Use AI for**: Understanding context, pattern recognition, classification, boundary detection, anything requiring semantic understanding
+- Write prompts at the document/recipe level (keep them generic; see “Generality & Non-Overfitting”).
+- Prefer simple, structural instructions over brittle heuristics:
+  - ✅ “This is a Fighting Fantasy gamebook with front matter, rules, then numbered sections 1–400. Find section headers.”
+  - ❌ Complex regex/keyword rule stacks and confidence micro-tuning.
+- Use code for deterministic transforms; use AI for semantic structure (classification, boundary detection, context).
 
 ### Why This Matters
 - This project processes books into structured data. **Wrong data is worse than no data.**
@@ -127,7 +119,7 @@ When a first-pass run leaves quality gaps, escalate in a controlled, data-driven
 3. **Targeted re-read**: Re-run only the flagged items with a stronger multimodal model and a focused prompt that embeds the minimal context directly (page image + raw_text in the prompt; no external attachments).
 4. **Rebuild & revalidate**: Rebuild downstream artifacts from the patched portions and re-run validation.
 5. **Verify artifacts**: Spot-check the repaired items and confirm warnings/errors are cleared or correctly justified (e.g., true deaths).
-Avoid manual text edits; use this loop to stay generic, reproducible, and book-agnostic.
+Avoid manual text edits; use this loop to stay generic, reproducible, and book-agnostic (see “Generality & Non-Overfitting”).
 
 ### OCR structural guard (add before baseline split)
 Before portionization, automatically flag pages for high-fidelity re-OCR if either engine output shows fused/structurally bad text:
@@ -207,5 +199,12 @@ Before portionization, automatically flag pages for high-fidelity re-OCR if eith
 ## Etiquette
 - Update the relevant story work log for any change or investigation.
 - Keep responses concise; cite file paths when referencing changes.
+- **Impact-first updates (required):** When reporting progress, don’t just summarize what changed—also state how it improved (or failed to improve) outcomes.
+  - Include a short “Impact” block with:
+    - **Story-scope impact:** What acceptance criteria/tasks this unblocked or de-risked.
+    - **Pipeline-scope impact:** What got measurably better downstream (coverage, fewer escalations, fewer bad tokens, cleaner boundaries, etc.).
+    - **Evidence:** 1–3 concrete artifact paths checked (e.g., `output/runs/<run_id>/pagelines_final.jsonl`, `.../elements_core_typed.jsonl`) and what you saw there.
+    - **Next:** The next highest-leverage step and what would falsify success.
+  - If results are mixed, say so explicitly and name the remaining failure mode(s).
 - **Debugging discipline:** when diagnosing issues, inspect the actual data/artifacts at each stage before changing code. Prefer evidence-driven plans (e.g., grep/rg on outputs, view JSONL samples) over guess-and-edit loops. Document what was observed and the decision that follows.
 - **Reuse working patterns first:** before inventing a new solution, look for an existing working pattern in this repo (code, UX, helper). Read it, understand it, and adapt with minimal changes.

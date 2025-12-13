@@ -1,10 +1,12 @@
 module_id: repair_portions_v1
+stage: clean
+entrypoint: modules/clean/repair_portions_v1/main.py
 description: >
   Re-read flagged sections with a multimodal LLM to repair garbled or low-confidence text.
   Flags short/low-alpha/digit-heavy raw_text (or forced IDs), sends page images + OCR
   to the model, and replaces raw_text/clean_text with repaired text while preserving provenance.
-entrypoint: modules/clean/repair_portions_v1/main.py
-stage: clean
+input_schema: enriched_portion_v1
+output_schema: enriched_portion_v1
 params:
   portions: Path to input portions (json/jsonl) containing raw_text and source_images.
   out: Output path; format follows input (json or jsonl).

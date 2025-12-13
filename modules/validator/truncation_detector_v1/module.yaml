@@ -1,0 +1,16 @@
+module_id: truncation_detector_v1
+module_type: validator
+entrypoint: modules/validator/truncation_detector_v1/main.py
+description: "Flags pagelines that likely end mid-sentence (missing punctuation)."
+input_schema: pagelines_v1
+output_schema: truncation_warning_v1
+default_params:
+  min_len: 50
+param_schema:
+  properties:
+    pagelines:
+      type: string
+    min_len:
+      type: integer
+  required: []
+notes: "Heuristically catches long lines that end without punctuation to detect probable truncations."

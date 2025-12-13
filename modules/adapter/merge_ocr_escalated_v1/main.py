@@ -43,13 +43,27 @@ def main():
     
     # Derive paths from driver inputs if not explicitly provided
     if args.inputs and len(args.inputs) >= 2:
-        intake_input = Path(args.inputs[0]).resolve()  # pages_raw.jsonl from intake
+        intake_input = Path(args.inputs[0]).resolve()  # pages_raw.jsonl from intake (or adapter_out.jsonl)
         escalate_input = Path(args.inputs[1]).resolve()  # adapter_out.jsonl from escalate_vision
         
         # Determine run directory from intake input
         run_dir = intake_input.parent if intake_input.is_file() else intake_input
-        if run_dir.name in {"ocr_ensemble"}:
+        if run_dir.name in {"ocr_ensemble", "ocr_ensemble_picked", "ocr_ensemble_gpt4v"}:
             run_dir = run_dir.parent
+
+        # If intake_input is adapter_out.jsonl, prefer its embedded index path.
+        original_index_path = None
+        if intake_input.is_file() and intake_input.name == "adapter_out.jsonl":
+            try:
+                with intake_input.open("r", encoding="utf-8") as f:
+                    first_line = f.readline().strip()
+                    if first_line:
+                        summary = json.loads(first_line)
+                        original_index_path = summary.get("index")
+                        if original_index_path and not os.path.isabs(original_index_path):
+                            original_index_path = os.path.join(run_dir, original_index_path)
+            except Exception:
+                original_index_path = None
         
         # Escalate input: should be adapter_out.jsonl with index path
         escalated_index_path = None
@@ -68,7 +82,8 @@ def main():
                 pass
         
         if not args.original_index:
-            args.original_index = os.path.join(run_dir, "ocr_ensemble", "pagelines_index.json")
+            picked_index = os.path.join(run_dir, "ocr_ensemble_picked", "pagelines_index.json")
+            args.original_index = original_index_path or (picked_index if os.path.exists(picked_index) else os.path.join(run_dir, "ocr_ensemble", "pagelines_index.json"))
         if not args.escalated_index:
             if escalated_index_path:
                 args.escalated_index = escalated_index_path

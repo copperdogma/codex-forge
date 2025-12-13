@@ -149,9 +149,9 @@ def main():
     parser.add_argument("--min-chars", type=int, default=320, help="Flag sections shorter than this many characters.")
     parser.add_argument("--alpha-threshold", type=float, default=0.72, help="Flag sections with alpha ratio below this.")
     parser.add_argument("--max-digit-ratio", type=float, default=0.38, help="Flag sections with digit ratio above this.")
-    parser.add_argument("--min-confidence", type=float, default=0.65, help="Re-run with boost model if below this.")
-    parser.add_argument("--max-repairs", type=int, default=40, help="Cap the number of sections to repair (to control cost).")
-    parser.add_argument("--max-images", type=int, default=2, help="Max images to send per section.")
+    parser.add_argument("--min-confidence", "--min_confidence", type=float, default=0.65, help="Re-run with boost model if below this.")
+    parser.add_argument("--max-repairs", "--max_repairs", type=int, default=40, help="Cap the number of sections to repair (to control cost).")
+    parser.add_argument("--max-images", "--max_images", type=int, default=2, help="Max images to send per section.")
     parser.add_argument("--force-ids", type=str, default="", help="Comma-separated portion IDs to force repair.")
     parser.add_argument("--progress-file")
     parser.add_argument("--state-file")
@@ -171,9 +171,15 @@ def main():
     for idx, row in enumerate(rows, start=1):
         section_id = str(row.get("section_id") or row.get("portion_id") or idx)
         text = row.get("raw_text") or row.get("text") or ""
-        reasons = detect_garble(text, min_chars=args.min_chars,
-                                alpha_thresh=args.alpha_threshold,
-                                max_digit_ratio=args.max_digit_ratio)
+        hints = row.get("repair_hints") or {}
+        reasons = list(hints.get("escalation_reasons") or [])
+        flagged_pages = hints.get("flagged_pages") or []
+        if flagged_pages and not reasons:
+            reasons = ["char_confusion"]
+        if not reasons:
+            reasons = detect_garble(text, min_chars=args.min_chars,
+                                    alpha_thresh=args.alpha_threshold,
+                                    max_digit_ratio=args.max_digit_ratio)
         if section_id in forced:
             reasons = reasons or ["forced"]
 

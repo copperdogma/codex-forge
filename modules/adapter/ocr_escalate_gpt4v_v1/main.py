@@ -3,7 +3,7 @@ import base64
 import json
 import os
 from pathlib import Path
-from typing import Dict, Any, List
+from typing import Dict, Any, List, Optional, Tuple
 
 from modules.common.utils import ensure_dir, save_json
 
@@ -85,6 +85,185 @@ def to_lines(text: str):
     return text.splitlines()
 
 
+def _extract_quality_subscores(q: Dict[str, Any]) -> Dict[str, float]:
+    """
+    Normalize quality report fields across versions (nested vs flat).
+    Values are 0..1 where higher generally indicates worse quality.
+    """
+    quality_metrics = q.get("quality_metrics", {})
+    if not isinstance(quality_metrics, dict):
+        quality_metrics = {}
+    return {
+        "quality_score": float(q.get("quality_score", 0) or 0),
+        "disagreement_score": float(q.get("disagreement_score", 0) or 0),
+        "disagree_rate": float(q.get("disagree_rate", 0) or 0),
+        "corruption_score": float(quality_metrics.get("corruption_score", q.get("corruption_score", 0)) or 0),
+        "missing_content_score": float(quality_metrics.get("missing_content_score", q.get("missing_content_score", 0)) or 0),
+        "dictionary_score": float(quality_metrics.get("dictionary_score", q.get("dictionary_score", 0)) or 0),
+        "char_confusion_score": float(quality_metrics.get("char_confusion_score", q.get("char_confusion_score", 0)) or 0),
+    }
+
+
+def page_escalation_reasons(q: Dict[str, Any], *, threshold: float) -> List[str]:
+    """
+    Derive explicit reasons for escalation from the quality report record.
+
+    Prefer upstream-computed `escalation_reasons` when present; otherwise fall back
+    to conservative legacy signals.
+    """
+    reasons = q.get("escalation_reasons")
+    if isinstance(reasons, list) and all(isinstance(x, str) for x in reasons):
+        return list(reasons)
+
+    subs = _extract_quality_subscores(q)
+    out: List[str] = []
+    if q.get("needs_escalation", False):
+        out.append("needs_escalation_flag")
+    if subs["disagreement_score"] >= threshold:
+        out.append("high_disagreement")
+    if subs["disagree_rate"] > 0.25:
+        out.append("high_disagree_rate")
+    if subs["quality_score"] >= threshold:
+        out.append("high_quality_score")
+    if subs["corruption_score"] >= 0.5:
+        out.append("high_corruption")
+    if subs["missing_content_score"] >= 0.6:
+        out.append("missing_content")
+    if subs["dictionary_score"] >= 0.5:
+        out.append("dictionary_oov")
+    if subs["char_confusion_score"] >= 0.25:
+        out.append("char_confusion")
+    return out
+
+
+def page_needs_escalation(q: Dict[str, Any], *, threshold: float) -> bool:
+    if q.get("needs_escalation", False):
+        return True
+    return bool(page_escalation_reasons(q, threshold=threshold))
+
+
+def candidate_sort_key(q: Dict[str, Any]) -> Tuple[float, float, float, float, float, float]:
+    subs = _extract_quality_subscores(q)
+    # Primary: prioritize disagreement_score (this is what thresholding historically used),
+    # but allow quality_score to bubble up severe non-disagreement failures when present.
+    quality_score = subs["quality_score"]
+    disagreement_score = subs["disagreement_score"]
+    if quality_score < 0.01 and disagreement_score < 0.01:
+        primary = subs["disagree_rate"]
+    else:
+        # Add small boosts for content-centric failure signals so they are less likely
+        # to be starved by purely structural disagreement pages under small budgets.
+        primary = max(disagreement_score, quality_score)
+        primary += subs["dictionary_score"] * 0.12
+        primary += subs["char_confusion_score"] * 0.10
+        primary += subs["missing_content_score"] * 0.06
+        primary += subs["corruption_score"] * 0.04
+    return (
+        float(primary),
+        subs["corruption_score"],
+        subs["missing_content_score"],
+        subs["dictionary_score"],
+        subs["char_confusion_score"],
+        subs["disagree_rate"],
+    )
+
+
+def _page_text_stats(page_data: Dict[str, Any]) -> Dict[str, Any]:
+    lines = page_data.get("lines") or []
+    texts: List[str] = []
+    for ln in lines:
+        if isinstance(ln, dict):
+            t = ln.get("text")
+            if isinstance(t, str) and t:
+                texts.append(t)
+    joined = "\n".join(texts)
+    return {
+        "line_count": len(texts),
+        "char_count": len(joined),
+        "has_text": bool(joined.strip()),
+    }
+
+
+def should_escalate_page_key(page_key: str,
+                            reasons: List[str],
+                            *,
+                            index: Dict[str, str],
+                            pages_cache: Dict[str, Dict[str, Any]],
+                            min_other_side_chars: int,
+                            min_chars_to_escalate_short_missing: int) -> Tuple[bool, Optional[str]]:
+    """
+    Apply conservative policy to avoid expensive rereads on likely-legit short/blank pages.
+
+    Returns (should_escalate, skip_reason).
+    """
+    if not reasons:
+        return False, "no_reasons"
+
+    # Load current page data for text stats when needed.
+    page_path = index.get(page_key)
+    page_data = None
+    if page_path and page_key in pages_cache:
+        page_data = pages_cache[page_key]
+    elif page_path:
+        try:
+            page_data = json.load(open(page_path, "r", encoding="utf-8"))
+            pages_cache[page_key] = page_data
+        except Exception:
+            page_data = None
+
+    stats = _page_text_stats(page_data or {})
+
+    # Heuristic 1: For "missing_content" only, avoid escalating very short legit pages
+    # like "NOW TURN OVER" unless they're actually empty.
+    if reasons == ["missing_content"] and stats["has_text"] and stats["char_count"] < min_chars_to_escalate_short_missing:
+        return False, "skip_short_missing_content"
+
+    # Heuristic 2: For half-spreads, empty-side pages are often truly blank.
+    # If this side is empty and the other side has substantial text, skip reread.
+    if reasons == ["missing_content"] and (not stats["has_text"]) and (page_key.endswith("L") or page_key.endswith("R")):
+        other_key = page_key[:-1] + ("R" if page_key.endswith("L") else "L")
+        other_path = index.get(other_key)
+        if other_path:
+            other = pages_cache.get(other_key)
+            if other is None:
+                try:
+                    other = json.load(open(other_path, "r", encoding="utf-8"))
+                    pages_cache[other_key] = other
+                except Exception:
+                    other = None
+            other_stats = _page_text_stats(other or {})
+            # If the other side has any text at all, treat this as a likely blank half-spread and skip.
+            # Also keep a stricter mode (via min_other_side_chars) for future tuning.
+            if other_stats["has_text"] and (other_stats["char_count"] >= min_other_side_chars or other_stats["char_count"] > 0):
+                return False, "skip_blank_half_spread"
+
+    return True, None
+
+
+def update_quality_row(q: Dict[str, Any], *, would_escalate: bool, reasons: List[str], dry_run: bool) -> Dict[str, Any]:
+    """
+    Return a new quality row reflecting escalation.
+    In dry-run mode, never clears flags; instead annotates with `would_escalate`.
+    """
+    out = dict(q)
+    if not would_escalate:
+        return out
+
+    if dry_run:
+        out["would_escalate"] = True
+        out["would_escalate_reasons"] = list(reasons)
+        return out
+
+    out["disagreement_score"] = 0.0
+    out["needs_escalation"] = False
+    out["source"] = "gpt4v"
+    out["engines"] = ["gpt4v"]
+    if reasons:
+        out["escalated_from_reasons"] = list(reasons)
+    out["escalation_reasons"] = []
+    return out
+
+
 def main():
     parser = argparse.ArgumentParser(description="Escalate low-quality pages with GPT-4V transcription.")
     parser.add_argument("--index", help="pagelines_index.json from BetterOCR run")
@@ -105,20 +284,57 @@ def main():
     parser.add_argument("--prompt_file", dest="prompt_file", default="prompts/ocr_page_gpt4v.md", help=argparse.SUPPRESS)
     parser.add_argument("--dry-run", dest="dry_run", action="store_true", help="List candidates without calling GPT-4V")
     parser.add_argument("--dry_run", dest="dry_run", action="store_true", help=argparse.SUPPRESS)
+    parser.add_argument("--min-other-side-chars", dest="min_other_side_chars", type=int, default=200,
+                        help="When skipping blank half-spreads, require the other side to have at least this many chars.")
+    parser.add_argument("--min_other_side_chars", dest="min_other_side_chars", type=int, default=200, help=argparse.SUPPRESS)
+    parser.add_argument("--min-chars-to-escalate-short-missing", dest="min_chars_to_escalate_short_missing", type=int, default=120,
+                        help="Skip escalating missing_content-only pages if they have some text but fewer than this many chars.")
+    parser.add_argument("--min_chars_to_escalate_short_missing", dest="min_chars_to_escalate_short_missing", type=int, default=120, help=argparse.SUPPRESS)
     args = parser.parse_args()
 
     # Derive paths when called via driver with only --inputs
     if args.inputs and (not args.index or not args.quality or not args.images_dir or not args.outdir):
-        # If input is a json, use its parent; if it's a directory, use it directly
+        # If input is a file, use its parent; if it's a directory, use it directly.
+        # Infer the correct layout by checking for expected artifacts rather than relying on folder names.
         first = Path(args.inputs[0]).resolve()
-        run_dir = first.parent if first.is_file() else first
-        if run_dir.name in {"ocr_ensemble", "ocr_ensemble_gpt4v"}:
-            run_dir = run_dir.parent
-        args.index = args.index or os.path.join(run_dir, "ocr_ensemble", "pagelines_index.json")
-        args.quality = args.quality or os.path.join(run_dir, "ocr_ensemble", "ocr_quality_report.json")
-        args.images_dir = args.images_dir or os.path.join(run_dir, "images")
-        # Write escalated pages into main run directory (ocr_ensemble_gpt4v subdirectory)
-        args.outdir = args.outdir or os.path.join(run_dir, "ocr_ensemble_gpt4v")
+        base = first.parent if first.is_file() else first
+
+        # Layout A (driver-style):
+        #   <base>/images/
+        #   <base>/ocr_ensemble/pagelines_index.json
+        ocr_dir_a = base / "ocr_ensemble"
+
+        # Layout B (module outdir-style):
+        #   <base>/images/
+        #   <base>/ocr_ensemble/ocr_ensemble/pagelines_index.json
+        ocr_dir_b = base / "ocr_ensemble" / "ocr_ensemble"
+
+        # Layout C (already pointing at ocr_ensemble directory):
+        #   <base>/pagelines_index.json
+        ocr_dir_c = base
+        base_c = base.parent
+
+        if (ocr_dir_a / "pagelines_index.json").exists():
+            base_dir = base
+            ocr_dir = ocr_dir_a
+            images_dir = base_dir / "images"
+        elif (ocr_dir_b / "pagelines_index.json").exists():
+            base_dir = base / "ocr_ensemble"
+            ocr_dir = ocr_dir_b
+            images_dir = base_dir / "images"
+        elif (ocr_dir_c / "pagelines_index.json").exists():
+            base_dir = base_c
+            ocr_dir = ocr_dir_c
+            images_dir = base_dir / "images"
+        else:
+            base_dir = base
+            ocr_dir = ocr_dir_a
+            images_dir = base_dir / "images"
+
+        args.index = args.index or str(ocr_dir / "pagelines_index.json")
+        args.quality = args.quality or str(ocr_dir / "ocr_quality_report.json")
+        args.images_dir = args.images_dir or str(images_dir)
+        args.outdir = args.outdir or str(base_dir / "ocr_ensemble_gpt4v")
 
     if not (args.index and args.quality and args.images_dir and args.outdir):
         raise SystemExit("index, quality, images-dir, and outdir are required (or infer via --inputs)")
@@ -128,59 +344,30 @@ def main():
 
     index = load_index(args.index)
     quality = load_quality(args.quality)
+    pages_cache: Dict[str, Dict[str, Any]] = {}
 
     # Select pages needing escalation
     # Use enhanced quality metrics: quality_score, corruption_score, or traditional disagreement_score
     candidates = []
     for q in quality:
-        # Extract nested quality metrics if present
-        quality_metrics = q.get("quality_metrics", {})
-        if isinstance(quality_metrics, dict):
-            corruption_score = quality_metrics.get("corruption_score", 0)
-            missing_content_score = quality_metrics.get("missing_content_score", 0)
-        else:
-            corruption_score = q.get("corruption_score", 0)
-            missing_content_score = q.get("missing_content_score", 0)
-        
-        # Check multiple quality indicators
-        needs_escalation = (
-            q.get("needs_escalation", False) or
-            q.get("disagreement_score", 0) >= args.threshold or
-            q.get("disagree_rate", 0) > 0.25 or  # High line-level disagreement rate
-            q.get("quality_score", 0) >= args.threshold or  # Enhanced quality score
-            corruption_score >= 0.5 or  # High corruption
-            missing_content_score >= 0.6  # Missing content
+        if not page_needs_escalation(q, threshold=args.threshold):
+            continue
+        page_key = str(q.get("page", ""))
+        reasons = page_escalation_reasons(q, threshold=args.threshold)
+        ok, _skip_reason = should_escalate_page_key(
+            page_key,
+            reasons,
+            index=index,
+            pages_cache=pages_cache,
+            min_other_side_chars=args.min_other_side_chars,
+            min_chars_to_escalate_short_missing=args.min_chars_to_escalate_short_missing,
         )
-        if needs_escalation:
+        if ok:
             candidates.append(q)
     
     # Sort by quality_score (if available) or disagreement_score, prioritizing worst pages
     # Extract nested quality metrics for sorting
-    def get_sort_key(r):
-        quality_metrics = r.get("quality_metrics", {})
-        if isinstance(quality_metrics, dict):
-            corruption = quality_metrics.get("corruption_score", 0)
-            missing = quality_metrics.get("missing_content_score", 0)
-        else:
-            corruption = r.get("corruption_score", 0)
-            missing = r.get("missing_content_score", 0)
-        
-        # Primary sort: use quality_score if meaningful (>0.01), otherwise use disagree_rate
-        # This ensures pages with high disagree_rate but low quality_score still get prioritized
-        quality_score = r.get("quality_score", 0)
-        if quality_score < 0.01:
-            # Quality score is too low, use disagree_rate as primary sort
-            primary = r.get("disagree_rate", r.get("disagreement_score", 0))
-        else:
-            primary = quality_score
-        
-        return (
-            primary,
-            corruption,
-            missing,
-            r.get("disagree_rate", 0)  # Tie-breaker: prefer higher disagree_rate
-        )
-    candidates.sort(key=get_sort_key, reverse=True)
+    candidates.sort(key=candidate_sort_key, reverse=True)
     cap = args.budget_pages if args.budget_pages is not None else args.max_pages
     candidates = candidates[: cap]
 
@@ -217,10 +404,11 @@ def main():
             page_num = int(page_key) if page_key.isdigit() else 1
             out_page_path = os.path.join(args.outdir, f"page-{page_num:03d}.json")
 
+        escalation_reasons = page_escalation_reasons(q, threshold=args.threshold)
         # Check if this page needs escalation (compare by page_key)
-        needs_escalation = any(str(c["page"]) == page_key for c in candidates)
+        would_escalate = any(str(c["page"]) == page_key for c in candidates)
         
-        if needs_escalation:
+        if would_escalate:
             image_path = os.path.join(args.images_dir, os.path.basename(page_data.get("image", "")))
             if args.dry_run:
                 print(f"[DRY] would escalate page {page_key} using {image_path}")
@@ -243,23 +431,19 @@ def main():
                     "prev_source": page_data.get("module_id"),
                     "prev_disagreement": page_data.get("disagreement_score"),
                     "engines_raw": page_data.get("engines_raw"),
+                    "prev_escalation_reasons": escalation_reasons,
+                    "prev_quality": _extract_quality_subscores(q),
                 }
                 new_page["meta"] = meta_prev
                 new_page["module_id"] = "ocr_escalate_gpt4v_v1"
+                new_page["escalation_reasons"] = []
         else:
             new_page = page_data
 
         save_json(out_page_path, new_page)
         new_index[page_key] = out_page_path
 
-        # update quality row
-        if needs_escalation:
-            q = dict(q)
-            q["disagreement_score"] = 0.0
-            q["needs_escalation"] = False
-            q["source"] = "gpt4v"
-            q["engines"] = ["gpt4v"]
-        new_quality.append(q)
+        new_quality.append(update_quality_row(q, would_escalate=would_escalate, reasons=escalation_reasons, dry_run=args.dry_run))
 
     # Save index and quality
     index_path = os.path.join(args.outdir, "pagelines_index.json")
@@ -274,6 +458,10 @@ def main():
             "run_id": None,
             "created_at": None,
             "escalated_pages": [c["page"] for c in candidates],
+            "escalated_pages_with_reasons": [
+                {"page": c.get("page"), "reasons": page_escalation_reasons(c, threshold=args.threshold)}
+                for c in candidates
+            ],
             "threshold": args.threshold,
             "max_pages": args.max_pages,
             "index": index_path,

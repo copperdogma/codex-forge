@@ -237,8 +237,8 @@ class TestIntegration:
 
         # Actual fragmented text pattern from page 008L
         col1 = """1-6. This sequenc
-score of either °
-fighting has been
+	score of either °
+	fighting has been
 
 On some pages you
 running away from ;
@@ -252,12 +252,11 @@ on the page.
 
 Fighting Mo
 
-If you come across
-particular encounter
-will tell you how to
-you will treat them <
-you will fight each o1
-
+	If you come across
+	particular encounter
+	will tell you how to
+	you will treat them <
+	you will fight each o1
 At various times du
 battles or when you «
 you could either be
@@ -788,6 +787,80 @@ class TestFragmentFilter:
         filtered, removed, stats = filter_func(lines)
         # Empty lines should remain
         assert "" in filtered
+
+class TestSpellGarbleMetrics:
+    def test_dictionary_score_flags_suspicious_consonant_oov(self):
+        from modules.common.text_quality import spell_garble_metrics
+
+        vocab = {"skill", "stamina", "luck"}
+        metrics = spell_garble_metrics(["sxrLL"], vocab=set(vocab))
+        assert metrics["dictionary_oov_words"] >= 1
+        assert metrics["dictionary_suspicious_oov_words"] >= 1
+        assert metrics["dictionary_score"] >= 0.5
+        # Alpha-only confusion (x↔k, r↔i) should be detected as a fixable-to-vocab token.
+        assert metrics["char_confusion_alpha_fixed_words"] >= 1
+        alpha_examples = [w for (w, _n) in metrics["char_confusion_alpha_fixed_examples"]]
+        assert any("sxrLL->skill" == e or "sxrLL->skill" in e for e in alpha_examples)
+
+    def test_char_confusion_score_flags_mixed_alnum_tokens(self):
+        from modules.common.text_quality import spell_garble_metrics
+
+        vocab = {"you", "are", "following", "start", "to", "peter", "out", "as"}
+        metrics = spell_garble_metrics(["y0u 4re f0110win9 5t4rt t0 peter 0ut 45."], vocab=set(vocab))
+        assert metrics["char_confusion_mixed_ratio"] > 0.0
+        assert metrics["char_confusion_score"] > 0.0
+        examples = [w for (w, _n) in metrics["char_confusion_examples"]]
+        assert any("y0u" in e or "f0110win9" in e for e in examples)
+        # Digit confusion should be detected even for short tokens like y0u/t0 when they map to vocab words.
+        assert metrics["char_confusion_digit_fixed_words"] >= 1
+        digit_examples = [w for (w, _n) in metrics["char_confusion_digit_fixed_examples"]]
+        assert any("y0u->you" in e or "t0->to" in e for e in digit_examples)
+
+    def test_enhanced_quality_metrics_exposes_spell_fields(self):
+        from modules.extract.extract_ocr_ensemble_v1.main import compute_enhanced_quality_metrics
+
+        q = compute_enhanced_quality_metrics(["sxrLL"], {}, disagreement=0.0, disagree_rate=0.0)
+        assert "dictionary_score" in q
+        assert "char_confusion_score" in q
+
+    def test_escalation_reasons_include_dictionary_oov(self):
+        from modules.extract.extract_ocr_ensemble_v1.main import (
+            compute_enhanced_quality_metrics,
+            compute_escalation_reasons,
+        )
+
+        q = compute_enhanced_quality_metrics(["sxrLL"], {}, disagreement=0.0, disagree_rate=0.0)
+        reasons = compute_escalation_reasons(
+            disagreement=0.0,
+            disagree_rate=0.0,
+            quality_metrics=q,
+            line_count=1,
+            avg_len=5.0,
+            escalation_threshold=1.0,
+        )
+        assert "dictionary_oov" in reasons
+
+    def test_escalation_reasons_include_char_confusion(self):
+        from modules.extract.extract_ocr_ensemble_v1.main import (
+            compute_enhanced_quality_metrics,
+            compute_escalation_reasons,
+        )
+
+        q = compute_enhanced_quality_metrics(
+            ["y0u 4re f0110win9 5t4rt t0 peter 0ut 45."],
+            {},
+            disagreement=0.0,
+            disagree_rate=0.0,
+        )
+        reasons = compute_escalation_reasons(
+            disagreement=0.0,
+            disagree_rate=0.0,
+            quality_metrics=q,
+            line_count=1,
+            avg_len=10.0,
+            escalation_threshold=1.0,
+        )
+        assert "char_confusion" in reasons
 
 
 if __name__ == "__main__":

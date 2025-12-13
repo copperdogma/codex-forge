@@ -92,6 +92,17 @@ class PageLines(BaseModel):
     lines: List[PageLine]
     disagreement_score: Optional[float] = None
     needs_escalation: bool = False
+    # Optional provenance/quality fields (kept during driver stamping).
+    # Many OCR modules emit these, and downstream adapters/guards rely on them.
+    engines_raw: Optional[Dict[str, Any]] = None
+    quality_metrics: Optional[Dict[str, Any]] = None
+    column_spans: Optional[List[List[float]]] = None
+    column_confidence: Optional[Dict[str, Any]] = None
+    ivr: Optional[float] = None
+    inline_escalated: Optional[bool] = None
+    spread_side: Optional[str] = None  # "L", "R", or None
+    meta: Optional[Dict[str, Any]] = None
+    escalation_reasons: Optional[List[str]] = None
 
 
 class BoundingBox(BaseModel):
@@ -210,6 +221,9 @@ class EnrichedPortion(BaseModel):
     item_effects: List[ItemEffect] = Field(default_factory=list)
     targets: List[str] = Field(default_factory=list)
     element_ids: Optional[List[str]] = None  # Source element IDs for provenance
+    repair: Optional[Dict[str, Any]] = None
+    repair_hints: Optional[Dict[str, Any]] = None
+    context_correction: Optional[Dict[str, Any]] = None
 
 
 class LLMCallUsage(BaseModel):
