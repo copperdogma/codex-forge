@@ -98,7 +98,9 @@ This index tracks stories in `/docs/stories/` for the codex-forge pipeline.
 || 066 | FF Pipeline Accel + Accuracy Guardrails | High | To Do | /docs/stories/story-066-ff-pipeline-accel-accuracy.md |
 || 067 | GPU Acceleration for OCR Pipeline | High | Done | /docs/stories/story-067-gpu-acceleration-ocr.md |
 || 068 | Fighting Fantasy Boundary Detection Improvements | High | Done | /docs/stories/story-068-ff-boundary-detection.md |
-|| 069 | PDF Text Extraction Engine for OCR Ensemble | Medium | In Progress | /docs/stories/story-069-pdf-text-extraction-engine.md |
+|| 069 | PDF Text Extraction Engine for OCR Ensemble | Medium | Done | /docs/stories/story-069-pdf-text-extraction-engine.md |
+|| 070 | OCR Split Refinement — Zero Bad Slices | High | Open | /docs/stories/story-070-ocr-split-refinement.md |
+|| 071 | Output Artifact Organization | Medium | Open | /docs/stories/story-071-output-artifact-organization.md |
 || 099 | Remove dev-only backcompat disclaimer | Low | To Do | /docs/stories/story-099-remove-dev-backcompat-note.md |
 
 ## Notes

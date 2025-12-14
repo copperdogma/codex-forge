@@ -22,7 +22,9 @@ stages:
     out: pages_raw.jsonl
     params:
       dpi: 300
-      engines: ["tesseract", "easyocr", "apple"]
+      # 4-engine voting: tesseract, easyocr, apple (macOS Vision), pdftext (embedded PDF text)
+      # pdftext recommended: 1-2% quality improvement, minimal cost (~1ms/page), graceful degradation
+      engines: ["tesseract", "easyocr", "apple", "pdftext"]
       write_engine_dumps: true
       escalation_threshold: 0.15
       start: 1

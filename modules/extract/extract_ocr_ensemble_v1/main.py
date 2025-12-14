@@ -1394,23 +1394,44 @@ def call_apple(pdf_path: str, page: int, lang: str, fast: bool, helper_path: Pat
     return combined, lines, columns_out, raw_lines
 
 
-def call_betterocr(image_path: str, engines, lang: str, *, use_llm: bool, llm_model: str,
-                   allow_fallback: bool, psm: int, oem: int,
-                   easyocr_state: Optional[EasyOcrRunState] = None,
-                   easyocr_langs: Optional[List[str]] = None,
-                   easyocr_gpu: bool = False,
-                   easyocr_retry_hi_res: bool = False,
-                   pdf_path: Optional[str] = None,
-                   page_num: Optional[int] = None):
+def extract_pdf_text(pdf_path: str, page_num: int) -> str:
     """
-    Lightweight ensemble:
-    - tesseract via pytesseract (run_ocr)
-    - easyocr via Reader (if requested)
-    - optional fallback if all empty
-    """
-    by_engine = {}
+    Extract embedded text directly from PDF page using pdfplumber.
 
-    tess_text = ""
+    Args:
+        pdf_path: Path to the PDF file
+        page_num: Page number (1-indexed)
+
+    Returns:
+        Extracted text as string, or empty string if no text or error occurs.
+    """
+    try:
+        import pdfplumber
+        with pdfplumber.open(pdf_path) as pdf:
+            # pdfplumber uses 0-indexed pages internally
+            page_idx = page_num - 1
+            if page_idx < 0 or page_idx >= len(pdf.pages):
+                return ""
+            page = pdf.pages[page_idx]
+            text = page.extract_text()
+            return text or ""
+    except Exception:
+        # Return empty on any error (missing pdfplumber, corrupted PDF, no text layer, etc.)
+        return ""
+
+
+def run_tesseract(image_path: str, lang: str = "en", psm: int = 3, oem: int = 3) -> Dict[str, Any]:
+    """
+    Run Tesseract OCR on an image.
+
+    Returns dict with:
+        - tesseract: text output
+        - tesseract_confidences: per-line confidence scores (0-1)
+        - tesseract_page_confidence: overall page confidence
+        - tesseract_line_bboxes: bounding boxes for each line
+        - tesseract_error: error message if OCR failed
+    """
+    result = {}
     try:
         tess_text, tess_data = run_ocr_with_word_data(
             image_path,
@@ -1418,149 +1439,142 @@ def call_betterocr(image_path: str, engines, lang: str, *, use_llm: bool, llm_mo
             psm=psm,
             oem=oem,
         )
-        by_engine["tesseract"] = tess_text
+        result["tesseract"] = tess_text
         if tess_data:
             conf_info = _tesseract_line_confidences_for_text(tess_text, tess_data)
             if conf_info.get("line_confidences"):
-                by_engine["tesseract_confidences"] = conf_info["line_confidences"]
+                result["tesseract_confidences"] = conf_info["line_confidences"]
             if conf_info.get("page_confidence") is not None:
-                by_engine["tesseract_page_confidence"] = conf_info["page_confidence"]
-            by_engine["tesseract_confidence_match_rate"] = conf_info.get("match_rate", 0.0)
+                result["tesseract_page_confidence"] = conf_info["page_confidence"]
+            result["tesseract_confidence_match_rate"] = conf_info.get("match_rate", 0.0)
             try:
                 from PIL import Image
                 with Image.open(image_path) as _img:
                     w, h = _img.size
                 bbox_info = _tesseract_line_bboxes_for_text(tess_text, tess_data, w, h)
                 if bbox_info.get("line_bboxes"):
-                    by_engine["tesseract_line_bboxes"] = bbox_info["line_bboxes"]
-                by_engine["tesseract_bbox_match_rate"] = bbox_info.get("match_rate", 0.0)
+                    result["tesseract_line_bboxes"] = bbox_info["line_bboxes"]
+                result["tesseract_bbox_match_rate"] = bbox_info.get("match_rate", 0.0)
             except Exception:
                 pass
     except Exception as ex:
-        by_engine["tesseract_error"] = str(ex)
+        result["tesseract_error"] = str(ex)
+    return result
 
+
+def run_easyocr(image_path: str,
+                langs: Optional[List[str]] = None,
+                gpu: bool = False,
+                retry_hi_res: bool = False,
+                pdf_path: Optional[str] = None,
+                page_num: Optional[int] = None,
+                state: Optional[EasyOcrRunState] = None) -> Dict[str, Any]:
+    """
+    Run EasyOCR on an image.
+
+    Returns dict with:
+        - easyocr: text output
+        - easyocr_lang: language used
+        - easyocr_retry: hi-res retry info if attempted
+        - easyocr_error or easyocr_errors: error info if failed
+    """
+    result = {}
     easy_text = ""
     easy_error = None
-    attempted_langs = easyocr_langs or ["en", "en_legacy"]
-    if "easyocr" in engines:
-        for attempt_lang in attempted_langs:
-            try:
-                easyocr_state and easyocr_state.log(
-                    "easyocr_attempt",
-                    scope="page",
-                    image=os.path.basename(image_path),
-                    lang=attempt_lang,
-                )
-                reader = get_easyocr_reader(attempt_lang, download_enabled=True, gpu=easyocr_gpu)
-                easyocr_state and easyocr_state.log(
-                    "easyocr_reader_ready",
-                    scope="page",
-                    image=os.path.basename(image_path),
-                    lang=attempt_lang,
-                    model_dir=getattr(reader, "model_storage_directory", None),
-                    user_network_dir=getattr(reader, "user_network_directory", None),
-                    download_enabled=True,
-                    gpu=easyocr_gpu,
-                )
-                result = reader.readtext(image_path, detail=0, paragraph=False)
-                easy_text = "\n".join(result)
-                is_empty = not easy_text.strip()
-                by_engine["easyocr"] = easy_text
-                by_engine["easyocr_lang"] = attempt_lang
-                easyocr_state and easyocr_state.log(
-                    "easyocr_success",
-                    scope="page",
-                    image=os.path.basename(image_path),
-                    lang=attempt_lang,
-                    lines=len(result),
-                    chars=len(easy_text),
-                    empty=is_empty,
-                    gpu=easyocr_gpu,
-                )
-                if is_empty and easyocr_retry_hi_res:
-                    # Try a hi-res re-render and second EasyOCR pass
-                    hi_path = image_path
-                    try:
-                        base_dir = Path(image_path).parent
-                        hi_path = base_dir / (Path(image_path).stem + "-hi.png")
-                        from modules.common import render_pdf
-                        target_pdf = pdf_path or str(Path(image_path).parents[2] / "input/06 deathtrap dungeon.pdf")
-                        target_page = page_num
-                        if target_page is None:
-                            import re
-                            m = re.search(r"page-(\\d+)", os.path.basename(image_path))
-                            target_page = int(m.group(1)) if m else None
-                        if target_page:
-                            rendered = render_pdf(target_pdf, str(base_dir), dpi=400, start_page=target_page, end_page=target_page)
-                            if rendered:
-                                hi_path = rendered[0]
-                        result_hi = reader.readtext(str(hi_path), detail=0, paragraph=False)
-                        hi_text = "\\n".join(result_hi)
-                        if hi_text.strip():
-                            easy_text = hi_text
-                            is_empty = False
-                            by_engine["easyocr_retry"] = {"path": str(hi_path), "lines": len(result_hi), "chars": len(hi_text)}
-                            by_engine["easyocr"] = easy_text  # promote retry text to primary output
-                    except Exception as retry_ex:
-                        easyocr_state and easyocr_state.log(
-                            "easyocr_retry_error",
-                            scope="page",
-                            image=os.path.basename(image_path),
-                            lang=attempt_lang,
-                            error=str(retry_ex),
-                        )
-                if is_empty:
-                    # Treat empty result as failure and try next language
-                    easyocr_state and easyocr_state.log(
-                        "easyocr_empty",
+    attempted_langs = langs or ["en", "en_legacy"]
+
+    for attempt_lang in attempted_langs:
+        try:
+            state and state.log(
+                "easyocr_attempt",
+                scope="page",
+                image=os.path.basename(image_path),
+                lang=attempt_lang,
+            )
+            reader = get_easyocr_reader(attempt_lang, download_enabled=True, gpu=gpu)
+            state and state.log(
+                "easyocr_reader_ready",
+                scope="page",
+                image=os.path.basename(image_path),
+                lang=attempt_lang,
+                model_dir=getattr(reader, "model_storage_directory", None),
+                user_network_dir=getattr(reader, "user_network_directory", None),
+                download_enabled=True,
+                gpu=gpu,
+            )
+            ocr_result = reader.readtext(image_path, detail=0, paragraph=False)
+            easy_text = "\n".join(ocr_result)
+            is_empty = not easy_text.strip()
+            result["easyocr"] = easy_text
+            result["easyocr_lang"] = attempt_lang
+            state and state.log(
+                "easyocr_success",
+                scope="page",
+                image=os.path.basename(image_path),
+                lang=attempt_lang,
+                lines=len(ocr_result),
+                chars=len(easy_text),
+                empty=is_empty,
+                gpu=gpu,
+            )
+            if is_empty and retry_hi_res and pdf_path and page_num:
+                # Try a hi-res re-render and second EasyOCR pass
+                try:
+                    base_dir = Path(image_path).parent
+                    hi_path = base_dir / (Path(image_path).stem + "-hi.png")
+                    from modules.common import render_pdf
+                    rendered = render_pdf(pdf_path, str(base_dir), dpi=400, start_page=page_num, end_page=page_num)
+                    if rendered:
+                        hi_path = rendered[0]
+                    result_hi = reader.readtext(str(hi_path), detail=0, paragraph=False)
+                    hi_text = "\n".join(result_hi)
+                    if hi_text.strip():
+                        easy_text = hi_text
+                        is_empty = False
+                        result["easyocr_retry"] = {"path": str(hi_path), "lines": len(result_hi), "chars": len(hi_text)}
+                        result["easyocr"] = easy_text  # promote retry text to primary output
+                except Exception as retry_ex:
+                    state and state.log(
+                        "easyocr_retry_error",
                         scope="page",
                         image=os.path.basename(image_path),
                         lang=attempt_lang,
+                        error=str(retry_ex),
                     )
-                    _easyocr_readers.pop((attempt_lang.lower(), True, easyocr_gpu), None)
-                    easy_text = ""
-                    continue
-                break
-            except Exception as ex:
-                easy_error = str(ex)
-                by_engine.setdefault("easyocr_errors", []).append({"lang": attempt_lang, "error": easy_error})
-                easyocr_state and easyocr_state.log(
-                    "easyocr_attempt_error",
+            if is_empty:
+                # Treat empty result as failure and try next language
+                state and state.log(
+                    "easyocr_empty",
                     scope="page",
                     image=os.path.basename(image_path),
                     lang=attempt_lang,
-                    error=easy_error,
                 )
-                easyocr_state and easyocr_state.log_first_error(
-                    lang=attempt_lang,
-                    error=easy_error,
-                    image=os.path.basename(image_path),
-                )
-                # Clear cached reader to allow clean retry on next language
-                _easyocr_readers.pop((attempt_lang.lower(), True), None)
-        if not easy_text and easy_error:
-            by_engine["easyocr_error"] = easy_error
+                _easyocr_readers.pop((attempt_lang.lower(), True, gpu), None)
+                easy_text = ""
+                continue
+            break
+        except Exception as ex:
+            easy_error = str(ex)
+            result.setdefault("easyocr_errors", []).append({"lang": attempt_lang, "error": easy_error})
+            state and state.log(
+                "easyocr_attempt_error",
+                scope="page",
+                image=os.path.basename(image_path),
+                lang=attempt_lang,
+                error=easy_error,
+            )
+            state and state.log_first_error(
+                lang=attempt_lang,
+                error=easy_error,
+                image=os.path.basename(image_path),
+            )
+            # Clear cached reader to allow clean retry on next language
+            _easyocr_readers.pop((attempt_lang.lower(), True), None)
 
-    candidates = []
-    if tess_text:
-        candidates.append((len(tess_text), "tesseract", tess_text))
-    if easy_text:
-        candidates.append((len(easy_text), "easyocr", easy_text))
+    if not easy_text and easy_error:
+        result["easyocr_error"] = easy_error
 
-    candidates.sort(reverse=True)
-    merged = ""
-    source = "ensemble"
-    if candidates:
-        merged = candidates[0][2]
-        source = candidates[0][1]
-        for _, name, text in candidates[1:]:
-            if text.strip() and text.strip() not in merged:
-                merged = merged.rstrip() + "\n" + text.strip()
-    if not merged and allow_fallback:
-        merged = run_ocr(image_path, lang="eng" if lang == "en" else lang, psm=psm, oem=oem)
-        by_engine["tesseract-fallback"] = merged
-        source = "tesseract-fallback"
-    return merged, by_engine, source
+    return result
 
 
 def normalize_numeric_token(token: str) -> str:
@@ -2279,7 +2293,7 @@ def detect_column_splits(image, min_lines: int = 30, min_spread: float = 0.25):
 
 
 def main():
-    parser = argparse.ArgumentParser(description="Multi-engine OCR ensemble (BetterOCR) → PageLines IR")
+    parser = argparse.ArgumentParser(description="Multi-engine OCR ensemble (tesseract, easyocr, apple, pdftext) → PageLines IR")
     parser.add_argument("--pdf", required=True)
     parser.add_argument("--outdir", required=True, help="Base output directory")
     parser.add_argument("--start", type=int, default=1)
@@ -2287,8 +2301,8 @@ def main():
     parser.add_argument("--dpi", type=int, default=300)
     parser.add_argument("--lang", default="en")
     parser.add_argument("--engines", nargs="+", default=["tesseract", "easyocr"],
-                        help="Engines to enable within BetterOCR (plus optional 'apple' for macOS Vision)")
-    parser.add_argument("--use-llm", action="store_true", help="Enable BetterOCR LLM reconciliation")
+                        help="OCR engines to use: tesseract, easyocr, apple (macOS Vision), pdftext (embedded PDF text)")
+    parser.add_argument("--use-llm", action="store_true", help="Enable LLM-based OCR reconciliation")
     parser.add_argument("--llm-model", dest="llm_model", default="gpt-4.1-mini")
     parser.add_argument("--llm_model", dest="llm_model", default="gpt-4.1-mini")
     parser.add_argument("--escalation-threshold", dest="escalation_threshold", type=float, default=0.15)
@@ -2297,7 +2311,7 @@ def main():
                         help="Persist per-engine raw text under ocr_engines/ for debugging")
     parser.add_argument("--write_engine_dumps", dest="write_engine_dumps", action="store_true", help=argparse.SUPPRESS)
     parser.add_argument("--disable-fallback", action="store_true",
-                        help="Fail hard if BetterOCR is unavailable instead of running tesseract only")
+                        help="Fail hard if multi-engine OCR is unavailable instead of running tesseract only")
     parser.add_argument("--disable_fallback", dest="disable_fallback", action="store_true", help=argparse.SUPPRESS)
     parser.add_argument("--psm", type=int, default=4, help="Tesseract PSM (fallback only)")
     parser.add_argument("--oem", type=int, default=3, help="Tesseract OEM (fallback only)")
@@ -2422,7 +2436,7 @@ def main():
                       "confidence": spread_decision["confidence"]})
 
     logger.log("extract", "running", current=0, total=total,
-               message="Running BetterOCR ensemble", artifact=os.path.join(ocr_dir, "pagelines_index.json"),
+               message="Running multi-engine OCR ensemble", artifact=os.path.join(ocr_dir, "pagelines_index.json"),
                module_id="extract_ocr_ensemble_v1", schema_version="pagelines_v1")
 
     for idx, img_path in enumerate(image_paths, start=args.start):
@@ -2531,6 +2545,14 @@ def main():
                     if apple_errors_path:
                         append_jsonl(apple_errors_path, {"stage": "run", "page": idx, "error": err_str})
 
+            # Extract PDF embedded text (peer engine alongside apple vision)
+            pdf_text = ""
+            if "pdftext" in args.engines:
+                try:
+                    pdf_text = extract_pdf_text(args.pdf, idx)
+                except Exception:
+                    pass  # Silently fail if PDF text extraction fails
+
             if not col_spans:
                 col_spans = detect_column_splits(img_obj)
             col_spans = verify_columns_with_projection(img_obj, col_spans, apple_lines_meta=apple_lines_meta)
@@ -2540,25 +2562,55 @@ def main():
             part_source = "betterocr"
 
             if len(col_spans) == 1:
-                text, part_by_engine, part_source = call_betterocr(
-                    img_path_part,
-                    args.engines,
-                    args.lang,
-                    use_llm=args.use_llm,
-                    llm_model=args.llm_model,
-                    allow_fallback=allow_fallback,
-                    psm=args.psm,
-                    oem=args.oem,
-                    easyocr_state=easyocr_state,
-                    easyocr_langs=easyocr_langs,
-                    easyocr_gpu=easyocr_gpu,
-                    easyocr_retry_hi_res=True,
-                    pdf_path=args.pdf,
-                    page_num=idx,
-                )
+                # Run independent OCR engines (direct orchestration, not bundled)
+                part_by_engine = {}
+
+                # Run Tesseract
+                tess_result = run_tesseract(img_path_part, args.lang, args.psm, args.oem)
+                part_by_engine.update(tess_result)
+
+                # Run EasyOCR if requested
+                if "easyocr" in args.engines:
+                    easy_result = run_easyocr(
+                        img_path_part,
+                        langs=easyocr_langs,
+                        gpu=easyocr_gpu,
+                        retry_hi_res=True,
+                        pdf_path=args.pdf,
+                        page_num=idx,
+                        state=easyocr_state
+                    )
+                    part_by_engine.update(easy_result)
+
+                # Build merged text from OCR outputs (for compatibility)
+                candidates = []
+                if part_by_engine.get("tesseract"):
+                    candidates.append((len(part_by_engine["tesseract"]), "tesseract", part_by_engine["tesseract"]))
+                if part_by_engine.get("easyocr"):
+                    candidates.append((len(part_by_engine["easyocr"]), "easyocr", part_by_engine["easyocr"]))
+
+                candidates.sort(reverse=True)
+                text = ""
+                part_source = "betterocr"
+                if candidates:
+                    text = candidates[0][2]
+                    part_source = candidates[0][1]
+                    for _, name, cand_text in candidates[1:]:
+                        if cand_text.strip() and cand_text.strip() not in text:
+                            text = text.rstrip() + "\n" + cand_text.strip()
+
+                if not text and allow_fallback:
+                    text = run_ocr(img_path_part, lang="eng" if args.lang == "en" else args.lang, psm=args.psm, oem=args.oem)
+                    part_by_engine["tesseract-fallback"] = text
+                    part_source = "tesseract-fallback"
+
                 fused_before_post = split_lines(text)
                 if apple_error:
                     part_by_engine["apple_error"] = apple_error
+
+                # Add pdftext to part_by_engine (extracted at page level as peer)
+                if pdf_text and pdf_text.strip():
+                    part_by_engine["pdftext"] = pdf_text
 
                 # Collect all engine outputs for outlier detection
                 engine_outputs_for_outlier = {}
@@ -2568,6 +2620,8 @@ def main():
                     engine_outputs_for_outlier["easyocr"] = part_by_engine["easyocr"]
                 if use_apple and apple_text:
                     engine_outputs_for_outlier["apple"] = apple_text
+                if isinstance(part_by_engine.get("pdftext"), str) and part_by_engine["pdftext"].strip():
+                    engine_outputs_for_outlier["pdftext"] = part_by_engine["pdftext"]
 
                 # Detect outlier engines (useful when 3+ engines available)
                 outlier_info = detect_outlier_engine(engine_outputs_for_outlier)
@@ -2606,6 +2660,10 @@ def main():
                         part_by_engine["apple_doc_similarity"] = round(ratio, 3)
                 elif use_apple and apple_text:
                     part_by_engine["apple_excluded_as_outlier"] = True
+                if "pdftext" in engine_outputs_for_outlier and "pdftext" not in outlier_info.get("outliers", []):
+                    engine_lines_by_engine["pdftext"] = split_lines(part_by_engine.get("pdftext", ""))
+                elif "pdftext" in engine_outputs_for_outlier:
+                    part_by_engine["pdftext_excluded_as_outlier"] = True
                 if "easyocr" in outlier_info.get("outliers", []):
                     part_by_engine["easyocr_excluded_as_outlier"] = True
                 if "tesseract" in outlier_info.get("outliers", []):
@@ -2640,6 +2698,9 @@ def main():
                 col_fusions = []
                 if apple_text:
                     part_by_engine["apple"] = apple_text  # persist Apple OCR text even in multi-column path
+                # Add pdftext (already extracted at page level as peer)
+                if pdf_text and pdf_text.strip():
+                    part_by_engine["pdftext"] = pdf_text  # persist PDF text even in multi-column path
                 for col_idx, span in enumerate(col_spans):
                     x0 = int(span[0] * w)
                     x1 = int(span[1] * w)
@@ -2648,20 +2709,24 @@ def main():
                     crop_path = os.path.join(ocr_dir, f"col-{idx:03d}-{part_idx}-{col_idx:02d}-{x0}-{x1}.png")
                     crop.save(crop_path)
 
-                    _text_col, by_engine_col, _src_col = call_betterocr(
-                        crop_path,
-                        args.engines,
-                        args.lang,
-                        use_llm=args.use_llm,
-                        llm_model=args.llm_model,
-                        allow_fallback=allow_fallback,
-                        psm=args.psm,
-                        oem=args.oem,
-                        easyocr_state=easyocr_state,
-                        easyocr_langs=easyocr_langs,
-                        easyocr_gpu=easyocr_gpu,
-                        easyocr_retry_hi_res=False,
-                    )
+                    # Run independent OCR engines on column crop
+                    by_engine_col = {}
+
+                    # Run Tesseract on column
+                    tess_col = run_tesseract(crop_path, args.lang, args.psm, args.oem)
+                    by_engine_col.update(tess_col)
+
+                    # Run EasyOCR on column if requested
+                    if "easyocr" in args.engines:
+                        easy_col = run_easyocr(
+                            crop_path,
+                            langs=easyocr_langs,
+                            gpu=easyocr_gpu,
+                            retry_hi_res=False,
+                            state=easyocr_state
+                        )
+                        by_engine_col.update(easy_col)
+
                     part_by_engine.setdefault("tesseract_cols", []).append(by_engine_col.get("tesseract", ""))
                     if isinstance(by_engine_col.get("easyocr"), str):
                         part_by_engine.setdefault("easyocr_cols", []).append(by_engine_col.get("easyocr", ""))
@@ -2684,7 +2749,8 @@ def main():
                                     alt_lines_col.append(ln["text"])
                                     alt_conf_col.append(ln.get("confidence", 0.0))
 
-                    # Column-level multi-engine vote (tesseract + easyocr + apple).
+                    # Column-level multi-engine vote (tesseract + easyocr + apple + pdftext).
+                    # Note: pdftext is page-level, not column-filtered, but can still help in voting.
                     engine_outputs_col = {}
                     if isinstance(by_engine_col.get("tesseract"), str) and by_engine_col["tesseract"].strip():
                         engine_outputs_col["tesseract"] = by_engine_col["tesseract"]
@@ -2692,6 +2758,8 @@ def main():
                         engine_outputs_col["easyocr"] = by_engine_col["easyocr"]
                     if alt_lines_col:
                         engine_outputs_col["apple"] = "\n".join(alt_lines_col)
+                    if isinstance(part_by_engine.get("pdftext"), str) and part_by_engine["pdftext"].strip():
+                        engine_outputs_col["pdftext"] = part_by_engine["pdftext"]
                     outliers_col = detect_outlier_engine(engine_outputs_col).get("outliers", [])
 
                     engine_lines_col = {}
@@ -2704,6 +2772,8 @@ def main():
                         engine_lines_col["easyocr"] = split_lines(by_engine_col.get("easyocr", ""))
                     if "apple" in engine_outputs_col and "apple" not in outliers_col:
                         engine_lines_col["apple"] = alt_lines_col
+                    if "pdftext" in engine_outputs_col and "pdftext" not in outliers_col:
+                        engine_lines_col["pdftext"] = split_lines(part_by_engine.get("pdftext", ""))
                         if alt_conf_col:
                             confs_col["apple"] = alt_conf_col
 
@@ -2742,22 +2812,53 @@ def main():
                     part_by_engine["column_rejection_reason"] = rejection_reason
                     logger.log("extract", "running",
                               message=f"Page {page_key}: Column split rejected ({rejection_reason}), re-OCRing as single column")
-                    # Re-OCR as single column
-                    text_single, part_by_engine_single, part_source_single = call_betterocr(
-                        img_path_part,
-                        args.engines,
-                        args.lang,
-                        use_llm=args.use_llm,
-                        llm_model=args.llm_model,
-                        allow_fallback=allow_fallback,
-                        psm=args.psm,
-                        oem=args.oem,
-                        easyocr_state=easyocr_state,
-                        easyocr_langs=easyocr_langs,
-                        easyocr_gpu=easyocr_gpu,
-                        easyocr_retry_hi_res=True,
-                    )
+                    # Re-OCR as single column (direct engine orchestration)
+                    part_by_engine_single = {}
+
+                    # Run Tesseract
+                    tess_single = run_tesseract(img_path_part, args.lang, args.psm, args.oem)
+                    part_by_engine_single.update(tess_single)
+
+                    # Run EasyOCR if requested
+                    if "easyocr" in args.engines:
+                        easy_single = run_easyocr(
+                            img_path_part,
+                            langs=easyocr_langs,
+                            gpu=easyocr_gpu,
+                            retry_hi_res=True,
+                            pdf_path=args.pdf,
+                            page_num=idx,
+                            state=easyocr_state
+                        )
+                        part_by_engine_single.update(easy_single)
+
+                    # Build merged text from OCR outputs
+                    candidates_single = []
+                    if part_by_engine_single.get("tesseract"):
+                        candidates_single.append((len(part_by_engine_single["tesseract"]), "tesseract", part_by_engine_single["tesseract"]))
+                    if part_by_engine_single.get("easyocr"):
+                        candidates_single.append((len(part_by_engine_single["easyocr"]), "easyocr", part_by_engine_single["easyocr"]))
+
+                    candidates_single.sort(reverse=True)
+                    text_single = ""
+                    part_source_single = "betterocr"
+                    if candidates_single:
+                        text_single = candidates_single[0][2]
+                        part_source_single = candidates_single[0][1]
+                        for _, name, cand_text in candidates_single[1:]:
+                            if cand_text.strip() and cand_text.strip() not in text_single:
+                                text_single = text_single.rstrip() + "\n" + cand_text.strip()
+
+                    if not text_single and allow_fallback:
+                        text_single = run_ocr(img_path_part, lang="eng" if args.lang == "en" else args.lang, psm=args.psm, oem=args.oem)
+                        part_by_engine_single["tesseract-fallback"] = text_single
+                        part_source_single = "tesseract-fallback"
+
                     fused_before_post = split_lines(text_single)
+
+                    # Add pdftext to part_by_engine_single (extracted at page level as peer)
+                    if pdf_text and pdf_text.strip():
+                        part_by_engine_single["pdftext"] = pdf_text
 
                     engine_outputs_for_outlier = {}
                     if isinstance(part_by_engine_single.get("tesseract"), str) and part_by_engine_single["tesseract"].strip():
@@ -2766,6 +2867,8 @@ def main():
                         engine_outputs_for_outlier["easyocr"] = part_by_engine_single["easyocr"]
                     if use_apple and apple_text:
                         engine_outputs_for_outlier["apple"] = apple_text
+                    if isinstance(part_by_engine_single.get("pdftext"), str) and part_by_engine_single["pdftext"].strip():
+                        engine_outputs_for_outlier["pdftext"] = part_by_engine_single["pdftext"]
 
                     outlier_info = detect_outlier_engine(engine_outputs_for_outlier)
                     if outlier_info.get("outliers"):
@@ -2786,6 +2889,8 @@ def main():
                             alt_confidences = [ln.get("confidence", 0.0) for ln in apple_lines_meta]
                             part_by_engine_single["apple_confidences"] = alt_confidences
                             confidences_by_engine["apple"] = alt_confidences
+                    if "pdftext" in engine_outputs_for_outlier and "pdftext" not in outlier_info.get("outliers", []):
+                        engine_lines_by_engine["pdftext"] = split_lines(part_by_engine_single.get("pdftext", ""))
 
                     if engine_lines_by_engine:
                         fused, fusion_srcs, dist = align_and_vote(
@@ -3143,6 +3248,7 @@ def main():
     inline_escalated_count = 0
     easyocr_pages_with_text = 0
     apple_pages_with_text = 0
+    pdftext_pages_with_text = 0
     output_count = len(page_rows)
     pdf_page_count = total
     for row in page_rows:
@@ -3157,6 +3263,8 @@ def main():
             easyocr_pages_with_text += 1
         if isinstance(engines_raw.get("apple"), str) and engines_raw["apple"].strip():
             apple_pages_with_text += 1
+        if isinstance(engines_raw.get("pdftext"), str) and engines_raw["pdftext"].strip():
+            pdftext_pages_with_text += 1
     save_json(os.path.join(ocr_dir, "ocr_source_histogram.json"),
               {
                   "histogram": hist,
@@ -3169,6 +3277,8 @@ def main():
                       "easyocr_text_pct": (easyocr_pages_with_text / output_count) if output_count else 0.0,
                       "apple_pages_with_text": apple_pages_with_text,
                       "apple_text_pct": (apple_pages_with_text / output_count) if output_count else 0.0,
+                      "pdftext_pages_with_text": pdftext_pages_with_text,
+                      "pdftext_text_pct": (pdftext_pages_with_text / output_count) if output_count else 0.0,
                   },
               })
 
