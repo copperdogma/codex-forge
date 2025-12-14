@@ -1,0 +1,23 @@
+module_id: extract_choices_v1
+stage: extract
+entrypoint: modules/extract/extract_choices_v1/main.py
+input_schema: enriched_portion_v1
+output_schema: enriched_portion_v1
+default_params:
+  use_ai_validation: false
+  max_ai_calls: 50
+  confidence_threshold: 0.8
+param_schema:
+  properties:
+    use_ai_validation:
+      type: boolean
+      description: "Use AI to validate ambiguous pattern matches (default: false)"
+    max_ai_calls:
+      type: integer
+      description: "Maximum AI validation calls if enabled (default: 50)"
+    confidence_threshold:
+      type: number
+      description: "Minimum confidence for pattern match (default: 0.8)"
+  required: []
+notes: "Code-first choice extraction using pattern matching for 'turn to X' references. Scans section text for deterministic choice patterns, extracts targets, and optionally validates ambiguous cases with AI. Critical for 100% game engine accuracy - uses strong signals (patterns) rather than pure AI extraction."
+

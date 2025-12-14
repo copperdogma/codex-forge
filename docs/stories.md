@@ -14,8 +14,8 @@ Guiding priorities: **perfect OCR first**, then move downstream stage‑by‑sta
 5. DONE: **059 — Section Detection & Boundary Improvements**
    Use improved OCR + content‑types to harden boundary/header detection for FF.
 
-6. **068 — Fighting Fantasy Boundary Detection Improvements** *(Active)*
-   Improve boundary detection from 87% to >95% coverage (remaining work from 035).
+6. DONE: **068 — Fighting Fantasy Boundary Detection Improvements**  
+   Improved boundary detection from 87% to 100% coverage (398/398 sections). Perfect accuracy achieved.
 7. **035 — Fighting Fantasy Pipeline Optimization** *(Paused)*
    Drive missing/no‑text/no‑choice to targets using the new OCR + boundary stack. (Resume after 068.)
 8. **050 — FF Ending Detection Verification**  
@@ -97,7 +97,8 @@ This index tracks stories in `/docs/stories/` for the codex-forge pipeline.
 || 065 | Stabilize EasyOCR as a Third OCR Engine | High | Done | /docs/stories/story-065-easyocr-reliability.md |
 || 066 | FF Pipeline Accel + Accuracy Guardrails | High | To Do | /docs/stories/story-066-ff-pipeline-accel-accuracy.md |
 || 067 | GPU Acceleration for OCR Pipeline | High | Done | /docs/stories/story-067-gpu-acceleration-ocr.md |
-|| 068 | Fighting Fantasy Boundary Detection Improvements | High | Active | /docs/stories/story-068-ff-boundary-detection.md |
+|| 068 | Fighting Fantasy Boundary Detection Improvements | High | Done | /docs/stories/story-068-ff-boundary-detection.md |
+|| 069 | PDF Text Extraction Engine for OCR Ensemble | Medium | In Progress | /docs/stories/story-069-pdf-text-extraction-engine.md |
 || 099 | Remove dev-only backcompat disclaimer | Low | To Do | /docs/stories/story-099-remove-dev-backcompat-note.md |
 
 ## Notes

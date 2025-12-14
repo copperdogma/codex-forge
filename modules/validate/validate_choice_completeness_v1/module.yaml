@@ -1,0 +1,25 @@
+module_id: validate_choice_completeness_v1
+stage: validate
+entrypoint: modules/validate/validate_choice_completeness_v1/main.py
+input_schema: null
+output_schema: validation_report_v1
+default_params:
+  max_discrepancy: 1
+  expected_range: "1-400"
+param_schema:
+  properties:
+    gamebook:
+      type: string
+      description: "Path to gamebook.json"
+    out:
+      type: string
+      description: "Output path for validation report"
+    max_discrepancy:
+      type: integer
+      description: "Maximum allowed difference between text references and extracted choices before flagging (default: 1)"
+    expected_range:
+      type: string
+      description: "Expected section range in format 'min-max' (default: '1-400')"
+  required: [gamebook, out]
+notes: "Validates choice completeness by comparing 'turn to X' references in section text with extracted choices. Flags sections where text mentions more choices than were extracted (indicating potential missing choices). Critical for 100% game engine accuracy - missing choices break gameplay."
+

@@ -1,0 +1,44 @@
+module_id: detect_boundaries_code_first_v1
+stage: portionize
+entrypoint: modules/portionize/detect_boundaries_code_first_v1/main.py
+input_schema: element_core_v1
+output_schema: section_boundary_v1
+default_params:
+  min_section: 1
+  max_section: 400
+  target_coverage: 0.95
+  max_escalation_pages: 30
+  model: gpt-4.1-mini
+  escalation_model: gpt-5
+param_schema:
+  properties:
+    min_section:
+      type: integer
+      description: "Minimum expected section number (default: 1)"
+    max_section:
+      type: integer
+      description: "Maximum expected section number (default: 400)"
+    target_coverage:
+      type: number
+      description: "Target coverage ratio (default: 0.95 = 380/400 sections)"
+    max_escalation_pages:
+      type: integer
+      description: "Maximum pages to escalate with AI (default: 30)"
+    model:
+      type: string
+      description: "LLM model for gap analysis (default: gpt-4.1-mini)"
+    escalation_model:
+      type: string
+      description: "Stronger LLM for targeted escalation (default: gpt-5)"
+  required: []
+notes: |
+  Code-first boundary detection following AGENTS.md escalation pattern:
+  
+  1. Baseline (code, free): Filter elements_core_typed for Section-header with valid numbers
+  2. Validate: Check coverage vs target
+  3. Escalate: Only re-scan pages with missing sections (targeted AI)
+  4. Fail explicitly: If coverage not met after escalation cap
+  
+  Replaces classify_headers_v1 (60 AI batches) with deterministic filter + 0-30 targeted AI calls.
+  Expected: 350+ boundaries from code filter, 95%+ after escalation.
+

@@ -49,24 +49,33 @@ stages:
       preferred_engines: ["easyocr", "tesseract", "apple"]
       min_chars: 40
 
+  - id: inject_missing_headers
+    stage: adapter
+    module: inject_missing_headers_v1
+    needs: [pick_best_engine]
+    out: pages_raw_injected.jsonl
+    params:
+      min_value: 1
+      max_value: 400
+
   - id: escalate_vision
     stage: adapter
     module: ocr_escalate_gpt4v_v1
-    needs: [pick_best_engine]
+    needs: [inject_missing_headers]
     inputs:
-      inputs: pick_best_engine
+      inputs: inject_missing_headers
     params:
       threshold: 0.4
       max_pages: 40
-      budget_pages: 15  # Increased to catch edge cases like 007L (was 12)
+      budget_pages: 30  # Increased to 30 for 100% coverage requirement
       model: gpt-4.1
 
   - id: merge_ocr
     stage: adapter
     module: merge_ocr_escalated_v1
-    needs: [pick_best_engine, escalate_vision]
+    needs: [inject_missing_headers, escalate_vision]
     inputs:
-      inputs: [pick_best_engine, escalate_vision]
+      inputs: [inject_missing_headers, escalate_vision]
     out: adapter_out.jsonl
 
   - id: reconstruct_text
@@ -312,3 +321,16 @@ stages:
       out: placeholder       # populated dynamically by driver to artifact path
       expected_range_start: 1
       expected_range_end: 400
+
+  - id: validate_choice_completeness
+    stage: validate
+    module: validate_choice_completeness_v1
+    needs: [build_ff_engine]
+    out: choice_completeness_report.json
+    inputs:
+      gamebook: build_ff_engine
+    params:
+      gamebook: placeholder
+      out: placeholder
+      max_discrepancy: 1
+      expected_range: "1-400"

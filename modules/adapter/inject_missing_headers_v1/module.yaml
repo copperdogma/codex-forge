@@ -1,0 +1,19 @@
+module_id: inject_missing_headers_v1
+stage: adapter
+entrypoint: modules/adapter/inject_missing_headers_v1/main.py
+input_schema: pagelines_v1
+output_schema: pagelines_v1
+default_params:
+  min_value: 1
+  max_value: 400
+param_schema:
+  properties:
+    min_value:
+      type: integer
+      description: "Minimum section number to inject (default: 1)"
+    max_value:
+      type: integer
+      description: "Maximum section number to inject (default: 400)"
+  required: []
+notes: "Post-processor that injects missing numeric headers (section numbers) from raw OCR engines into picked output. Scans raw engine outputs (tesseract, easyocr, apple) for numeric-only lines (1-3 digits) and adds them to picked JSON if missing. Critical for 100% section coverage in game engine outputs."
+

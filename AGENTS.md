@@ -6,12 +6,13 @@ This repo processes scanned (or text) books into structured JSON, using modular 
 - **Do NOT run `git commit`, `git push`, or modify remotes unless the user explicitly requests it.**
 - System is in active development (not production); do not preserve backward compatibility or keep legacy shims unless explicitly requested.
 - AI-first: the AI owns implementation and self-verification; humans provide requirements and oversight. Do not report work "done" without testing/validation against requirements and story acceptance criteria.
+- **100% Accuracy Requirement:** The final artifacts (gamebook.json) are used directly in a game engine. **If even ONE section number or choice is wrong, the game is broken.** Partial success on section coverage or choice extraction is a complete failure. Pipeline must either achieve 100% accuracy or fail explicitly with clear diagnostics. There is no "good enough" - it's perfect or broken.
 - Keep artifacts append-only; never rewrite user data or outputs in `output/` or `input/`.
 - Artifacts are write-only: never silently patch; any manual or auto patch must be emitted as a new artifact with traceable intent.
 - Default to `workspace-write` safe commands; avoid destructive ops (`rm -rf`, `git reset --hard`).
 - Preserve non-ASCII only if the file already contains it.
 - Do not patch artifacts by hand to hide upstream issues; fix the root cause and regenerate. Any temporary manual edit must be explicit, traceable, and leave original inputs untouched.
-- Never “fix” run artifacts by hand: all data corrections must be structural/code changes and reproducible; regenerate outputs instead of manual edits.
+- Never "fix" run artifacts by hand: all data corrections must be structural/code changes and reproducible; regenerate outputs instead of manual edits.
 - Every stage must resolve before the next runs: either reach its coverage/quality target or finish a defined escalate→validate loop and clearly mark unresolved items. Do not pass partially-resolved outputs downstream without explicit failure markers.
 - **Always inspect outputs, not just logs:** After every meaningful run, manually open the produced artifacts (JSON/JSONL) and check they match expectations (counts, sample content). A green or non-crashing run is not evidence of correctness; if outputs are empty/suspicious, stop and fix before proceeding.
 
@@ -94,6 +95,31 @@ This is a **data pipeline** project. Every stage produces **artifacts** (JSONL f
 - Each pass must use the latest artifacts (hash/mtime guard to prevent stale inputs).
 - Escalation outputs become the new gold standard for that scope (do not fall back to earlier OCR/LLM results).
 - Surface evidence automatically: emit per-item presence/reason flags and small debug bundles for failures.
+- **Escalation caps are mandatory:** Every escalation loop must have a maximum iteration/retry/budget cap to prevent infinite loops. Examples: `max_retries`, `budget_pages`, `max_repairs`, `max_candidates`. If a stage hits its cap without reaching 100% accuracy, it must fail explicitly (not silently pass partial results).
+
+### Choice Extraction & Validation (Critical for Game Engine)
+
+**Code-first extraction approach:**
+- **Primary signal:** Pattern matching for "turn to X", "go to Y" references in text
+- **AI role:** Validation only, not primary extraction (saves costs, more reliable)
+- **Module:** `extract_choices_v1` - dedicated, single-purpose choice extractor
+
+**Two-layer validation:**
+
+1. **Per-section validation:** Text patterns vs. extracted choices
+   - Scan text for all "turn to X" references
+   - Compare with extracted choices
+   - Flag discrepancies (text mentions choice not extracted)
+   - **Limitation:** Can't detect missing choices not mentioned in text patterns
+
+2. **Graph validation (Orphan Detection):**
+   - Every section (except section 1) must be referenced by at least one choice
+   - Build graph: sections → incoming choice references
+   - Find orphans: sections with zero incoming references
+   - **Signal:** Orphans prove we're missing pointers somewhere (even if we don't know where)
+   - **Limitation:** Tells us THAT we have errors, not WHERE the missing choices are
+
+**Escalation:** If validation fails, flagged sections must be re-extracted with choice-focused prompts and stronger models. Maximum retry cap required (e.g., `max_choice_repairs: 50`).
 
 ### Prompt Design: Trust AI Intelligence, Don't Over-Engineer
 
