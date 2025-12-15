@@ -28,6 +28,9 @@ The **Intermediate Representation (IR)** stays unchanged throughout; portionizat
 - `docs/requirements.md`: system requirements
 - `snapshot.md`: current status and pipeline notes
 - `output/`: git-ignored; run artifacts live at `output/runs/<run_id>/`
+  - **Artifact organization**: Each module has its own folder `{ordinal:02d}_{module_id}/` (e.g., `01_extract_ocr_ensemble_v1/`) containing its artifacts
+  - **Final outputs**: `gamebook.json` stays in root for easy access
+  - **Pipeline metadata**: `pipeline_state.json`, `pipeline_events.jsonl`, `snapshots/` in root
 - `settings.example.yaml`: sample config
 - Driver snapshots: each run writes `snapshots/` (recipe.yaml, plan.json, registry.json, optional settings/pricing/instrumentation configs) and records paths in `output/run_manifest.jsonl` for reproducibility.
 - Shared helpers for module entrypoints live in `modules/common/` (utils, OCR helpers).

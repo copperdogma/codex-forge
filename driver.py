@@ -477,7 +477,8 @@ def update_state(state_path: str, progress_path: str, stage_name: str, status: s
 
 def build_command(entrypoint: str, params: Dict[str, Any], stage_conf: Dict[str, Any], run_dir: str,
                   recipe_input: Dict[str, Any], state_path: str, progress_path: str, run_id: str,
-                  artifact_inputs: Dict[str, str], artifact_index: Dict[str, Any] = None) -> (str, list, str):
+                  artifact_inputs: Dict[str, str], artifact_index: Dict[str, Any] = None,
+                  stage_ordinal_map: Dict[str, int] = None) -> (str, list, str):
     """
     Returns (artifact_path, cmd_list, cwd)
     """
@@ -488,7 +489,31 @@ def build_command(entrypoint: str, params: Dict[str, Any], stage_conf: Dict[str,
         module_name = script[:-3].replace("/", ".")
 
     artifact_name = stage_conf["artifact_name"]
-    artifact_path = os.path.join(run_dir, artifact_name)
+    stage_id = stage_conf.get("id")
+    module_id = stage_conf.get("module")
+    stage_type = stage_conf.get("stage")
+    
+    # Determine if this is a final output (gamebook.json stays in root)
+    is_final_output = (stage_type == "build" and artifact_name == "gamebook.json")
+    
+    if is_final_output:
+        # Final outputs stay in root
+        artifact_path = os.path.join(run_dir, artifact_name)
+    else:
+        # Intermediate artifacts go into module-specific folders (directly in run_dir)
+        if stage_ordinal_map and stage_id and stage_id in stage_ordinal_map:
+            ordinal = stage_ordinal_map[stage_id]
+            if module_id:
+                module_folder = f"{ordinal:02d}_{module_id}"
+                module_dir = os.path.join(run_dir, module_folder)
+                ensure_dir(module_dir)
+                artifact_path = os.path.join(module_dir, artifact_name)
+            else:
+                # Fallback: if no module_id, use root (shouldn't happen in practice)
+                artifact_path = os.path.join(run_dir, artifact_name)
+        else:
+            # Fallback: if no ordinal map provided, use root (backward compat during transition)
+            artifact_path = os.path.join(run_dir, artifact_name)
 
     if module_name:
         cmd = [sys.executable, "-m", module_name]
@@ -503,27 +528,89 @@ def build_command(entrypoint: str, params: Dict[str, Any], stage_conf: Dict[str,
             cmd += ["--pdf", recipe_input["pdf"]]; flags_added.add("--pdf")
         if "images" in recipe_input:
             cmd += ["--images", recipe_input["images"]]; flags_added.add("--images")
-        cmd += ["--outdir", run_dir]; flags_added.add("--outdir")
-    elif stage_conf["stage"] == "clean":
-        portions_path = artifact_inputs.get("portions")
-        if portions_path:
-            cmd += ["--portions", portions_path]
-            flags_added.add("--portions")
-        else:
+        # Use module folder as outdir for intake/extract stages so artifacts go to module folder
+        # (module subdirectories like images/, ocr_ensemble/ will be created in module folder)
+        module_outdir = os.path.dirname(artifact_path) if not is_final_output else run_dir
+        cmd += ["--outdir", module_outdir]; flags_added.add("--outdir")
+        # Handle inputs for intake stages (e.g., pagelines_to_elements_v1)
+        # Note: params.inputs might contain stage IDs - don't pass those, use resolved artifact_inputs instead
+        if artifact_inputs:
             pages_path = artifact_inputs.get("pages") or artifact_inputs.get("input")
-            if not pages_path:
-                raise SystemExit(f"Stage {stage_conf['id']} missing pages/portions input")
-            cmd += ["--pages", pages_path]
-            flags_added.add("--pages")
-        cmd += ["--out", artifact_path]
-        flags_added.add("--out")
+            if pages_path:
+                cmd += ["--pages", pages_path]
+                flags_added.add("--pages")
+                # Remove "inputs" from params if present to avoid passing stage ID strings
+                if "inputs" in (params or {}):
+                    params = dict(params or {})
+                    del params["inputs"]
+    elif stage_conf["stage"] == "clean":
+        # Handle repair_candidates_v1 specially - needs pagelines param
+        if stage_conf["module"] == "repair_candidates_v1":
+            portions_path = artifact_inputs.get("portions") or artifact_inputs.get("input")
+            if not portions_path:
+                raise SystemExit(f"Stage {stage_conf['id']} missing portions input")
+            cmd += ["--portions", portions_path, "--out", artifact_path]
+            # Handle pagelines param - resolve to absolute path in merge_ocr module folder
+            if "pagelines" in params:
+                pagelines_param = params["pagelines"]
+                if not os.path.isabs(str(pagelines_param)):
+                    # Try to find merge_ocr artifact from artifact_index first
+                    resolved_pagelines = None
+                    if artifact_index:
+                        merge_ocr_artifact = artifact_index.get("merge_ocr", {}).get("path")
+                        if merge_ocr_artifact:
+                            merge_ocr_dir = os.path.dirname(merge_ocr_artifact)
+                            resolved_pagelines = os.path.join(merge_ocr_dir, str(pagelines_param))
+                    # Fallback: try to find it in run_dir by looking for merge_ocr module folder
+                    if not resolved_pagelines and os.path.exists(run_dir):
+                        try:
+                            # Look for numbered folder starting with merge_ocr
+                            for item in os.listdir(run_dir):
+                                if item.startswith("06_") and "merge_ocr" in item.lower():
+                                    resolved_pagelines = os.path.join(run_dir, item, str(pagelines_param))
+                                    break
+                        except (OSError, PermissionError):
+                            pass
+                    # Final fallback: construct expected path based on known structure (always works)
+                    if not resolved_pagelines:
+                        # Default: assume merge_ocr is stage 06 (from recipe order)
+                        resolved_pagelines = os.path.join(run_dir, "06_merge_ocr_escalated_v1", str(pagelines_param))
+                    # Always pass absolute path
+                    cmd += ["--pagelines", resolved_pagelines]
+                    flags_added.add("--pagelines")
+                    # Remove from params so it's not added again
+                    del params["pagelines"]
+            flags_added.update({"--portions", "--out"})
+        else:
+            # Standard clean stage handling
+            portions_path = artifact_inputs.get("portions")
+            if portions_path:
+                cmd += ["--portions", portions_path]
+                flags_added.add("--portions")
+            else:
+                pages_path = artifact_inputs.get("pages") or artifact_inputs.get("input")
+                if not pages_path:
+                    raise SystemExit(f"Stage {stage_conf['id']} missing pages/portions input")
+                cmd += ["--pages", pages_path]
+                flags_added.add("--pages")
+            cmd += ["--out", artifact_path]
+            flags_added.add("--out")
     elif stage_conf["stage"] == "portionize":
         # Handle various input names (pages, elements, input)
-        pages_path = artifact_inputs.get("pages") or artifact_inputs.get("elements") or artifact_inputs.get("input")
+        pages_path = artifact_inputs.get("pages") or artifact_inputs.get("input")
+        elements_path = artifact_inputs.get("elements")
+        if not pages_path and not elements_path:
+            # Fallback: try elements as input
+            pages_path = artifact_inputs.get("elements") or artifact_inputs.get("input")
         if not pages_path:
             raise SystemExit(f"Stage {stage_conf['id']} missing pages/elements input")
         # Use --pages for compatibility (coarse_segment_v1 accepts both --pages and --elements)
         cmd += ["--pages", pages_path]
+        flags_added.add("--pages")
+        # Also pass --elements if specified (structure_globally_v1 needs both)
+        if elements_path:
+            cmd += ["--elements", elements_path]
+            flags_added.add("--elements")
         if "boundaries" in artifact_inputs:
             cmd += ["--boundaries", artifact_inputs["boundaries"]]
         # Handle coarse-segments for fine_segment_frontmatter_v1
@@ -532,7 +619,7 @@ def build_command(entrypoint: str, params: Dict[str, Any], stage_conf: Dict[str,
             if coarse_segments_path:
                 cmd += ["--coarse-segments", os.path.abspath(coarse_segments_path)]
         cmd += ["--out", artifact_path]
-        flags_added.update({"--pages", "--out"})
+        flags_added.add("--out")
     elif stage_conf["stage"] == "adapter":
         if stage_conf["module"] == "load_stub_v1":
             stub_path = params.get("stub")
@@ -549,6 +636,122 @@ def build_command(entrypoint: str, params: Dict[str, Any], stage_conf: Dict[str,
             cmd += ["--inputs", *inputs_list, "--out", artifact_path]
             if artifact_inputs.get("elements_core"):
                 cmd += ["--elements-core", artifact_inputs["elements_core"]]
+            flags_added.update({"--inputs", "--out"})
+        elif stage_conf["module"] == "pick_best_engine_v1":
+            # pick_best_engine_v1 needs the ocr_ensemble index from the intake stage
+            input_paths = artifact_inputs.get("inputs")
+            if not input_paths:
+                raise SystemExit(f"Stage {stage_conf['id']} missing adapter inputs")
+            cmd += ["--inputs", *input_paths, "--out", artifact_path]
+            # Find intake stage's ocr_ensemble folder for the index
+            if artifact_index:
+                intake_artifact = artifact_index.get("intake", {}).get("path")
+                if intake_artifact:
+                    intake_dir = os.path.dirname(intake_artifact)
+                    index_path = os.path.join(intake_dir, "ocr_ensemble", "pagelines_index.json")
+                    if os.path.exists(index_path) or "--index" not in flags_added:
+                        cmd += ["--index", index_path]
+                        flags_added.add("--index")
+                # Pass outdir explicitly to avoid run_dir inference issues
+                module_outdir = os.path.dirname(artifact_path)
+                cmd += ["--outdir", os.path.join(module_outdir, "ocr_ensemble_picked")]
+                flags_added.add("--outdir")
+            flags_added.update({"--inputs", "--out"})
+        elif stage_conf["module"] == "inject_missing_headers_v1":
+            # inject_missing_headers_v1 needs the ocr_ensemble_picked index from pick_best_engine stage
+            input_paths = artifact_inputs.get("inputs")
+            if not input_paths:
+                raise SystemExit(f"Stage {stage_conf['id']} missing adapter inputs")
+            cmd += ["--inputs", *input_paths, "--out", artifact_path]
+            # Find pick_best_engine stage's ocr_ensemble_picked folder for the index
+            if artifact_index:
+                pick_best_artifact = artifact_index.get("pick_best_engine", {}).get("path")
+                if pick_best_artifact:
+                    pick_best_dir = os.path.dirname(pick_best_artifact)
+                    index_path = os.path.join(pick_best_dir, "ocr_ensemble_picked", "pagelines_index.json")
+                    if os.path.exists(index_path) or "--index" not in flags_added:
+                        cmd += ["--index", index_path]
+                        flags_added.add("--index")
+                    # Pass outdir to avoid run_dir inference issues
+                    module_outdir = os.path.dirname(artifact_path)
+                    cmd += ["--outdir", os.path.join(module_outdir, "ocr_ensemble_injected")]
+                    flags_added.add("--outdir")
+            flags_added.update({"--inputs", "--out"})
+        elif stage_conf["module"] == "ocr_escalate_gpt4v_v1":
+            # ocr_escalate_gpt4v_v1 needs paths from intake stage (index, quality, images_dir)
+            input_paths = artifact_inputs.get("inputs")
+            if not input_paths:
+                raise SystemExit(f"Stage {stage_conf['id']} missing adapter inputs")
+            cmd += ["--inputs", *input_paths, "--out", artifact_path]
+            # Find intake stage's ocr_ensemble folder for index, quality, and images
+            if artifact_index:
+                intake_artifact = artifact_index.get("intake", {}).get("path")
+                if intake_artifact:
+                    intake_dir = os.path.dirname(intake_artifact)
+                    index_path = os.path.join(intake_dir, "ocr_ensemble", "pagelines_index.json")
+                    quality_path = os.path.join(intake_dir, "ocr_ensemble", "ocr_quality_report.json")
+                    images_dir = os.path.join(intake_dir, "images")
+                    if os.path.exists(index_path) or "--index" not in flags_added:
+                        cmd += ["--index", index_path]
+                        flags_added.add("--index")
+                    if os.path.exists(quality_path) or "--quality" not in flags_added:
+                        cmd += ["--quality", quality_path]
+                        flags_added.add("--quality")
+                    if os.path.exists(images_dir) or "--images-dir" not in flags_added:
+                        cmd += ["--images-dir", images_dir]
+                        flags_added.add("--images-dir")
+                # Pass outdir explicitly to avoid inference issues
+                module_outdir = os.path.dirname(artifact_path)
+                cmd += ["--outdir", os.path.join(module_outdir, "ocr_ensemble_gpt4v")]
+                flags_added.add("--outdir")
+            flags_added.update({"--inputs", "--out"})
+        elif stage_conf["module"] == "merge_ocr_escalated_v1":
+            # merge_ocr_escalated_v1 needs outdir to be the module folder so pagelines_final.jsonl is created there
+            input_paths = artifact_inputs.get("inputs")
+            if not input_paths or len(input_paths) < 2:
+                raise SystemExit(f"Stage {stage_conf['id']} missing adapter inputs")
+            cmd += ["--inputs", *input_paths, "--out", artifact_path]
+            # Pass outdir explicitly to module folder
+            module_outdir = os.path.dirname(artifact_path)
+            cmd += ["--outdir", module_outdir]
+            flags_added.add("--outdir")
+            # Pass explicit index paths to avoid run_dir inference issues
+            if artifact_index:
+                pick_best_artifact = artifact_index.get("pick_best_engine", {}).get("path")
+                escalate_artifact = artifact_index.get("escalate_vision", {}).get("path")
+                if pick_best_artifact:
+                    pick_best_dir = os.path.dirname(pick_best_artifact)
+                    original_index = os.path.join(pick_best_dir, "ocr_ensemble_picked", "pagelines_index.json")
+                    if os.path.exists(original_index) or "--original-index" not in flags_added:
+                        cmd += ["--original-index", original_index]
+                        flags_added.add("--original-index")
+                if escalate_artifact:
+                    escalate_dir = os.path.dirname(escalate_artifact)
+                    escalated_index = os.path.join(escalate_dir, "ocr_ensemble_gpt4v", "pagelines_index.json")
+                    if os.path.exists(escalated_index) or "--escalated-index" not in flags_added:
+                        cmd += ["--escalated-index", escalated_index]
+                        flags_added.add("--escalated-index")
+            flags_added.update({"--inputs", "--out"})
+        elif stage_conf["module"] == "reconstruct_text_v1":
+            input_paths = artifact_inputs.get("inputs")
+            if not input_paths:
+                raise SystemExit(f"Stage {stage_conf['id']} missing adapter inputs")
+            cmd += ["--inputs", *input_paths, "--out", artifact_path]
+            # Handle params.input (pagelines_final.jsonl) - resolve to absolute path in merge_ocr module folder
+            if "input" in params:
+                input_param = params["input"]
+                # If it's a relative path like "pagelines_final.jsonl", resolve it in merge_ocr module folder
+                if not os.path.isabs(str(input_param)) and artifact_index:
+                    merge_ocr_artifact = artifact_index.get("merge_ocr", {}).get("path")
+                    if merge_ocr_artifact:
+                        merge_ocr_dir = os.path.dirname(merge_ocr_artifact)
+                        resolved_input = os.path.join(merge_ocr_dir, str(input_param))
+                        if os.path.exists(resolved_input):
+                            # Pass --input with absolute path explicitly (before params processing)
+                            cmd += ["--input", resolved_input]
+                            flags_added.add("--input")
+                            # Remove from params dict so it's not added again (modify in place)
+                            del params["input"]
             flags_added.update({"--inputs", "--out"})
         else:
             input_paths = artifact_inputs.get("inputs")
@@ -631,7 +834,6 @@ def build_command(entrypoint: str, params: Dict[str, Any], stage_conf: Dict[str,
         flags_added.add("--out")
 
     # Additional params from recipe (skip flags already added)
-    # Additional params from recipe (skip flags already added)
     seen_flags = set(flags_added)
     for key, val in (params or {}).items():
         flag = f"--{key}"
@@ -686,9 +888,50 @@ def stamp_artifact(artifact_path: str, schema_name: str, module_id: str, run_id:
     print(f"[stamp] {artifact_path} stamped with {schema_name} ({len(rows)} rows)")
 
 
-def mock_clean(run_dir: str, outputs: Dict[str, str], module_id: str, run_id: str):
-    pages_path = os.path.join(run_dir, outputs["extract"])
-    out_path = os.path.join(run_dir, outputs["clean"])
+def copy_key_artifact_to_root(artifact_path: str, run_dir: str, artifact_name: str, artifact_index: Dict[str, Any] = None) -> None:
+    """
+    Copy key intermediate artifacts to root for visibility.
+    Key artifacts are major pipeline milestones that should be visible in root.
+    """
+    # List of key artifact names that should be copied to root
+    key_artifacts = {
+        "pagelines_final.jsonl",
+        "pagelines_reconstructed.jsonl", 
+        "elements_core.jsonl",
+    }
+    
+    # Don't copy if already in root
+    if os.path.dirname(artifact_path) == run_dir:
+        return
+    
+    # Check if this is a primary artifact that should be copied
+    if artifact_name in key_artifacts:
+        root_path = os.path.join(run_dir, artifact_name)
+        try:
+            if os.path.exists(artifact_path):
+                shutil.copy2(artifact_path, root_path)
+                print(f"[copy-to-root] {artifact_name} -> {root_path}")
+        except Exception as e:
+            # Non-fatal - log but don't fail
+            print(f"[copy-to-root-warning] Failed to copy {artifact_name} to root: {e}")
+        return
+    
+    # Special handling: Check for secondary files that should be copied
+    # pagelines_final.jsonl is created as a secondary file in merge_ocr module folder
+    if artifact_name == "adapter_out.jsonl" and "merge_ocr" in artifact_path:
+        # Check if pagelines_final.jsonl exists in the same module folder
+        module_dir = os.path.dirname(artifact_path)
+        pagelines_final_path = os.path.join(module_dir, "pagelines_final.jsonl")
+        if os.path.exists(pagelines_final_path):
+            root_path = os.path.join(run_dir, "pagelines_final.jsonl")
+            try:
+                shutil.copy2(pagelines_final_path, root_path)
+                print(f"[copy-to-root] pagelines_final.jsonl -> {root_path}")
+            except Exception as e:
+                print(f"[copy-to-root-warning] Failed to copy pagelines_final.jsonl to root: {e}")
+
+
+def mock_clean(pages_path: str, out_path: str, module_id: str, run_id: str):
     rows = []
     for row in read_jsonl(pages_path):
         row_out = {
@@ -708,9 +951,7 @@ def mock_clean(run_dir: str, outputs: Dict[str, str], module_id: str, run_id: st
     return out_path
 
 
-def mock_portionize(run_dir: str, outputs: Dict[str, str], module_id: str, run_id: str):
-    pages_path = os.path.join(run_dir, outputs["clean"])
-    out_path = os.path.join(run_dir, outputs["portionize"])
+def mock_portionize(pages_path: str, out_path: str, module_id: str, run_id: str):
     rows = []
     for row in read_jsonl(pages_path):
         page = row["page"]
@@ -737,9 +978,7 @@ def mock_portionize(run_dir: str, outputs: Dict[str, str], module_id: str, run_i
     return out_path
 
 
-def mock_consensus(run_dir: str, outputs: Dict[str, str], module_id: str, run_id: str):
-    in_path = os.path.join(run_dir, outputs["portionize"])
-    out_path = os.path.join(run_dir, outputs["consensus"])
+def mock_consensus(in_path: str, out_path: str, module_id: str, run_id: str):
     rows = []
     for row in read_jsonl(in_path):
         locked = {
@@ -1039,6 +1278,11 @@ def main():
         save_json(instr_json_path, instrumentation_run)
         _render_instrumentation_md(instrumentation_run, instr_md_path)
 
+    # Build stage ordinal map for module folder naming (01_, 02_, etc.)
+    stage_ordinal_map: Dict[str, int] = {}
+    for idx, sid in enumerate(plan["topo"], start=1):
+        stage_ordinal_map[sid] = idx
+
     start_gate_reached = not bool(args.start_from)
     stage_timings = {}
     for stage_id in plan["topo"]:
@@ -1108,7 +1352,16 @@ def main():
         # Input resolution
         artifact_inputs: Dict[str, str] = {}
         needs = node.get("needs", [])
-        if stage in {"clean", "portionize", "consensus", "dedupe", "normalize", "resolve", "build", "enrich", "adapter", "export", "app", "validate"}:
+        if stage in ("intake", "extract"):
+            # Handle intake stages that may have inputs (like pagelines_to_elements_v1)
+            inputs_map = node.get("inputs", {}) or {}
+            if inputs_map:
+                for key, origin in inputs_map.items():
+                    if origin in artifact_index:
+                        artifact_inputs[key] = artifact_index[origin]["path"]
+                    else:
+                        artifact_inputs[key] = origin
+        elif stage in {"clean", "portionize", "consensus", "dedupe", "normalize", "resolve", "build", "enrich", "adapter", "export", "app", "validate"}:
             # adapters fall-through below
             if stage == "build":
                 inputs_map = node.get("inputs", {}) or {}
@@ -1233,7 +1486,7 @@ def main():
 
         artifact_path, cmd, cwd = build_command(entrypoint, node["params"], node, run_dir,
                                                 recipe.get("input", {}), state_path, progress_path, run_id,
-                                                artifact_inputs, artifact_index)
+                                                artifact_inputs, artifact_index, stage_ordinal_map)
 
         if args.dry_run:
             print(f"[dry-run] {stage_id} -> {' '.join(cmd)}")
@@ -1250,11 +1503,8 @@ def main():
             upstream = needs[0] if needs else None
             if not upstream:
                 raise SystemExit(f"Mock clean needs upstream extract output")
-            mock_outputs = {
-                "extract": os.path.relpath(artifact_index[upstream]["path"], run_dir),
-                "clean": node["artifact_name"],
-            }
-            artifact_path = mock_clean(run_dir, mock_outputs, module_id, run_id)
+            pages_path = artifact_index[upstream]["path"]
+            artifact_path = mock_clean(pages_path, artifact_path, module_id, run_id)
             update_state(state_path, progress_path, stage_id, "done", artifact_path, run_id, module_id, out_schema,
                          stage_description=stage_description)
             artifact_index[stage_id] = {"path": artifact_path, "schema": out_schema}
@@ -1265,11 +1515,8 @@ def main():
             upstream = needs[0] if needs else None
             if not upstream:
                 raise SystemExit(f"Mock portionize needs upstream clean output")
-            mock_outputs = {
-                "clean": os.path.relpath(artifact_index[upstream]["path"], run_dir),
-                "portionize": node["artifact_name"],
-            }
-            artifact_path = mock_portionize(run_dir, mock_outputs, module_id, run_id)
+            pages_path = artifact_index[upstream]["path"]
+            artifact_path = mock_portionize(pages_path, artifact_path, module_id, run_id)
             update_state(state_path, progress_path, stage_id, "done", artifact_path, run_id, module_id, out_schema,
                          stage_description=stage_description)
             artifact_index[stage_id] = {"path": artifact_path, "schema": out_schema}
@@ -1280,11 +1527,8 @@ def main():
             upstream = needs[0] if needs else None
             if not upstream:
                 raise SystemExit(f"Mock consensus needs upstream portionize output")
-            mock_outputs = {
-                "portionize": os.path.relpath(artifact_index[upstream]["path"], run_dir),
-                "consensus": node["artifact_name"],
-            }
-            artifact_path = mock_consensus(run_dir, mock_outputs, module_id, run_id)
+            in_path = artifact_index[upstream]["path"]
+            artifact_path = mock_consensus(in_path, artifact_path, module_id, run_id)
             update_state(state_path, progress_path, stage_id, "done", artifact_path, run_id, module_id, out_schema,
                          stage_description=stage_description)
             artifact_index[stage_id] = {"path": artifact_path, "schema": out_schema}
@@ -1347,6 +1591,11 @@ def main():
         update_state(state_path, progress_path, stage_id, "done", artifact_path, run_id, module_id, out_schema,
                      stage_description=stage_description)
         artifact_index[stage_id] = {"path": artifact_path, "schema": out_schema}
+        
+        # Copy key intermediate artifacts to root for visibility
+        artifact_name = node.get("artifact_name", os.path.basename(artifact_path))
+        copy_key_artifact_to_root(artifact_path, run_dir, artifact_name, artifact_index)
+        
         record_stage_instrumentation(stage_id, module_id, "done", artifact_path, out_schema,
                                      stage_started_at, stage_wall_start, stage_cpu_start)
         stage_timings[stage_id] = time.perf_counter() - stage_wall_start

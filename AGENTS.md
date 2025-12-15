@@ -49,7 +49,8 @@ Before writing any significant code or starting implementation:
 This is a **data pipeline** project. Every stage produces **artifacts** (JSONL files, JSON files). After implementing any change:
 
 1. **MANDATORY: Inspect actual output artifacts**
-   - Open the files: `output/runs/<run_id>/<artifact>.jsonl`
+   - Open the files: `output/runs/<run_id>/{ordinal:02d}_{module_id}/<artifact>.jsonl` for intermediate artifacts (e.g., `01_extract_ocr_ensemble_v1/pages_raw.jsonl`)
+   - Final outputs (e.g., `gamebook.json`) are in root: `output/runs/<run_id>/gamebook.json`
    - Read sample entries (5-10 minimum)
    - Verify the **data content**, not just that the file exists
 
@@ -70,8 +71,8 @@ This is a **data pipeline** project. Every stage produces **artifacts** (JSONL f
 - ❌ "Added section classification. Tests pass." (What does the actual classification data look like?)
 
 **Examples of what TO do:**
-- ✅ "Implemented text extraction. Inspected `window_hypotheses.jsonl` - all 293 portions now have populated `raw_text` (e.g., portion 9 has 1295 chars: 'There is also a LUCK box...'). Text quality looks good."
-- ✅ "Fixed duplicate detection. Checked `portions_enriched.jsonl` - previously had 3 portions claiming section_id='1', now only 1 (page 16, correct text). Issue resolved."
+- ✅ "Implemented text extraction. Inspected `03_portionize_llm_v1/window_hypotheses.jsonl` - all 293 portions now have populated `raw_text` (e.g., portion 9 has 1295 chars: 'There is also a LUCK box...'). Text quality looks good."
+- ✅ "Fixed duplicate detection. Checked `06_enrich_v1/portions_enriched.jsonl` - previously had 3 portions claiming section_id='1', now only 1 (page 16, correct text). Issue resolved."
 - ✅ "Added classification. Sampled 10 sections from `gamebook.json` - 8 correctly classified as 'gameplay', 2 as 'rules'. Spot-checked section 42: classified as 'gameplay', text contains combat ('SKILL 7 STAMINA 9'), correct."
 
 **The pattern:**
@@ -172,6 +173,9 @@ Before portionization, automatically flag pages for high-fidelity re-OCR if eith
 
 ## Key Files/Paths
 - Artifacts live under `output/runs/<run_id>/`.
+- **Artifact organization**: Each module's artifacts are in `{ordinal:02d}_{module_id}/` folders directly in run_dir (e.g., `01_extract_ocr_ensemble_v1/pages_raw.jsonl`)
+- **Final outputs**: `gamebook.json` stays in root for easy access
+- **Pipeline metadata**: `pipeline_state.json`, `pipeline_events.jsonl`, `snapshots/` remain in root
 - Driver now auto-generates a fresh `run_id`/output directory per run; reuse is opt-in via `--allow-run-id-reuse` (or explicit `--run-id`).
 - Input PDF: `input/06 deathtrap dungeon.pdf`; images: `input/images/`.
 - Story work logs: bottom of each `docs/stories/story-XXX-*.md`.
@@ -229,7 +233,7 @@ Before portionization, automatically flag pages for high-fidelity re-OCR if eith
   - Include a short “Impact” block with:
     - **Story-scope impact:** What acceptance criteria/tasks this unblocked or de-risked.
     - **Pipeline-scope impact:** What got measurably better downstream (coverage, fewer escalations, fewer bad tokens, cleaner boundaries, etc.).
-    - **Evidence:** 1–3 concrete artifact paths checked (e.g., `output/runs/<run_id>/pagelines_final.jsonl`, `.../elements_core_typed.jsonl`) and what you saw there.
+    - **Evidence:** 1–3 concrete artifact paths checked (e.g., `output/runs/<run_id>/07_reconstruct_text_v1/pagelines_reconstructed.jsonl`, `.../09_elements_content_type_v1/elements_core_typed.jsonl`) and what you saw there.
     - **Next:** The next highest-leverage step and what would falsify success.
   - If results are mixed, say so explicitly and name the remaining failure mode(s).
 - **Debugging discipline:** when diagnosing issues, inspect the actual data/artifacts at each stage before changing code. Prefer evidence-driven plans (e.g., grep/rg on outputs, view JSONL samples) over guess-and-edit loops. Document what was observed and the decision that follows.

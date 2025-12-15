@@ -104,18 +104,31 @@ def main():
     
     logger = ProgressLogger()
     
-    # Infer run directory from inputs
+    # Infer run directory from inputs or output path
+    import re
     run_dir = None
     if args.inputs:
         for inp in args.inputs:
-            p = Path(inp)
-            if p.exists() and 'runs/' in str(p):
-                # Extract run directory
-                parts = str(p).split('runs/')
-                if len(parts) >= 2:
-                    run_id_part = parts[1].split('/')[0]
-                    run_dir = Path(parts[0]) / 'runs' / run_id_part
-                    break
+            p = Path(inp).resolve()
+            if p.exists():
+                # If input is in a module folder (XX_module_name/), go up to run_dir
+                # Otherwise, if it contains 'runs/', extract run_dir from that
+                if 'runs/' in str(p):
+                    parts = str(p).split('runs/')
+                    if len(parts) >= 2:
+                        run_id_part = parts[1].split('/')[0]
+                        run_dir = Path(parts[0]) / 'runs' / run_id_part
+                        break
+                else:
+                    # Try to find run_dir by going up from module folder
+                    # Path like /tmp/cf-verify/03_module/file.jsonl -> /tmp/cf-verify
+                    current = p.parent
+                    # Go up until we find a directory that doesn't match module folder pattern
+                    while current != current.parent:
+                        if not re.match(r'^\d{2}_', current.name):
+                            run_dir = current
+                            break
+                        current = current.parent
     
     if not run_dir or not run_dir.exists():
         raise ValueError(f"Could not infer run directory from inputs: {args.inputs}")
@@ -139,10 +152,23 @@ def main():
         output_dir = run_dir / 'ocr_ensemble_injected' / 'pages'
     ensure_dir(output_dir)
     
-    # OCR engines directory
-    ocr_engines_dir = run_dir / 'ocr_ensemble' / 'ocr_engines'
-    if not ocr_engines_dir.exists():
-        raise FileNotFoundError(f"OCR engines directory not found: {ocr_engines_dir}")
+    # OCR engines directory - look in intake module folder (01_extract_ocr_ensemble_v1/)
+    # Note: This directory is optional (only exists if write_engine_dumps was enabled)
+    ocr_engines_dir = None
+    # Try to find intake module folder by looking for numbered module folders starting with 01_
+    if run_dir and run_dir.exists():
+        for item in run_dir.iterdir():
+            if item.is_dir() and item.name.startswith('01_') and 'extract' in item.name.lower():
+                candidate = item / 'ocr_ensemble' / 'ocr_engines'
+                if candidate.exists():
+                    ocr_engines_dir = candidate
+                    break
+    # Fallback to old location
+    if not ocr_engines_dir:
+        fallback_dir = run_dir / 'ocr_ensemble' / 'ocr_engines'
+        if fallback_dir.exists():
+            ocr_engines_dir = fallback_dir
+    # If directory doesn't exist, that's OK - module will skip pages without engine subdirectories
     
     output_index = {}
     total_injected = 0
@@ -169,14 +195,22 @@ def main():
         
         page_num = page_data.get('page', 0)
         
-        # Scan raw engines for numeric headers
-        page_dir = ocr_engines_dir / page_key
-        if not page_dir.exists():
-            # Page may not have engine subdirectory
+        # Scan raw engines for numeric headers (only if ocr_engines_dir exists)
+        if ocr_engines_dir:
+            page_dir = ocr_engines_dir / page_key
+            if page_dir.exists():
+                raw_numbers = scan_raw_engines_for_numbers(page_dir, args.min_value, args.max_value)
+            else:
+                # Page may not have engine subdirectory - skip header injection for this page
+                raw_numbers = set()
+        else:
+            # ocr_engines_dir doesn't exist (write_engine_dumps was disabled) - skip header injection
+            raw_numbers = set()
+        
+        if not raw_numbers:
+            # No raw engine data available - pass through unchanged
             output_index[page_key] = str(page_path)
             continue
-        
-        raw_numbers = scan_raw_engines_for_numbers(page_dir, args.min_value, args.max_value)
         picked_numbers = get_numbers_in_picked(page_data.get('lines', []))
         
         missing_numbers = raw_numbers - picked_numbers

@@ -2784,9 +2784,10 @@ def main():
                             confidences_by_engine=confs_col or None,
                         )
                     else:
-                        fused_col = split_lines(_text_col or "")
-                        fusion_srcs_col = ["ensemble"] * len(fused_col)
-                        dist_col = [0.0] * len(fused_col)
+                        # Fallback when no engine outputs: use empty text
+                        fused_col = []
+                        fusion_srcs_col = []
+                        dist_col = []
                     col_fusions.append((fused_col, fusion_srcs_col, dist_col))
                     col_lines.extend(fused_col)
                 text = "\n".join(col_lines)

@@ -185,7 +185,11 @@ class DriverPlanTests(unittest.TestCase):
             run_id="test-run",
             artifact_inputs=artifact_inputs,
         )
-        self.assertEqual(artifact_path, os.path.join(run_dir, stage_conf["artifact_name"]))
+        # Artifact path should be in module folder: modules/{ordinal:02d}_{module_id}/{artifact_name}
+        # Since we don't pass stage_ordinal_map in this test, it will fall back to root for backward compat
+        # But in practice with ordinal map, it would be: modules/01_m_portion/window_hypotheses.jsonl
+        expected_fallback = os.path.join(run_dir, stage_conf["artifact_name"])
+        self.assertEqual(artifact_path, expected_fallback)
         self.assertIn("--state-file", cmd)
         self.assertIn("/tmp/run/pipeline_state.json", cmd)
         self.assertIn("--progress-file", cmd)
