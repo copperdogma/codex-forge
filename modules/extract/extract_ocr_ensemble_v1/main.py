@@ -36,6 +36,7 @@ from modules.common.image_utils import (
     sample_spread_decision, split_spread_at_gutter, deskew_image,
     detect_spread_and_split,  # kept for backward compatibility
     reduce_noise, should_apply_noise_reduction,
+    find_gutter_position,  # for per-page gutter detection
 )
 
 
@@ -2337,6 +2338,9 @@ def main():
                         type=int, default=5, help="Max pages to escalate inline per run (default: 5)")
     parser.add_argument("--inline_escalation_budget", dest="inline_escalation_budget",
                         type=int, default=5, help=argparse.SUPPRESS)
+    parser.add_argument("--split-only", dest="split_only", action="store_true",
+                        help="Only perform page splitting, skip OCR (for testing split algorithm)")
+    parser.add_argument("--split_only", dest="split_only", action="store_true", help=argparse.SUPPRESS)
     args = parser.parse_args()
 
     # normalize engines if driver passed a single string like "['tesseract','easyocr','apple']"
@@ -2453,7 +2457,52 @@ def main():
         # The projection variance method fails on spreads due to mixed content
         images_to_ocr = [(pil_img, img_path, None)]  # (image, path, side)
         if is_spread_book:
-            left_img, right_img = split_spread_at_gutter(pil_img, gutter_position)
+            # Per-page gutter detection (Story-070: fixes bad splits on pages with varying gutter positions)
+            # Conservative center-biased approach: default to center, only shift if strong seam signal
+            page_gutter_frac, page_brightness, page_contrast, page_continuity = find_gutter_position(pil_img)
+
+            # Conservative thresholds for using detected gutter (bias toward center split)
+            min_contrast_threshold = 0.15  # Strong contrast signal (was 0.05)
+            min_continuity_threshold = 0.7  # Full-height binding (not illustration border)
+            min_center_distance = 0.02  # At least 2% away from center (otherwise just use center)
+
+            # Check if detected gutter is far enough from center
+            distance_from_center = abs(page_gutter_frac - 0.5)
+
+            # Use detected gutter only if:
+            # 1. Strong contrast signal (clear seam)
+            # 2. High vertical continuity (full-height binding, not illustration border)
+            # 3. Far enough from center (otherwise center is fine)
+            has_strong_seam = (page_contrast >= min_contrast_threshold and
+                              page_continuity >= min_continuity_threshold and
+                              distance_from_center >= min_center_distance)
+
+            if has_strong_seam:
+                actual_gutter = page_gutter_frac
+                gutter_source = "per-page (strong seam)"
+            elif distance_from_center < min_center_distance:
+                # Detected gutter is very close to center anyway, just use center
+                actual_gutter = 0.5
+                gutter_source = "center (detected too close)"
+            else:
+                # Weak signal - default to center (safer than using weak detection)
+                actual_gutter = 0.5
+                gutter_source = "center (weak signal)"
+
+            # Log per-page gutter diagnostics
+            w_px = pil_img.size[0]
+            center_px = int(0.5 * w_px)
+            detected_px = int(page_gutter_frac * w_px)
+            actual_px = int(actual_gutter * w_px)
+            diff_from_center_px = actual_px - center_px
+
+            logger.log("extract", "running",
+                      message=f"Page {idx} gutter: {actual_gutter:.3f} ({gutter_source}), "
+                              f"detected: {page_gutter_frac:.3f} (contrast: {page_contrast:.3f}, "
+                              f"continuity: {page_continuity:.3f}), "
+                              f"center diff: {diff_from_center_px:+d}px")
+
+            left_img, right_img = split_spread_at_gutter(pil_img, actual_gutter)
             # Deskew each half independently (works better than deskewing the spread)
             left_img = deskew_image(left_img)
             right_img = deskew_image(right_img)
@@ -2477,6 +2526,11 @@ def main():
                 logger.log("extract", "running", message=f"Applying noise reduction to page {idx}")
                 pil_img = reduce_noise(pil_img, method="morphological", kernel_size=2)
 
+        # Early exit if --split-only: just do splitting, skip OCR
+        if args.split_only:
+            logger.log("extract", "running", message=f"Page {idx} split complete (--split-only mode, skipping OCR)")
+            continue
+
         for part_idx, (img_obj, img_path_part, side) in enumerate(images_to_ocr):
             # Virtual page key: use L/R suffix for spreads, plain number for single pages
             if side:
@@ -2499,7 +2553,13 @@ def main():
                         args.pdf, idx, args.lang, fast=False, helper_path=apple_helper, columns=True
                     )
                     # Use Apple's column detection if available (works for both spread and non-spread pages)
-                    col_spans = infer_columns_from_lines(apple_lines_meta) or apple_cols or []
+                    # BUT: Skip column detection for already-split pages (L/R) - they're single-column
+                    if side:
+                        # For split pages (L/R), force single column - they're already split from spreads
+                        col_spans = [(0.0, 1.0)]
+                    else:
+                        # Only detect columns on full pages (not split halves)
+                        col_spans = infer_columns_from_lines(apple_lines_meta) or apple_cols or []
                     # For spread books, filter Apple lines into the current half (L/R) so we vote on comparable text.
                     if side and apple_lines_meta:
                         filtered_meta = []
@@ -2553,8 +2613,14 @@ def main():
                 except Exception:
                     pass  # Silently fail if PDF text extraction fails
 
-            if not col_spans:
+            # Skip column detection for already-split pages (L/R) - they're already single-column
+            # Column detection should only run on full spreads, not on split halves
+            if not col_spans and not side:
+                # Only detect columns if this is a full page (not a split L/R half)
                 col_spans = detect_column_splits(img_obj)
+            elif side:
+                # For split pages (L/R), force single column - they're already split from spreads
+                col_spans = [(0.0, 1.0)]
             col_spans = verify_columns_with_projection(img_obj, col_spans, apple_lines_meta=apple_lines_meta)
 
             part_lines = []
@@ -3242,6 +3308,21 @@ def main():
     save_jsonl(jsonl_path, page_rows)
     save_jsonl(jsonl_root_path, page_rows)
 
+    # Escalation summary for downstream validation/forensics
+    total_quality_rows = len(quality_report)
+    total_needing_escalation = sum(1 for q in quality_report if q.get("needs_escalation"))
+    total_inline_escalated = sum(1 for q in quality_report if q.get("inline_escalated"))
+    total_escalation_outstanding = max(0, total_needing_escalation - total_inline_escalated)
+    escalation_summary = {
+        "total_quality_rows": total_quality_rows,
+        "total_needing_escalation": total_needing_escalation,
+        "total_inline_escalated": total_inline_escalated,
+        "total_escalation_outstanding": total_escalation_outstanding,
+        "escalation_budget_pages": escalation_budget_pages,
+        "escalated_pages_within_budget": escalated_pages,
+    }
+    save_json(os.path.join(ocr_dir, "ocr_escalation_summary.json"), escalation_summary)
+
     # simple source histogram for quick sanity
     # Note: for spread books, one PDF page can emit multiple outputs (L/R); `page_rows` is the true output count.
     hist = {}
@@ -3282,6 +3363,14 @@ def main():
                       "pdftext_text_pct": (pdftext_pages_with_text / output_count) if output_count else 0.0,
                   },
               })
+
+    if args.split_only:
+        logger.log("extract", "done", current=total, total=total,
+                   message="Split-only mode complete (OCR skipped)", artifact=None,
+                   module_id="extract_ocr_ensemble_v1", schema_version="pagelines_v1")
+        print(f"Split-only mode: Processed {total} pages, split images saved to {images_dir}")
+        print("OCR skipped per --split-only flag")
+        return
 
     logger.log("extract", "done", current=total, total=total,
                message="OCR ensemble complete", artifact=index_path,

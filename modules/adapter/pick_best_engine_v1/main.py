@@ -6,6 +6,7 @@ from typing import Any, Dict, List, Optional, Tuple
 
 from modules.common.text_quality import spell_garble_metrics
 from modules.common.utils import ensure_dir, save_json, append_jsonl, ProgressLogger
+from modules.adapter.reconstruct_text_v1.main import is_section_header
 
 
 def load_index(index_path: str) -> Dict[str, str]:
@@ -33,6 +34,54 @@ def _engine_text_from_page(page_data: Dict[str, Any], engine: str) -> str:
         return ""
     txt = engines.get(engine)
     return txt if isinstance(txt, str) else ""
+
+
+def build_chosen_lines(page_data: Dict[str, Any], engine: str) -> List[Dict[str, Any]]:
+    """
+    Build canonical pagelines for pagelines_final.jsonl after an engine has been chosen.
+
+    Critical invariant: preserve standalone numeric section headers even if they were
+    synthesized upstream or sourced from a different engine. These headers are often
+    not present in engines_raw text blobs, so throwing away page_data['lines'] will
+    silently drop section starts (e.g. '6', '7', '8' on a shared header like '6-8').
+    """
+    # Prefer curated lines from extract_ocr_ensemble_v1 when available.
+    original_lines = page_data.get("lines") or []
+
+    # Only treat as structured lines if they look like dicts with text fields.
+    has_structured = bool(
+        original_lines
+        and isinstance(original_lines, list)
+        and isinstance(original_lines[0], dict)
+        and "text" in original_lines[0]
+    )
+
+    chosen_lines: List[Dict[str, Any]] = []
+
+    if has_structured:
+        for ln in original_lines:
+            if not isinstance(ln, dict):
+                continue
+            txt = (ln.get("text") or "").strip()
+            src = (ln.get("source") or "").strip()
+
+            # Preserve all lines from the picked engine, plus any line that
+            # looks like a section header (standalone number or numeric glitch).
+            if src == engine or is_section_header(txt):
+                # Make a shallow copy so we don't mutate upstream artifacts.
+                ln_out = dict(ln)
+                if not ln_out.get("source"):
+                    ln_out["source"] = engine
+                chosen_lines.append(ln_out)
+
+        # If we managed to build a non-empty structured view, use it.
+        if chosen_lines:
+            return chosen_lines
+
+    # Fallback: no structured lines (or nothing matched); derive from engines_raw.
+    txt = _engine_text_from_page(page_data, engine)
+    lines = split_lines(txt)
+    return [{"text": ln, "source": engine} for ln in lines]
 
 
 def score_engine_lines(lines: List[str]) -> Dict[str, Any]:
@@ -157,9 +206,7 @@ def main():
             chosen_lines = page_data.get("lines") or []
             unchanged += 1
         else:
-            txt = _engine_text_from_page(page_data, engine)
-            lines = split_lines(txt)
-            chosen_lines = [{"text": ln, "source": engine} for ln in lines]
+            chosen_lines = build_chosen_lines(page_data, engine)
 
             # If chosen engine equals the existing canonical source and line count matches, call it unchanged.
             existing_src = None

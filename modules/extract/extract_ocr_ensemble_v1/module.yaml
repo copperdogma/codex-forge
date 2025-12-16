@@ -46,6 +46,8 @@ param_schema:
       type: boolean
     disable_fallback:
       type: boolean
+    split_only:
+      type: boolean
     psm:
       type: integer
       minimum: 0

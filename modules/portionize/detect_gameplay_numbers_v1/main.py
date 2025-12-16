@@ -414,13 +414,29 @@ def main():
                 continue  # keep first occurrence
 
             # Context validation: check if number is standalone (not embedded in sentence)
-            if not validate_context(elem, all_elements, page):
-                continue  # Reject embedded numbers
+            # BUT: If element is already classified as Section-header with high confidence,
+            # trust that classification over simple text flow analysis (which can fail when
+            # element boundaries are ambiguous due to text extraction issues)
+            content_type = elem.get("content_type")
+            content_type_confidence = elem.get("content_type_confidence", 0.0)
+            is_high_confidence_header = (
+                content_type == "Section-header" and content_type_confidence >= 0.8
+            )
+            
+            if not is_high_confidence_header:
+                # For non-Section-header or low-confidence elements, use strict validation
+                if not validate_context(elem, all_elements, page):
+                    continue  # Reject embedded numbers
+            # else: Skip strict validation for high-confidence Section-headers (trust the classification)
 
             # Base confidence and evidence
             is_centered = False
             confidence = 0.7
             evidence_parts = [f"numeric-or-OCR-glitch line page={page} text='{text[:40]}'"]
+            
+            # If we bypassed validation for high-confidence header, note it in evidence
+            if is_high_confidence_header:
+                evidence_parts.append("high-confidence-Section-header")
 
             # Centering check: if enabled and bbox data available, verify header is centered
             if args.use_centering and pagelines_data:

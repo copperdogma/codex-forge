@@ -94,13 +94,19 @@ def deskew_image(image: Image.Image, max_angle: float = 1.5) -> Image.Image:
 def find_gutter_position(image: Image.Image, center_pct: float = 0.15,
                          window: int = 25) -> Tuple[float, float, float]:
     """
-    Find the gutter (brightest vertical band) near center of image.
+    Find the gutter (book binding/crease) near center of image.
 
-    Returns (gutter_fraction, brightness_score, contrast_score).
+    Handles BOTH bright gutters (white paper gap) AND dark gutters (shadow/crease).
+    Uses vertical continuity to distinguish actual page binding (extends full height)
+    from illustration borders (only partial height).
+
+    Returns (gutter_fraction, brightness_score, contrast_score, continuity_score).
     - gutter_fraction: 0.0-1.0 position from left edge
     - brightness_score: average brightness at gutter (0-255)
-    - contrast_score: how much brighter the gutter is vs surroundings (0-1)
+    - contrast_score: how strong the gutter signal is vs surroundings (0-1)
       Higher contrast = more confident this is a real gutter
+    - continuity_score: fraction of image height with consistent signal (0-1)
+      Higher continuity = more likely to be full-height page binding vs illustration border
     """
     w, h = image.size
     gray = np.array(image.convert("L"))
@@ -114,30 +120,94 @@ def find_gutter_position(image: Image.Image, center_pct: float = 0.15,
     kernel = np.ones(window) / window
     smoothed = np.convolve(col_means, kernel, mode='same')
 
-    # Find brightest column in center region
-    search_region = smoothed[search_start:search_end]
-    if len(search_region) == 0:
-        return 0.5, 0.0, 0.0
-    best_idx = search_start + int(np.argmax(search_region))
-    gutter_brightness = float(smoothed[best_idx])
+    # Also compute gradient (edge strength) to find sharp transitions
+    gradient = np.abs(np.gradient(smoothed))
 
-    # Compute contrast: how much brighter is gutter vs content on sides?
-    # Look at regions 10-30% and 70-90% of width (avoiding edges and center)
+    # Find the side brightness (typical page content brightness)
     left_region = smoothed[int(0.10 * w):int(0.30 * w)]
     right_region = smoothed[int(0.70 * w):int(0.90 * w)]
 
     if len(left_region) > 0 and len(right_region) > 0:
-        # Use median to be robust to outliers
         side_brightness = (float(np.median(left_region)) + float(np.median(right_region))) / 2
-        # Contrast: normalized difference (0 = same, 1 = gutter is much brighter)
-        if gutter_brightness > 0:
-            contrast = max(0.0, (gutter_brightness - side_brightness) / gutter_brightness)
-        else:
-            contrast = 0.0
     else:
-        contrast = 0.0
+        side_brightness = 128.0  # fallback to mid-gray
 
-    return best_idx / w, gutter_brightness, contrast
+    search_region = smoothed[search_start:search_end]
+    gradient_region = gradient[search_start:search_end]
+
+    if len(search_region) == 0:
+        return 0.5, 0.0, 0.0, 0.0
+
+    # Strategy: Find BOTH bright gutters (max) and dark creases (min)
+    # Then choose whichever has stronger contrast vs side brightness
+    # AND extends the full vertical height (not just illustration borders)
+
+    bright_idx = search_start + int(np.argmax(search_region))
+    dark_idx = search_start + int(np.argmin(search_region))
+
+    bright_val = float(smoothed[bright_idx])
+    dark_val = float(smoothed[dark_idx])
+
+    # Calculate contrast for both candidates
+    # Bright gutter: higher than sides
+    bright_contrast = max(0.0, (bright_val - side_brightness) / max(bright_val, 1.0))
+
+    # Dark gutter: lower than sides (shadow/crease)
+    dark_contrast = max(0.0, (side_brightness - dark_val) / max(side_brightness, 1.0))
+
+    # Also check edge strength (sharp transitions indicate binding)
+    bright_edge = float(gradient[bright_idx])
+    dark_edge = float(gradient[dark_idx])
+
+    # NEW: Check vertical continuity - the actual page binding extends top-to-bottom
+    # Illustration borders only extend partial height with margins
+    # This discriminates against locking onto illustration borders
+
+    def compute_vertical_continuity(col_idx: int, is_dark: bool) -> float:
+        """
+        Compute what fraction of the image HEIGHT shows consistent dark/bright signal.
+        Page bindings extend 100% of height; illustration borders only partial.
+        """
+        if col_idx < 0 or col_idx >= w:
+            return 0.0
+
+        col_pixels = gray[:, col_idx]
+
+        # For dark gutters: count pixels significantly darker than side brightness
+        # For bright gutters: count pixels significantly brighter than side brightness
+        threshold = 20  # brightness difference threshold
+
+        if is_dark:
+            consistent_pixels = np.sum(col_pixels < (side_brightness - threshold))
+        else:
+            consistent_pixels = np.sum(col_pixels > (side_brightness + threshold))
+
+        # Return fraction of height with consistent signal
+        return float(consistent_pixels) / float(h)
+
+    bright_continuity = compute_vertical_continuity(bright_idx, is_dark=False)
+    dark_continuity = compute_vertical_continuity(dark_idx, is_dark=True)
+
+    # Choose the candidate with stronger signal
+    # Weight vertical continuity heavily (5x) - it's the key discriminator
+    # Prefer dark creases slightly (1.2x) - more common in book scans
+    dark_score = (dark_contrast * 1.2) + (dark_edge / 10.0) + (dark_continuity * 5.0)
+    bright_score = bright_contrast + (bright_edge / 10.0) + (bright_continuity * 5.0)
+
+    if dark_score > bright_score:
+        # Dark gutter (shadow/crease)
+        best_idx = dark_idx
+        gutter_brightness = dark_val
+        contrast = dark_contrast
+        continuity = dark_continuity
+    else:
+        # Bright gutter (white paper gap)
+        best_idx = bright_idx
+        gutter_brightness = bright_val
+        contrast = bright_contrast
+        continuity = bright_continuity
+
+    return best_idx / w, gutter_brightness, contrast, continuity
 
 
 def sample_spread_decision(image_paths: List[str], sample_size: int = 5,
@@ -180,7 +250,7 @@ def sample_spread_decision(image_paths: List[str], sample_size: int = 5,
         ratio = w / h
         is_landscape = ratio > min_ratio
 
-        gutter_frac, brightness, contrast = find_gutter_position(img)
+        gutter_frac, brightness, contrast, continuity = find_gutter_position(img)
         # Confident if: landscape AND contrast shows a visible gutter
         is_confident = is_landscape and contrast >= min_contrast
 

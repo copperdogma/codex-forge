@@ -16,8 +16,10 @@ Guiding priorities: **perfect OCR first**, then move downstream stage‑by‑sta
 
 6. DONE: **068 — Fighting Fantasy Boundary Detection Improvements**  
    Improved boundary detection from 87% to 100% coverage (398/398 sections). Perfect accuracy achieved.
-7. **035 — Fighting Fantasy Pipeline Optimization** *(Paused)*
-   Drive missing/no‑text/no‑choice to targets using the new OCR + boundary stack. (Resume after 068.)
+7. **073 — 100% Section Detection — Complete Coverage** *(Next)*
+   Achieve 100% section detection (400/400) for full Fighting Fantasy book. Current: 377/400 (94.25%).
+8. **035 — Fighting Fantasy Pipeline Optimization** *(Paused)*
+   Drive missing/no‑text/no‑choice to targets using the new OCR + boundary stack. (Resume after 073.)
 8. **050 — FF Ending Detection Verification**  
    Verify ending/dead‑end classification quality on FF outputs (no book‑specific tuning).
 9. **056 — Validation Forensics Automation (remaining items)**  
@@ -80,10 +82,10 @@ This index tracks stories in `/docs/stories/` for the codex-forge pipeline.
 || 036 | FF OCR Recovery & Text Repair | High | Done | /docs/stories/story-036-ff-ocr-recovery-and-text-repair.md |
 || 037 | FF OCR Ensemble with BetterOCR | High | Done | /docs/stories/story-037-ocr-ensemble-with-betterocr.md |
 || 038 | Agentic Pipeline Coordinator | Medium | To Do | /docs/stories/story-038-agentic-pipeline-coordinator.md |
-|| 050 | FF Ending Detection Verification | Medium | Open | /docs/stories/story-050-ff-ending-detection.md |
+|| 050 | FF Ending Detection Verification | Medium | To Do | /docs/stories/story-050-ff-ending-detection.md |
 || 051 | Text Quality Evaluation & Repair | High | Done | /docs/stories/story-051-text-quality-eval.md |
 || 052 | Evaluate Apple Vision OCR Integration | Medium | Done | /docs/stories/story-052-apple-ocr-integration.md |
-|| 053 | Pipeline Smoke Test (Static Sample, No External Calls) | High | Open | /docs/stories/story-053-smoke-test-pipeline.md |
+|| 053 | Pipeline Smoke Test (Static Sample, No External Calls) | High | To Do | /docs/stories/story-053-smoke-test-pipeline.md |
 || 054 | Canonical FF Recipe Consolidation | High | Done | /docs/stories/story-054-canonical-ff-recipe.md |
 || 056 | Validation Forensics Automation | High | To Do | /docs/stories/story-056-validation-forensics.md |
 || 057 | OCR Quality & Column Detection Improvements | High | Done | /docs/stories/story-057-ocr-quality-column-detection.md |
@@ -99,8 +101,10 @@ This index tracks stories in `/docs/stories/` for the codex-forge pipeline.
 || 067 | GPU Acceleration for OCR Pipeline | High | Done | /docs/stories/story-067-gpu-acceleration-ocr.md |
 || 068 | Fighting Fantasy Boundary Detection Improvements | High | Done | /docs/stories/story-068-ff-boundary-detection.md |
 || 069 | PDF Text Extraction Engine for OCR Ensemble | Medium | Done | /docs/stories/story-069-pdf-text-extraction-engine.md |
-|| 070 | OCR Split Refinement — Zero Bad Slices | High | Open | /docs/stories/story-070-ocr-split-refinement.md |
+|| 070 | OCR Split Refinement — Zero Bad Slices | High | Done | /docs/stories/story-070-ocr-split-refinement.md |
 || 071 | Output Artifact Organization | Medium | Done | /docs/stories/story-071-output-artifact-organization.md |
+|| 072 | OCR Spell-Weighted Voting Enhancement | Medium | To Do | /docs/stories/story-072-ocr-spell-weighted-voting.md |
+|| 073 | 100% Section Detection — Complete Coverage | High | To Do | /docs/stories/story-073-100-percent-section-detection.md |
 || 099 | Remove dev-only backcompat disclaimer | Low | To Do | /docs/stories/story-099-remove-dev-backcompat-note.md |
 
 ## Notes
