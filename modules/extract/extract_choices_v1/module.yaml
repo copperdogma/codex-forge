@@ -21,3 +21,4 @@ param_schema:
   required: []
 notes: "Code-first choice extraction using pattern matching for 'turn to X' references. Scans section text for deterministic choice patterns, extracts targets, and optionally validates ambiguous cases with AI. Critical for 100% game engine accuracy - uses strong signals (patterns) rather than pure AI extraction."
 
+

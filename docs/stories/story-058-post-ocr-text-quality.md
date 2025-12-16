@@ -444,3 +444,4 @@ Improve post-OCR text quality by adding spell-check, character confusion detecti
 - **Result:** Story 058 validated against the 20-page canonical smoke; the repair table, regression script, and validator outputs are captured and documented, and we accept the remaining warnings as faithful artefacts of the source.
 - **Evidence:** `output/runs/story-058-canonical-ocr20-tess-bestpick8/repair_table.md`, `section_number_warnings_manual.jsonl` (portion 3), and `truncation_warnings_manual.jsonl` (reports truncated front-matter/gameplay snippets) plus the latest story log entries (20251213-0035/0043/0050/0105) showing the loop ran as expected.
 - **Next:** Continue rerunning the automation/regression after each smoke for traceability, but no further action is required right now—this story is finalized unless future scans change substantially.
+
