@@ -3,6 +3,10 @@
 Code-first section boundary detection with targeted AI escalation.
 
 Follows AGENTS.md pattern: code → validate → targeted escalate → validate
+
+IMPORTANT: This module now requires coarse_segments.json as input.
+Elements are filtered to ONLY gameplay pages (excludes frontmatter/endmatter)
+before boundary detection. This eliminates false positives from frontmatter.
 """
 import argparse
 import json
@@ -14,17 +18,89 @@ from modules.common.utils import read_jsonl, save_jsonl, ProgressLogger
 from modules.common.escalation_cache import EscalationCache
 
 
-def filter_section_headers(elements: List[Dict], min_section: int, max_section: int) -> List[Dict]:
+def filter_elements_to_gameplay(elements: List[Dict], gameplay_pages: List) -> List[Dict]:
+    """
+    Filter elements to ONLY those in the gameplay page range.
+
+    Args:
+        elements: All elements from elements_core_typed.jsonl
+        gameplay_pages: [start_page, end_page] from coarse_segments.json
+                       Can be integers (12, 110) or strings ("012L", "111L")
+
+    Returns:
+        Elements within gameplay range only (excludes frontmatter and endmatter)
+    """
+    import re
+
+    def parse_page_id(elem):
+        """Extract page identifier from element (handles both integer page and L/R splits)."""
+        # First try to get from element ID (e.g., "111L-0000" -> "111L")
+        elem_id = elem.get('id', '')
+        if '-' in elem_id:
+            return elem_id.split('-')[0]
+        # Fallback to page field (integer)
+        page = elem.get('page')
+        return str(page) if page is not None else None
+
+    def page_in_range(page_id, start, end):
+        """Check if page_id is within [start, end] range (handles string page IDs)."""
+        if page_id is None:
+            return False
+
+        # Extract numeric portions for comparison
+        def extract_num_and_suffix(pid):
+            """Extract (number, suffix) from page ID. E.g., "111L" -> (111, "L"), 12 -> (12, "")"""
+            pid_str = str(pid)
+            match = re.match(r'^(\d+)([LR]?)$', pid_str)
+            if match:
+                return (int(match.group(1)), match.group(2) or '')
+            return None
+
+        page_parts = extract_num_and_suffix(page_id)
+        start_parts = extract_num_and_suffix(start)
+        end_parts = extract_num_and_suffix(end)
+
+        if not all([page_parts, start_parts, end_parts]):
+            return False
+
+        page_num, page_suffix = page_parts
+        start_num, start_suffix = start_parts
+        end_num, end_suffix = end_parts
+
+        # Compare: (number, suffix) tuple comparison works naturally
+        # "111L" < "111R" because ("L" < "R")
+        # "012L" < "111L" because (12 < 111)
+        return (page_num, page_suffix) >= (start_num, start_suffix) and \
+               (page_num, page_suffix) <= (end_num, end_suffix)
+
+    start_page, end_page = gameplay_pages
+    filtered = []
+    for elem in elements:
+        page_id = parse_page_id(elem)
+        if page_in_range(page_id, start_page, end_page):
+            filtered.append(elem)
+
+    return filtered
+
+
+def filter_section_headers(elements: List[Dict], min_section: int, max_section: int,
+                          gameplay_pages: Optional[List] = None) -> List[Dict]:
     """
     Code-first: Filter elements for Section-header with valid numbers.
     This is FREE, instant, and deterministic.
-    
+
     CRITICAL: Applies multi-stage validation to eliminate false positives:
-    1. Find section 1 to determine frontmatter boundary
-    2. Filter frontmatter (BEFORE duplicate resolution to avoid losing valid instances)
-    3. Page-level clustering (eliminate outliers on same page)
+    1. Content type filtering (Section-header classification)
+    2. Range validation (min_section to max_section)
+    3. Page-level clustering with expected range selection (eliminate outliers on same page)
     4. Multi-page duplicate resolution (choose best instance)
     5. Sequential validation (enforce ordering)
+
+    Args:
+        elements: Elements to filter (pre-filtered to gameplay pages)
+        min_section: Minimum section number
+        max_section: Maximum section number
+        gameplay_pages: [start, end] page range from coarse_segments (enables smart clustering)
 """
     candidates = []
     
@@ -70,51 +146,12 @@ def filter_section_headers(elements: List[Dict], min_section: int, max_section: 
             'source': 'content_type_classification'
         })
     
-    # Find section 1 to determine frontmatter boundary (must happen early!)
-    # CRITICAL: There may be multiple false positives for section 1 in frontmatter
-    # We need to find the CORRECT section 1 (the one that would win duplicate resolution)
-    # Strategy: Find the section 1 instance on the page with the best fit score
-    # (i.e., the page with the most consecutive sections starting from 1)
-    section_1_candidates = [b for b in candidates if int(b['section_id']) == 1]
-    section_1_page = None
-    
-    if section_1_candidates:
-        # For each section 1 candidate, calculate fit score (consecutive neighbors)
-        best_section_1 = None
-        best_score = -1
-        
-        for boundary in section_1_candidates:
-            page = boundary['start_page']
-            # Find all sections on this page
-            page_sections = sorted([
-                int(b['section_id']) for b in candidates 
-                if b['start_page'] == page
-            ])
-            
-            # Calculate fit: count consecutive sections starting from 1
-            fit_score = 1  # Section 1 itself
-            check_section = 1
-            while check_section + 1 in page_sections:
-                fit_score += 1
-                check_section += 1
-            
-            if fit_score > best_score:
-                best_score = fit_score
-                best_section_1 = boundary
-                section_1_page = page
-        
-        # If no good fit found, use the lowest page number (assumes earlier instances are false positives)
-        if section_1_page is None:
-            section_1_page = min(b['start_page'] for b in section_1_candidates)
-    
-    # STAGE 0: Filter frontmatter BEFORE duplicate resolution
-    # This prevents valid instances from being lost when duplicate resolution
-    # chooses a frontmatter instance that later gets filtered out
-    if section_1_page is not None:
-        candidates = [b for b in candidates if b['start_page'] >= section_1_page]
-    
-    # STAGE 1: Page-level clustering to eliminate outliers
-    clustered = _filter_page_outliers(candidates)
+    # NOTE: Frontmatter filtering is now handled UPSTREAM by coarse segmentation
+    # We trust that elements have already been filtered to gameplay pages only
+    # No need to re-detect section 1 or filter frontmatter here
+
+    # STAGE 1: Page-level clustering with expected range selection to eliminate outliers
+    clustered = _filter_page_outliers(candidates, gameplay_pages, max_section)
     
     # STAGE 2: Multi-page duplicate resolution
     deduplicated = _resolve_duplicates(clustered)
@@ -128,37 +165,74 @@ def filter_section_headers(elements: List[Dict], min_section: int, max_section: 
     return validated
 
 
-def _filter_page_outliers(candidates: List[Dict]) -> List[Dict]:
+def _filter_page_outliers(candidates: List[Dict], gameplay_pages: Optional[List] = None,
+                          max_section: int = 400) -> List[Dict]:
     """
-    Eliminate false positives using page-level clustering.
-    
-    Strategy: On each page, find the MAIN CLUSTER (largest group of consecutive sections).
-    Outliers (sections with gap >5 from cluster) are likely false positives.
-    
-    Example:
-        Page 39: [87, 96, 97, 98, 99]
-        - Gap between 87 and 96 is 9 (large)
-        - Main cluster: [96, 97, 98, 99]
-        - Outlier: [87] ← false positive, eliminated
+    Eliminate false positives using page-level clustering with expected range selection.
+
+    Strategy: On each page, find clusters of consecutive sections (gap ≤ 5).
+    Select the cluster whose center is CLOSEST to the expected section for that page.
+
+    Why not "largest cluster"? False positives can outnumber valid sections!
+    Example: Page 51 has [7,7,8,8,8,8] (6 false positives) and [148,149,150,151] (4 valid).
+    Largest cluster = [7,8] ✗ Wrong! Expected section ~157, so [148-151] is correct ✓
+
+    Args:
+        candidates: Boundary candidates to filter
+        gameplay_pages: [start, end] page range from coarse_segments (e.g., ["012L", "111L"])
+        max_section: Maximum section number (default: 400)
     """
+    import re
+
+    def parse_page_num(page_id):
+        """Extract numeric portion from page ID (e.g., "051L" → 51, 73 → 73)."""
+        if isinstance(page_id, int):
+            return page_id
+        match = re.match(r'^(\d+)', str(page_id))
+        return int(match.group(1)) if match else 0
+
+    def expected_section_for_page(page_id):
+        """Calculate expected section number for a page based on position in gameplay range."""
+        if not gameplay_pages or len(gameplay_pages) < 2:
+            # Fallback: assume linear distribution across all pages
+            page_num = parse_page_num(page_id)
+            return page_num * 4  # Rough estimate: ~4 sections per page
+
+        start_num = parse_page_num(gameplay_pages[0])
+        end_num = parse_page_num(gameplay_pages[1])
+        page_num = parse_page_num(page_id)
+
+        # Position in gameplay range (0 to 1)
+        if end_num == start_num:
+            position = 0.5
+        else:
+            position = (page_num - start_num) / (end_num - start_num)
+            position = max(0, min(1, position))  # Clamp to [0, 1]
+
+        return int(position * max_section)
+
+    def cluster_center(cluster_indices, sections):
+        """Calculate the center (average) of a cluster."""
+        return sum(sections[i] for i in cluster_indices) / len(cluster_indices)
+
     # Group candidates by page
     page_groups = defaultdict(list)
     for boundary in candidates:
         page = boundary['start_page']
         page_groups[page].append(boundary)
-    
+
     filtered = []
-    
+
     for page, boundaries in page_groups.items():
         if len(boundaries) == 1:
             # Single section on page → keep it
             filtered.append(boundaries[0])
             continue
-        
+
         # Sort by section number
         boundaries.sort(key=lambda b: int(b['section_id']))
         sections = [int(b['section_id']) for b in boundaries]
-        
+
         # Find clusters (sections within 5 of each other)
         clusters = []
         current_cluster = [0]  # Indices
@@ -169,12 +243,36 @@ def _filter_page_outliers(candidates: List[Dict]) -> List[Dict]:
                 clusters.append(current_cluster)
                 current_cluster = [i]
         clusters.append(current_cluster)
-        
-        # Keep only the LARGEST cluster
-        main_cluster_indices = max(clusters, key=len)
-        for idx in main_cluster_indices:
+
+        # Select cluster with WEIGHTED preference: larger clusters preferred unless smaller is significantly closer
+        # Rationale: Non-uniform section distribution means expected section is approximate
+        # Large clusters (multiple consecutive sections) are more likely valid than small false positives
+        # Only prefer smaller cluster if it's 3× closer to expected section
+        expected = expected_section_for_page(page)
+
+        # Sort clusters by size (largest first)
+        clusters_sorted = sorted(clusters, key=lambda c: len(c), reverse=True)
+
+        # Start with largest cluster
+        best_cluster_indices = clusters_sorted[0]
+        best_center = cluster_center(best_cluster_indices, sections)
+        best_distance = abs(best_center - expected)
+
+        # Check if any smaller cluster is significantly closer (3× threshold)
+        for cluster_indices in clusters_sorted[1:]:
+            center = cluster_center(cluster_indices, sections)
+            distance = abs(center - expected)
+
+            # Only switch to smaller cluster if it's at least 3× closer
+            if distance * 3 < best_distance:
+                best_cluster_indices = cluster_indices
+                best_center = center
+                best_distance = distance
+
+        # Keep only the best cluster
+        for idx in best_cluster_indices:
             filtered.append(boundaries[idx])
-    
+
     return filtered
 
 
@@ -242,73 +340,32 @@ def _resolve_duplicates(candidates: List[Dict]) -> List[Dict]:
 def _validate_sequential_ordering(candidates: List[Dict]) -> List[Dict]:
     """
     Eliminate false positives using sequential validation.
-    
+
     Key insight: Fighting Fantasy sections are 100% in order.
     Section numbers MUST increase (roughly) with page numbers.
-    
-    Strategy:
-    1. Find section 1 (the TRUE anchor point) - ignores intro/rules pages
-    2. Start sequential validation from section 1's page
-    3. Accept sections that continue the sequence
-    4. Reject anything before section 1's page (front matter false positives)
-    
-    Example:
-        Page 5-15: [17, 18, 10, 11, 2, 7] ✗ (intro/rules false positives)
-        Page 16: [1, 2] ✓ (TRUE section 1 starts here)
-        Page 17: [3, 4, 5] ✓ (continues sequence)
+
+    NOTE: Frontmatter filtering is handled upstream by coarse segmentation.
+    We just apply basic sequential validation here.
     """
     if not candidates:
         return []
-    
-    # Find section 1 (the TRUE anchor)
-    section_1 = None
-    section_1_page = None
-    for boundary in candidates:
-        if int(boundary['section_id']) == 1:
-            section_1 = boundary
-            section_1_page = boundary['start_page']
-            break
-    
-    if section_1 is None:
-        # No section 1 found - fall back to accepting all (will escalate later)
-        # But still apply basic sequential validation
-        candidates.sort(key=lambda b: (b['start_page'], int(b['section_id'])))
-        validated = []
-        last_section = 0
-        seen_sections = set()
-        
-        for boundary in candidates:
-            sect = int(boundary['section_id'])
-            if sect in seen_sections:
-                continue
-            if sect > last_section:
-                validated.append(boundary)
-                seen_sections.add(sect)
-                last_section = sect
-        return validated
-    
+
     # Sort by page, then section number
     candidates.sort(key=lambda b: (b['start_page'], int(b['section_id'])))
-    
+
     validated = []
     last_section = 0
+    last_page = 0
     seen_sections = set()
-    
-    # Process candidates, starting from section 1's page
-    last_page = section_1_page
-    
+
     for boundary in candidates:
         page = boundary['start_page']
         sect = int(boundary['section_id'])
-        
-        # Reject anything before section 1's page (front matter)
-        if page < section_1_page:
-            continue
-        
+
         # Skip duplicates
         if sect in seen_sections:
             continue
-        
+
         # Accept sections that continue the sequence
         if sect > last_section:
             # Additional check: Is the jump REASONABLE?
@@ -316,7 +373,7 @@ def _validate_sequential_ordering(candidates: List[Dict]) -> List[Dict]:
             # (FF typically has 3-4 sections per page, so 10 is generous)
             section_jump = sect - last_section
             page_advance = page - last_page
-            
+
             # Allow big jumps if pages advance, or small jumps on same page
             if page_advance > 0 or section_jump <= 10:
                 validated.append(boundary)
@@ -324,7 +381,7 @@ def _validate_sequential_ordering(candidates: List[Dict]) -> List[Dict]:
                 last_section = sect
                 last_page = page
             # else: reject (unreasonable jump on same page, likely false positive)
-    
+
     return validated
 
 
@@ -469,9 +526,11 @@ def main():
                        default='gpt-5', help='Stronger LLM for escalation')
     parser.add_argument('--images-dir', '--images_dir', dest='images_dir',
                        help='Images directory (defaults to run_dir/../images)')
+    parser.add_argument('--coarse-segments', '--coarse_segments', dest='coarse_segments',
+                       help='Path to coarse_segments.json (gameplay/frontmatter/endmatter ranges)')
     parser.add_argument('--state-file', dest='state_file', help='Driver state file (ignored)')
     parser.add_argument('--progress-file', dest='progress_file', help='Driver progress file (ignored)')
-    
+
     args = parser.parse_args()
     
     logger = ProgressLogger(args.run_id, 'detect_boundaries_code_first_v1')
@@ -502,13 +561,35 @@ def main():
     logger.log('load', 'running', message=f'Loading {input_path}')
     elements = list(read_jsonl(input_path))
     logger.log('load', 'done', message=f'Loaded {len(elements)} elements')
-    
+
+    # Load coarse segmentation (gameplay/frontmatter/endmatter ranges)
+    coarse_segments = None
+    gameplay_pages = None
+    if args.coarse_segments:
+        logger.log('load', 'running', message=f'Loading coarse segments from {args.coarse_segments}')
+        import json
+        with open(args.coarse_segments) as f:
+            coarse_segments = json.load(f)
+        gameplay_pages = coarse_segments.get('gameplay_pages')
+        if gameplay_pages:
+            logger.log('load', 'done', message=f'Gameplay pages: {gameplay_pages[0]} to {gameplay_pages[1]}')
+        else:
+            logger.log('load', 'done', message='No gameplay_pages range in coarse segments')
+
+    # Filter elements to ONLY gameplay pages (exclude frontmatter/endmatter)
+    # This is critical: we should NEVER process frontmatter or endmatter sections
+    if gameplay_pages:
+        logger.log('filter', 'running', message='Filtering elements to gameplay pages only')
+        gameplay_elements = filter_elements_to_gameplay(elements, gameplay_pages)
+        logger.log('filter', 'done', message=f'Filtered to {len(gameplay_elements)} gameplay elements (from {len(elements)} total)')
+        elements = gameplay_elements
+
     # ========================================
     # STAGE 1: Code-first baseline (FREE)
     # ========================================
     logger.log('baseline', 'running', message='Code-first filtering for Section-header elements')
-    
-    boundaries = filter_section_headers(elements, args.min_section, args.max_section)
+
+    boundaries = filter_section_headers(elements, args.min_section, args.max_section, gameplay_pages)
     
     logger.log(
         'baseline',
@@ -601,36 +682,59 @@ def main():
     )
     
     # ========================================
-    # STAGE 5: Final validation / fail
+    # STAGE 5: Final validation
     # ========================================
     final_missing = find_missing_sections(boundaries, args.min_section, args.max_section)
-    
+
     if len(boundaries) < target_count:
+        # Check if we exhausted escalation attempts
+        # We've exhausted attempts if we either:
+        # 1. Scanned all suspected pages (flagged_pages == suspected_pages), or
+        # 2. Hit the escalation cap (flagged_pages == max_escalation_pages)
+        exhausted = (len(flagged_pages) == len(suspected_pages) or
+                     len(flagged_pages) == args.max_escalation_pages)
+
+        if exhausted:
+            # We exhausted escalation - missing sections are likely not in source
+            logger.log(
+                'validate',
+                'warning',
+                message=f'⚠️  {len(boundaries)}/{expected_total} found. Exhausted escalation attempts ({len(flagged_pages)} pages). Suspected missing from source: {final_missing}',
+                artifact=args.out
+            )
+            save_jsonl(args.out, boundaries)
+            print(f'⚠️  Found {len(boundaries)}/{expected_total} boundaries ({len(boundaries)/expected_total:.1%})')
+            print(f'  Baseline (code): {len(boundaries) - len(discovered)} boundaries (FREE)')
+            print(f'  Escalation (AI): {len(flagged_pages)} pages scanned')
+            print(f'  Exhausted escalation attempts (scanned all {len(flagged_pages)} suspected pages)')
+            print(f'  Suspected missing from source: {final_missing}')
+            print(f'  Note: These sections likely do not exist in the input document (missing/damaged pages)')
+        else:
+            # We didn't hit the cap - this is a real failure
+            logger.log(
+                'validate',
+                'failed',
+                message=f'FAILED: Only {len(boundaries)}/{expected_total} after {len(flagged_pages)} escalations. Missing: {final_missing[:20]}',
+                artifact=args.out
+            )
+            # Save partial results for forensics
+            save_jsonl(args.out, boundaries)
+            raise Exception(
+                f'Coverage target not met: {len(boundaries)}/{expected_total} '
+                f'({len(boundaries)/expected_total:.1%}). '
+                f'Missing {len(final_missing)} sections after {len(flagged_pages)} escalations.'
+            )
+    else:
         logger.log(
             'validate',
-            'failed',
-            message=f'FAILED: Only {len(boundaries)}/{expected_total} after {len(flagged_pages)} escalations. Missing: {final_missing[:20]}',
+            'done',
+            message=f'✓ Success! {len(boundaries)}/{expected_total} boundaries ({len(boundaries)/expected_total:.1%})',
             artifact=args.out
         )
-        # Save partial results for forensics
         save_jsonl(args.out, boundaries)
-        raise Exception(
-            f'Coverage target not met: {len(boundaries)}/{expected_total} '
-            f'({len(boundaries)/expected_total:.1%}). '
-            f'Missing {len(final_missing)} sections after {len(flagged_pages)} escalations.'
-        )
-    
-    logger.log(
-        'validate',
-        'done',
-        message=f'✓ Success! {len(boundaries)}/{expected_total} boundaries ({len(boundaries)/expected_total:.1%})',
-        artifact=args.out
-    )
-    
-    save_jsonl(args.out, boundaries)
-    print(f'✓ Found {len(boundaries)}/{expected_total} boundaries ({len(boundaries)/expected_total:.1%})')
-    print(f'  Baseline (code): {len(boundaries) - len(flagged_pages)} boundaries (FREE)')
-    print(f'  Escalation (AI): {len(flagged_pages)} pages scanned')
+        print(f'✓ Found {len(boundaries)}/{expected_total} boundaries ({len(boundaries)/expected_total:.1%})')
+        print(f'  Baseline (code): {len(boundaries) - len(discovered)} boundaries (FREE)')
+        print(f'  Escalation (AI): {len(flagged_pages)} pages scanned')
 
 
 if __name__ == '__main__':

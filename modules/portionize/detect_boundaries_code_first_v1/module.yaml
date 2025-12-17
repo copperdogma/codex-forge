@@ -2,11 +2,15 @@ module_id: detect_boundaries_code_first_v1
 stage: portionize
 entrypoint: modules/portionize/detect_boundaries_code_first_v1/main.py
 input_schema: element_core_v1
+additional_inputs:
+  - name: coarse_segments
+    schema: coarse_segments_v1
+    required: true
 output_schema: section_boundary_v1
 default_params:
   min_section: 1
   max_section: 400
-  target_coverage: 0.95
+  target_coverage: 1.0
   max_escalation_pages: 30
   model: gpt-4.1-mini
   escalation_model: gpt-5
@@ -20,7 +24,7 @@ param_schema:
       description: "Maximum expected section number (default: 400)"
     target_coverage:
       type: number
-      description: "Target coverage ratio (default: 0.95 = 380/400 sections)"
+      description: "Target coverage ratio (default: 1.0 = 100% = 400/400 sections)"
     max_escalation_pages:
       type: integer
       description: "Maximum pages to escalate with AI (default: 30)"
@@ -41,6 +45,7 @@ notes: |
   
   Replaces classify_headers_v1 (60 AI batches) with deterministic filter + 0-30 targeted AI calls.
   Expected: 350+ boundaries from code filter, 95%+ after escalation.
+
 
 
 

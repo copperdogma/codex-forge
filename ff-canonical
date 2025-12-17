@@ -1,0 +1,102 @@
+{
+  "stages": {
+    "load": {
+      "status": "done",
+      "artifact": null,
+      "updated_at": "2025-12-17T16:01:31.061874Z",
+      "module_id": null,
+      "schema_version": null,
+      "description": null,
+      "progress": {
+        "current": null,
+        "total": null,
+        "percent": null,
+        "message": "Gameplay pages: 012L to 111L"
+      }
+    },
+    "baseline": {
+      "status": "done",
+      "artifact": "output/runs/ff-canonical/13_detect_boundaries_code_first_v1/section_boundaries.jsonl",
+      "updated_at": "2025-12-17T16:01:31.073083Z",
+      "module_id": null,
+      "schema_version": null,
+      "description": null,
+      "progress": {
+        "current": null,
+        "total": null,
+        "percent": null,
+        "message": "Code filter found 396 boundaries (FREE, instant)"
+      }
+    },
+    "validate": {
+      "status": "running",
+      "artifact": "output/runs/ff-canonical/13_detect_boundaries_code_first_v1/section_boundaries.jsonl",
+      "updated_at": "2025-12-17T16:01:31.076406Z",
+      "module_id": null,
+      "schema_version": null,
+      "description": null,
+      "progress": {
+        "current": null,
+        "total": null,
+        "percent": null,
+        "message": "\u26a0\ufe0f  396/400 found. Exhausted escalation attempts (4 pages). Suspected missing from source: [48, 80, 169, 170]"
+      }
+    },
+    "gap_analysis": {
+      "status": "done",
+      "artifact": "output/runs/ff-canonical/13_detect_boundaries_code_first_v1/section_boundaries.jsonl",
+      "updated_at": "2025-12-17T16:01:31.074350Z",
+      "module_id": null,
+      "schema_version": null,
+      "description": null,
+      "progress": {
+        "current": null,
+        "total": null,
+        "percent": null,
+        "message": "Flagged 4 pages for AI escalation (cap: 30)"
+      }
+    },
+    "escalate": {
+      "status": "done",
+      "artifact": "output/runs/ff-canonical/13_detect_boundaries_code_first_v1/section_boundaries.jsonl",
+      "updated_at": "2025-12-17T16:01:31.076141Z",
+      "module_id": null,
+      "schema_version": null,
+      "description": null,
+      "progress": {
+        "current": null,
+        "total": null,
+        "percent": null,
+        "message": "Vision escalation found 0 boundaries from 4 pages"
+      }
+    },
+    "escalation": {
+      "status": "running",
+      "artifact": "output/runs/ff-canonical/13_detect_boundaries_code_first_v1/escalation_cache",
+      "updated_at": "2025-12-17T16:01:31.075914Z",
+      "module_id": null,
+      "schema_version": null,
+      "description": null,
+      "progress": {
+        "current": null,
+        "total": null,
+        "percent": null,
+        "message": "Failed to escalate page 56: No image found for page 56"
+      }
+    },
+    "filter": {
+      "status": "done",
+      "artifact": null,
+      "updated_at": "2025-12-17T16:01:31.066427Z",
+      "module_id": null,
+      "schema_version": null,
+      "description": null,
+      "progress": {
+        "current": null,
+        "total": null,
+        "percent": null,
+        "message": "Filtered to 1661 gameplay elements (from 1799 total)"
+      }
+    }
+  }
+}

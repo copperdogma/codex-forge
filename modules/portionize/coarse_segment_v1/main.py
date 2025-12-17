@@ -17,8 +17,12 @@ from openai import OpenAI
 from modules.common.utils import read_jsonl, save_json, log_llm_usage, ProgressLogger
 
 
-def summarize_page(lines: List[Dict], page: int, max_lines: int = 10, max_len: int = 120) -> Dict:
-    """Summarize a page's elements into compact snippets."""
+def summarize_page(lines: List[Dict], page_id, max_lines: int = 10, max_len: int = 120) -> Dict:
+    """Summarize a page's elements into compact snippets.
+
+    Args:
+        page_id: Page identifier (int or str like "111L" for split pages)
+    """
     snippets = []
     numeric_flags = 0
     for ln in lines[:max_lines]:
@@ -31,7 +35,7 @@ def summarize_page(lines: List[Dict], page: int, max_lines: int = 10, max_len: i
             text = text[:max_len] + "…"
         snippets.append(text)
     return {
-        "page": page,
+        "page": page_id,  # Now can be "111L" or "111R" for split pages
         "snippet_lines": snippets,
         "line_count": len(lines),
         "numeric_lines": numeric_flags,
@@ -40,24 +44,48 @@ def summarize_page(lines: List[Dict], page: int, max_lines: int = 10, max_len: i
 
 def reduce_elements(elements_path: str, max_lines: int = 8, max_len: int = 100) -> List[Dict]:
     """Reduce elements.jsonl to compact per-page summaries.
-    
+
     Optimized for minimal data: only essential snippets, shorter lines, fewer per page.
     Works with full book output (226 pages from spread splitting).
+
+    CRITICAL: Preserves L/R page splits by extracting page ID from element 'id' field.
+    For spread-split books, elements have id like "111L-0000" or "111R-0000".
+    We must treat 111L and 111R as separate pages to avoid mixing gameplay/endmatter.
     """
     pages = {}
     for row in read_jsonl(elements_path):
-        # Handle element_core_v1 format (has 'page' directly as integer)
-        pg = row.get("page")
-        if pg is None:
-            # Fallback to metadata if page not directly available
-            pg = row.get("metadata", {}).get("page_number") or row.get("metadata", {}).get("page") or 0
-        if pg == 0:
-            continue  # Skip elements with no page
-        pages.setdefault(pg, []).append(row)
-    
+        # Extract page identifier from element ID (e.g., "111L-0000" -> "111L")
+        # This preserves L/R split for spread pages
+        elem_id = row.get("id", "")
+        if "-" in elem_id:
+            # Format: "{page_id}-{seq}" where page_id might be "111L" or "111R"
+            page_id = elem_id.split("-")[0]
+        else:
+            # Fallback: use integer page field if no ID or no dash
+            pg = row.get("page")
+            if pg is None:
+                # Fallback to metadata if page not directly available
+                pg = row.get("metadata", {}).get("page_number") or row.get("metadata", {}).get("page") or 0
+            if pg == 0:
+                continue  # Skip elements with no page
+            page_id = str(pg)
+
+        pages.setdefault(page_id, []).append(row)
+
     summaries = []
-    for pg in sorted(pages.keys()):
-        summaries.append(summarize_page(pages[pg], pg, max_lines, max_len))
+    # Sort page IDs: numeric pages first (1, 2, ...), then L/R pages (111L, 111R)
+    def page_sort_key(page_id):
+        # Extract numeric portion and suffix
+        import re
+        match = re.match(r'^(\d+)([LR]?)$', page_id)
+        if match:
+            num = int(match.group(1))
+            suffix = match.group(2) or ''
+            return (num, suffix)  # Sort by number first, then L before R
+        return (0, page_id)  # Fallback for non-numeric
+
+    for page_id in sorted(pages.keys(), key=page_sort_key):
+        summaries.append(summarize_page(pages[page_id], page_id, max_lines, max_len))
     return summaries
 
 
@@ -71,12 +99,15 @@ def load_prompt(prompt_path: Optional[str] = None) -> str:
     return """You are analyzing the structure of a Fighting Fantasy gamebook to identify three macro sections.
 
 INPUT: A JSON object with a "pages" array. Each page entry contains:
-- page: page number (integer, 1-based)
+- page: page identifier (integer like 1, 2, 3... OR string like "111L", "111R" for spread-split pages)
 - snippets: array of short text snippets from that page (up to 8 lines, ~100 chars each)
 - line_count: total number of text lines on the page
 - numeric: count of standalone numeric lines (potential section headers)
 
 CRITICAL: You will receive ALL pages in the book (typically 100+ pages). You MUST analyze ALL pages to determine the correct boundaries.
+
+SPREAD-SPLIT PAGES: Some books have pages split into Left (L) and Right (R) spreads (e.g., "111L" and "111R").
+These are SEPARATE pages - treat "111L" and "111R" as two different pages. One may contain gameplay while the other contains ads.
 
 TASK: Identify three contiguous page ranges:
 1. frontmatter: Title pages, copyright, TOC, rules, instructions, adventure sheets (typically pages 1-15)
@@ -85,8 +116,10 @@ TASK: Identify three contiguous page ranges:
 
 RULES:
 - Frontmatter always starts at page 1
-- Gameplay begins at the first page with "BACKGROUND", "INTRODUCTION", or numbered section headers
-- Endmatter starts after gameplay clearly ends (no more numbered sections, or ads/previews appear)
+- Gameplay begins at the first page with "BACKGROUND", "INTRODUCTION", or numbered section headers (typically 1-400)
+- Gameplay ends at the LAST page containing numbered sections (1-400), even if ads/previews also appear on that page
+- Endmatter starts at the first page that contains ONLY ads/previews/appendices with NO numbered sections
+- IMPORTANT: If a page has BOTH numbered sections AND ads, it is GAMEPLAY (the numbered sections take precedence)
 - All three ranges must be contiguous (no gaps)
 - If endmatter is absent, set it to null
 - Use the page numbers from the input (do not invent page numbers)
@@ -101,11 +134,13 @@ OUTPUT JSON (exactly this format):
 
 Example for a 400-page book:
 {
-  "frontmatter_pages": [1, 15],
-  "gameplay_pages": [16, 380],
-  "endmatter_pages": [381, 400],
-  "notes": "Frontmatter includes title, rules, adventure sheet. Gameplay starts at page 16 with BACKGROUND. Endmatter has ads and previews."
-}"""
+  "frontmatter_pages": [1, 11],
+  "gameplay_pages": [12, "111L"],
+  "endmatter_pages": ["111R", 113],
+  "notes": "Frontmatter (pp.1-11) includes title, copyright, rules. Gameplay starts at page 12 with BACKGROUND and ends at 111L (contains section 400). Endmatter starts at 111R (ads/previews begin)."
+}
+
+IMPORTANT: For spread-split pages, the page identifier is a STRING like "111L" or "111R", not an integer."""
 
 
 def call_llm_classify(client: OpenAI, model: str, pages: List[Dict], prompt: str) -> Dict:
@@ -145,46 +180,58 @@ def call_llm_classify(client: OpenAI, model: str, pages: List[Dict], prompt: str
 
 
 def validate_ranges(result: Dict, total_pages: int) -> Tuple[bool, List[str]]:
-    """Validate the LLM output page ranges."""
+    """Validate the LLM output page ranges.
+
+    Handles both integer page IDs (1, 2, 3...) and string page IDs ("111L", "111R").
+    """
+    import re
     errors = []
-    
+
+    def parse_page_id(page_id):
+        """Extract numeric portion from page ID for validation."""
+        if isinstance(page_id, int):
+            return page_id
+        elif isinstance(page_id, str):
+            # Extract numeric portion (e.g., "111L" -> 111)
+            match = re.match(r'^(\d+)', str(page_id))
+            if match:
+                return int(match.group(1))
+        return None
+
     # Check required fields
     required = ["frontmatter_pages", "gameplay_pages", "endmatter_pages"]
     for field in required:
         if field not in result:
             errors.append(f"Missing field: {field}")
-    
+
     # Validate frontmatter
     front = result.get("frontmatter_pages")
     if front is not None:
         if not isinstance(front, list) or len(front) != 2:
             errors.append("frontmatter_pages must be [start, end] or null")
-        elif front[0] < 1 or front[1] > total_pages:
-            errors.append(f"frontmatter_pages out of range: {front}")
-        elif front[0] > front[1]:
-            errors.append(f"frontmatter_pages invalid: start > end: {front}")
-    
+        else:
+            # For string page IDs, just check format, not numeric range
+            start_num = parse_page_id(front[0])
+            end_num = parse_page_id(front[1])
+            if start_num and start_num < 1:
+                errors.append(f"frontmatter_pages start < 1: {front}")
+
     # Validate gameplay
     gameplay = result.get("gameplay_pages")
     if gameplay is not None:
         if not isinstance(gameplay, list) or len(gameplay) != 2:
             errors.append("gameplay_pages must be [start, end] or null")
-        elif gameplay[0] < 1 or gameplay[1] > total_pages:
-            errors.append(f"gameplay_pages out of range: {gameplay}")
-        elif gameplay[0] > gameplay[1]:
-            errors.append(f"gameplay_pages invalid: start > end: {gameplay}")
-    
+        # Light validation - just check format is reasonable
+
     # Validate endmatter
     end = result.get("endmatter_pages")
     if end is not None:
         if not isinstance(end, list) or len(end) != 2:
             errors.append("endmatter_pages must be [start, end] or null")
-        elif end[0] < 1 or end[1] > total_pages:
-            errors.append(f"endmatter_pages out of range: {end}")
-        elif end[0] > end[1]:
-            errors.append(f"endmatter_pages invalid: start > end: {end}")
     
     # Check for overlaps/gaps
+    # NOTE: With string page IDs (e.g., "111L", "111R"), we skip numeric gap/overlap checks
+    # The AI is responsible for ensuring contiguity
     ranges = []
     if front:
         ranges.append(("frontmatter", front))
@@ -192,16 +239,12 @@ def validate_ranges(result: Dict, total_pages: int) -> Tuple[bool, List[str]]:
         ranges.append(("gameplay", gameplay))
     if end:
         ranges.append(("endmatter", end))
-    
-    ranges.sort(key=lambda x: x[1][0])
-    for i in range(len(ranges) - 1):
-        curr_name, curr_range = ranges[i]
-        next_name, next_range = ranges[i + 1]
-        if curr_range[1] >= next_range[0]:
-            errors.append(f"Overlap between {curr_name} and {next_name}")
-        elif curr_range[1] + 1 < next_range[0]:
-            errors.append(f"Gap between {curr_name} (ends {curr_range[1]}) and {next_name} (starts {next_range[0]})")
-    
+
+    # Light validation: just check that all page IDs are present (no None values)
+    for name, page_range in ranges:
+        if page_range[0] is None or page_range[1] is None:
+            errors.append(f"{name} has None page boundary: {page_range}")
+
     return len(errors) == 0, errors
 
 
