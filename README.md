@@ -40,6 +40,185 @@ The **Intermediate Representation (IR)** stays unchanged throughout; portionizat
 - Driver orchestrates stages, stamps artifacts with schema/module/run IDs, and tracks state in `pipeline_state.json`.
 - Swap modules by changing the recipe, e.g. OCR vs text ingest.
 
+### Fighting Fantasy Book Structure
+
+**Running Headers (Section Ranges):**
+- Fighting Fantasy gamebooks use **running headers** in the upper corners of gameplay pages
+- **Left page (L)**: Shows section range (e.g., "9-10", "18-21") indicating which sections are on that page
+- **Right page (R)**: Shows single section number (e.g., "22") or range indicating sections on that page
+- These are **NOT page numbers** - they indicate which gameplay sections (1-400) appear on the page
+- Format: Either ranges like "X-Y" (sections X through Y) or single numbers like "Z" (section Z only)
+- Position: Upper outside corners (top-left for left pages, top-right for right pages)
+
+**Coordinate System Note:**
+- OCR engines may use different coordinate systems (standard: y=0=top, inverted: y=0=bottom)
+- Running headers at top corners may have high y values (0.9+) if coordinate system is inverted
+- Pattern detection must account for this when identifying top vs bottom positions
+
+### Canonical Recipe Module Reference
+
+The canonical Fighting Fantasy recipe (`configs/recipes/recipe-ff-canonical.yaml`) uses the following modules, organized by stage:
+
+#### Intake Stage
+
+**01. `extract_ocr_ensemble_v1`** (Code + AI escalation)
+- **What it does**: Runs multiple OCR engines (Tesseract, EasyOCR, Apple Vision, PDF text) in parallel and combines results with voting/consensus
+- **Why**: Different engines excel at different fonts/layouts; ensemble improves accuracy
+- **Try**: Code (multi-engine OCR)
+- **Validate**: Code (disagreement scoring)
+- **Escalate**: AI (GPT-4V vision transcription for high-disagreement pages)
+
+**02. `easyocr_guard_v1`** (Code)
+- **What it does**: Validates that EasyOCR produced text for sufficient pages
+- **Why**: EasyOCR is primary engine; missing output indicates critical failure
+- **Type**: Code-only validation guard
+
+**03. `pick_best_engine_v1`** (Code)
+- **What it does**: Selects the best OCR engine output per page based on quality metrics, preserves standalone numeric headers from all engines
+- **Why**: Reduces noise while preserving critical section headers that might only appear in one engine
+- **Type**: Code-only selection
+
+**04. `inject_missing_headers_v1`** (Code)
+- **What it does**: Scans raw OCR engine outputs for numeric headers (1-400) missing from picked output and injects them
+- **Why**: Critical for 100% section coverage; headers can be lost during engine selection
+- **Type**: Code-only injection
+
+**05. `ocr_escalate_gpt4v_v1`** (AI)
+- **What it does**: Re-transcribes high-disagreement or low-quality pages using GPT-4V vision model
+- **Why**: Vision models can read corrupted/scanned text that OCR engines miss
+- **Type**: AI escalation (targeted, budget-capped)
+
+**06. `merge_ocr_escalated_v1`** (Code)
+- **What it does**: Merges original OCR pages with escalated GPT-4V pages into unified final OCR output
+- **Why**: Creates single authoritative OCR artifact for downstream stages
+- **Type**: Code-only merge
+
+**07. `reconstruct_text_v1`** (Code)
+- **What it does**: Merges fragmented OCR lines into coherent paragraphs while preserving section boundaries
+- **Why**: Cleaner text improves downstream AI accuracy and human readability
+- **Type**: Code-only reconstruction
+
+**08. `pagelines_to_elements_v1`** (Code)
+- **What it does**: Converts pagelines IR (OCR output) into elements_core.jsonl (structured element IR)
+- **Why**: Standardizes format for downstream portionization stages
+- **Type**: Code-only transformation
+
+**09. `elements_content_type_v1`** (Code + optional AI)
+- **What it does**: Classifies elements into DocLayNet types (Section-header, Text, Page-footer, etc.) using text-first heuristics
+- **Why**: Content type tags enable code-first boundary detection (filters for Section-header)
+- **Try**: Code (heuristic classification)
+- **Escalate**: Optional AI (LLM classification for low-confidence items, disabled by default)
+
+#### Portionize Stage
+
+**10. `coarse_segment_v1`** (AI)
+- **What it does**: Single LLM call to classify entire book into frontmatter/gameplay/endmatter page ranges
+- **Why**: Establishes macro boundaries before fine-grained section detection
+- **Type**: AI classification (one call for entire book)
+
+**11. `fine_segment_frontmatter_v1`** (AI)
+- **What it does**: Divides frontmatter section into logical portions (title, copyright, TOC, rules, etc.)
+- **Why**: Structures non-gameplay content for completeness
+- **Type**: AI segmentation
+
+**12. `classify_headers_v1`** (AI)
+- **What it does**: Batched AI calls to classify elements as macro headers, game section headers, or neither
+- **Why**: Provides header candidates for global structure analysis
+- **Type**: AI classification (batched, forward/backward redundancy)
+
+**13. `structure_globally_v1`** (AI, currently stubbed)
+- **What it does**: Single AI call to create coherent global document structure from header candidates
+- **Why**: Creates ordered section structure with macro sections and game sections
+- **Type**: AI structuring (currently skipped via stub)
+
+**14. `detect_boundaries_code_first_v1`** (Code + AI escalation)
+- **What it does**: Code-first section boundary detection with targeted AI escalation for missing sections
+- **Why**: Replaces expensive batched AI with free code filter + 0-30 targeted AI calls; achieves 95%+ coverage
+- **Try**: Code (filters elements_core_typed for Section-header with valid numbers, applies multi-stage validation)
+- **Validate**: Code (coverage check vs target)
+- **Escalate**: AI (targeted re-scan of pages with missing sections using GPT-5)
+- **Type**: Code-first with AI escalation
+
+**15. `portionize_ai_scan_v1`** (AI, fallback)
+- **What it does**: Full-document AI scan for section boundaries (fallback if code-first fails)
+- **Why**: Backup method if code-first detection misses too many sections
+- **Type**: AI fallback
+
+**16. `macro_locate_ff_v1`** (AI)
+- **What it does**: Identifies frontmatter/main_content/endmatter pages from minimal OCR text
+- **Why**: Provides macro section hints for structure analysis
+- **Type**: AI location
+
+**17. `merge_boundaries_pref_v1`** (Code)
+- **What it does**: Merges primary boundary set with fallback, preferring primary and filling gaps
+- **Why**: Combines code-first results with AI fallback for maximum coverage
+- **Type**: Code-only merge
+
+**18. `verify_boundaries_v1`** (Code + optional AI)
+- **What it does**: Validates section boundaries with deterministic checks (ordering, duplicates) and optional AI spot-checks
+- **Why**: Catches boundary errors before expensive extraction stage
+- **Try**: Code (deterministic validation)
+- **Escalate**: Optional AI (spot-checks sampled boundaries for mid-sentence starts)
+- **Type**: Code validation with optional AI sampling
+
+**19. `validate_boundary_coverage_v1`** (Code)
+- **What it does**: Ensures boundary set covers expected section IDs and meets minimum count
+- **Why**: Fails fast if coverage is too low
+- **Type**: Code-only validation
+
+**20. `validate_boundaries_gate_v1`** (Code)
+- **What it does**: Final gate check before extraction (count, ordering, gaps)
+- **Why**: Prevents proceeding with invalid boundary set
+- **Type**: Code-only gate
+
+**21. `portionize_ai_extract_v1`** (AI)
+- **What it does**: Extracts section text from elements and parses gameplay data (choices, combat, luck tests, items) using AI
+- **Why**: AI understands context and can extract structured gameplay data from narrative text
+- **Type**: AI extraction (per-section calls)
+
+**22. `repair_candidates_v1`** (Code)
+- **What it does**: Detects sections needing repair (garbled text, low alpha ratio, high digit ratio) using heuristics
+- **Why**: Identifies problematic sections before expensive repair stage
+- **Type**: Code-only detection
+
+**23. `repair_portions_v1`** (AI)
+- **What it does**: Re-reads flagged sections with multimodal LLM (GPT-5) to repair garbled text
+- **Why**: Vision models can transcribe corrupted text that OCR missed
+- **Type**: AI repair (targeted, budget-capped)
+
+**24. `strip_section_numbers_v1`** (Code)
+- **What it does**: Removes section/page number artifacts from section text while preserving paragraph structure
+- **Why**: Clean text for final gamebook output
+- **Type**: Code-only cleaning
+
+#### Extract Stage
+
+**25. `extract_choices_v1`** (Code + optional AI)
+- **What it does**: Extracts choices from section text using deterministic pattern matching ("turn to X", "go to Y")
+- **Why**: Code-first approach is faster, cheaper, and more reliable than pure AI extraction
+- **Try**: Code (pattern matching)
+- **Escalate**: Optional AI (validation for ambiguous cases, disabled by default)
+- **Type**: Code-first with optional AI validation
+
+#### Build Stage
+
+**26. `build_ff_engine_v1`** (Code)
+- **What it does**: Assembles final gamebook.json from portions with choices, combat, items, etc.
+- **Why**: Creates final output format for game engine consumption
+- **Type**: Code-only assembly
+
+#### Validate Stage
+
+**27. `validate_ff_engine_v2`** (Code)
+- **What it does**: Validates gamebook.json for missing sections, duplicates, empty sections, structural issues
+- **Why**: Ensures final output meets quality requirements before use
+- **Type**: Code-only validation
+
+**28. `validate_choice_completeness_v1`** (Code)
+- **What it does**: Compares "turn to X" references in section text with extracted choices to find missing choices
+- **Why**: Critical for 100% game engine accuracy; missing choices break gameplay
+- **Type**: Code-only validation (pattern matching + comparison)
+
 ### Two Ways to Run the Pipeline
 
 **1. Regular Production Runs** (output in `output/runs/`)

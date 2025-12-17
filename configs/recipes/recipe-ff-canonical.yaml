@@ -113,10 +113,12 @@ stages:
     params:
       out: elements_core_typed.jsonl
       debug_out: elements_content_type_debug.jsonl
+      patterns_out: elements_patterns.jsonl
       disabled: false
       use_llm: false
+      # Note: coarse_segments will be added as input when available from coarse_segment stage
 
-  - id: coarse_segment
+  - id: coarse_segment_semantic
     stage: portionize
     module: coarse_segment_v1
     needs: [content_types]
@@ -132,6 +134,41 @@ stages:
       max_lines: 8
       max_len: 100
 
+  - id: coarse_segment_patterns
+    stage: portionize
+    module: coarse_segment_patterns_v1
+    needs: [content_types]
+    out: pattern_regions.json
+    inputs:
+      inputs: content_types
+    params:
+      inputs: elements_core_typed.jsonl
+      out: pattern_regions.json
+
+  - id: coarse_segment_ff_override
+    stage: portionize
+    module: coarse_segment_ff_override_v1
+    needs: [content_types, coarse_segment_semantic, coarse_segment_patterns]
+    out: ff_segment_hints.json
+    inputs:
+      inputs: content_types
+    params:
+      inputs: elements_core_typed.jsonl
+      coarse_segments: coarse_segments.json
+      pattern_regions: pattern_regions.json
+      out: ff_segment_hints.json
+
+  - id: coarse_segment
+    stage: portionize
+    module: coarse_segment_merge_v1
+    needs: [coarse_segment_semantic, coarse_segment_patterns, coarse_segment_ff_override]
+    out: merged_segments.json
+    params:
+      coarse_segments: coarse_segments.json
+      pattern_regions: pattern_regions.json
+      ff_hints: ff_segment_hints.json
+      out: merged_segments.json
+
   - id: fine_segment_frontmatter
     stage: portionize
     module: fine_segment_frontmatter_v1
@@ -141,7 +178,7 @@ stages:
       elements: content_types
     params:
       elements: elements_core_typed.jsonl
-      coarse_segments: coarse_segments.json
+      coarse_segments: merged_segments.json
       out: frontmatter_portions.json
       model: gpt-4.1-mini
       retry_model: gpt-5
@@ -175,12 +212,18 @@ stages:
 
   - id: assemble_boundaries
     stage: portionize
-    module: detect_gameplay_numbers_v1
-    needs: [macro_locate, content_types]
+    module: detect_boundaries_code_first_v1
+    needs: [content_types]
     out: section_boundaries.jsonl
     inputs:
       pages: content_types
-      macro: macro_locate
+    params:
+      min_section: 1
+      max_section: 400
+      target_coverage: 0.95
+      max_escalation_pages: 30
+      model: gpt-4.1-mini
+      escalation_model: gpt-5
 
   - id: ai_scan_fallback
     stage: portionize
@@ -296,10 +339,19 @@ stages:
     inputs:
       portions: repair_loop
 
+  - id: extract_choices
+    stage: extract
+    module: extract_choices_v1
+    needs: [strip_numbers]
+    out: portions_with_choices.jsonl
+    inputs:
+      inputs: strip_numbers
+    params: {}
+
   - id: build_ff_engine
     stage: build
     module: build_ff_engine_v1
-    needs: [strip_numbers]
+    needs: [extract_choices]
     out: gamebook.json
     out: gamebook.json
     inputs:

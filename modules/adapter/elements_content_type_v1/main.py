@@ -388,6 +388,306 @@ def _sig(text: str) -> str:
     return " ".join((text or "").strip().lower().split())
 
 
+def get_abstract_position(layout: Dict[str, Any], bbox: Optional[List[float]] = None) -> Optional[Tuple[str, str]]:
+    """
+    Determine abstract position as (vertical_align, horizontal_align) tuple.
+    
+    Returns None if layout data insufficient.
+    
+    NOTE: Coordinate system handling:
+    - Tesseract/EasyOCR: y=0 = top, y=1 = bottom (standard image coordinates)
+    - Apple Vision: y=0 = bottom, y=1 = top (inverted, bottom-left origin)
+    - If bbox is provided and y0 is high (>0.8), coordinate system may be inverted
+    - We detect inversion by checking if y is high AND element is at corner (likely running header)
+    
+    Examples:
+        (top, left), (top, center), (top, right)
+        (middle, left), (middle, center), (middle, right)
+        (bottom, left), (bottom, center), (bottom, right)
+    """
+    if not isinstance(layout, dict):
+        return None
+    
+    y = layout.get("y")
+    h_align = layout.get("h_align")
+    
+    if not isinstance(y, (int, float)):
+        return None
+    
+    # Detect inverted coordinate system: if y is high (>0.8) and element is at corner,
+    # it's likely a running header at top (inverted coords) rather than footer at bottom
+    # Heuristic: If y > 0.85 and h_align is left/right (corner), likely inverted
+    y_normalized = y
+    if bbox and len(bbox) >= 4:
+        y0, y1 = bbox[1], bbox[3]
+        # If y0 is very high (>0.9) and h_align suggests corner, likely inverted
+        # For running headers at top corners, they'll have high y in inverted system
+        if y0 > 0.85 and isinstance(h_align, str) and h_align.lower() in ["left", "right"]:
+            # Likely inverted: use (1 - y) to convert to standard
+            y_normalized = 1.0 - y
+        # Otherwise, assume standard coordinates
+    elif y > 0.85 and isinstance(h_align, str) and h_align.lower() in ["left", "right"]:
+        # No bbox but high y at corner - likely inverted
+        y_normalized = 1.0 - y
+    
+    # Vertical alignment (using normalized y)
+    if y_normalized <= 0.10:
+        vertical = "top"
+    elif y_normalized >= 0.90:
+        vertical = "bottom"
+    else:
+        vertical = "middle"
+    
+    # Horizontal alignment
+    if not isinstance(h_align, str):
+        # Default based on position if h_align not available
+        horizontal = "center"  # Conservative default
+    else:
+        h_align_lower = h_align.lower()
+        if "left" in h_align_lower:
+            horizontal = "left"
+        elif "right" in h_align_lower:
+            horizontal = "right"
+        elif "center" in h_align_lower:
+            horizontal = "center"
+        else:
+            horizontal = "center"  # Default
+    
+    return (vertical, horizontal)
+
+
+@dataclass
+class NumericElementInfo:
+    """Information about a numeric element or page range for pattern analysis."""
+    idx: int
+    element_id: str
+    page: int
+    number: Optional[int]  # None for page ranges (e.g., "6-8")
+    is_page_range: bool  # True if text is a page range like "6-8"
+    abstract_pos: Optional[Tuple[str, str]]
+    text: str
+    segment: Optional[str] = None  # frontmatter, gameplay, endmatter (optional, for debugging only)
+
+
+def detect_sequential_page_numbers(
+    numeric_elements: List[NumericElementInfo],
+    min_sequence_length: int = 3,
+    segment_filter: Optional[str] = None,
+) -> Dict[int, Dict[str, Any]]:
+    """
+    Detect sequential page number patterns (highest priority pattern).
+    
+    Looks for sequences of increasing integers (N, N+1, N+2...) at the same
+    abstract position on consecutive pages. Only processes numeric-only (not ranges).
+    
+    If segment_filter is provided, only processes elements from that segment (frontmatter/gameplay/endmatter).
+    Patterns should be detected separately per macro segment to avoid mixing patterns.
+    
+    Returns dict mapping element idx -> pattern info with high confidence.
+    """
+    # Filter by segment if provided (patterns should be detected per macro segment)
+    filtered_elements = numeric_elements
+    if segment_filter:
+        filtered_elements = [e for e in numeric_elements if e.segment == segment_filter]
+    
+    # Only process numeric-only elements (not page ranges) for sequential detection
+    numeric_only = [e for e in filtered_elements if not e.is_page_range and e.number is not None]
+    
+    if len(numeric_only) < min_sequence_length:
+        return {}
+    
+    # Group by abstract position (generic, no segment-specific logic)
+    by_pos: Dict[Optional[Tuple[str, str]], List[NumericElementInfo]] = defaultdict(list)
+    for elem in numeric_only:
+        by_pos[elem.abstract_pos].append(elem)
+    
+    matched_elements: Dict[int, Dict[str, Any]] = {}
+    
+    for pos, elems in by_pos.items():
+        if pos is None or len(elems) < min_sequence_length:
+            continue
+        
+        # Sort by page number
+        elems_sorted = sorted(elems, key=lambda e: e.page)
+        
+        # Look for sequences where number increases with page number
+        sequences: List[List[NumericElementInfo]] = []
+        current_seq: List[NumericElementInfo] = [elems_sorted[0]]
+        
+        for i in range(1, len(elems_sorted)):
+            prev = elems_sorted[i - 1]
+            curr = elems_sorted[i]
+            
+            # Check if this continues a sequence
+            # Page numbers typically increase by 1, but allow some gaps
+            if curr.page == prev.page + 1 or (curr.page > prev.page and curr.number is not None and prev.number is not None and curr.number == prev.number + 1):
+                current_seq.append(curr)
+            else:
+                if len(current_seq) >= min_sequence_length:
+                    sequences.append(current_seq)
+                current_seq = [curr]
+        
+        if len(current_seq) >= min_sequence_length:
+            sequences.append(current_seq)
+        
+        # Mark elements in valid sequences as page numbers
+        for seq in sequences:
+            for elem in seq:
+                if elem.number is not None:
+                    matched_elements[elem.idx] = {
+                        "pattern_type": "sequential_page_number",
+                        "content_type": "Page-footer",
+                        "confidence": 0.99,
+                        "pattern_info": {
+                            "sequence_length": len(seq),
+                            "abstract_position": pos,
+                            "page_range": (seq[0].page, seq[-1].page),
+                            "number_range": (seq[0].number, seq[-1].number) if seq[0].number is not None and seq[-1].number is not None else None,
+                        }
+                    }
+    
+    return matched_elements
+
+
+def detect_other_header_footer_patterns(
+    numeric_elements: List[NumericElementInfo],
+    matched_indices: set,
+    min_repeats: int = 3,
+    segment_filter: Optional[str] = None,
+) -> Dict[int, Dict[str, Any]]:
+    """
+    Detect other header/footer patterns for remaining numeric elements and page ranges.
+    
+    - Running Headers: Repeating page ranges or numbers at same position (typically top)
+    - Other Page Footers: Consistently placed non-sequential numbers at bottom
+    
+    If segment_filter is provided, only processes elements from that segment (frontmatter/gameplay/endmatter).
+    Patterns should be detected separately per macro segment to avoid mixing patterns.
+    """
+    matched_elements: Dict[int, Dict[str, Any]] = {}
+    
+    # Filter by segment if provided (patterns should be detected per macro segment)
+    filtered_elements = numeric_elements
+    if segment_filter:
+        filtered_elements = [e for e in numeric_elements if e.segment == segment_filter]
+    
+    # Filter out already matched elements
+    remaining = [e for e in filtered_elements if e.idx not in matched_indices]
+    
+    if not remaining:
+        return matched_elements
+    
+    # Group by abstract position (generic, no segment-specific logic)
+    by_pos: Dict[Optional[Tuple[str, str]], List[NumericElementInfo]] = defaultdict(list)
+    for elem in remaining:
+        by_pos[elem.abstract_pos].append(elem)
+    
+    for pos, elems in by_pos.items():
+        if pos is None or len(elems) < min_repeats:
+            continue
+        
+        vertical, horizontal = pos
+        
+        # Running Headers: Top position, repeating page ranges or numbers
+        if vertical == "top":
+            # Running headers can be detected in two ways:
+            # 1. Same text repeating (traditional running header with identical text)
+            # 2. Position pattern: Multiple DIFFERENT page ranges/numbers at same position
+            #    (e.g., "9-10", "14-15", "18-21" all at top-left - section ranges per page)
+            
+            # Group by text signature for exact matches
+            by_text_sig: Dict[str, List[NumericElementInfo]] = defaultdict(list)
+            for elem in elems:
+                sig = elem.text.strip()
+                by_text_sig[sig].append(elem)
+            
+            # Pattern 1: Same text repeating (traditional running header)
+            for text_sig, sig_elems in by_text_sig.items():
+                if len(sig_elems) >= min_repeats:
+                    for elem in sig_elems:
+                        pattern_info = {
+                            "abstract_position": pos,
+                            "repeat_count": len(sig_elems),
+                            "text": text_sig,
+                            "pattern_variant": "exact_text_repeat",
+                        }
+                        if elem.is_page_range:
+                            pattern_info["is_page_range"] = True
+                        else:
+                            pattern_info["number"] = elem.number
+                        
+                        matched_elements[elem.idx] = {
+                            "pattern_type": "running_header",
+                            "content_type": "Page-header",
+                            "confidence": 0.90,
+                            "pattern_info": pattern_info,
+                        }
+            
+            # Pattern 2: Position-based pattern (different text, same position)
+            # If we have enough elements at this position (even with different text),
+            # and they're page ranges or numbers, classify as running headers
+            # Lower threshold for position pattern (different text is still a pattern)
+            position_pattern_min = max(5, min_repeats)  # Need at least 5 occurrences for position pattern
+            
+            # Filter out already matched elements (from exact text matches)
+            unmatched_at_pos = [e for e in elems if e.idx not in matched_elements]
+            
+            # Check if enough unmatched elements remain to form a position pattern
+            # Look for page ranges specifically (section ranges are most common)
+            page_ranges_at_pos = [e for e in unmatched_at_pos if e.is_page_range]
+            numeric_at_pos = [e for e in unmatched_at_pos if not e.is_page_range and e.number is not None]
+            
+            # If we have enough page ranges at this position, classify all as running headers
+            if len(page_ranges_at_pos) >= position_pattern_min:
+                for elem in page_ranges_at_pos:
+                    matched_elements[elem.idx] = {
+                        "pattern_type": "running_header",
+                        "content_type": "Page-header",
+                        "confidence": 0.90,
+                        "pattern_info": {
+                            "abstract_position": pos,
+                            "occurrence_count": len(page_ranges_at_pos),
+                            "text": elem.text,
+                            "pattern_variant": "position_pattern",
+                            "is_page_range": True,
+                        }
+                    }
+            # If we have enough numeric elements at this position (but not ranges), also classify
+            elif len(numeric_at_pos) >= position_pattern_min:
+                for elem in numeric_at_pos:
+                    matched_elements[elem.idx] = {
+                        "pattern_type": "running_header",
+                        "content_type": "Page-header",
+                        "confidence": 0.85,  # Slightly lower confidence for numeric-only
+                        "pattern_info": {
+                            "abstract_position": pos,
+                            "occurrence_count": len(numeric_at_pos),
+                            "text": elem.text,
+                            "pattern_variant": "position_pattern",
+                            "number": elem.number,
+                        }
+                    }
+        
+        # Other Page Footers: Bottom position, non-sequential but consistent
+        elif vertical == "bottom":
+            # Only process numeric-only (not ranges) at bottom - ranges at bottom are unusual
+            numeric_at_bottom = [e for e in elems if not e.is_page_range]
+            if len(numeric_at_bottom) >= min_repeats:
+                for elem in numeric_at_bottom:
+                    # Only if not already matched and not sequential (sequential handled earlier)
+                    matched_elements[elem.idx] = {
+                        "pattern_type": "consistent_bottom_footer",
+                        "content_type": "Page-footer",
+                        "confidence": 0.85,
+                        "pattern_info": {
+                            "abstract_position": pos,
+                            "occurrence_count": len(numeric_at_bottom),
+                        }
+                    }
+    
+    return matched_elements
+
+
 def batch_items(items: List[Any], batch_size: int) -> List[List[Any]]:
     out: List[List[Any]] = []
     for i in range(0, len(items), batch_size):
@@ -496,6 +796,26 @@ def main():
         action="store_true",
         help=argparse.SUPPRESS,
     )
+    parser.add_argument(
+        "--coarse-segments",
+        dest="coarse_segments",
+        help="Optional path to coarse_segments.json for segment-aware pattern analysis",
+    )
+    parser.add_argument(
+        "--coarse_segments",
+        dest="coarse_segments",
+        help=argparse.SUPPRESS,  # alias for driver params
+    )
+    parser.add_argument(
+        "--patterns-out",
+        dest="patterns_out",
+        help="Optional path for element_patterns.jsonl debug artifact",
+    )
+    parser.add_argument(
+        "--patterns_out",
+        dest="patterns_out",
+        help=argparse.SUPPRESS,  # alias for driver params
+    )
     args = parser.parse_args()
 
     inp = args.inputs[0]
@@ -509,6 +829,34 @@ def main():
             args.debug_out = os.path.join(os.path.dirname(os.path.abspath(args.out)), args.debug_out)
         ensure_dir(os.path.dirname(args.debug_out) or ".")
         open(args.debug_out, "w", encoding="utf-8").close()
+    
+    if args.patterns_out:
+        # If patterns_out is relative, place it next to the primary output artifact
+        if not os.path.isabs(args.patterns_out):
+            args.patterns_out = os.path.join(os.path.dirname(os.path.abspath(args.out)), args.patterns_out)
+        ensure_dir(os.path.dirname(args.patterns_out) or ".")
+        open(args.patterns_out, "w", encoding="utf-8").close()
+    
+    # Load coarse segments if available
+    segment_map: Dict[int, str] = {}  # page -> segment name
+    if args.coarse_segments and os.path.exists(args.coarse_segments):
+        try:
+            with open(args.coarse_segments, "r", encoding="utf-8") as f:
+                coarse = json.load(f)
+            if "frontmatter_pages" in coarse:
+                start, end = coarse["frontmatter_pages"]
+                for page in range(start, end + 1):
+                    segment_map[page] = "frontmatter"
+            if "gameplay_pages" in coarse:
+                start, end = coarse["gameplay_pages"]
+                for page in range(start, end + 1):
+                    segment_map[page] = "gameplay"
+            if "endmatter_pages" in coarse and coarse["endmatter_pages"]:
+                start, end = coarse["endmatter_pages"]
+                for page in range(start, end + 1):
+                    segment_map[page] = "endmatter"
+        except Exception as e:
+            print(f"[elements_content_type_v1] Warning: Failed to load coarse_segments: {e}")
 
     elements: List[Dict[str, Any]] = []
     for row in read_jsonl(inp):
@@ -549,13 +897,15 @@ def main():
                 top_text_idx_by_page[page] = idx
 
         # Candidate header/footer signatures are repetition-based; avoid naive y-only tagging.
+        # NOTE: We now include numeric-only text in repetition analysis for pattern detection
         if len(text) > 90:
             continue
-        if is_numeric_only(text) is not None:
-            continue
+        # REMOVED: if is_numeric_only(text) is not None: continue
+        # Now numeric-only text is included for pattern-based detection
         if looks_like_list_item(text) or looks_like_toc_entry(text):
             continue
-        if not re.search(r"[A-Za-z]", text):
+        if not re.search(r"[A-Za-z]", text) and is_numeric_only(text) is None:
+            # Skip non-numeric, non-alphabetic text (but allow numeric-only for pattern analysis)
             continue
 
         sig = _sig(text)
@@ -614,6 +964,47 @@ def main():
         predictions.append(Prediction(content_type=label, confidence=conf, subtype=subtype))
         if args.use_llm and conf < args.llm_threshold and (elem.get("kind") == "text"):
             ambiguous.append(idx)
+    
+    # NEW: Collect numeric elements and page ranges with abstract positions BEFORE post-processing
+    # (so pattern detection can work on all numeric elements and ranges regardless of current classification)
+    numeric_elements: List[NumericElementInfo] = []
+    for idx, elem in enumerate(elements):
+        if (elem.get("kind") or "").strip() != "text":
+            continue
+        text = (elem.get("text") or "").strip()
+        
+        # Check for numeric-only OR page ranges (e.g., "6-8", "12-17")
+        n = is_numeric_only(text)
+        is_range = looks_like_page_range(text)
+        
+        if n is None and not is_range:
+            continue
+        
+        page = elem.get("page")
+        if not isinstance(page, int):
+            continue
+        
+        layout = elem.get("layout") or {}
+        bbox = elem.get("bbox")  # Get bbox to help detect coordinate system
+        abstract_pos = get_abstract_position(layout, bbox=bbox) if isinstance(layout, dict) else None
+        
+        # Skip if no position info (will use fallback heuristics)
+        if abstract_pos is None:
+            continue
+        
+        segment = segment_map.get(page)  # Optional, for debugging only
+        element_id = elem.get("id") or elem.get("element_id") or f"elem_{idx}"
+        
+        numeric_elements.append(NumericElementInfo(
+            idx=idx,
+            element_id=element_id,
+            page=page,
+            number=n,
+            is_page_range=is_range,
+            abstract_pos=abstract_pos,
+            text=text,
+            segment=segment,
+        ))
 
     # Post-process: bbox/layout-aware tagging where we can do it safely (repetition + page-number).
     for idx, elem in enumerate(elements):
@@ -643,6 +1034,7 @@ def main():
             continue
 
         # Page range indicators at the top (e.g., "6-8" / "6–8") are headers, not Titles.
+        # NOTE: These will also be processed by pattern detection, which may override with higher confidence
         if y <= 0.08 and looks_like_page_range(text):
             predictions[idx] = Prediction(content_type="Page-header", confidence=max(pred.confidence, 0.85), subtype=pred.subtype)
             continue
@@ -652,6 +1044,92 @@ def main():
             continue
         if sig in footer_sigs:
             predictions[idx] = Prediction(content_type="Page-footer", confidence=max(pred.confidence, 0.9), subtype=pred.subtype)
+    
+    # NEW: Pattern-based classification for numeric elements at margins
+    # (runs after initial post-processing, can override with higher confidence)
+    # Patterns should be detected separately per macro segment (frontmatter/gameplay/endmatter)
+    # to avoid mixing patterns from different segments
+    
+    # Get unique segments from numeric elements (if segment_map was loaded)
+    segments = sorted(set(e.segment for e in numeric_elements if e.segment))
+    if not segments:
+        # No segment information available - process all together (backward compatibility)
+        segments = [None]
+    
+    all_sequential_patterns: Dict[int, Dict[str, Any]] = {}
+    all_other_patterns: Dict[int, Dict[str, Any]] = {}
+    all_matched_indices: set = set()
+    
+    # Process each segment separately
+    for segment in segments:
+        # Step 2: Detect sequential page numbers (highest priority) for this segment
+        sequential_patterns = detect_sequential_page_numbers(
+            numeric_elements, 
+            min_sequence_length=3,
+            segment_filter=segment
+        )
+        all_sequential_patterns.update(sequential_patterns)
+        all_matched_indices.update(sequential_patterns.keys())
+        
+        # Step 3: Detect other header/footer patterns (lower priority) for this segment
+        other_patterns = detect_other_header_footer_patterns(
+            numeric_elements, 
+            all_matched_indices, 
+            min_repeats=min_repeats,
+            segment_filter=segment
+        )
+        all_other_patterns.update(other_patterns)
+        all_matched_indices.update(other_patterns.keys())
+    
+    # Combine results from all segments
+    sequential_patterns = all_sequential_patterns
+    matched_indices = all_matched_indices
+    other_patterns = all_other_patterns
+    
+    # Step 4: Apply pattern-based overrides
+    pattern_debug_log: List[Dict[str, Any]] = []
+    all_patterns = {**sequential_patterns, **other_patterns}
+    
+    for idx, pattern_info in all_patterns.items():
+        if idx >= len(predictions):
+            continue
+        
+        pred = predictions[idx]
+        elem = elements[idx]
+        
+        # Override only if pattern confidence is higher than current
+        pattern_conf = pattern_info["confidence"]
+        if pattern_conf > pred.confidence:
+            new_content_type = pattern_info["content_type"]
+            
+            # Update subtype if needed
+            subtype = dict(pred.subtype) if isinstance(pred.subtype, dict) else {}
+            if pattern_info["content_type"] == "Page-footer" and "page_number" not in subtype:
+                subtype["page_number"] = numeric_elements[next(i for i, e in enumerate(numeric_elements) if e.idx == idx)].number
+            
+            predictions[idx] = Prediction(
+                content_type=new_content_type,
+                confidence=pattern_conf,
+                subtype=subtype if subtype else None
+            )
+            
+            # Log for debug artifact
+            pattern_debug_log.append({
+                "element_id": elem.get("id") or elem.get("element_id"),
+                "page": elem.get("page"),
+                "text": elem.get("text", "")[:50],
+                "original_type": pred.content_type,
+                "original_confidence": pred.confidence,
+                "pattern_type": pattern_info["pattern_type"],
+                "new_type": new_content_type,
+                "new_confidence": pattern_conf,
+                "pattern_info": pattern_info.get("pattern_info", {}),
+            })
+    
+    # Write pattern debug artifact
+    if args.patterns_out and pattern_debug_log:
+        for entry in pattern_debug_log:
+            append_jsonl(args.patterns_out, entry)
 
     # Top-of-page title nudge: if the top-most element is near the top and not a repeating header,
     # treat it as a Title when heuristics were otherwise uncertain.

@@ -48,5 +48,11 @@ param_schema:
       type: boolean
     allow_unknown_kv_keys:
       type: boolean
+    coarse_segments:
+      type: string
+      description: Optional path to coarse_segments.json for segment-aware pattern analysis
+    patterns_out:
+      type: string
+      description: Optional path for element_patterns.jsonl debug artifact
   required: [out]
 notes: "Text-first DocLayNet-style content type tagging for elements_core.jsonl."

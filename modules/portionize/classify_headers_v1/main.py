@@ -322,7 +322,17 @@ def aggregate_results(results_forward: List[Dict], results_backward: List[Dict])
         macro_header = max(macro_header_counts.items(), key=lambda x: x[1])[0]
         
         # Majority vote for game_section_header
-        game_section_flags = [r.get("game_section_header", False) for r in results]
+        # Normalize to booleans (LLM might return strings like "true"/"false")
+        game_section_flags = []
+        for r in results:
+            val = r.get("game_section_header", False)
+            # Convert to boolean: handle bool, string "true"/"false", or truthy/falsy
+            if isinstance(val, bool):
+                game_section_flags.append(val)
+            elif isinstance(val, str):
+                game_section_flags.append(val.lower() in ("true", "1", "yes"))
+            else:
+                game_section_flags.append(bool(val))
         game_section_header = sum(game_section_flags) > len(game_section_flags) / 2
         
         # Average confidence
@@ -333,8 +343,17 @@ def aggregate_results(results_forward: List[Dict], results_backward: List[Dict])
         claimed_section_number = None
         if game_section_header:
             # Get section numbers from results where game_section_header is true
+            # Normalize game_section_header check (same logic as above)
+            def is_game_section_header(val):
+                if isinstance(val, bool):
+                    return val
+                elif isinstance(val, str):
+                    return val.lower() in ("true", "1", "yes")
+                else:
+                    return bool(val)
+            
             section_numbers = [r.get("claimed_section_number") for r in results 
-                             if r.get("game_section_header") and r.get("claimed_section_number") is not None]
+                             if is_game_section_header(r.get("game_section_header")) and r.get("claimed_section_number") is not None]
             if section_numbers:
                 # Use most common section number
                 section_number_counts = defaultdict(int)

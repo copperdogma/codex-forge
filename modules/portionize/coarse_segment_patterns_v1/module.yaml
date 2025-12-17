@@ -1,0 +1,19 @@
+stage: portionize
+module_id: coarse_segment_patterns_v1
+entrypoint: modules/portionize/coarse_segment_patterns_v1/main.py
+
+needs:
+  - elements: content_types
+
+outputs:
+  - pattern_regions.json
+
+parameters:
+  inputs:
+    description: Path to elements_core_typed.jsonl
+    required: true
+  out:
+    description: Path to output pattern_regions.json
+    required: true
+
+

@@ -1,0 +1,29 @@
+stage: portionize
+module_id: coarse_segment_merge_v1
+entrypoint: modules/portionize/coarse_segment_merge_v1/main.py
+
+needs:
+  - elements: core
+
+outputs:
+  - merged_segments.json
+
+parameters:
+  coarse_segments:
+    description: Path to coarse_segments.json (semantic segments)
+    required: true
+  pattern_regions:
+    description: Path to pattern_regions.json (pattern regions)
+    required: true
+  ff_hints:
+    description: Path to ff_segment_hints.json (FF override hints)
+    required: false
+  out:
+    description: Path to output merged_segments.json
+    required: true
+
+notes: |
+  Merges semantic segments, pattern regions, and FF override hints
+  to produce refined segment boundaries.
+
+

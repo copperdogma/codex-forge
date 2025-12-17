@@ -1,0 +1,30 @@
+stage: portionize
+module_id: coarse_segment_ff_override_v1
+entrypoint: modules/portionize/coarse_segment_ff_override_v1/main.py
+
+needs:
+  - elements: core
+
+outputs:
+  - ff_segment_hints.json
+
+parameters:
+  inputs:
+    description: Path to elements_core.jsonl
+    required: true
+  coarse_segments:
+    description: Optional path to coarse_segments.json (semantic segments)
+    required: false
+  pattern_regions:
+    description: Optional path to pattern_regions.json (pattern regions)
+    required: false
+  out:
+    description: Path to output ff_segment_hints.json
+    required: true
+
+notes: |
+  FF-specific override rule: "Gameplay starts with BACKGROUND header"
+  This module searches for the BACKGROUND keyword and overrides semantic/pattern
+  boundaries when found. FF-specific but clearly documented.
+
+

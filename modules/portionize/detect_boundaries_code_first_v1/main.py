@@ -20,20 +20,23 @@ def filter_section_headers(elements: List[Dict], min_section: int, max_section: 
     This is FREE, instant, and deterministic.
     
     CRITICAL: Applies multi-stage validation to eliminate false positives:
-    1. Page-level clustering (eliminate outliers on same page)
-    2. Multi-page duplicate resolution (choose best instance)
-    3. Sequential validation (enforce ordering)
-    """
+    1. Find section 1 to determine frontmatter boundary
+    2. Filter frontmatter (BEFORE duplicate resolution to avoid losing valid instances)
+    3. Page-level clustering (eliminate outliers on same page)
+    4. Multi-page duplicate resolution (choose best instance)
+    5. Sequential validation (enforce ordering)
+"""
     candidates = []
     
     for elem in elements:
         # Check if marked as Section-header by content_type classifier
+        # NOTE: This is a SIGNAL, not a guarantee - we validate further below
         if elem.get('content_type') != 'Section-header':
             continue
         
         # Extract section number from content_subtype
-        subtype = elem.get('content_subtype', {})
-        section_num = subtype.get('number')
+        subtype = elem.get('content_subtype') or {}
+        section_num = subtype.get('number') if isinstance(subtype, dict) else None
         
         if section_num is None:
             continue
@@ -42,16 +45,73 @@ def filter_section_headers(elements: List[Dict], min_section: int, max_section: 
         if not (min_section <= section_num <= max_section):
             continue
         
+        # VALIDATION: Content type classification is a SIGNAL, not a guarantee
+        # Additional checks to filter false positives (e.g., page numbers misclassified as headers)
+        page = elem.get('page')
+        if page is not None:
+            # Check layout position if available (bottom of page = likely page number footer)
+            layout = elem.get('layout') or {}
+            if isinstance(layout, dict):
+                y = layout.get('y')
+                if y is not None and y >= 0.92:
+                    # At bottom of page (y >= 0.92) - likely a page number footer, not a section header
+                    continue
+        
         # Create boundary record (allow duplicates for now, will filter in validation)
+        # Use 'id' field (element schema uses 'id', not 'element_id')
+        element_id = elem.get('id') or elem.get('element_id')
         candidates.append({
             'section_id': str(section_num),
-            'start_element_id': elem.get('element_id'),
-            'start_page': elem.get('page'),
+            'start_element_id': element_id,
+            'start_page': page,
             'start_line_idx': elem.get('line_idx'),
             'confidence': 0.95,
             'method': 'code_filter',
             'source': 'content_type_classification'
         })
+    
+    # Find section 1 to determine frontmatter boundary (must happen early!)
+    # CRITICAL: There may be multiple false positives for section 1 in frontmatter
+    # We need to find the CORRECT section 1 (the one that would win duplicate resolution)
+    # Strategy: Find the section 1 instance on the page with the best fit score
+    # (i.e., the page with the most consecutive sections starting from 1)
+    section_1_candidates = [b for b in candidates if int(b['section_id']) == 1]
+    section_1_page = None
+    
+    if section_1_candidates:
+        # For each section 1 candidate, calculate fit score (consecutive neighbors)
+        best_section_1 = None
+        best_score = -1
+        
+        for boundary in section_1_candidates:
+            page = boundary['start_page']
+            # Find all sections on this page
+            page_sections = sorted([
+                int(b['section_id']) for b in candidates 
+                if b['start_page'] == page
+            ])
+            
+            # Calculate fit: count consecutive sections starting from 1
+            fit_score = 1  # Section 1 itself
+            check_section = 1
+            while check_section + 1 in page_sections:
+                fit_score += 1
+                check_section += 1
+            
+            if fit_score > best_score:
+                best_score = fit_score
+                best_section_1 = boundary
+                section_1_page = page
+        
+        # If no good fit found, use the lowest page number (assumes earlier instances are false positives)
+        if section_1_page is None:
+            section_1_page = min(b['start_page'] for b in section_1_candidates)
+    
+    # STAGE 0: Filter frontmatter BEFORE duplicate resolution
+    # This prevents valid instances from being lost when duplicate resolution
+    # chooses a frontmatter instance that later gets filtered out
+    if section_1_page is not None:
+        candidates = [b for b in candidates if b['start_page'] >= section_1_page]
     
     # STAGE 1: Page-level clustering to eliminate outliers
     clustered = _filter_page_outliers(candidates)
@@ -59,7 +119,7 @@ def filter_section_headers(elements: List[Dict], min_section: int, max_section: 
     # STAGE 2: Multi-page duplicate resolution
     deduplicated = _resolve_duplicates(clustered)
     
-    # STAGE 3: Sequential validation
+    # STAGE 3: Sequential validation (now redundant frontmatter check, but keeps logic clean)
     validated = _validate_sequential_ordering(deduplicated)
     
     # Sort by section number
@@ -392,6 +452,8 @@ def main():
         description='Code-first section boundary detection with targeted escalation'
     )
     parser.add_argument('--inputs', nargs='*', help='Driver-provided inputs (elements_core_typed.jsonl)')
+    parser.add_argument('--pages', help='Alias for --inputs (driver compatibility)')
+    parser.add_argument('--elements', help='Alias for --inputs (driver compatibility)')
     parser.add_argument('--out', required=True, help='Output section_boundary_v1 JSONL')
     parser.add_argument('--run-id', '--run_id', dest='run_id', help='Run ID for logging')
     parser.add_argument('--min-section', '--min_section', type=int, default=1, dest='min_section',
@@ -407,15 +469,23 @@ def main():
                        default='gpt-5', help='Stronger LLM for escalation')
     parser.add_argument('--images-dir', '--images_dir', dest='images_dir',
                        help='Images directory (defaults to run_dir/../images)')
+    parser.add_argument('--state-file', dest='state_file', help='Driver state file (ignored)')
+    parser.add_argument('--progress-file', dest='progress_file', help='Driver progress file (ignored)')
     
     args = parser.parse_args()
     
     logger = ProgressLogger(args.run_id, 'detect_boundaries_code_first_v1')
     
-    # Get input path
-    input_path = args.inputs[0] if args.inputs else None
+    # Get input path (support multiple aliases for driver compatibility)
+    input_path = None
+    if args.inputs:
+        input_path = args.inputs[0] if isinstance(args.inputs, list) else args.inputs
+    elif args.pages:
+        input_path = args.pages
+    elif args.elements:
+        input_path = args.elements
     if not input_path:
-        raise ValueError("No input path provided")
+        raise ValueError("No input path provided (use --inputs, --pages, or --elements)")
     
     # Determine run directory and images directory
     run_dir = Path(args.out).parent

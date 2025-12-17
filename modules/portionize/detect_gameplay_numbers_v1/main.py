@@ -299,6 +299,76 @@ def check_centering(elem: Dict, pagelines_data: Dict, page: int) -> bool:
     return is_centered
 
 
+def _filter_page_ordering_violations(boundaries: List[Dict], all_elements: List[Dict]) -> List[Dict]:
+    """
+    Filter out boundaries that violate page ordering sanity checks.
+    
+    Key insight: Fighting Fantasy sections are 100% in order.
+    If sections 168 and 171 are on pages 55-56, section 169 cannot be on page 95.
+    
+    Strategy: Sort boundaries by page (document order), then check for violations
+    where a section with a lower ID appears significantly later (more than 5 pages)
+    than a section with a higher ID, or vice versa.
+    """
+    if not boundaries or len(boundaries) < 2:
+        return boundaries
+    
+    # Build element ID to page map for quick lookup
+    elem_to_page = {}
+    for elem in all_elements:
+        elem_id = elem.get("id")
+        if elem_id:
+            page = elem.get("metadata", {}).get("page_number") or elem.get("page")
+            if page is not None:
+                elem_to_page[elem_id] = page
+    
+    # Build list of (section_id, page, boundary) tuples
+    sections_with_pages = []
+    for boundary in boundaries:
+        sid = int(boundary["section_id"])
+        elem_id = boundary["start_element_id"]
+        page = elem_to_page.get(elem_id)
+        if page is not None:
+            sections_with_pages.append((sid, page, boundary))
+    
+    if len(sections_with_pages) < 2:
+        return boundaries
+    
+    # Sort by page (document order), then by section ID for ties
+    sections_with_pages.sort(key=lambda x: (x[1], x[0]))
+    
+    # Check for violations: a section with a lower ID appearing significantly later
+    # than a section with a higher ID, or vice versa
+    violations = set()
+    for i in range(len(sections_with_pages) - 1):
+        sid1, page1, boundary1 = sections_with_pages[i]
+        sid2, page2, boundary2 = sections_with_pages[i + 1]
+        
+        # If pages are the same or very close (within 2 pages), allow any ID order
+        if abs(page2 - page1) <= 2:
+            continue
+        
+        # If section with higher ID (sid1) appears earlier (page1) but lower ID (sid2) appears
+        # significantly later (more than 5 pages), flag the later one (sid2) as false positive
+        # Example: section 171 (page 56) before section 169 (page 95) - section 169 is false positive
+        if sid1 > sid2 and page2 > page1 + 5:
+            violations.add(sid2)
+        # If section with lower ID (sid1) appears earlier but higher ID (sid2) appears
+        # significantly later, flag the later one (sid2) as false positive
+        # Example: section 168 (page 55) before section 170 (page 95) - section 170 is false positive
+        elif sid1 < sid2 and page2 > page1 + 5:
+            # This is actually valid - sections should increase with pages
+            # But if the jump is too large, might be false positive
+            # Skip for now - the first check should catch most cases
+            pass
+    
+    if violations:
+        print(f"[detect_gameplay_numbers] Filtered {len(violations)} boundaries due to page ordering violations: {sorted(violations)}")
+    
+    # Return boundaries that don't violate page ordering
+    return [b for b in boundaries if int(b["section_id"]) not in violations]
+
+
 def load_pagelines_for_centering(pagelines_path: str) -> Dict:
     """
     Load pagelines data to access bbox information for centering detection.
@@ -405,11 +475,23 @@ def main():
         if not candidates:
             continue
         page = elem.get("metadata", {}).get("page_number") or elem.get("page")
+        
+        # Check content_type early to make filtering decisions
+        content_type = elem.get("content_type")
+        content_type_confidence = elem.get("content_type_confidence", 0.0)
+        is_high_confidence_header = (
+            content_type == "Section-header" and content_type_confidence >= 0.8
+        )
+        
         for sid in candidates:
             if sid < args.min_id or sid > args.max_id:
                 continue
+            
+            # Frontmatter filtering: ALWAYS skip pages before main_start_page
+            # Frontmatter cannot contain gameplay sections - the boundary is trusted
             if main_start_page and page and page < main_start_page:
-                continue  # skip frontmatter
+                continue  # skip frontmatter - no exceptions
+            
             if sid in seen_ids:
                 continue  # keep first occurrence
 
@@ -417,11 +499,6 @@ def main():
             # BUT: If element is already classified as Section-header with high confidence,
             # trust that classification over simple text flow analysis (which can fail when
             # element boundaries are ambiguous due to text extraction issues)
-            content_type = elem.get("content_type")
-            content_type_confidence = elem.get("content_type_confidence", 0.0)
-            is_high_confidence_header = (
-                content_type == "Section-header" and content_type_confidence >= 0.8
-            )
             
             if not is_high_confidence_header:
                 # For non-Section-header or low-confidence elements, use strict validation
@@ -464,6 +541,11 @@ def main():
             boundaries.append(boundary.model_dump(exclude_none=True))
             seen_ids.add(sid)
             count += 1
+
+    # Filter out boundaries that violate page ordering
+    # Key insight: Sections must appear in roughly sequential page order
+    # If sections 168 and 171 are on pages 55-56, section 169 cannot be on page 95
+    boundaries = _filter_page_ordering_violations(boundaries, all_elements)
 
     # sort by section_id then confidence
     boundaries.sort(key=lambda b: int(b["section_id"]))

@@ -44,6 +44,10 @@ def build_chosen_lines(page_data: Dict[str, Any], engine: str) -> List[Dict[str,
     synthesized upstream or sourced from a different engine. These headers are often
     not present in engines_raw text blobs, so throwing away page_data['lines'] will
     silently drop section starts (e.g. '6', '7', '8' on a shared header like '6-8').
+
+    Also: extract standalone numeric headers from ALL engines (not just chosen one)
+    if they're missing from the lines array, since extract_ocr_ensemble_v1 may not
+    have synthesized them from ranges.
     """
     # Prefer curated lines from extract_ocr_ensemble_v1 when available.
     original_lines = page_data.get("lines") or []
@@ -57,31 +61,93 @@ def build_chosen_lines(page_data: Dict[str, Any], engine: str) -> List[Dict[str,
     )
 
     chosen_lines: List[Dict[str, Any]] = []
+    seen_texts = set()  # Track texts we've already included
 
     if has_structured:
-        for ln in original_lines:
-            if not isinstance(ln, dict):
-                continue
-            txt = (ln.get("text") or "").strip()
-            src = (ln.get("source") or "").strip()
+        # Check if any original lines are from the chosen engine
+        has_chosen_engine_lines = any(
+            isinstance(ln, dict) and (ln.get("source") or "").strip() == engine
+            for ln in original_lines
+        )
+        
+        if has_chosen_engine_lines:
+            # We have lines from the chosen engine - use structured view
+            for ln in original_lines:
+                if not isinstance(ln, dict):
+                    continue
+                txt = (ln.get("text") or "").strip()
+                src = (ln.get("source") or "").strip()
 
-            # Preserve all lines from the picked engine, plus any line that
-            # looks like a section header (standalone number or numeric glitch).
-            if src == engine or is_section_header(txt):
-                # Make a shallow copy so we don't mutate upstream artifacts.
-                ln_out = dict(ln)
-                if not ln_out.get("source"):
-                    ln_out["source"] = engine
-                chosen_lines.append(ln_out)
+                # Preserve all lines from the picked engine, plus any line that
+                # looks like a section header (standalone number or numeric glitch).
+                if src == engine or is_section_header(txt):
+                    # Make a shallow copy so we don't mutate upstream artifacts.
+                    ln_out = dict(ln)
+                    if not ln_out.get("source"):
+                        ln_out["source"] = engine
+                    chosen_lines.append(ln_out)
+                    seen_texts.add(txt)
 
-        # If we managed to build a non-empty structured view, use it.
-        if chosen_lines:
-            return chosen_lines
+            # Enhancement: Also check ALL engines_raw for standalone numeric headers
+            # that might be missing from the lines array (e.g., if extract_ocr_ensemble_v1
+            # didn't synthesize them from ranges)
+            engines_raw = page_data.get("engines_raw") or {}
+            if isinstance(engines_raw, dict):
+                for eng_name, eng_text in engines_raw.items():
+                    if not isinstance(eng_text, str):
+                        continue
+                    eng_lines = split_lines(eng_text)
+                    for eng_line in eng_lines:
+                        txt = eng_line.strip()
+                        # If this is a standalone numeric header we haven't seen yet, add it
+                        # Also validate it's a reasonable section number (1-400 range)
+                        if is_section_header(txt) and txt not in seen_texts:
+                            # Extract numeric value (handle cases like "16." -> 16)
+                            try:
+                                num_str = txt.replace('.', '').strip()
+                                if num_str.isdigit():
+                                    num_val = int(num_str)
+                                    # Only include valid section numbers (1-400 for Fighting Fantasy)
+                                    if 1 <= num_val <= 400:
+                                        chosen_lines.append({"text": txt, "source": eng_name})
+                                        seen_texts.add(txt)
+                            except (ValueError, AttributeError):
+                                pass  # Skip if we can't parse as number
+            
+            if chosen_lines:
+                return chosen_lines
+        # If no lines from chosen engine, fall through to use chosen engine's raw text
 
     # Fallback: no structured lines (or nothing matched); derive from engines_raw.
+    # In this case, scan ALL engines for standalone numeric headers, not just chosen one
     txt = _engine_text_from_page(page_data, engine)
     lines = split_lines(txt)
-    return [{"text": ln, "source": engine} for ln in lines]
+    result_lines = [{"text": ln, "source": engine} for ln in lines]
+    seen_texts = {ln.strip() for ln in lines}
+    
+    # Also check other engines for standalone numeric headers we might have missed
+    engines_raw = page_data.get("engines_raw") or {}
+    if isinstance(engines_raw, dict):
+        for eng_name, eng_text in engines_raw.items():
+            if eng_name == engine or not isinstance(eng_text, str):
+                continue
+            eng_lines = split_lines(eng_text)
+            for eng_line in eng_lines:
+                txt = eng_line.strip()
+                if is_section_header(txt) and txt not in seen_texts:
+                    # Validate it's a reasonable section number (1-400 range)
+                    try:
+                        num_str = txt.replace('.', '').strip()
+                        if num_str.isdigit():
+                            num_val = int(num_str)
+                            # Only include valid section numbers (1-400 for Fighting Fantasy)
+                            if 1 <= num_val <= 400:
+                                result_lines.append({"text": txt, "source": eng_name})
+                                seen_texts.add(txt)
+                    except (ValueError, AttributeError):
+                        pass  # Skip if we can't parse as number
+    
+    return result_lines
 
 
 def score_engine_lines(lines: List[str]) -> Dict[str, Any]:
