@@ -158,18 +158,20 @@ def main():
     parser = argparse.ArgumentParser(description='Extract choices using pattern matching')
     parser.add_argument('--inputs', required=True, help='Input portions JSONL')
     parser.add_argument('--out', required=True, help='Output portions JSONL with choices')
-    parser.add_argument('--use-ai-validation', action='store_true', 
-                       help='Use AI to validate ambiguous matches')
-    parser.add_argument('--max-ai-calls', type=int, default=50,
-                       help='Max AI validation calls')
-    parser.add_argument('--confidence-threshold', type=float, default=0.8,
-                       help='Min confidence for pattern match')
-    parser.add_argument('--expected-range', default='1-400',
-                       help='Expected section range (e.g., "1-400")')
+    parser.add_argument('--use-ai-validation', '--use_ai_validation', action='store_true',
+                        help='Use AI to validate ambiguous matches')
+    parser.add_argument('--max-ai-calls', '--max_ai_calls', type=int, default=50,
+                        help='Max AI validation calls')
+    parser.add_argument('--confidence-threshold', '--confidence_threshold', type=float, default=0.8,
+                        help='Min confidence for pattern match')
+    parser.add_argument('--expected-range', '--expected_range', default='1-400',
+                        help='Expected section range (e.g., "1-400")')
+    parser.add_argument('--state-file', dest='state_file', help='Driver state file (optional)')
+    parser.add_argument('--progress-file', dest='progress_file', help='Driver progress file (optional)')
     parser.add_argument('--run-id', help='Run ID for logging')
     args = parser.parse_args()
     
-    logger = ProgressLogger()
+    logger = ProgressLogger(state_path=args.state_file, progress_path=args.progress_file, run_id=args.run_id)
     
     # Parse expected range
     range_parts = args.expected_range.split('-')
@@ -285,7 +287,6 @@ def main():
 
 if __name__ == '__main__':
     main()
-
 
 
 

@@ -1,17 +1,19 @@
 # Story: Missing Sections Investigation — Complete 100% Coverage
 
-**Status**: Boundary Detection Complete (Portion/Gamebook Validation Pending)
+**Status**: Done
 **Created**: 2025-12-16
 **Boundary Detection Completed**: 2025-12-17
 **Parent Story**: story-073 (100% Section Detection — Segmentation Architecture Complete)
 
-**Current Status**: ✅ Boundary detection achieving 99% coverage (396/400, effective 100%). Ready for full pipeline validation.
+**Current Status**: ✅ Section coverage resolved: **398/400 found**, with **[169, 170] verified missing from source** (missing/damaged pages). Sections **48** and **80** are detected via vision escalation and anchored to real element IDs. A full end-to-end run produces a `gamebook.json` with **all 400 ids present**, where the only stubs are the verified-missing ids (169/170).
 
 ---
 
 ## Goal
 
-Complete the remaining work from Story-073 to achieve **100% section detection** (400/400 sections) for Fighting Fantasy gamebooks. Story-073 successfully implemented the segmentation architecture and fixed critical bugs, but the final goal of 100% coverage remains. This story focuses on investigating and fixing all missing sections to reach complete coverage.
+Complete the remaining work from Story-073 to achieve **100% section coverage** for Fighting Fantasy gamebooks, where each target section is either:
+- present with a correct boundary (and extractable portion), or
+- explicitly recorded as missing from the source (diagnostic allowlist artifact).
 
 **Current State** (from Story-073 work):
 - Segmentation architecture: ✅ Complete (semantic + pattern + FF override + merge)
@@ -19,15 +21,15 @@ Complete the remaining work from Story-073 to achieve **100% section detection**
 - Portion extraction: 369/400 (92.25%) — **31 sections missing**
 - Gamebook coverage: 381/400 (95.25%, 19 stubs) — **19 sections requiring stubs**
 
-**Target**: 100% accuracy — every section (1-400) must be detected, extracted, and included in final gamebook.json with zero stubs.
+**Target** (sections-only scope): 100% accuracy — every section id (1–400) is either present as an extracted section, or explicitly recorded as missing from source and represented as an engine-safe stub with clear provenance.
 
 ---
 
 ## Success Criteria
 
-- [x] **100% boundary detection**: All 400 sections have boundaries (396/400 found, 4 missing from source)
-- [ ] **100% portion extraction**: All 400 sections have portions in `portions_enriched_clean.jsonl` (READY TO TEST - run full pipeline)
-- [ ] **100% gamebook coverage**: Final `gamebook.json` contains all 400 sections with no stubs (READY TO TEST - run full pipeline)
+- [x] **100% boundary detection (available sections)**: 398/400 found, 2 verified missing from source ([169, 170])
+- [x] **100% portion extraction (available sections)**: `portions_enriched.jsonl` contains all 398 detected sections (includes 48/80); 169/170 are absent and recorded in `unresolved_missing.json`
+- [x] **100% gamebook coverage (sections-only scope)**: `gamebook.json` contains all 400 ids; stubs exist only for the verified-missing ids (169/170), and the allowlist is recorded in the run root
 - [x] **Zero false positives**: No duplicate sections or incorrect boundaries
 - [x] **Forensics complete**: All missing sections have diagnostic traces showing where they were lost
 - [x] **Regression tests**: 13 automated tests + manual validation complete
@@ -158,83 +160,16 @@ Complete the remaining work from Story-073 to achieve **100% section detection**
 
 ## Tasks
 
-### Priority 1: Complete Boundary Detection (23 missing)
+### Completed
 
-- [ ] **Systematically investigate all 23 missing sections**:
-  - [ ] Use `scripts/trace_section_pipeline.py` to trace each missing section
-  - [ ] For each section, document:
-    - Whether it appears in elements_core_typed.jsonl
-    - If in elements, why boundary detection rejected it
-    - If not in elements, where it was lost upstream
-  - [ ] Categorize failures by failure mode
+- [x] Fix boundary detection to 398/400, with `[169, 170]` explicitly recorded as missing from source.
+- [x] Ensure vision escalation actually runs (gpt-5) and recovers sections 48/80, anchored to real element IDs.
+- [x] Run a full end-to-end pipeline and verify `gamebook.json` contains ids 1–400, with stubs only for the verified-missing ids.
+- [x] Add a monitored-run workflow (PID + `pipeline_events.jsonl` polling) and document it.
 
-- [ ] **Fix boundary detection issues**:
-  - [ ] Fix frontmatter filtering edge cases (e.g., section 17 on page 5)
-  - [ ] Fix duplicate resolution logic if valid instances are being lost
-  - [ ] Fix context validation if sections are incorrectly rejected
-  - [ ] Verify content type classification (page numbers not misclassified as Section-headers)
-
-- [ ] **Handle OCR corruption cases**:
-  - [ ] Sections 80, 86, 91, 92: Verify against source PDF/images
-  - [ ] If they exist, improve OCR extraction to handle range-to-standalone conversion
-  - [ ] If they don't exist, document as expected missing (not a bug)
-
-- [ ] **Verify fixes**:
-  - [ ] Re-run boundary detection and verify all 400 sections found
-  - [ ] Verify no false positives introduced
-  - [ ] Verify frontmatter filtering still works correctly
-
-### Priority 2: Complete Portion Extraction (31 missing)
-
-- [ ] **Identify sections with boundaries but no portions**:
-  - [ ] Compare `section_boundaries_merged.jsonl` vs `portions_enriched_clean.jsonl`
-  - [ ] List all sections that have boundaries but missing portions
-  - [ ] Use trace script to understand extraction failures
-
-- [ ] **Fix portion extraction failures**:
-  - [ ] Review `portionize_ai_extract_v1` validation logic
-  - [ ] Check if sections are being skipped due to empty text or other validation failures
-  - [ ] Fix extraction logic to handle edge cases
-  - [ ] Ensure all valid boundaries result in portions
-
-- [ ] **Handle frontmatter sections**:
-  - [ ] Verify which missing sections are actually frontmatter (should be excluded)
-  - [ ] Ensure frontmatter sections are correctly excluded from gameplay portions
-  - [ ] Document expected missing sections (frontmatter)
-
-- [ ] **Verify fixes**:
-  - [ ] Re-run portion extraction and verify all sections with boundaries have portions
-  - [ ] Verify frontmatter sections correctly excluded
-
-### Priority 3: Complete Gamebook Build (19 stubs)
-
-- [ ] **Identify stub sections**:
-  - [ ] Run full pipeline and extract exact list of 19 sections requiring stub backfill
-  - [ ] Use trace script to trace each stub section through pipeline
-  - [ ] Categorize by failure mode (boundary missing, portion missing, validation failure)
-
-- [ ] **Fix root causes**:
-  - [ ] Address boundary detection issues (Priority 1)
-  - [ ] Address portion extraction issues (Priority 2)
-  - [ ] Fix any validation failures preventing sections from being included
-
-- [ ] **Verify 100% coverage**:
-  - [ ] Run full pipeline and verify all 400 sections in gamebook.json
-  - [ ] Confirm zero stubs required
-  - [ ] Validate all sections have text and choices where expected
-
-### Priority 4: Documentation & Testing
-
-- [ ] **Document expected missing sections**:
-  - [ ] Create allowlist of sections that are truly frontmatter (should be excluded)
-  - [ ] Document sections that don't exist in source (not a bug)
-  - [ ] Update validation to explicitly handle expected missing sections
-
-- [ ] **Add regression tests**:
-  - [ ] Test that all 400 sections are detected in full dataset
-  - [ ] Test that fixes don't introduce false positives
-  - [ ] Test that frontmatter filtering works correctly
-  - [ ] Add test for edge cases (sections in ranges, OCR corruption, etc.)
+### Follow-ups (new stories)
+- Choice accuracy: `validate_choice_completeness_v1` discrepancies are real and must be addressed, but are out-of-scope for section coverage.
+- Optional: regenerate a fresh “gold” run so the exported stubs for 169/170 carry `provenance.reason="verified_missing_from_source"` in `output/runs/<run_id>/gamebook.json` (append-only policy).
 
 ---
 
@@ -260,6 +195,24 @@ Complete the remaining work from Story-073 to achieve **100% section detection**
 ---
 
 ## Work Log
+
+### 2025-12-17 — Full Run Checkpoint: Section Coverage Regression Detected (93–96)
+- **Run**: `output/runs/story-074-full-20251217-152253/`
+- **Section coverage status**: ❌ Not acceptable yet (93–96 incorrectly marked “missing from source”)
+- **What happened**:
+  - `section_boundaries_merged.jsonl` contains **394** sections, and `unresolved_missing.json` lists **6** ids: `[93, 94, 95, 96, 169, 170]`.
+  - However, **93–96 do exist in IR** as `content_type=Section-header` elements:
+    - Section 93: `038L-0001` and `038R-0001`
+    - Section 94: `038L-0003` and `038R-0003`
+    - Section 95: `039L-0007`
+    - Section 96: `039L-0002` and `039R-0002`
+  - This means the boundary detector is dropping real sections and then the pipeline incorrectly “verifies missing from source”.
+- **Evidence (artifacts inspected)**:
+  - `output/runs/story-074-full-20251217-152253/20_merge_boundaries_pref_v1/section_boundaries_merged.jsonl` (missing 93–96; 92 and 97 present)
+  - `output/runs/story-074-full-20251217-152253/unresolved_missing.json` (lists 93–96, 169–170)
+  - `output/runs/story-074-full-20251217-152253/09_elements_content_type_v1/elements_core_typed.jsonl` (contains 93–96 as Section-header candidates on pages 38–39)
+- **Hypothesis**: Regression in `detect_boundaries_code_first_v1` post-classifier validation (page clustering / duplicate resolution / sequential validation) is incorrectly eliminating a consecutive run (93–96).
+- **Next**: Stop spending on downstream stages; diagnose *why* `detect_boundaries_code_first_v1` drops 93–96 and fix it so these are **found** (not “missing from source”), then re-run only boundary detection → merge_boundaries → coverage gate before another full run.
 
 ###  20251216-2245 — Initial Investigation Complete
 - **Result**: SUCCESS - Root cause identified for boundary detection failures
@@ -733,12 +686,12 @@ else:
 
 ---
 
-## Final Status: **100% SUCCESS** 🎉
+## Final Status: **Section Coverage = 100% (found or verified missing)**
 
-**Coverage**: 396/400 sections detected (99.0%)
-- Sections found: 396 (all sections that exist in source)
-- Sections missing from source: 4 (48, 80, 169, 170 - not in OCR)
-- **Effective coverage: 100%** (found all available sections)
+**Coverage**: 398/400 sections detected (99.5%)
+- Sections found: 398 (includes 48 and 80 via vision escalation)
+- Sections missing from source: 2 (169, 170 - on missing/damaged PDF pages)
+- **Section coverage status**: 100% (each section is either found or verified missing from source)
 
 **Improvements Made**:
 1. ✅ Coarse segment integration - frontmatter properly excluded
@@ -748,8 +701,8 @@ else:
 5. ✅ Regression tests added (13 test cases, all passing)
 
 **Before**: 377/400 (94.25%) - 23 sections missing
-**After**: 396/400 (99.0%) - 4 sections missing from source
-**Recovered**: 19 sections from clustering fixes!
+**After**: 398/400 (99.5%) - 2 sections missing from source
+**Recovered**: 21 sections total (19 via clustering fixes + 2 via vision escalation fixes)
 
 **Boundary Detection Complete**: All goals achieved for boundary detection stage:
 - Valid sections detection (100% of available sections)
@@ -759,7 +712,7 @@ else:
 
 **Remaining Work**:
 - Full pipeline run (boundaries → portions → gamebook) with updated boundaries
-- Validate 396/400 coverage propagates through to final gamebook
+- Validate 398/400 coverage propagates through to final gamebook
 - Update story with final portion/gamebook coverage numbers
 
 ---
@@ -782,13 +735,13 @@ python driver.py --recipe output/runs/ff-canonical/snapshots/recipe.yaml \
 ```
 
 **Expected Results**:
-- Boundaries: 396/400 (already achieved ✓)
-- Portions: 396/400 (should match boundaries)
-- Gamebook: 396/400 with 4 stubs for missing source sections
+- Boundaries: 398/400 (already achieved ✓; missing [169, 170] from source)
+- Portions: 398/400 (should match boundaries)
+- Gamebook: 398/400 with 2 stubs (169, 170) for missing source sections
 
 **Validation Checklist**:
-1. [ ] Check `portions_enriched_clean.jsonl` for 396 sections
-2. [ ] Check `gamebook.json` for 396 complete sections + 4 stubs
+1. [ ] Check `portions_enriched_clean.jsonl` for 398 sections
+2. [ ] Check `gamebook.json` for 398 complete sections + 2 stubs
 3. [ ] Verify no regressions in downstream stages
 4. [ ] Update story with final coverage numbers
 5. [ ] Mark story as "Done"
@@ -805,9 +758,9 @@ python driver.py --recipe output/runs/ff-canonical/snapshots/recipe.yaml \
 5. ✅ Created comprehensive regression tests (13 test cases, all passing)
 
 **Test Results**:
-- Boundary detection: 396/400 (99.0%)
-- Missing from source: [48, 80, 169, 170] - confirmed OCR failures
-- Effective coverage: 100% of available sections
+- Boundary detection: 398/400 (99.5%)
+- Missing from source: [169, 170]
+- Effective coverage: 100% (found or verified missing)
 
 **Code Changes**:
 - modules/portionize/detect_boundaries_code_first_v1/main.py: Weighted clustering + graceful failure
@@ -815,6 +768,71 @@ python driver.py --recipe output/runs/ff-canonical/snapshots/recipe.yaml \
 - tests/test_boundary_detection_weighted_clustering.py: 13 regression tests (NEW)
 
 **Next**: Run full pipeline (portions → gamebook) to validate end-to-end coverage
+
+### 2025-12-17 — Follow-up: Vision escalation was not actually working (fix applied)
+
+**What I found**
+- `detect_boundaries_code_first_v1` was *not* successfully escalating for missing sections like 48/80.
+  - In the `ff-canonical` run, `13_detect_boundaries_code_first_v1/escalation_cache/` was empty, indicating no usable vision escalation artifacts were produced.
+  - Root cause #1: The boundary detector defaulted `images_dir` to `run_dir.parent/images`, but the canonical run stores page images under `01_extract_ocr_ensemble_v1/images/`.
+- Even when forced to run, the vision calls were returning empty `sections` because the OpenAI request parameters were incompatible with `gpt-5`:
+  - `max_tokens` was rejected by the API (needs `max_completion_tokens`).
+  - `temperature` was rejected by the API (only default supported for `gpt-5` in this endpoint).
+
+**Fixes**
+- Fixed image directory resolution in `modules/portionize/detect_boundaries_code_first_v1/main.py` so it can locate `*/images` inside the run root (canonical location: `01_extract_ocr_ensemble_v1/images/`).
+- Updated `modules/common/escalation_cache.py` to use `max_completion_tokens` and omit unsupported params for `gpt-5` vision calls.
+- Ensured vision-found boundaries are *anchored to real element IDs* (required by downstream extraction) by matching:
+  - Direct header text matches (e.g., `48.` → `027R-0010`)
+  - Numeric-like OCR slips between neighboring headers (e.g., section 80 anchored to `035R-0003`, OCR read header as standalone `0`)
+- Added `section_boundary_v1` to `validate_artifact.py` and expanded `schemas.py` `SectionBoundary` to allow the provenance fields emitted by the code-first detector.
+
+**Evidence**
+- Verified vision escalation actually finds missing sections on the correct pages:
+  - `output/runs/story-074-boundaries-vision4-20251217-093158/13_detect_boundaries_code_first_v1/escalation_cache/page_027.json` contains sections `47, 48, 49, 50`
+  - `output/runs/story-074-boundaries-vision4-20251217-093158/13_detect_boundaries_code_first_v1/escalation_cache/page_035.json` contains sections `76–82` including `80`
+- Verified anchored boundary output validates and only leaves the truly-missing sections:
+  - `output/runs/story-074-boundaries-vision4-20251217-093158/13_detect_boundaries_code_first_v1/section_boundaries_anchored_v2.jsonl` → 398 boundaries, missing `[169, 170]`
+
+### 2025-12-18 — Re-validated Section Coverage After Fixes
+
+**What I did**
+- Ran `detect_boundaries_code_first_v1` against the existing upstream artifacts from `output/runs/story-074-full-20251217-152253/` to confirm section coverage is still correct after the sequential-ordering + dedupe fixes.
+
+**Result**
+- 398/400 boundaries found; missing `[169, 170]` only.
+- Section 48 and 80 are present as `method=vision_escalation` and anchored to real element IDs.
+
+**Evidence**
+- `/private/tmp/story-074-boundaries-validate-20251218/section_boundaries.jsonl` (validated via `validate_artifact.py --schema section_boundary_v1`)
+- `/private/tmp/story-074-boundaries-validate-20251218/escalation_cache/page_027.json` (contains 48)
+- `/private/tmp/story-074-boundaries-validate-20251218/escalation_cache/page_035.json` (contains 80)
+- `/private/tmp/story-074-section-slice-20251218/section_boundaries_merged.jsonl` (398 rows; missing `[169, 170]` only)
+- `/private/tmp/story-074-section-slice-20251218/boundary_verification.json` (`is_valid=true`, 0 errors/warnings)
+- `/private/tmp/story-074-section-slice-20251218/boundary_coverage_report.json` (min_present=398 passes)
+- `/private/tmp/story-074-section-slice-20251218/boundary_gate_report.json` (min_count=398 passes)
+
+**Tests**
+- `pytest -q tests/test_boundary_detection_weighted_clustering.py tests/test_boundary_content_type_filtering.py` → 27 passed
+
+### 2025-12-18 — Full Pipeline Run (Sections-Only Validation)
+
+**What I did**
+- Ran the full canonical driver pipeline end-to-end to confirm the section fixes survive the entire pipeline (boundary detection → extraction → export).
+
+**Result (sections-only)**
+- ✅ `gamebook.json` contains **all section ids 1–400**.
+- ✅ 48 and 80 are present as real extracted portions (not stubs).
+- ✅ Only 169/170 are stubs, and they are explicitly recorded as missing-from-source in the run root (`unresolved_missing.json`).
+
+**Evidence (artifacts inspected)**
+- `output/runs/story-074-full-20251218-031618/19_detect_boundaries_code_first_v1/section_boundaries.jsonl` (398 boundaries; includes 48/80; missing 169/170)
+- `output/runs/story-074-full-20251218-031618/24_portionize_ai_extract_v1/portions_enriched.jsonl` (398 portions; includes 48/80; excludes 169/170)
+- `output/runs/story-074-full-20251218-031618/unresolved_missing.json` (allowlist: `[169, 170]`)
+- `output/runs/story-074-full-20251218-031618/gamebook.json` (400 ids; stubs for 169/170)
+
+**Out of scope (logged for follow-up story)**
+- `output/runs/story-074-full-20251218-031618/31_validate_choice_completeness_v1/choice_completeness_report.json` fails with many discrepancies; this is choice-accuracy work, not section-coverage work.
 
 ### 2025-12-16 — Story Created
 - **Context**: Story-073 segmentation architecture complete, but 100% coverage goal remains
@@ -842,5 +860,3 @@ python driver.py --recipe output/runs/ff-canonical/snapshots/recipe.yaml \
 - Fixed gamebook build (zero stubs)
 - Documentation of expected missing sections (if any)
 - Regression tests for 100% coverage
-
-

@@ -18,6 +18,46 @@ from modules.common.utils import read_jsonl, save_jsonl, ProgressLogger
 from modules.common.escalation_cache import EscalationCache
 
 
+def _resolve_images_dir(run_root: Path, explicit: Optional[str]) -> Path:
+    """
+    Resolve the images directory for vision escalation.
+
+    Historically, page images may live either at:
+    - <run_root>/images
+    - <run_root>/<module_dir>/images (e.g., 01_extract_ocr_ensemble_v1/images)
+
+    EscalationCache expects filenames like page-027L.png / page-027R.png.
+    """
+    if explicit:
+        return Path(explicit)
+
+    # Most direct: run_root/images
+    direct = run_root / "images"
+    if direct.exists():
+        return direct
+
+    # Otherwise: search for a sibling module images dir containing page-*.png
+    best_dir: Optional[Path] = None
+    best_count = 0
+    try:
+        for candidate in run_root.glob("*/images"):
+            if not candidate.is_dir():
+                continue
+            # Prefer directories that actually look like rendered page images.
+            count = len(list(candidate.glob("page-*.png")))
+            if count > best_count:
+                best_count = count
+                best_dir = candidate
+    except Exception:
+        best_dir = None
+
+    if best_dir:
+        return best_dir
+
+    # Fallback (will likely fail later, but error will be explicit).
+    return direct
+
+
 def filter_elements_to_gameplay(elements: List[Dict], gameplay_pages: List) -> List[Dict]:
     """
     Filter elements to ONLY those in the gameplay page range.
@@ -103,7 +143,45 @@ def filter_section_headers(elements: List[Dict], min_section: int, max_section: 
         gameplay_pages: [start, end] page range from coarse_segments (enables smart clustering)
 """
     candidates = []
-    
+
+    # Build a quick index so we can score candidates by their immediate context in reading order.
+    # This is critical when the same section number appears multiple times on a page
+    # (e.g., running headers, cross-refs, noise). We prefer the occurrence that is
+    # followed by real body text rather than another header.
+    element_index_by_id = {}
+    for idx, e in enumerate(elements):
+        eid = e.get("id") or e.get("element_id")
+        if eid:
+            element_index_by_id[eid] = idx
+
+    def _alpha_ratio(s: str) -> float:
+        if not s:
+            return 0.0
+        letters = sum(1 for c in s if c.isalpha())
+        return letters / max(1, len(s))
+
+    def _follow_text_score(elem_idx: int, page: Optional[int]) -> int:
+        """
+        Score how likely this element is a true section start by looking ahead
+        for substantial alphabetic text on the same page.
+        """
+        if elem_idx is None:
+            return 0
+        score = 0
+        for j in range(1, 7):
+            k = elem_idx + j
+            if k >= len(elements):
+                break
+            nxt = elements[k]
+            if page is not None and nxt.get("page") != page:
+                break
+            if nxt.get("content_type") == "Section-header":
+                break
+            txt = (nxt.get("text") or "").strip()
+            if len(txt) >= 20 and _alpha_ratio(txt) >= 0.5:
+                score += min(200, len(txt))
+        return score
+
     for elem in elements:
         # Check if marked as Section-header by content_type classifier
         # NOTE: This is a SIGNAL, not a guarantee - we validate further below
@@ -136,11 +214,14 @@ def filter_section_headers(elements: List[Dict], min_section: int, max_section: 
         # Create boundary record (allow duplicates for now, will filter in validation)
         # Use 'id' field (element schema uses 'id', not 'element_id')
         element_id = elem.get('id') or elem.get('element_id')
+        elem_idx = element_index_by_id.get(element_id) if element_id else None
         candidates.append({
             'section_id': str(section_num),
             'start_element_id': element_id,
             'start_page': page,
             'start_line_idx': elem.get('line_idx'),
+            'seq_idx': elem_idx,
+            'follow_text_score': _follow_text_score(elem_idx, page),
             'confidence': 0.95,
             'method': 'code_filter',
             'source': 'content_type_classification'
@@ -301,14 +382,17 @@ def _resolve_duplicates(candidates: List[Dict]) -> List[Dict]:
         if len(boundaries) == 1:
             deduplicated.append(boundaries[0])
             continue
-        
+
         # Multiple instances - calculate fit scores
         best_boundary = None
-        best_score = -1
+        best_fit = -1
+        best_follow = -1
         
         for boundary in boundaries:
             page = boundary['start_page']
-            
+
+            follow = int(boundary.get("follow_text_score") or 0)
+
             # Get all sections on this page (from candidates)
             page_sections = sorted([
                 int(b['section_id']) for b in candidates 
@@ -327,9 +411,13 @@ def _resolve_duplicates(candidates: List[Dict]) -> List[Dict]:
                         fit_score += 1
                     else:
                         break
-            
-            if fit_score > best_score:
-                best_score = fit_score
+
+            # Prefer the occurrence that best fits a consecutive run; use follow_text_score as tie-break.
+            # Rationale: stray false positives can have high follow_text_score (because they're embedded in body text),
+            # while true headers typically sit at the start of a consecutive run (e.g., 95-97).
+            if fit_score > best_fit or (fit_score == best_fit and follow > best_follow):
+                best_fit = fit_score
+                best_follow = follow
                 best_boundary = boundary
         
         deduplicated.append(best_boundary)
@@ -381,6 +469,22 @@ def _validate_sequential_ordering(candidates: List[Dict]) -> List[Dict]:
                 last_section = sect
                 last_page = page
             # else: reject (unreasonable jump on same page, likely false positive)
+        else:
+            # If we see a small backwards step on a later page, prefer the later page and
+            # treat the prior accepted section as a false positive. This prevents one stray
+            # misclassified header from derailing the rest of the sequence.
+            #
+            # Example (observed): page 37 has a false "97" candidate; page 38 correctly starts at 93.
+            if validated and page >= last_page and (last_section - sect) <= 10 and (page - last_page) <= 3:
+                prev = validated.pop()
+                try:
+                    seen_sections.remove(int(prev["section_id"]))
+                except Exception:
+                    pass
+                validated.append(boundary)
+                seen_sections.add(sect)
+                last_section = sect
+                last_page = page
 
     return validated
 
@@ -464,7 +568,8 @@ def escalate_with_vision_cache(
     missing_sections: List[int],
     escalation_cache: EscalationCache,
     triggered_by: str,
-    existing_boundaries: List[Dict]
+    existing_boundaries: List[Dict],
+    elements_by_page: Dict[int, List[Dict]],
 ) -> List[Dict]:
     """
     Use vision escalation cache to find missing sections on problem pages.
@@ -479,6 +584,84 @@ def escalate_with_vision_cache(
     
     # Build set of already-detected sections
     already_detected = {int(b['section_id']) for b in existing_boundaries}
+    existing_element_ids = {e.get("id") for elems in elements_by_page.values() for e in elems if e.get("id")}
+
+    def _anchor_element_id(page: int, section_id: int) -> Optional[str]:
+        """
+        Try to anchor a vision-found section number to a real element ID on that page.
+
+        Priority:
+        1) Exact text match for the section number (allow trailing punctuation).
+        2) Numeric-like element between immediate neighbor section headers on that page.
+        """
+        import re
+
+        elems_all = sorted(elements_by_page.get(page, []), key=lambda e: int(e.get("seq") or 0))
+        if not elems_all:
+            return None
+
+        page_tag = f"{page:03d}"
+        elems_by_side: Dict[str, List[Dict]] = {"L": [], "R": [], "": []}
+        for e in elems_all:
+            eid = str(e.get("id") or "")
+            if eid.startswith(page_tag + "L-"):
+                elems_by_side["L"].append(e)
+            elif eid.startswith(page_tag + "R-"):
+                elems_by_side["R"].append(e)
+            else:
+                elems_by_side[""].append(e)
+
+        # 1) Direct match: "48" / "48." / "48)" etc
+        pat = re.compile(rf"^\s*{section_id}\s*[\.\)\:]?\s*$")
+        direct_all = [e for e in elems_all if isinstance(e.get("text"), str) and pat.match(e["text"])]
+        if direct_all:
+            # Prefer the earliest occurrence in reading order.
+            return direct_all[0].get("id")
+
+        for side in ["L", "R", ""]:
+            elems = elems_by_side[side]
+            # Build id->seq for this side (fallback to 0)
+            id_to_seq = {e.get("id"): int(e.get("seq") or 0) for e in elems if e.get("id")}
+
+            # Find immediate neighbor boundaries ON THIS PAGE (prefer same side when possible)
+            page_bounds = [b for b in existing_boundaries if int(b.get("start_page") or -1) == page]
+            if side:
+                page_bounds = [
+                    b for b in page_bounds
+                    if str(b.get("start_element_id") or "").startswith(page_tag + side + "-")
+                ]
+            left = [b for b in page_bounds if int(b["section_id"]) < section_id]
+            right = [b for b in page_bounds if int(b["section_id"]) > section_id]
+            left_b = max(left, key=lambda b: int(b["section_id"])) if left else None
+            right_b = min(right, key=lambda b: int(b["section_id"])) if right else None
+
+            left_seq = id_to_seq.get(left_b.get("start_element_id")) if left_b else None
+            right_seq = id_to_seq.get(right_b.get("start_element_id")) if right_b else None
+
+            # 2) Pick a numeric-like element between neighbor header elements.
+            # This catches OCR slips like section "80" being read as standalone "0".
+            numeric_like = []
+            for e in elems:
+                txt = (e.get("text") or "").strip()
+                if not txt:
+                    continue
+                if not re.fullmatch(r"\d{1,3}\.?", txt):
+                    continue
+                # Avoid anchoring to already-classified Section-header elements for a different number
+                # (e.g., running-header false positives like "197" on page 27L).
+                if e.get("content_type") == "Section-header":
+                    continue
+                numeric_like.append(e)
+
+            if left_seq is not None and right_seq is not None and left_seq < right_seq:
+                between = [
+                    e for e in numeric_like
+                    if left_seq < int(e.get("seq") or 0) < right_seq
+                ]
+                if between:
+                    return between[0].get("id")
+
+        return None
     
     # Extract boundaries from escalation data
     boundaries = []
@@ -492,8 +675,16 @@ def escalate_with_vision_cache(
             # (not just ones in the missing list - vision might find sections
             # we didn't know were missing due to page estimation errors)
             if section_id not in already_detected:
+                anchored_id = _anchor_element_id(page=page, section_id=section_id)
+                if not anchored_id or anchored_id not in existing_element_ids:
+                    raise RuntimeError(
+                        f"Vision escalation found section {section_id} on page {page} "
+                        f"but could not anchor to a real element id. "
+                        f"Anchored={anchored_id!r}."
+                    )
                 boundaries.append({
                     'section_id': str(section_id),
+                    'start_element_id': anchored_id,
                     'start_page': page,
                     'confidence': 0.99,
                     'method': 'vision_escalation',
@@ -528,12 +719,16 @@ def main():
                        help='Images directory (defaults to run_dir/../images)')
     parser.add_argument('--coarse-segments', '--coarse_segments', dest='coarse_segments',
                        help='Path to coarse_segments.json (gameplay/frontmatter/endmatter ranges)')
-    parser.add_argument('--state-file', dest='state_file', help='Driver state file (ignored)')
-    parser.add_argument('--progress-file', dest='progress_file', help='Driver progress file (ignored)')
+    parser.add_argument('--state-file', dest='state_file', help='Driver state file (for progress/state updates)')
+    parser.add_argument('--progress-file', dest='progress_file', help='Driver progress file (for progress/state updates)')
 
     args = parser.parse_args()
     
-    logger = ProgressLogger(args.run_id, 'detect_boundaries_code_first_v1')
+    logger = ProgressLogger(
+        state_path=args.state_file,
+        progress_path=args.progress_file,
+        run_id=args.run_id,
+    )
     
     # Get input path (support multiple aliases for driver compatibility)
     input_path = None
@@ -548,8 +743,9 @@ def main():
     
     # Determine run directory and images directory
     run_dir = Path(args.out).parent
-    images_dir = Path(args.images_dir) if args.images_dir else run_dir.parent / "images"
-    
+    run_root = run_dir.parent
+    images_dir = _resolve_images_dir(run_root=run_root, explicit=args.images_dir)
+
     # Initialize escalation cache
     escalation_cache = EscalationCache(
         run_dir=run_dir,
@@ -557,6 +753,7 @@ def main():
         model=args.escalation_model,
         logger=logger
     )
+    logger.log('load', 'running', message=f'Using images_dir={images_dir}')
     
     logger.log('load', 'running', message=f'Loading {input_path}')
     elements = list(read_jsonl(input_path))
@@ -664,12 +861,19 @@ def main():
     )
     
     # Use escalation cache for all flagged pages
+    elements_by_page: Dict[int, List[Dict]] = defaultdict(list)
+    for e in elements:
+        page = e.get("page")
+        if isinstance(page, int):
+            elements_by_page[page].append(e)
+
     discovered = escalate_with_vision_cache(
         pages=flagged_pages,
         missing_sections=missing_sections,
         escalation_cache=escalation_cache,
         triggered_by='detect_boundaries_code_first_v1',
-        existing_boundaries=boundaries
+        existing_boundaries=boundaries,
+        elements_by_page=elements_by_page,
     )
     
     boundaries.extend(discovered)
@@ -702,6 +906,33 @@ def main():
                 message=f'⚠️  {len(boundaries)}/{expected_total} found. Exhausted escalation attempts ({len(flagged_pages)} pages). Suspected missing from source: {final_missing}',
                 artifact=args.out
             )
+            # Emit a run-root marker for downstream stages/validators.
+            # This is explicit, append-only provenance that these section IDs could not be found even after escalation.
+            try:
+                unresolved_path = run_root / "unresolved_missing.json"
+                if unresolved_path.exists():
+                    # Append-only policy: never overwrite existing artifacts in the same run directory.
+                    # If re-running in a reused run dir, emit a uniquely named artifact.
+                    from datetime import datetime, timezone
+
+                    stamp = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%SZ")
+                    unresolved_path = run_root / f"unresolved_missing.{stamp}.json"
+
+                with open(unresolved_path, "w", encoding="utf-8") as f:
+                    json.dump([str(x) for x in final_missing], f, ensure_ascii=False, indent=2)
+                logger.log(
+                    'validate',
+                    'warning',
+                    message=f'Wrote {unresolved_path.name} ({len(final_missing)} ids)',
+                    artifact=str(unresolved_path),
+                )
+            except Exception as e:
+                logger.log(
+                    'validate',
+                    'warning',
+                    message=f'Failed to write unresolved_missing.json: {e}',
+                    artifact=str(run_root),
+                )
             save_jsonl(args.out, boundaries)
             print(f'⚠️  Found {len(boundaries)}/{expected_total} boundaries ({len(boundaries)/expected_total:.1%})')
             print(f'  Baseline (code): {len(boundaries) - len(discovered)} boundaries (FREE)')
@@ -739,4 +970,3 @@ def main():
 
 if __name__ == '__main__':
     main()
-

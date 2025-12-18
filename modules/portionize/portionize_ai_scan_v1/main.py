@@ -143,9 +143,12 @@ Please identify ALL Fighting Fantasy gameplay section boundaries."""
             ],
             response_format={"type": "json_object"},
         )
-        # Use max_tokens for all models (max_completion_tokens is gpt-5 specific but may not be available)
-        kwargs["max_tokens"] = max_tokens
-        kwargs["temperature"] = 0.0 if not selected_model.startswith("gpt-5") else 1.0
+        # gpt-5 uses max_completion_tokens and may reject temperature overrides in this endpoint.
+        if selected_model.startswith("gpt-5"):
+            kwargs["max_completion_tokens"] = max_tokens
+        else:
+            kwargs["max_tokens"] = max_tokens
+            kwargs["temperature"] = 0.0
 
         completion = client.chat.completions.create(**kwargs)
 

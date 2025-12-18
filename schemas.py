@@ -461,8 +461,18 @@ class SectionBoundary(BaseModel):
     section_id: str  # "1", "2", "3", etc. (Fighting Fantasy section numbers)
     start_element_id: str  # ID of first element in this section
     end_element_id: Optional[str] = None  # ID of last element (None if extends to next section)
+    # Optional provenance helpers (code-first + vision escalation modules may emit these)
+    start_page: Optional[int] = None
+    start_line_idx: Optional[int] = None
+    end_page: Optional[int] = None
+    method: Optional[str] = None  # "code_filter" | "vision_escalation" | ...
+    source: Optional[str] = None  # "content_type_classification" | "escalation_cache" | ...
+    header_position: Optional[str] = None  # "top" | "middle" | "bottom" | "unknown"
     confidence: float  # 0.0-1.0, AI's confidence this is a real section boundary
     evidence: Optional[str] = None  # Why AI thinks this is a section boundary
+
+    class Config:
+        extra = "allow"
 
 
 class BoundaryIssue(BaseModel):

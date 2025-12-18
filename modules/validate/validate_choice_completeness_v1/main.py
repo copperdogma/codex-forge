@@ -95,14 +95,18 @@ def main():
     parser = argparse.ArgumentParser(description='Validate choice completeness')
     parser.add_argument('--gamebook', required=True, help='Input gamebook.json')
     parser.add_argument('--out', required=True, help='Output validation report (JSON)')
-    parser.add_argument('--max-discrepancy', type=int, default=1, 
+    parser.add_argument('--max-discrepancy', '--max_discrepancy', type=int, default=1,
                        help='Max allowed diff between text refs and choices')
-    parser.add_argument('--expected-range', default='1-400',
+    parser.add_argument('--expected-range', '--expected_range', default='1-400',
                        help='Expected section range (e.g., "1-400")')
+    parser.add_argument('--boundaries', help='(ignored; driver compatibility)')
+    parser.add_argument('--elements', help='(ignored; driver compatibility)')
+    parser.add_argument('--state-file', dest='state_file', help='Driver state file (optional)')
+    parser.add_argument('--progress-file', dest='progress_file', help='Driver progress file (optional)')
     parser.add_argument('--run-id', help='Run ID for logging')
     args = parser.parse_args()
     
-    logger = ProgressLogger()
+    logger = ProgressLogger(state_path=args.state_file, progress_path=args.progress_file, run_id=args.run_id)
     
     # Load gamebook
     with open(args.gamebook, 'r') as f:
@@ -205,4 +209,3 @@ def main():
 
 if __name__ == '__main__':
     exit(main())
-

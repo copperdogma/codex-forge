@@ -233,11 +233,14 @@ class DriverIntegrationTests(unittest.TestCase):
             ]
             first = subprocess.run(base_cmd + ["--skip-done"], cwd=str(Path(__file__).resolve().parents[1]))
             self.assertEqual(first.returncode, 0)
-            clean_path = tmp_path / "run" / "clean_custom.jsonl"
-            self.assertTrue(clean_path.exists())
+            # Artifacts live under the per-module folder (see Story 071 output organization).
+            matches = list((tmp_path / "run").glob("*/clean_custom.jsonl"))
+            self.assertEqual(len(matches), 1, f"Expected exactly 1 clean_custom.jsonl, found {len(matches)}: {matches}")
+            clean_path = matches[0]
             first_mtime = clean_path.stat().st_mtime
 
-            second = subprocess.run(base_cmd + ["--skip-done"], cwd=str(Path(__file__).resolve().parents[1]))
+            # Re-running with the same run_id/output_dir should be treated as a resume.
+            second = subprocess.run(base_cmd + ["--allow-run-id-reuse", "--skip-done"], cwd=str(Path(__file__).resolve().parents[1]))
             self.assertEqual(second.returncode, 0)
             second_mtime = clean_path.stat().st_mtime
             self.assertEqual(first_mtime, second_mtime)

@@ -50,6 +50,26 @@
 - `python -m unittest discover -s tests -p '*test.py' -v`
 - `scripts/tests/run_ff20_regression_fast.sh`
 
+## [2025-12-18] - Story 074: 100% section-id coverage + monitored runs
+
+### Added
+- Monitored driver run helpers (`scripts/run_driver_monitored.sh`, `scripts/monitor_run.sh`) to avoid “silent crash” long runs; docs updated to prefer these over manual tailing.
+- Pytest bootstrap `conftest.py` so tests can import `modules.*` without requiring `PYTHONPATH=.`.
+- `section_boundary_v1` schema mapping in `validate_artifact.py`.
+
+### Changed
+- Canonical FF recipe wires `coarse_segment` into boundary detection and raises `target_coverage` to 1.0.
+- Story index + Story 074 marked Done; Story 074 docs updated with full-run evidence and sections-only scope.
+
+### Fixed
+- Boundary detection vision escalation now reliably runs and anchors missing sections (e.g., 48/80) by fixing image-dir resolution, gpt-5 API params, and duplicate/sequence validation.
+- `portionize_ai_extract_v1` now uses split page ids (e.g., `080L/080R`) when available to avoid overlapping boundaries and to attach correct `source_images`.
+- Driver/module compatibility: improved flag/path wiring for `coarse_segment_merge_v1`, `repair_candidates_v1`, `extract_choices_v1`, and `validate_choice_completeness_v1`.
+- `build_ff_engine_v1` now filters stub targets to expected range and permits stubs only when explicitly allowlisted as missing-from-source.
+
+### Tested
+- `pytest -q` (171 passed, 3 skipped)
+
 ## [2025-12-01] - OCR ensemble retries, resolver, and fuzzy headers
 
 ### Added

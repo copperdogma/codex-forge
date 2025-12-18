@@ -18,8 +18,8 @@ Guiding priorities: **perfect OCR first**, then move downstream stage‑by‑sta
    Improved boundary detection from 87% to 100% coverage (398/398 sections). Perfect accuracy achieved.
 7. DONE: **073 — 100% Section Detection — Segmentation Architecture**
    Implemented multi-stage segmentation architecture. Page 12 correctly identified as gameplay start.
-8. **074 — Missing Sections Investigation — Complete 100% Coverage** *(Next)*
-   Complete remaining work from Story-073: investigate and fix 23 missing boundaries, 31 missing portions, 19 stubs to achieve 100% (400/400) section coverage.
+8. DONE: **074 — Missing Sections Investigation — Complete 100% Coverage**
+   Achieved 100% section-id coverage (400/400), with missing-from-source explicitly recorded.
 8. **035 — Fighting Fantasy Pipeline Optimization** *(Paused)*
    Drive missing/no‑text/no‑choice to targets using the new OCR + boundary stack. (Resume after 073.)
 8. **050 — FF Ending Detection Verification**  
@@ -107,6 +107,7 @@ This index tracks stories in `/docs/stories/` for the codex-forge pipeline.
 || 071 | Output Artifact Organization | Medium | Done | /docs/stories/story-071-output-artifact-organization.md |
 || 072 | OCR Spell-Weighted Voting Enhancement | Medium | To Do | /docs/stories/story-072-ocr-spell-weighted-voting.md |
 || 073 | 100% Section Detection — Segmentation Architecture | High | Done | /docs/stories/story-073-100-percent-section-detection.md |
+|| 074 | Missing Sections Investigation — Complete 100% Coverage | High | Done | /docs/stories/story-074-missing-sections-investigation.md |
 || 099 | Remove dev-only backcompat disclaimer | Low | To Do | /docs/stories/story-099-remove-dev-backcompat-note.md |
 
 ## Notes

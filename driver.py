@@ -524,25 +524,33 @@ def build_command(entrypoint: str, params: Dict[str, Any], stage_conf: Dict[str,
 
     # Standard parameter conveniences by stage
     if stage_conf["stage"] in ("intake", "extract"):
-        if "pdf" in recipe_input:
-            cmd += ["--pdf", recipe_input["pdf"]]; flags_added.add("--pdf")
-        if "images" in recipe_input:
-            cmd += ["--images", recipe_input["images"]]; flags_added.add("--images")
-        # Use module folder as outdir for intake/extract stages so artifacts go to module folder
-        # (module subdirectories like images/, ocr_ensemble/ will be created in module folder)
-        module_outdir = os.path.dirname(artifact_path) if not is_final_output else run_dir
-        cmd += ["--outdir", module_outdir]; flags_added.add("--outdir")
-        # Handle inputs for intake stages (e.g., pagelines_to_elements_v1)
-        # Note: params.inputs might contain stage IDs - don't pass those, use resolved artifact_inputs instead
-        if artifact_inputs:
-            pages_path = artifact_inputs.get("pages") or artifact_inputs.get("input")
-            if pages_path:
-                cmd += ["--pages", pages_path]
-                flags_added.add("--pages")
-                # Remove "inputs" from params if present to avoid passing stage ID strings
-                if "inputs" in (params or {}):
-                    params = dict(params or {})
-                    del params["inputs"]
+        # Some extract stages are NOT PDF/image ingestors (e.g., extract_choices_v1 consumes JSONL portions).
+        if stage_conf["module"] == "extract_choices_v1":
+            in_path = artifact_inputs.get("inputs") or artifact_inputs.get("input")
+            if not in_path:
+                raise SystemExit(f"Stage {stage_conf['id']} missing inputs")
+            cmd += ["--inputs", in_path, "--out", artifact_path]
+            flags_added.update({"--inputs", "--out"})
+        else:
+            if "pdf" in recipe_input:
+                cmd += ["--pdf", recipe_input["pdf"]]; flags_added.add("--pdf")
+            if "images" in recipe_input:
+                cmd += ["--images", recipe_input["images"]]; flags_added.add("--images")
+            # Use module folder as outdir for intake/extract stages so artifacts go to module folder
+            # (module subdirectories like images/, ocr_ensemble/ will be created in module folder)
+            module_outdir = os.path.dirname(artifact_path) if not is_final_output else run_dir
+            cmd += ["--outdir", module_outdir]; flags_added.add("--outdir")
+            # Handle inputs for intake stages (e.g., pagelines_to_elements_v1)
+            # Note: params.inputs might contain stage IDs - don't pass those, use resolved artifact_inputs instead
+            if artifact_inputs:
+                pages_path = artifact_inputs.get("pages") or artifact_inputs.get("input")
+                if pages_path:
+                    cmd += ["--pages", pages_path]
+                    flags_added.add("--pages")
+                    # Remove "inputs" from params if present to avoid passing stage ID strings
+                    if "inputs" in (params or {}):
+                        params = dict(params or {})
+                        del params["inputs"]
     elif stage_conf["stage"] == "clean":
         # Handle repair_candidates_v1 specially - needs pagelines param
         if stage_conf["module"] == "repair_candidates_v1":
@@ -575,8 +583,8 @@ def build_command(entrypoint: str, params: Dict[str, Any], stage_conf: Dict[str,
                     if not resolved_pagelines:
                         # Default: assume merge_ocr is stage 06 (from recipe order)
                         resolved_pagelines = os.path.join(run_dir, "06_merge_ocr_escalated_v1", str(pagelines_param))
-                    # Always pass absolute path
-                    cmd += ["--pagelines", resolved_pagelines]
+                    # Always pass absolute path (repair_candidates_v1 treats relative paths as relative to its module dir)
+                    cmd += ["--pagelines", os.path.abspath(resolved_pagelines)]
                     flags_added.add("--pagelines")
                     # Remove from params so it's not added again
                     del params["pagelines"]
@@ -596,30 +604,61 @@ def build_command(entrypoint: str, params: Dict[str, Any], stage_conf: Dict[str,
             cmd += ["--out", artifact_path]
             flags_added.add("--out")
     elif stage_conf["stage"] == "portionize":
-        # Handle various input names (pages, elements, input)
-        pages_path = artifact_inputs.get("pages") or artifact_inputs.get("input")
-        elements_path = artifact_inputs.get("elements")
-        if not pages_path and not elements_path:
-            # Fallback: try elements as input
-            pages_path = artifact_inputs.get("elements") or artifact_inputs.get("input")
-        if not pages_path:
-            raise SystemExit(f"Stage {stage_conf['id']} missing pages/elements input")
-        # Use --pages for compatibility (coarse_segment_v1 accepts both --pages and --elements)
-        cmd += ["--pages", pages_path]
-        flags_added.add("--pages")
-        # Also pass --elements if specified (structure_globally_v1 needs both)
-        if elements_path:
-            cmd += ["--elements", elements_path]
-            flags_added.add("--elements")
-        if "boundaries" in artifact_inputs:
-            cmd += ["--boundaries", artifact_inputs["boundaries"]]
-        # Handle coarse-segments for fine_segment_frontmatter_v1
-        if stage_conf["module"] == "fine_segment_frontmatter_v1" and artifact_index:
-            coarse_segments_path = artifact_index.get("coarse_segment", {}).get("path")
-            if coarse_segments_path:
-                cmd += ["--coarse-segments", os.path.abspath(coarse_segments_path)]
-        cmd += ["--out", artifact_path]
-        flags_added.add("--out")
+        # Some portionize modules are merges and do not accept --pages/--elements.
+        if stage_conf.get("module") == "coarse_segment_merge_v1":
+            params = dict(params or {})
+            # Resolve upstream artifacts for required inputs.
+            coarse_art = artifact_index.get("coarse_segment_semantic", {}).get("path") if artifact_index else None
+            patt_art = artifact_index.get("coarse_segment_patterns", {}).get("path") if artifact_index else None
+            ff_art = artifact_index.get("coarse_segment_ff_override", {}).get("path") if artifact_index else None
+
+            if not coarse_art or not os.path.exists(coarse_art):
+                raise SystemExit(f"Stage {stage_conf['id']} missing coarse_segment_semantic artifact")
+            if not patt_art or not os.path.exists(patt_art):
+                raise SystemExit(f"Stage {stage_conf['id']} missing coarse_segment_patterns artifact")
+
+            cmd += ["--coarse-segments", os.path.abspath(coarse_art)]
+            flags_added.add("--coarse-segments")
+            cmd += ["--pattern-regions", os.path.abspath(patt_art)]
+            flags_added.add("--pattern-regions")
+            if ff_art and os.path.exists(ff_art):
+                cmd += ["--ff-hints", os.path.abspath(ff_art)]
+                flags_added.add("--ff-hints")
+
+            cmd += ["--out", artifact_path]
+            flags_added.add("--out")
+
+            # Avoid re-adding these via the generic params loop below.
+            for k in ("coarse_segments", "pattern_regions", "ff_hints", "out"):
+                params.pop(k, None)
+        else:
+            # Handle various input names (pages, elements, input)
+            pages_path = artifact_inputs.get("pages") or artifact_inputs.get("input")
+            elements_path = artifact_inputs.get("elements")
+            if not pages_path and not elements_path:
+                # Fallback: try elements as input
+                pages_path = artifact_inputs.get("elements") or artifact_inputs.get("input")
+            if not pages_path:
+                raise SystemExit(f"Stage {stage_conf['id']} missing pages/elements input")
+            # Use --pages for compatibility (coarse_segment_v1 accepts both --pages and --elements)
+            cmd += ["--pages", pages_path]
+            flags_added.add("--pages")
+            # Also pass --elements if specified (structure_globally_v1 needs both)
+            if elements_path:
+                cmd += ["--elements", elements_path]
+                flags_added.add("--elements")
+            if "boundaries" in artifact_inputs:
+                cmd += ["--boundaries", artifact_inputs["boundaries"]]
+            # detect_boundaries_code_first_v1 can optionally use coarse segments for gameplay filtering.
+            if stage_conf["module"] == "detect_boundaries_code_first_v1" and artifact_inputs.get("coarse_segments"):
+                cmd += ["--coarse-segments", os.path.abspath(artifact_inputs["coarse_segments"])]
+            # Handle coarse-segments for fine_segment_frontmatter_v1
+            if stage_conf["module"] == "fine_segment_frontmatter_v1" and artifact_index:
+                coarse_segments_path = artifact_index.get("coarse_segment", {}).get("path")
+                if coarse_segments_path:
+                    cmd += ["--coarse-segments", os.path.abspath(coarse_segments_path)]
+            cmd += ["--out", artifact_path]
+            flags_added.add("--out")
     elif stage_conf["stage"] == "adapter":
         if stage_conf["module"] == "load_stub_v1":
             stub_path = params.get("stub")
@@ -846,6 +885,29 @@ def build_command(entrypoint: str, params: Dict[str, Any], stage_conf: Dict[str,
                 val = coarse_art
             else:
                 val = os.path.abspath(val) if not os.path.isabs(str(val)) else val
+        # coarse_segment_* modules use hyphenated flags and should receive resolved artifact paths.
+        if stage_conf.get("module") in {"coarse_segment_ff_override_v1", "coarse_segment_merge_v1"}:
+            if key == "coarse_segments":
+                flag = "--coarse-segments"
+                art = artifact_index.get("coarse_segment_semantic", {}).get("path") if artifact_index else None
+                if art and os.path.exists(art):
+                    val = art
+                else:
+                    val = os.path.abspath(val) if not os.path.isabs(str(val)) else val
+            elif key == "pattern_regions":
+                flag = "--pattern-regions"
+                art = artifact_index.get("coarse_segment_patterns", {}).get("path") if artifact_index else None
+                if art and os.path.exists(art):
+                    val = art
+                else:
+                    val = os.path.abspath(val) if not os.path.isabs(str(val)) else val
+            elif key == "ff_hints":
+                flag = "--ff-hints"
+                art = artifact_index.get("coarse_segment_ff_override", {}).get("path") if artifact_index else None
+                if art and os.path.exists(art):
+                    val = art
+                else:
+                    val = os.path.abspath(val) if not os.path.isabs(str(val)) else val
         if flag in seen_flags:
             continue
         if val is None:

@@ -65,6 +65,40 @@ Important:
 """
 
 
+def _resolve_images_dir(run_root: str, explicit: Optional[str] = None) -> Optional[str]:
+    if explicit:
+        return explicit
+    preferred = os.path.join(run_root, "01_extract_ocr_ensemble_v1", "images")
+    if os.path.isdir(preferred):
+        return preferred
+    try:
+        for name in os.listdir(run_root):
+            cand = os.path.join(run_root, name, "images")
+            if os.path.isdir(cand):
+                return cand
+    except Exception:
+        return None
+    return None
+
+
+def _page_id_from_element_id(eid: str) -> Optional[str]:
+    if not eid or "-" not in eid:
+        return None
+    return eid.split("-", 1)[0]
+
+
+def _sort_page_ids(page_ids: List[str]) -> List[str]:
+    import re
+
+    def key(pid: str):
+        m = re.match(r"^(\\d+)([LR]?)$", str(pid))
+        if not m:
+            return (999999, "")
+        return (int(m.group(1)), m.group(2) or "")
+
+    return sorted(page_ids, key=key)
+
+
 def extract_text_from_elements(
     elements_by_id: Dict[str, Dict],
     element_sequence: List[str],
@@ -178,6 +212,8 @@ def main():
     parser.add_argument("--pages", required=True, help="Path to elements.jsonl (uses --pages for driver compatibility)")
     parser.add_argument("--boundaries", required=True, help="Path to section_boundaries.jsonl")
     parser.add_argument("--out", required=True, help="Path to portions_enriched.jsonl")
+    parser.add_argument("--images-dir", "--images_dir", dest="images_dir",
+                        help="Optional path to page images directory (defaults to run_root/*/images).")
     parser.add_argument("--model", default="gpt-4o", help="OpenAI model to use")
     parser.add_argument("--max_tokens", type=int, default=2000, help="Max tokens for AI response")
     parser.add_argument("--fallback-window", type=int, default=6,
@@ -227,35 +263,44 @@ def main():
     if not boundaries:
         raise SystemExit("No section boundaries found in input file")
 
-    # Optional filter
-    allowed = None
-    if args.section_filter:
-        allowed = set([s.strip() for s in args.section_filter.split(",") if s.strip()])
-
     # Sort boundaries by section_id (numeric)
     boundaries_sorted = sorted(boundaries, key=lambda b: int(b["section_id"]) if b["section_id"].isdigit() else 999999)
-    if allowed is not None:
-        boundaries_sorted = [b for b in boundaries_sorted if b.get("section_id") in allowed]
 
-    logger.log("portionize", "running", current=0, total=len(boundaries_sorted),
-               message=f"Extracting {len(boundaries_sorted)} sections with AI",
+    # Compute end boundaries from the full list (so targeted re-runs still have correct spans)
+    next_start_by_sid = {}
+    for i, b in enumerate(boundaries_sorted):
+        sid = b.get("section_id")
+        if not sid:
+            continue
+        next_start_by_sid[sid] = boundaries_sorted[i + 1]["start_element_id"] if i + 1 < len(boundaries_sorted) else None
+
+    # Optional filter (process only a subset, but keep spans defined by full neighbor boundaries)
+    allowed = None
+    if args.section_filter:
+        allowed = {s.strip() for s in args.section_filter.split(",") if s.strip()}
+    boundaries_to_process = boundaries_sorted
+    if allowed is not None:
+        boundaries_to_process = [b for b in boundaries_sorted if b.get("section_id") in allowed]
+
+    logger.log("portionize", "running", current=0, total=len(boundaries_to_process),
+               message=f"Extracting {len(boundaries_to_process)} sections with AI",
                artifact=args.out, module_id="portionize_ai_extract_v1")
 
     # Prepare output directory
     ensure_dir(os.path.dirname(args.out) or ".")
+    run_root = os.path.abspath(os.path.join(os.path.dirname(os.path.abspath(args.out)), os.pardir))
+    images_dir = _resolve_images_dir(run_root=run_root, explicit=args.images_dir)
 
     # Process each boundary
     client = OpenAI()
     error_traces = []
-    for idx, boundary in enumerate(tqdm(boundaries_sorted, desc="Extracting sections"), start=1):
+    for idx, boundary in enumerate(tqdm(boundaries_to_process, desc="Extracting sections"), start=1):
         try:
             section_id = boundary["section_id"]
             start_element_id = boundary["start_element_id"]
 
             # Find end_element_id (start of next section, or None for last section)
-            end_element_id = None
-            if idx < len(boundaries_sorted):
-                end_element_id = boundaries_sorted[idx]["start_element_id"]
+            end_element_id = next_start_by_sid.get(section_id)
 
             # Extract text from elements
             raw_text, element_ids = extract_text_from_elements(
@@ -322,6 +367,8 @@ def main():
                         "error": str(last_err) if last_err else "unknown_error"
                     }
 
+            parse_warnings: List[Dict[str, Any]] = []
+
             # Parse gameplay data into schema objects
             choices = []
             for choice_data in gameplay_data.get("choices", []):
@@ -335,30 +382,67 @@ def main():
             combat_data = gameplay_data.get("combat")
             if combat_data and isinstance(combat_data, dict):
                 if "skill" in combat_data and "stamina" in combat_data:
-                    combat = Combat(
-                        skill=int(combat_data["skill"]),
-                        stamina=int(combat_data["stamina"]),
-                        name=combat_data.get("name")
-                    )
+                    try:
+                        combat = Combat(
+                            skill=int(combat_data["skill"]),
+                            stamina=int(combat_data["stamina"]),
+                            name=combat_data.get("name")
+                        )
+                    except Exception as e:
+                        parse_warnings.append({
+                            "kind": "combat_parse_failed",
+                            "error": str(e),
+                            "combat_data": combat_data,
+                        })
+                        combat = None
 
             test_luck = bool(gameplay_data.get("test_luck", False))
 
             item_effects = []
             for effect_data in gameplay_data.get("item_effects", []):
                 if isinstance(effect_data, dict):
-                    item_effects.append(ItemEffect(**effect_data))
+                    try:
+                        item_effects.append(ItemEffect(**effect_data))
+                    except Exception as e:
+                        parse_warnings.append({
+                            "kind": "item_effect_parse_failed",
+                            "error": str(e),
+                            "effect_data": effect_data,
+                        })
 
             # Get page range from elements
             section_elements = [elements_by_id[eid] for eid in element_ids if eid in elements_by_id]
-            page_numbers = [
-                e.get("metadata", {}).get("page_number")
-                for e in section_elements
-                if e.get("metadata", {}).get("page_number")
-            ]
+            page_numbers = []
+            for e in section_elements:
+                md = e.get("metadata") or {}
+                pn = md.get("page_number") or e.get("page")
+                if pn is None:
+                    continue
+                try:
+                    page_numbers.append(int(pn))
+                except Exception:
+                    continue
             page_start = min(page_numbers) if page_numbers else 1
             page_end = max(page_numbers) if page_numbers else 1
 
             # Create EnrichedPortion
+            page_ids = []
+            for eid in element_ids:
+                pid = _page_id_from_element_id(eid)
+                if pid:
+                    page_ids.append(pid)
+            # If we only have integer page numbers (and split images exist), include both L/R images
+            # so downstream multimodal repair can see the full spread.
+            for pn in range(int(page_start), int(page_end) + 1):
+                page_ids.append(f"{pn:03d}L")
+                page_ids.append(f"{pn:03d}R")
+            page_ids = _sort_page_ids(sorted(set(page_ids)))
+            source_images = []
+            if images_dir and page_ids:
+                for pid in page_ids:
+                    cand = os.path.join(images_dir, f"page-{pid}.png")
+                    if os.path.exists(cand):
+                        source_images.append(cand)
             enriched = EnrichedPortion(
                 portion_id=section_id,
                 section_id=section_id,
@@ -367,7 +451,7 @@ def main():
                 title=None,
                 type="section",
                 confidence=boundary.get("confidence", 0.0),
-                source_images=[],
+                source_images=source_images,
                 raw_text=raw_text,
                 choices=choices,
                 combat=combat,
@@ -377,28 +461,76 @@ def main():
                 element_ids=element_ids,
                 module_id="portionize_ai_extract_v1",
                 run_id=args.run_id,
+                context_correction=(
+                    {
+                        "parse_warnings": parse_warnings,
+                        "widened_span": widened,
+                        "error": gameplay_data.get("error"),
+                    }
+                    if parse_warnings or gameplay_data.get("error") or widened
+                    else None
+                ),
             )
 
             append_jsonl(args.out, enriched.dict(by_alias=True, exclude_none=True))
 
-            logger.log("portionize", "running", current=idx, total=len(boundaries_sorted),
+            logger.log("portionize", "running", current=idx, total=len(boundaries_to_process),
                        message=f"Extracted section {section_id}",
                        artifact=args.out, module_id="portionize_ai_extract_v1")
 
         except Exception as e:
-            # Log error but continue processing
-            error_record = {
-                "error": str(e),
-                "section_id": boundary.get("section_id"),
-                "start_element_id": boundary.get("start_element_id")
-            }
-            append_jsonl(args.out, error_record)
-            logger.log("portionize", "running", current=idx, total=len(boundaries_sorted),
+            # Always emit a schema-valid placeholder portion so downstream can diagnose/repair.
+            section_id = str(boundary.get("section_id") or "")
+            start_element_id = boundary.get("start_element_id")
+            start_elem = elements_by_id.get(start_element_id) if start_element_id else None
+            page = start_elem.get("metadata", {}).get("page_number") if start_elem else None
+            if page is None and start_elem:
+                page = start_elem.get("page")
+            try:
+                page_int = int(page) if page is not None else 0
+            except Exception:
+                page_int = 0
+            source_images = []
+            if images_dir and start_element_id:
+                pid = _page_id_from_element_id(start_element_id)
+                if pid:
+                    cand = os.path.join(images_dir, f"page-{pid}.png")
+                    if os.path.exists(cand):
+                        source_images.append(cand)
+            enriched = EnrichedPortion(
+                portion_id=section_id or "unknown",
+                section_id=section_id or None,
+                page_start=page_int,
+                page_end=page_int,
+                title=None,
+                type="section",
+                confidence=0.0,
+                source_images=source_images,
+                raw_text="",
+                choices=[],
+                combat=None,
+                test_luck=False,
+                item_effects=[],
+                targets=[],
+                element_ids=[start_element_id] if start_element_id else None,
+                module_id="portionize_ai_extract_v1",
+                run_id=args.run_id,
+                context_correction={
+                    "error": str(e),
+                    "error_kind": "exception",
+                    "boundary": {
+                        "section_id": section_id,
+                        "start_element_id": start_element_id,
+                    },
+                },
+            )
+            append_jsonl(args.out, enriched.dict(by_alias=True, exclude_none=True))
+            logger.log("portionize", "running", current=idx, total=len(boundaries_to_process),
                        message=f"Error on section {boundary.get('section_id')}: {e}",
                        artifact=args.out, module_id="portionize_ai_extract_v1")
 
-    logger.log("portionize", "done", current=len(boundaries_sorted), total=len(boundaries_sorted),
-               message=f"Extracted {len(boundaries_sorted)} sections",
+    logger.log("portionize", "done", current=len(boundaries_to_process), total=len(boundaries_to_process),
+               message=f"Extracted {len(boundaries_to_process)} sections",
                artifact=args.out, module_id="portionize_ai_extract_v1",
                schema_version="enriched_portion_v1")
 
@@ -409,7 +541,7 @@ def main():
         if args.fail_on_empty:
             raise SystemExit(f"Extraction unresolved for {len(error_traces)} sections (empty or parse errors)")
 
-    print(f"Extracted {len(boundaries_sorted)} sections → {args.out}")
+    print(f"Extracted {len(boundaries_to_process)} sections → {args.out}")
 
 
 if __name__ == "__main__":

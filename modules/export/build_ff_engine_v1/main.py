@@ -1,5 +1,6 @@
 import argparse
 import json
+import os
 from typing import Any, Dict, List, Optional
 
 from modules.common.utils import read_jsonl, save_json, ProgressLogger
@@ -195,6 +196,10 @@ def main():
     parser.add_argument("--format-version", "--format_version", default="1.0.0", dest="format_version", help="Format version string")
     parser.add_argument("--allow-stubs", action="store_true", dest="allow_stubs",
                         help="Permit stub backfill for missing targets (default: fail if stubs needed)")
+    parser.add_argument("--expected-range", "--expected_range", default="1-400", dest="expected_range",
+                        help="Expected section id range (e.g., 1-400). Targets outside are ignored.")
+    parser.add_argument("--unresolved-missing", "--unresolved_missing", dest="unresolved_missing",
+                        help="Optional path to unresolved_missing.json (sections verified missing from source).")
     parser.add_argument("--progress-file")
     parser.add_argument("--state-file")
     parser.add_argument("--run-id")
@@ -203,6 +208,27 @@ def main():
 
     logger = ProgressLogger(state_path=args.state_file, progress_path=args.progress_file, run_id=args.run_id)
     logger.log("build_ff_engine", "running", current=0, total=None, message="Loading enriched portions", module_id="build_ff_engine_v1")
+
+    # Parse expected range for filtering targets/stubs.
+    try:
+        r0, r1 = args.expected_range.split("-", 1)
+        min_expected = int(r0.strip())
+        max_expected = int(r1.strip())
+    except Exception:
+        min_expected, max_expected = 1, 400
+
+    # Load unresolved-missing allowlist (explicit artifact). If present, we can allow stubs
+    # for these missing IDs without requiring --allow-stubs.
+    unresolved_allow: set[str] = set()
+    unresolved_path = args.unresolved_missing
+    if not unresolved_path:
+        unresolved_path = os.path.join(os.path.dirname(os.path.abspath(args.out)), "unresolved_missing.json")
+    try:
+        if unresolved_path and os.path.exists(unresolved_path):
+            with open(unresolved_path, "r", encoding="utf-8") as f:
+                unresolved_allow = {str(x) for x in json.load(f)}
+    except Exception:
+        unresolved_allow = set()
 
     portions = list(read_jsonl(args.portions))
 
@@ -222,11 +248,19 @@ def main():
     all_targets: List[str] = []
     for sec in sections.values():
         all_targets.extend(collect_targets(sec))
-    missing = {t for t in all_targets if t.isdigit() and t not in sections}
+    # Ignore targets outside expected range (often OCR/AI noise in provenance targets).
+    missing = {
+        t for t in all_targets
+        if t.isdigit()
+        and min_expected <= int(t) <= max_expected
+        and t not in sections
+    }
     stub_targets = sorted(missing, key=lambda x: int(x))
     stub_count = len(stub_targets)
 
-    if stub_count and not args.allow_stubs:
+    allow_stubs_effective = args.allow_stubs or (stub_targets and all(t in unresolved_allow for t in stub_targets))
+
+    if stub_count and not allow_stubs_effective:
         # Explicit failure message for observability
         missing_ids_preview = ", ".join(stub_targets[:10])
         if stub_count > 10:
@@ -249,12 +283,15 @@ def main():
         raise SystemExit(error_msg)
 
     for mid in sorted(missing, key=lambda x: int(x) if str(x).isdigit() else x):
+        reason = "backfilled missing target"
+        if mid in unresolved_allow:
+            reason = "verified_missing_from_source"
         sections[mid] = {
             "id": mid,
             "text": "",
             "isGameplaySection": True,
             "type": "section",
-            "provenance": {"stub": True, "reason": "backfilled missing target"},
+            "provenance": {"stub": True, "reason": reason},
         }
 
     start_section = str(args.start_section)
@@ -276,7 +313,14 @@ def main():
         "provenance": {
             "stub_targets": stub_targets[:20],
             "stub_count": stub_count,
-            "stubs_allowed": bool(args.allow_stubs),
+            "stubs_allowed": bool(allow_stubs_effective),
+            "expected_range": args.expected_range,
+            "unresolved_missing": sorted(
+                [s for s in unresolved_allow if s.isdigit()],
+                key=lambda x: int(x),
+            )
+            if unresolved_allow
+            else [],
         },
     }
 

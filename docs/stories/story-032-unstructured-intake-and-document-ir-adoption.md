@@ -15,14 +15,14 @@ Updated: 2025-11-29 05:47
 
 ### How to Check Progress
 ```bash
-# Check live pipeline events
-tail -f output/runs/ff-unstructured-test/pipeline_events.jsonl
+# Preferred: run with active monitoring (streams progress + exits on completion)
+scripts/run_driver_monitored.sh --recipe configs/recipes/recipe-ff-unstructured.yaml --run-id ff-unstructured-test --output-dir output/runs
 
 # Check if elements.jsonl is being written
 ls -lah output/runs/ff-unstructured-test/elements.jsonl
 
-# Check latest pipeline status
-tail -1 output/runs/ff-unstructured-test/pipeline_events.jsonl | python -m json.tool
+# If the run is already in progress and you have its pidfile:
+scripts/monitor_run.sh output/runs/ff-unstructured-test output/runs/ff-unstructured-test/driver.pid 5
 
 # Look for "status": "done" with element counts when complete
 ```
@@ -597,7 +597,7 @@ Work Log
 - **Files modified:**
   - modules/intake/unstructured_pdf_intake_v1/main.py:25-69 (make_json_serializable function)
 - **How to check status:**
-  - `tail -f output/runs/ff-unstructured-test/pipeline_events.jsonl` (live progress)
+  - `scripts/monitor_run.sh output/runs/ff-unstructured-test output/runs/ff-unstructured-test/driver.pid 5` (live progress; preferred)
   - `ls -lah output/runs/ff-unstructured-test/elements.jsonl` (check if output is being written)
   - Latest event should show "done" when complete with element counts
 - **Current run status:**

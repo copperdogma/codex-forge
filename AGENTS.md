@@ -216,6 +216,10 @@ Before portionization, automatically flag pages for high-fidelity re-OCR if eith
 - View docs: `sed -n '1,120p' docs/stories/story-015-modular-pipeline.md`
 - Run validator: `python validate_artifact.py --schema portion_hyp_v1 --file output/...jsonl`
 - Dry-run the canonical 20-page recipe: `python driver.py --recipe configs/recipes/recipe-ff-canonical.yaml --dry-run`
+- **Monitored full run (preferred, streams progress)**:
+  - `scripts/run_driver_monitored.sh --recipe configs/recipes/recipe-ff-canonical.yaml --settings configs/settings.ff-canonical-smoke-5.yaml --run-id ff-canonical-smoke-5 --output-dir output/runs -- --instrument`
+- **Attach monitoring to an existing run** (requires a pidfile containing the driver PID):
+  - `scripts/monitor_run.sh output/runs/<run_id> output/runs/<run_id>/driver.pid 5`
 - Section coverage check (map + backfill + fail on missing): `python modules/adapter/section_target_guard_v1/main.py --inputs output/runs/ocr-enrich-sections-noconsensus/portions_enriched.jsonl --out /tmp/portions_enriched_guard.jsonl --report /tmp/section_target_report.json`
 - Legacy map/backfill adapters are obsolete; use `section_target_guard_v1` (no backward compatibility maintained).
 - **Dashboard Testing**: Serve from repo root (`python -m http.server 8000`) and access via `http://localhost:8000/docs/pipeline-visibility.html`. Do not use `file://` URIs as they block CORS/fetch.

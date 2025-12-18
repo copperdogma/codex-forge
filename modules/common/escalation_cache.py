@@ -274,6 +274,9 @@ IMPORTANT:
             import openai
             client = openai.OpenAI()
             
+            # NOTE: Some newer OpenAI models (e.g., gpt-5) have stricter/limited
+            # parameter support (e.g., fixed temperature). Prefer max_completion_tokens
+            # and omit optional tuning params for broad compatibility.
             response = client.chat.completions.create(
                 model=self.model,
                 messages=[
@@ -283,15 +286,12 @@ IMPORTANT:
                             {"type": "text", "text": prompt},
                             {
                                 "type": "image_url",
-                                "image_url": {
-                                    "url": f"data:image/png;base64,{image_data}"
-                                }
-                            }
-                        ]
+                                "image_url": {"url": f"data:image/png;base64,{image_data}"},
+                            },
+                        ],
                     }
                 ],
-                max_tokens=4096,
-                temperature=0.1  # Low temperature for factual extraction
+                max_completion_tokens=4096,
             )
             
             content = response.choices[0].message.content
@@ -314,4 +314,3 @@ IMPORTANT:
                 artifact=str(image_path)
             )
             return {}
-

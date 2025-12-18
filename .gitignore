@@ -8,6 +8,9 @@ models/
 .cursor/
 .DS_Store
 
+# Stray local debug logs accidentally written to repo root
+/detect_boundaries_code_first_v1
+
 # Local pip cache
 .pip-packages/
 
