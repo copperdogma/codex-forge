@@ -14,7 +14,7 @@ from collections import defaultdict
 from pathlib import Path
 from typing import Dict, List, Set, Optional, Any
 
-from modules.common.utils import read_jsonl, save_jsonl, ProgressLogger
+from modules.common.utils import read_jsonl, save_jsonl, save_json, ensure_dir, ProgressLogger
 from modules.common.escalation_cache import EscalationCache
 
 
@@ -124,7 +124,7 @@ def filter_elements_to_gameplay(elements: List[Dict], gameplay_pages: List) -> L
 
 
 def filter_section_headers(elements: List[Dict], min_section: int, max_section: int,
-                          gameplay_pages: Optional[List] = None) -> List[Dict]:
+                           gameplay_pages: Optional[List] = None) -> List[Dict]:
     """
     Code-first: Filter elements for Section-header with valid numbers.
     This is FREE, instant, and deterministic.
@@ -242,8 +242,123 @@ def filter_section_headers(elements: List[Dict], min_section: int, max_section: 
     
     # Sort by section number
     validated.sort(key=lambda b: int(b['section_id']))
-    
+
     return validated
+
+
+def _build_element_sequence(elements: List[Dict]) -> tuple:
+    """Return (elements_sorted, element_sequence, id_to_index, id_to_seq)."""
+    elements_sorted = sorted(elements, key=lambda e: int(e.get("seq") or 0))
+    element_sequence = [e.get("id") for e in elements_sorted if e.get("id")]
+    id_to_index = {eid: idx for idx, eid in enumerate(element_sequence)}
+    id_to_seq = {e.get("id"): int(e.get("seq") or 0) for e in elements_sorted if e.get("id")}
+    return elements_sorted, element_sequence, id_to_index, id_to_seq
+
+
+def detect_ordering_conflicts(boundaries: List[Dict], id_to_seq: Dict[str, int]) -> Dict[str, Dict]:
+    """
+    Detect pages where numeric section order contradicts element sequence order.
+    Group by page side (L/R) to avoid false conflicts across spreads.
+    Returns {page: {"sides": {side: {"sections_seq": [...], "sections_numeric": [...]}}}}.
+    """
+    import re
+
+    def page_side(b: Dict) -> str:
+        eid = str(b.get("start_element_id") or "")
+        m = re.match(r"^(\d+)([LR])-", eid)
+        return m.group(2) if m else ""
+
+    page_groups: Dict[str, Dict[str, List[Dict]]] = defaultdict(lambda: defaultdict(list))
+    for b in boundaries:
+        page = b.get("start_page")
+        if page is None:
+            continue
+        side = page_side(b)
+        page_key = f"{int(page)}{side}" if side else str(int(page))
+        page_groups[page_key][side].append(b)
+
+    conflicts: Dict[str, Dict] = {}
+    for page_key, sides in page_groups.items():
+        page_conflicts = {}
+        for side, items in sides.items():
+            if len(items) < 2:
+                continue
+            items_sorted = sorted(items, key=lambda b: id_to_seq.get(b.get("start_element_id"), 999999))
+            seq_order = [int(b["section_id"]) for b in items_sorted]
+            if seq_order != sorted(seq_order):
+                page_conflicts[side or ""] = {
+                    "sections_seq": seq_order,
+                    "sections_numeric": sorted(seq_order),
+                }
+        if page_conflicts:
+            conflicts[page_key] = {"sides": page_conflicts}
+    return conflicts
+
+
+def detect_span_issues(boundaries: List[Dict],
+                       id_to_index: Dict[str, int],
+                       elements_sorted: List[Dict],
+                       min_words: int = 5,
+                       min_alpha_ratio: float = 0.2,
+                       min_alpha_chars: int = 20) -> Dict[int, Dict]:
+    """
+    Detect sections whose numeric-order span is inverted or has no real text.
+    Returns {page: {"reason": "...", "section_id": "..."}}
+    """
+    issues: Dict[int, Dict] = {}
+    if not boundaries:
+        return issues
+
+    boundaries_sorted = sorted(boundaries, key=lambda b: int(b["section_id"]))
+    next_start_by_sid = {}
+    for i, b in enumerate(boundaries_sorted):
+        sid = b.get("section_id")
+        if not sid:
+            continue
+        next_start_by_sid[sid] = boundaries_sorted[i + 1]["start_element_id"] if i + 1 < len(boundaries_sorted) else None
+
+    for b in boundaries_sorted:
+        sid = b.get("section_id")
+        start_id = b.get("start_element_id")
+        end_id = next_start_by_sid.get(sid)
+        if not start_id or start_id not in id_to_index:
+            continue
+        start_idx = id_to_index[start_id]
+        end_idx = id_to_index.get(end_id, len(elements_sorted)) if end_id else len(elements_sorted)
+        page = b.get("start_page")
+        if page is None:
+            continue
+        eid = str(start_id or "")
+        side = ""
+        if isinstance(eid, str) and len(eid) >= 5 and eid[3] in ("L", "R"):
+            side = eid[3]
+        page_key = f"{int(page)}{side}" if side else str(int(page))
+        if end_idx < start_idx:
+            issues[page_key] = {"reason": "inverted_span", "section_id": sid}
+            continue
+        span = elements_sorted[start_idx:end_idx]
+        alpha_chars = 0
+        total_chars = 0
+        word_count = 0
+        for e in span:
+            if e.get("content_type") == "Section-header":
+                continue
+            text = (e.get("text") or "").strip()
+            if not text:
+                continue
+            total_chars += len(text)
+            alpha_chars += sum(ch.isalpha() for ch in text)
+            word_count += len([w for w in text.split() if any(c.isalpha() for c in w)])
+        alpha_ratio = (alpha_chars / total_chars) if total_chars else 0.0
+        if word_count < min_words or alpha_chars < min_alpha_chars or alpha_ratio < min_alpha_ratio:
+            issues[page_key] = {
+                "reason": "empty_or_low_text_span",
+                "section_id": sid,
+                "word_count": word_count,
+                "alpha_chars": alpha_chars,
+                "alpha_ratio": round(alpha_ratio, 3),
+            }
+    return issues
 
 
 def _filter_page_outliers(candidates: List[Dict], gameplay_pages: Optional[List] = None,
@@ -695,6 +810,111 @@ def escalate_with_vision_cache(
     return boundaries
 
 
+def escalate_pages_replace_boundaries(
+    pages: List[int],
+    escalation_cache: EscalationCache,
+    triggered_by: str,
+    trigger_reason: str,
+    existing_boundaries: List[Dict],
+    elements_by_page: Dict[int, List[Dict]],
+) -> List[Dict]:
+    """
+    Escalate specific pages and return FULL boundary replacements for those pages.
+    Unlike missing-section escalation, this replaces existing boundaries on the page.
+    """
+    escalation_data = escalation_cache.request_escalation(
+        pages=pages,
+        triggered_by=triggered_by,
+        trigger_reason=trigger_reason
+    )
+
+    existing_element_ids = {e.get("id") for elems in elements_by_page.values() for e in elems if e.get("id")}
+
+    def _anchor_element_id(page: int, section_id: int) -> Optional[str]:
+        import re
+
+        elems_all = sorted(elements_by_page.get(page, []), key=lambda e: int(e.get("seq") or 0))
+        if not elems_all:
+            return None
+
+        page_tag = f"{page:03d}"
+        elems_by_side: Dict[str, List[Dict]] = {"L": [], "R": [], "": []}
+        for e in elems_all:
+            eid = str(e.get("id") or "")
+            if eid.startswith(page_tag + "L-"):
+                elems_by_side["L"].append(e)
+            elif eid.startswith(page_tag + "R-"):
+                elems_by_side["R"].append(e)
+            else:
+                elems_by_side[""].append(e)
+
+        pat = re.compile(rf"^\s*{section_id}\s*[\.\)\:]?\s*$")
+        direct_all = [e for e in elems_all if isinstance(e.get("text"), str) and pat.match(e["text"])]
+        if direct_all:
+            return direct_all[0].get("id")
+
+        for side in ["L", "R", ""]:
+            elems = elems_by_side[side]
+            id_to_seq = {e.get("id"): int(e.get("seq") or 0) for e in elems if e.get("id")}
+
+            page_bounds = [b for b in existing_boundaries if int(b.get("start_page") or -1) == page]
+            if side:
+                page_bounds = [
+                    b for b in page_bounds
+                    if str(b.get("start_element_id") or "").startswith(page_tag + side + "-")
+                ]
+            left = [b for b in page_bounds if int(b["section_id"]) < section_id]
+            right = [b for b in page_bounds if int(b["section_id"]) > section_id]
+            left_b = max(left, key=lambda b: int(b["section_id"])) if left else None
+            right_b = min(right, key=lambda b: int(b["section_id"])) if right else None
+
+            left_seq = id_to_seq.get(left_b.get("start_element_id")) if left_b else None
+            right_seq = id_to_seq.get(right_b.get("start_element_id")) if right_b else None
+
+            numeric_like = []
+            for e in elems:
+                txt = (e.get("text") or "").strip()
+                if not txt:
+                    continue
+                if not re.fullmatch(r"\d{1,3}\.?", txt):
+                    continue
+                if e.get("content_type") == "Section-header":
+                    continue
+                numeric_like.append(e)
+
+            if left_seq is not None and right_seq is not None and left_seq < right_seq:
+                between = [
+                    e for e in numeric_like
+                    if left_seq < int(e.get("seq") or 0) < right_seq
+                ]
+                if between:
+                    return between[0].get("id")
+
+        return None
+
+    boundaries = []
+    for page, page_data in escalation_data.items():
+        for section_id_str, section_data in page_data.get("sections", {}).items():
+            section_id = int(section_id_str)
+            anchored_id = _anchor_element_id(page=page, section_id=section_id)
+            if not anchored_id or anchored_id not in existing_element_ids:
+                raise RuntimeError(
+                    f"Vision escalation found section {section_id} on page {page} "
+                    f"but could not anchor to a real element id. Anchored={anchored_id!r}."
+                )
+            boundaries.append({
+                'section_id': str(section_id),
+                'start_element_id': anchored_id,
+                'start_page': page,
+                'confidence': 0.99,
+                'method': 'vision_escalation_ordering',
+                'source': 'escalation_cache',
+                'header_position': section_data.get('header_position', 'unknown')
+            })
+
+    return boundaries
+
+
 def main():
     parser = argparse.ArgumentParser(
         description='Code-first section boundary detection with targeted escalation'
@@ -712,6 +932,19 @@ def main():
                        dest='target_coverage', help='Target coverage ratio (0.95 = 95%%)')
     parser.add_argument('--max-escalation-pages', '--max_escalation_pages', type=int, default=30,
                        dest='max_escalation_pages', help='Max pages to escalate with AI')
+    parser.add_argument('--max-ordering-pages', '--max_ordering_pages', type=int, default=15,
+                       dest='max_ordering_pages', help='Max pages to escalate for ordering/span issues')
+    parser.add_argument('--min-span-words', '--min_span_words', type=int, default=5,
+                       dest='min_span_words', help='Minimum words required in a section span')
+    parser.add_argument('--min-span-alpha', '--min_span_alpha', type=float, default=0.2,
+                       dest='min_span_alpha', help='Minimum alpha ratio required in a section span')
+    parser.add_argument('--min-span-chars', '--min_span_chars', type=int, default=20,
+                       dest='min_span_chars', help='Minimum alphabetic chars required in a section span')
+    parser.add_argument('--no-fail-on-ordering-conflict', '--no_fail_on_ordering_conflict',
+                       dest='fail_on_ordering_conflict', action='store_false', default=True,
+                       help='Do not fail if ordering/span issues remain after escalation')
+    parser.add_argument('--ordering-pages', '--ordering_pages', dest='ordering_pages',
+                       help='Comma-separated page keys to escalate for ordering/span issues (e.g., 28L,33L)')
     parser.add_argument('--model', default='gpt-4.1-mini', help='LLM model for gap analysis')
     parser.add_argument('--escalation-model', '--escalation_model', dest='escalation_model',
                        default='gpt-5', help='Stronger LLM for escalation')
@@ -796,28 +1029,157 @@ def main():
     )
     
     # ========================================
-    # STAGE 2: Validate coverage
+    # STAGE 2: Ordering/span feasibility checks (pre-extraction guard)
+    # ========================================
+    elements_sorted, element_sequence, id_to_index, id_to_seq = _build_element_sequence(elements)
+    ordering_conflicts = detect_ordering_conflicts(boundaries, id_to_seq)
+    span_issues = detect_span_issues(
+        boundaries,
+        id_to_index=id_to_index,
+        elements_sorted=elements_sorted,
+        min_words=args.min_span_words,
+        min_alpha_ratio=args.min_span_alpha,
+        min_alpha_chars=args.min_span_chars,
+    )
+    report_path = Path(args.out).with_suffix(".ordering_report.json")
+    report = {
+        "schema_version": "boundary_order_guard_v1",
+        "run_id": args.run_id,
+        "ordering_conflicts": ordering_conflicts,
+        "span_issues": span_issues,
+        "ordering_conflicts_after": None,
+        "span_issues_after": None,
+        "flagged_pages": [],
+        "repaired_boundaries": 0,
+    }
+
+    if ordering_conflicts or span_issues:
+        logger.log(
+            'validate',
+            'running',
+            message=f'Ordering/span issues detected: {len(ordering_conflicts)} ordering pages, '
+                    f'{len(span_issues)} span pages',
+            artifact=args.out
+        )
+
+        # Build per-page escalation list (ordering/span issues first)
+        ordering_pages = sorted(set(ordering_conflicts.keys()))
+        span_pages = sorted(set(span_issues.keys()))
+        flagged_pages = []
+        for p in ordering_pages + span_pages:
+            if p not in flagged_pages:
+                flagged_pages.append(p)
+
+        if args.ordering_pages:
+            requested = [p.strip() for p in args.ordering_pages.split(",") if p.strip()]
+            flagged_pages = [p for p in requested if p in ordering_conflicts or p in span_issues]
+
+        # Cap to avoid runaway escalation
+        flagged_pages = flagged_pages[:args.max_ordering_pages]
+        report["flagged_pages"] = flagged_pages
+        if flagged_pages:
+            logger.log(
+                'escalate',
+                'running',
+                message=f'Escalating {len(flagged_pages)} pages for ordering/span issues (cap: {args.max_ordering_pages})',
+                artifact=args.out
+            )
+
+            def _page_num_from_key(k: str) -> int:
+                return int("".join(ch for ch in k if ch.isdigit()) or 0)
+
+            flagged_page_nums = []
+            for k in flagged_pages:
+                num = _page_num_from_key(k)
+                if num and num not in flagged_page_nums:
+                    flagged_page_nums.append(num)
+
+            elements_by_page: Dict[int, List[Dict]] = defaultdict(list)
+            for e in elements:
+                page = e.get("page")
+                if isinstance(page, int):
+                    elements_by_page[page].append(e)
+
+            repaired = escalate_pages_replace_boundaries(
+                pages=flagged_page_nums,
+                escalation_cache=escalation_cache,
+                triggered_by="detect_boundaries_code_first_v1",
+                trigger_reason="ordering_or_empty_span",
+                existing_boundaries=boundaries,
+                elements_by_page=elements_by_page,
+            )
+
+            if repaired:
+                repaired_sections = {b["section_id"] for b in repaired}
+                boundaries = [
+                    b for b in boundaries
+                    if int(b.get("start_page") or -1) not in flagged_pages
+                    and b.get("section_id") not in repaired_sections
+                ]
+                boundaries.extend(repaired)
+                report["repaired_boundaries"] = len(repaired)
+
+                # Re-validate sequential ordering after replacement
+                boundaries = _validate_sequential_ordering(boundaries)
+
+            logger.log(
+                'escalate',
+                'done',
+                message=f'Repaired {len(repaired)} boundaries from ordering/span escalation',
+                artifact=args.out
+            )
+
+        # Re-check ordering/span issues after escalation
+        ordering_conflicts = detect_ordering_conflicts(boundaries, id_to_seq)
+        span_issues = detect_span_issues(
+            boundaries,
+            id_to_index=id_to_index,
+            elements_sorted=elements_sorted,
+            min_words=args.min_span_words,
+            min_alpha_ratio=args.min_span_alpha,
+            min_alpha_chars=args.min_span_chars,
+        )
+        report["ordering_conflicts_after"] = ordering_conflicts
+        report["span_issues_after"] = span_issues
+        if (ordering_conflicts or span_issues) and args.fail_on_ordering_conflict:
+            msg = (f'Ordering/span issues remain after escalation: '
+                   f'{len(ordering_conflicts)} ordering pages, {len(span_issues)} span pages')
+            logger.log('validate', 'failed', message=msg, artifact=args.out)
+            raise SystemExit(msg)
+    else:
+        report["ordering_conflicts_after"] = ordering_conflicts
+        report["span_issues_after"] = span_issues
+
+    ensure_dir(str(report_path.parent))
+    save_json(str(report_path), report)
+
+    # ========================================
+    # STAGE 3: Validate coverage
     # ========================================
     expected_total = args.max_section - args.min_section + 1
     target_count = int(expected_total * args.target_coverage)
-    
+
     logger.log(
         'validate',
         'running',
         message=f'Coverage: {len(boundaries)}/{expected_total} ({len(boundaries)/expected_total:.1%}), target: {target_count} ({args.target_coverage:.0%})',
         artifact=args.out
     )
-    
+
     if len(boundaries) >= target_count:
         logger.log(
             'validate',
             'done',
-            message=f'✓ Target coverage met! No escalation needed.',
+            message='✓ Target coverage met! No missing-section escalation needed.',
             artifact=args.out
         )
-        save_jsonl(args.out, boundaries)
-        print(f'✓ Found {len(boundaries)}/{expected_total} boundaries ({len(boundaries)/expected_total:.1%}) - target met!')
-        return
+    else:
+        logger.log(
+            'validate',
+            'running',
+            message='Coverage below target; proceeding to missing-section escalation.',
+            artifact=args.out
+        )
     
     # ========================================
     # STAGE 3: Gap analysis

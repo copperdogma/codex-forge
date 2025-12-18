@@ -20,10 +20,12 @@ Guiding priorities: **perfect OCR first**, then move downstream stage‑by‑sta
    Implemented multi-stage segmentation architecture. Page 12 correctly identified as gameplay start.
 8. DONE: **074 — Missing Sections Investigation — Complete 100% Coverage**
    Achieved 100% section-id coverage (400/400), with missing-from-source explicitly recorded.
-8. **078 — Boundary Ordering Guard + Targeted Escalation**
+8. DONE: **078 — Boundary Ordering Guard + Targeted Escalation**
    Prevent empty sections by enforcing span feasibility and escalating out‑of‑order headers. (Resume 035 after 078.)
-9. **035 — Fighting Fantasy Pipeline Optimization** *(Paused)*
-   Drive missing/no‑text/no‑choice to targets using the new OCR + boundary stack. (Resume after 078.)
+9. **080 — Central Escalation Cache (Premium OCR Overlay)**
+   Consolidate vision escalations into a shared cache consumed by multiple modules. (Optional but recommended after 078.)
+10. **035 — Fighting Fantasy Pipeline Optimization** *(Paused)*
+   Drive missing/no‑text/no‑choice to targets using the new OCR + boundary stack. (Resume after 078/080.)
 8. **050 — FF Ending Detection Verification**  
    Verify ending/dead‑end classification quality on FF outputs (no book‑specific tuning).
 9. **056 — Validation Forensics Automation (remaining items)**  
@@ -113,8 +115,9 @@ This index tracks stories in `/docs/stories/` for the codex-forge pipeline.
 || 075 | Booktype Text Cleanup Adapter (Downstream Normalization) | Medium | To Do | /docs/stories/story-075-booktype-text-cleanup-adapter.md |
 || 076 | AI Vision Engine Evaluation — Best Value for Pipeline | Medium | To Do | /docs/stories/story-076-ai-vision-engine-evaluation.md |
 || 077 | AI OCR Radical Simplification — Challenging the Escalation Assumption | High | To Do | /docs/stories/story-077-ai-ocr-simplification.md |
-|| 078 | Boundary Ordering Guard + Targeted Escalation | High | To Do | /docs/stories/story-078-boundary-ordering-escalation.md |
+|| 078 | Boundary Ordering Guard + Targeted Escalation | High | Done | /docs/stories/story-078-boundary-ordering-escalation.md |
 || 079 | Sequential Page Numbering Refactor — Dual-Field Provenance | High | To Do | /docs/stories/story-079-page-numbering-refactor.md |
+|| 080 | Central Escalation Cache (Premium OCR Overlay) | High | To Do | /docs/stories/story-080-central-escalation-cache.md |
 || 099 | Remove dev-only backcompat disclaimer | Low | To Do | /docs/stories/story-099-remove-dev-backcompat-note.md |
 
 ## Notes

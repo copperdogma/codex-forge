@@ -1,3 +1,19 @@
+## [2025-12-18] - Boundary ordering guard + targeted escalation
+
+### Added
+- Ordering/span guard and sidecar report for code-first boundary detection (`detect_boundaries_code_first_v1`).
+- Targeted ordering-page escalation with cached vision overlays and repair path.
+- Optional extraction overrides using escalation cache and sequence-based span ordering in `portionize_ai_extract_v1`.
+- Regression tests for ordering conflicts and span issues (`tests/test_boundary_ordering_guard.py`).
+- Story 078 closure and Story 080 (central escalation cache) documentation.
+
+### Changed
+- Canonical FF recipe now includes ordering/span guard knobs and `span_order: sequence`.
+- Story index updated to mark Story 078 done and insert Story 080 in recommended order.
+
+### Tested
+- `pytest -q tests/test_boundary_ordering_guard.py`
+
 ## [2025-12-12] - GPU “pit of success” for EasyOCR on Apple Silicon
 
 ### Added

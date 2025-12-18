@@ -1,6 +1,7 @@
 import argparse
 import json
 import os
+from pathlib import Path
 from typing import List, Dict, Optional
 from collections import defaultdict
 
@@ -214,6 +215,8 @@ def main():
     parser.add_argument("--out", required=True, help="Path to portions_enriched.jsonl")
     parser.add_argument("--images-dir", "--images_dir", dest="images_dir",
                         help="Optional path to page images directory (defaults to run_root/*/images).")
+    parser.add_argument("--escalation-cache-dir", dest="escalation_cache_dir",
+                        help="Optional escalation cache dir (page_*.json) to override raw_text by section_id")
     parser.add_argument("--model", default="gpt-4o", help="OpenAI model to use")
     parser.add_argument("--max_tokens", type=int, default=2000, help="Max tokens for AI response")
     parser.add_argument("--fallback-window", type=int, default=6,
@@ -231,6 +234,8 @@ def main():
     parser.add_argument("--fail-on-empty", action="store_true", dest="fail_on_empty",
                         help="Fail the stage if any section text remains empty after retries/widening")
     parser.add_argument("--section-filter", help="Comma-separated list of section_ids to process (others skipped)")
+    parser.add_argument("--span-order", dest="span_order", choices=["numeric", "sequence"], default="numeric",
+                        help="How to choose the next boundary for span end: numeric (default) or sequence order")
     args = parser.parse_args()
 
     logger = ProgressLogger(state_path=args.state_file, progress_path=args.progress_file, run_id=args.run_id)
@@ -263,16 +268,29 @@ def main():
     if not boundaries:
         raise SystemExit("No section boundaries found in input file")
 
-    # Sort boundaries by section_id (numeric)
+    # Sort boundaries by section_id (numeric) for processing order
     boundaries_sorted = sorted(boundaries, key=lambda b: int(b["section_id"]) if b["section_id"].isdigit() else 999999)
 
     # Compute end boundaries from the full list (so targeted re-runs still have correct spans)
     next_start_by_sid = {}
-    for i, b in enumerate(boundaries_sorted):
-        sid = b.get("section_id")
-        if not sid:
-            continue
-        next_start_by_sid[sid] = boundaries_sorted[i + 1]["start_element_id"] if i + 1 < len(boundaries_sorted) else None
+    if args.span_order == "sequence":
+        # Use document order to define spans (prevents inverted spans when IDs are out of order)
+        id_to_index = {eid: idx for idx, eid in enumerate(element_sequence)}
+        boundaries_by_seq = sorted(
+            [b for b in boundaries if b.get("start_element_id") in id_to_index],
+            key=lambda b: id_to_index.get(b.get("start_element_id"), 999999),
+        )
+        for i, b in enumerate(boundaries_by_seq):
+            sid = b.get("section_id")
+            if not sid:
+                continue
+            next_start_by_sid[sid] = boundaries_by_seq[i + 1]["start_element_id"] if i + 1 < len(boundaries_by_seq) else None
+    else:
+        for i, b in enumerate(boundaries_sorted):
+            sid = b.get("section_id")
+            if not sid:
+                continue
+            next_start_by_sid[sid] = boundaries_sorted[i + 1]["start_element_id"] if i + 1 < len(boundaries_sorted) else None
 
     # Optional filter (process only a subset, but keep spans defined by full neighbor boundaries)
     allowed = None
@@ -285,6 +303,27 @@ def main():
     logger.log("portionize", "running", current=0, total=len(boundaries_to_process),
                message=f"Extracting {len(boundaries_to_process)} sections with AI",
                artifact=args.out, module_id="portionize_ai_extract_v1")
+
+    # Load escalation cache if provided
+    escalation_text = {}
+    escalation_images = {}
+    if args.escalation_cache_dir:
+        cache_dir = Path(args.escalation_cache_dir)
+        if cache_dir.exists():
+            for cache_file in cache_dir.glob("page_*.json"):
+                try:
+                    data = json.loads(cache_file.read_text(encoding="utf-8"))
+                except Exception:
+                    continue
+                sections = data.get("sections", {}) or {}
+                for sid, info in sections.items():
+                    if sid and isinstance(info, dict):
+                        text = info.get("text")
+                        if text:
+                            escalation_text[str(sid)] = text
+                            escalation_images[str(sid)] = data.get("image_paths") or []
+        else:
+            logger.log("portionize", "warning", message=f"Escalation cache dir not found: {cache_dir}")
 
     # Prepare output directory
     ensure_dir(os.path.dirname(args.out) or ".")
@@ -302,13 +341,21 @@ def main():
             # Find end_element_id (start of next section, or None for last section)
             end_element_id = next_start_by_sid.get(section_id)
 
-            # Extract text from elements
-            raw_text, element_ids = extract_text_from_elements(
-                elements_by_id,
-                element_sequence,
-                start_element_id,
-                end_element_id
-            )
+            # Extract text from elements (or use escalation cache override)
+            source_images = []
+            used_escalation = False
+            if str(section_id) in escalation_text:
+                raw_text = escalation_text[str(section_id)]
+                element_ids = []
+                source_images = escalation_images.get(str(section_id)) or []
+                used_escalation = True
+            else:
+                raw_text, element_ids = extract_text_from_elements(
+                    elements_by_id,
+                    element_sequence,
+                    start_element_id,
+                    end_element_id
+                )
 
             gameplay_data = None
             widened = False
@@ -411,38 +458,43 @@ def main():
                         })
 
             # Get page range from elements
-            section_elements = [elements_by_id[eid] for eid in element_ids if eid in elements_by_id]
-            page_numbers = []
-            for e in section_elements:
-                md = e.get("metadata") or {}
-                pn = md.get("page_number") or e.get("page")
-                if pn is None:
-                    continue
-                try:
-                    page_numbers.append(int(pn))
-                except Exception:
-                    continue
-            page_start = min(page_numbers) if page_numbers else 1
-            page_end = max(page_numbers) if page_numbers else 1
+            if used_escalation:
+                page_start = int(boundary.get("start_page") or 1)
+                page_end = page_start
+            else:
+                section_elements = [elements_by_id[eid] for eid in element_ids if eid in elements_by_id]
+                page_numbers = []
+                for e in section_elements:
+                    md = e.get("metadata") or {}
+                    pn = md.get("page_number") or e.get("page")
+                    if pn is None:
+                        continue
+                    try:
+                        page_numbers.append(int(pn))
+                    except Exception:
+                        continue
+                page_start = min(page_numbers) if page_numbers else 1
+                page_end = max(page_numbers) if page_numbers else 1
 
             # Create EnrichedPortion
-            page_ids = []
-            for eid in element_ids:
-                pid = _page_id_from_element_id(eid)
-                if pid:
-                    page_ids.append(pid)
-            # If we only have integer page numbers (and split images exist), include both L/R images
-            # so downstream multimodal repair can see the full spread.
-            for pn in range(int(page_start), int(page_end) + 1):
-                page_ids.append(f"{pn:03d}L")
-                page_ids.append(f"{pn:03d}R")
-            page_ids = _sort_page_ids(sorted(set(page_ids)))
-            source_images = []
-            if images_dir and page_ids:
-                for pid in page_ids:
-                    cand = os.path.join(images_dir, f"page-{pid}.png")
-                    if os.path.exists(cand):
-                        source_images.append(cand)
+            if not used_escalation:
+                page_ids = []
+                for eid in element_ids:
+                    pid = _page_id_from_element_id(eid)
+                    if pid:
+                        page_ids.append(pid)
+                # If we only have integer page numbers (and split images exist), include both L/R images
+                # so downstream multimodal repair can see the full spread.
+                for pn in range(int(page_start), int(page_end) + 1):
+                    page_ids.append(f"{pn:03d}L")
+                    page_ids.append(f"{pn:03d}R")
+                page_ids = _sort_page_ids(sorted(set(page_ids)))
+                source_images = []
+                if images_dir and page_ids:
+                    for pid in page_ids:
+                        cand = os.path.join(images_dir, f"page-{pid}.png")
+                        if os.path.exists(cand):
+                            source_images.append(cand)
             enriched = EnrichedPortion(
                 portion_id=section_id,
                 section_id=section_id,
