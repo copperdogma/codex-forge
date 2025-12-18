@@ -20,8 +20,10 @@ Guiding priorities: **perfect OCR first**, then move downstream stage‑by‑sta
    Implemented multi-stage segmentation architecture. Page 12 correctly identified as gameplay start.
 8. DONE: **074 — Missing Sections Investigation — Complete 100% Coverage**
    Achieved 100% section-id coverage (400/400), with missing-from-source explicitly recorded.
-8. **035 — Fighting Fantasy Pipeline Optimization** *(Paused)*
-   Drive missing/no‑text/no‑choice to targets using the new OCR + boundary stack. (Resume after 073.)
+8. **078 — Boundary Ordering Guard + Targeted Escalation**
+   Prevent empty sections by enforcing span feasibility and escalating out‑of‑order headers. (Resume 035 after 078.)
+9. **035 — Fighting Fantasy Pipeline Optimization** *(Paused)*
+   Drive missing/no‑text/no‑choice to targets using the new OCR + boundary stack. (Resume after 078.)
 8. **050 — FF Ending Detection Verification**  
    Verify ending/dead‑end classification quality on FF outputs (no book‑specific tuning).
 9. **056 — Validation Forensics Automation (remaining items)**  
@@ -109,6 +111,10 @@ This index tracks stories in `/docs/stories/` for the codex-forge pipeline.
 || 073 | 100% Section Detection — Segmentation Architecture | High | Done | /docs/stories/story-073-100-percent-section-detection.md |
 || 074 | Missing Sections Investigation — Complete 100% Coverage | High | Done | /docs/stories/story-074-missing-sections-investigation.md |
 || 075 | Booktype Text Cleanup Adapter (Downstream Normalization) | Medium | To Do | /docs/stories/story-075-booktype-text-cleanup-adapter.md |
+|| 076 | AI Vision Engine Evaluation — Best Value for Pipeline | Medium | To Do | /docs/stories/story-076-ai-vision-engine-evaluation.md |
+|| 077 | AI OCR Radical Simplification — Challenging the Escalation Assumption | High | To Do | /docs/stories/story-077-ai-ocr-simplification.md |
+|| 078 | Boundary Ordering Guard + Targeted Escalation | High | To Do | /docs/stories/story-078-boundary-ordering-escalation.md |
+|| 079 | Sequential Page Numbering Refactor — Dual-Field Provenance | High | To Do | /docs/stories/story-079-page-numbering-refactor.md |
 || 099 | Remove dev-only backcompat disclaimer | Low | To Do | /docs/stories/story-099-remove-dev-backcompat-note.md |
 
 ## Notes
