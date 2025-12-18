@@ -77,3 +77,7 @@ Add a repeatable smoke test that runs the full pipeline on a static image sample
 ### 20251204-0120 — Single-recipe plan locked
 - **Result:** Confirmed we’ll keep one canonical recipe (ff-engine) and run smoke via settings/overrides; separate smoke DAG is temporary and will be removed after ff-engine is rewired.
 - **Next:** Rewire `recipe-ff-engine.yaml` to only use modules present in repo, thread skip_ai/stub params, delete the extra smoke recipe, run smoke once, and document the single-command invocation.
+### 20251218-1530 — Smoke recipe drift noted (follow-up needed)
+- **Result:** Noted ongoing drift: `configs/recipes/recipe-ff-smoke.yaml` still exists alongside the canonical smoke path (`configs/recipes/recipe-ff-canonical.yaml` + `settings.smoke.yaml`).
+- **Notes:** Decide whether to keep the dedicated smoke recipe or fully standardize on canonical+settings; document and remove/retain accordingly.
+- **Next:** Pick one smoke path and update docs/scripts to match; remove the other path to avoid divergence.

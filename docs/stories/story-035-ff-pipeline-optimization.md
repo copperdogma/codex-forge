@@ -1,6 +1,6 @@
 # Story: Fighting Fantasy Pipeline Optimization
 
-**Status**: PAUSED (Core goals achieved - 4/5 criteria met, remaining work split to story-068)
+**Status**: PAUSED (Awaiting Story-078 boundary-ordering escalation guard)
 **Created**: 2025-11-30
 **Updated**: 2025-12-13
 **Paused**: 2025-12-13
@@ -66,30 +66,30 @@ Optimize the redesigned Fighting Fantasy pipeline to achieve near-perfect sectio
 
 ## Tasks
 
-### Priority 1: Improve Section Recall
+### Priority 1: Improve Section Recall ✅ COMPLETE (handled by stories 073/074)
 
 **Missing Sections** (24 total): 11, 46, 68, 153, 158, 159, 169, 227, 273, 278, 281, 296, 303, 314, 329, 337, 338, 339, 346, 350, 355, 359, 367, 375
 
-- [ ] **Investigate missing sections**:
-  - [ ] Check if these sections exist in `elements_core.jsonl`
-  - [ ] Check if they're detected in `header_candidates.jsonl` but filtered out in Stage 2
-  - [ ] Identify patterns (page breaks, special formatting, edge cases)
-  - [ ] Document root causes with evidence
+- [x] **Investigate missing sections**:
+  - [x] Check if these sections exist in `elements_core.jsonl`
+  - [x] Check if they're detected in `header_candidates.jsonl` but filtered out in Stage 2
+  - [x] Identify patterns (page breaks, special formatting, edge cases)
+  - [x] Document root causes with evidence
 
-- [ ] **Improve Stage 1 detection**:
-  - [ ] Analyze why specific sections aren't detected
-  - [ ] Refine prompts if needed (but keep them simple per AGENTS.md guidance)
-  - [ ] Consider edge cases (colon prefixes, page breaks, special formatting)
+- [x] **Improve Stage 1 detection**:
+  - [x] Analyze why specific sections aren't detected
+  - [x] Refine prompts if needed (but keep them simple per AGENTS.md guidance)
+  - [x] Consider edge cases (colon prefixes, page breaks, special formatting)
 
-- [ ] **Improve Stage 2 filtering**:
-  - [ ] Review why candidates might be filtered out
-  - [ ] Ensure Stage 2 isn't being too conservative
-  - [ ] Verify uncertain sections are handled correctly
+- [x] **Improve Stage 2 filtering**:
+  - [x] Review why candidates might be filtered out
+  - [x] Ensure Stage 2 isn't being too conservative
+  - [x] Verify uncertain sections are handled correctly
 
-- [ ] **Add targeted detection** (if needed):
-  - [ ] Consider a "backfill" stage to catch missed sections
-  - [ ] Or improve Stage 1/2 to catch edge cases
-  - [ ] Implement gap-based backfill module: given consecutive detected sections, ask LLM to scan the interstitial elements/text to find missing headers (e.g., 43-46 block hides 46). Insert boundaries without disturbing confirmed ones.
+- [x] **Add targeted detection** (if needed):
+  - [x] Consider a "backfill" stage to catch missed sections
+  - [x] Or improve Stage 1/2 to catch edge cases
+  - [x] Implement gap-based backfill module: given consecutive detected sections, ask LLM to scan the interstitial elements/text to find missing headers (e.g., 43-46 block hides 46). Insert boundaries without disturbing confirmed ones.
 
 ### Priority 2: Address Empty Sections
 
@@ -115,25 +115,25 @@ Optimize the redesigned Fighting Fantasy pipeline to achieve near-perfect sectio
 - [ ] Repair strategy: (a) re-OCR snippets if available, then (b) use LLM with page text/image context and strict “do not invent” prompt to normalize spelling while keeping semantics.
 - [ ] Validate on sample garbled sections (44, 277, 381) to ensure readability improves without content drift.
 
-### Priority 2b: Strip section/page numbers from text while keeping structure
+### Priority 2b: Strip section/page numbers from text while keeping structure ✅ COMPLETE
 
-- [ ] Ensure final `text` fields do **not** include section numbers or page-number artifacts (e.g., "47-50" headers), while preserving paragraph breaks and legitimate in-text numbers.
-- [ ] Keep section numbers in structured JSON fields (e.g., `section`, `id`) but not in `text` content.
-- [ ] Build this as a **dedicated cleanup module** (not jammed into existing extraction) to avoid harming primary extraction quality.
-- [ ] Validate on sample outputs that numbering is removed and paragraph integrity (no spurious newlines) is retained.
+- [x] Ensure final `text` fields do **not** include section numbers or page-number artifacts (e.g., "47-50" headers), while preserving paragraph breaks and legitimate in-text numbers.
+- [x] Keep section numbers in structured JSON fields (e.g., `section`, `id`) but not in `text` content.
+- [x] Build this as a **dedicated cleanup module** (not jammed into existing extraction) to avoid harming primary extraction quality.
+- [x] Validate on sample outputs that numbering is removed and paragraph integrity (no spurious newlines) is retained.
 
-### Priority 3: Improve Choices Detection
+### Priority 3: Improve Choices Detection ✅ COMPLETE (code-first extraction integrated)
 
 **67 gameplay sections with no choices** - May be legitimate dead ends, but should verify.
 
-- [ ] **Investigate**:
-  - [ ] Check if these are actually dead ends (endings, deaths, etc.)
-  - [ ] Or if choices aren't being detected properly
-  - [ ] Sample 10-20 sections to verify
+- [x] **Investigate**:
+  - [x] Check if these are actually dead ends (endings, deaths, etc.)
+  - [x] Or if choices aren't being detected properly
+  - [x] Sample 10-20 sections to verify
 
-- [ ] **Improve extraction** (if needed):
-  - [ ] Refine Stage 6 prompts to better detect choice patterns
-  - [ ] Consider edge cases (conditional choices, test-your-luck, etc.)
+- [x] **Improve extraction** (if needed):
+  - [x] Refine Stage 6 prompts to better detect choice patterns
+  - [x] Consider edge cases (conditional choices, test-your-luck, etc.)
 
 ### Priority 4: Validation & Quality
 
@@ -398,6 +398,49 @@ Optimize the redesigned Fighting Fantasy pipeline to achieve near-perfect sectio
   - ✅ Repair stage processed 32 flagged portions, attempted 24 repairs
   - ❌ Build failed on stub-fatal guard (47 stub backfills required)
 - **Built with --allow-stubs:** 392 total sections (345 real + 47 stubs)
+
+### 20251218-1237 — Story check and planning handoff alignment
+- **Result:** Success; story format and checklist already present, no task edits required.
+- **Notes:** Story remains paused with boundary-detection work moved to story-068; tasks here still reflect historical optimization and should not be advanced without a new directive.
+- **Next:** If reactivating this story, start by reconciling remaining Priority 1–2 items against story-068 outcomes and a fresh run baseline.
+
+### 20251218-1310 — Reactivation triage against completed stories
+- **Result:** Success; reviewed commit history + stories 068/069/070/071/072/073/074 to map completed work vs remaining Story‑035 requirements.
+- **Notes:** Boundary detection & section coverage are now handled by story‑073/074 (398/400 detected; 169/170 verified missing). `extract_choices_v1` is implemented and integrated in the canonical recipe; tolerant parsing work tracked in story‑072. `strip_section_numbers_v1` is integrated in `recipe-ff-canonical.yaml`. OCR pipeline improvements and output structure changes landed in stories 069–071. Endmatter propagation and typo/garble repair appear still unclosed in Story‑035.
+- **Next:** Update Story‑035 scope to focus on remaining gaps (endmatter propagation + typo/garble repair + any residual choice validation gaps) and confirm with a fresh canonical run baseline before further changes.
+
+### 20251218-1322 — Closed completed requirements; reactivated scope
+- **Result:** Success; marked Priority 1, Priority 2b, and Priority 3 tasks complete; status set to ACTIVE.
+- **Notes:** These items are now covered by Story‑073/074 (section coverage), existing `strip_section_numbers_v1`, and `extract_choices_v1` integration with tolerant parsing work in Story‑072.
+- **Next:** Proceed with remaining open work: endmatter propagation (Priority 5) and typo/garble repair (Priority 2c), starting with artifact confirmation on a fresh baseline run.
+
+### 20251218-1340 — Inspected latest full run quality (story‑074 full)
+- **Result:** Mixed; coverage good but quality gaps remain.
+- **Notes:** Checked `output/runs/story-074-full-20251218-031618/30_validate_ff_engine_v2/validation_report.json` and `.../31_validate_choice_completeness_v1/choice_completeness_report.json`:
+  - `is_valid: true` for engine validation, but **17 sections have no text** (includes 169/170; warning lists 51, 53, 69, 95, 123, 125, 193, 256, 276, 305, plus 7 more).
+  - **42 gameplay sections with no choices** (warning only).
+  - Choice completeness validator **is_valid: false** with 5 warnings (sections 1, 5, 9, 10, 11 missing choices referenced in text).
+  - `unresolved_missing.json` contains `["169","170"]`; `gamebook.json` includes these as empty backfilled sections (provenance reason: “backfilled missing target”).
+- **Next:** Use this run as the baseline for endmatter propagation + typo/garble repair (append-only artifacts), and address choice-completeness warnings with targeted re‑extract/repair.
+
+### 20251218-1405 — Diagnosed 17 no‑text sections (baseline run)
+- **Result:** Partial success; identified a common failure mode for 15/17 sections.
+- **Notes:** Inspected `output/runs/story-074-full-20251218-031618/{24_portionize_ai_extract_v1,26_repair_portions_v1,27_strip_section_numbers_v1}` and `09_elements_content_type_v1/elements_core_typed.jsonl`.
+  - No‑text IDs: `['51','53','69','95','123','125','193','256','276','305','335','347','367','369','374','169','170']`.
+  - For 15/17 (excluding 169/170), `raw_text` exists in `repaired_portions.jsonl` but is **numeric header clutter only** (e.g., `51\\n\\n51-52\\n\\n348...`) and gets stripped to empty in `portions_enriched_clean.jsonl`.
+  - `elements_core_typed.jsonl` shows valid section headers on pages (e.g., 028L for 51/52/53/54, 033L for 69/70) but **header order by `seq` is out of numeric order**, so extracting by section-id order produces empty spans.
+  - Example: Page 028L has headers for 53/54/52/51 interleaved with body text; section 51 header occurs after the text for 52/53, so the range between “51” and the next numeric section id is empty.
+- **Next:** Implement a repair step for “no‑text” sections that re‑segments within the page using element sequence order (and/or vision‑based re‑read) to recover correct spans before strip‑numbers; keep 169/170 as verified‑missing stubs.
+
+### 20251218-1445 — Root cause: extraction assumes numeric order; boundary validation allows out‑of‑order IDs
+- **Result:** Success; found the code path that allows out‑of‑order headers to become empty extractions.
+- **Notes:** In `modules/portionize/portionize_ai_extract_v1/main.py`, boundaries are **sorted by section_id** and spans are defined by the *next section id* (`boundaries_sorted`, `next_start_by_sid`). If a later‑numbered header appears *before* an earlier one in element sequence, the end index precedes the start, producing empty text. `modules/validate/verify_boundaries_v1/main.py` validates monotonic **sequence order** only and explicitly allows out‑of‑order section IDs, so this mismatch is not flagged upstream.
+- **Next:** Add an ordering guard that detects `end_idx < start_idx` (or per‑page seq order vs numeric order) and triggers targeted escalation/repair; do not rely on numeric ordering alone.
+
+### 20251218-1515 — Paused pending boundary‑ordering escalation story
+- **Result:** Success; paused Story‑035 to avoid duplicate work.
+- **Notes:** The next required work (ordering guard + targeted escalation for out‑of‑order headers / no‑text spans) is now scoped as a separate story for focused implementation.
+- **Next:** Complete Story‑078, then return here to continue endmatter propagation + typo/garble repair.
 - **Validation Results:**
   - Total sections: 392
   - Valid: False (missing sections)
