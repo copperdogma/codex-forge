@@ -157,6 +157,7 @@ class PortionHypothesis(BaseModel):
     continuation_confidence: Optional[float] = None
     raw_text: Optional[str] = None  # Text extracted from elements/pages
     element_ids: Optional[List[str]] = None  # Source element IDs for provenance
+    macro_section: Optional[str] = None  # frontmatter | gameplay | endmatter
 
 
 class LockedPortion(BaseModel):
@@ -176,6 +177,7 @@ class LockedPortion(BaseModel):
     continuation_confidence: Optional[float] = None
     raw_text: Optional[str] = None  # Text extracted from elements/pages
     element_ids: Optional[List[str]] = None  # Source element IDs for provenance
+    macro_section: Optional[str] = None  # frontmatter | gameplay | endmatter
 
 
 class ResolvedPortion(BaseModel):
@@ -196,6 +198,7 @@ class ResolvedPortion(BaseModel):
     continuation_confidence: Optional[float] = None
     raw_text: Optional[str] = None  # Text extracted from elements/pages
     element_ids: Optional[List[str]] = None  # Source element IDs for provenance
+    macro_section: Optional[str] = None  # frontmatter | gameplay | endmatter
 
 
 class EnrichedPortion(BaseModel):
@@ -224,6 +227,7 @@ class EnrichedPortion(BaseModel):
     repair: Optional[Dict[str, Any]] = None
     repair_hints: Optional[Dict[str, Any]] = None
     context_correction: Optional[Dict[str, Any]] = None
+    macro_section: Optional[str] = None  # frontmatter | gameplay | endmatter
 
 
 class LLMCallUsage(BaseModel):
@@ -465,6 +469,7 @@ class SectionBoundary(BaseModel):
     start_page: Optional[int] = None
     start_line_idx: Optional[int] = None
     end_page: Optional[int] = None
+    macro_section: Optional[str] = None  # frontmatter | gameplay | endmatter
     method: Optional[str] = None  # "code_filter" | "vision_escalation" | ...
     source: Optional[str] = None  # "content_type_classification" | "escalation_cache" | ...
     header_position: Optional[str] = None  # "top" | "middle" | "bottom" | "unknown"

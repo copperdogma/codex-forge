@@ -6,6 +6,7 @@ from typing import List, Dict
 from openai import OpenAI
 
 from modules.common.utils import read_jsonl, save_jsonl, ensure_dir, ProgressLogger, log_llm_usage
+from modules.common.macro_section import macro_section_for_page, page_num_from_element_id
 from schemas import SectionBoundary
 
 SYSTEM_PROMPT = """You are analyzing a Fighting Fantasy gamebook to identify gameplay section boundaries.
@@ -193,6 +194,8 @@ def main():
     parser.add_argument("--run-id", help="Run identifier for logging")
     parser.add_argument("--retry-model", dest="retry_model", default="gpt-5",
                         help="Model to retry with if JSON parsing fails")
+    parser.add_argument("--coarse-segments", "--coarse_segments", dest="coarse_segments",
+                        help="Optional coarse_segments.json or merged_segments.json for macro_section tagging")
     args = parser.parse_args()
 
     logger = ProgressLogger(state_path=args.state_file, progress_path=args.progress_file, run_id=args.run_id)
@@ -204,6 +207,17 @@ def main():
     elements = list(read_jsonl(args.pages))
     if not elements:
         raise SystemExit("No elements found in input file")
+    elements_by_id = {e.get("id"): e for e in elements if e.get("id")}
+
+    coarse_segments = None
+    if args.coarse_segments:
+        try:
+            with open(args.coarse_segments, "r", encoding="utf-8") as f:
+                coarse_segments = json.load(f)
+        except Exception as exc:
+            logger.log("portionize", "warning", current=0, total=1,
+                       message=f"Failed to load coarse segments: {exc}", artifact=args.out,
+                       module_id="portionize_ai_scan_v1")
 
     logger.log("portionize", "running", current=0, total=1,
                message=f"Scanning {len(elements)} elements with AI",
@@ -221,10 +235,19 @@ def main():
     # Convert to SectionBoundary schema
     boundaries = []
     for b in boundaries_data:
+        start_id = b.get("start_element_id")
+        page = None
+        if start_id and start_id in elements_by_id:
+            elem = elements_by_id[start_id]
+            page = elem.get("metadata", {}).get("page_number") or elem.get("page")
+        if page is None:
+            page = page_num_from_element_id(start_id)
+        macro_section = macro_section_for_page(page, coarse_segments) if coarse_segments else None
         boundary = SectionBoundary(
             section_id=str(b.get("section_id")),
             start_element_id=b.get("start_element_id"),
             end_element_id=None,  # Will be inferred later
+            macro_section=macro_section,
             confidence=b.get("confidence", 0.0),
             evidence=b.get("evidence"),
             module_id="portionize_ai_scan_v1",

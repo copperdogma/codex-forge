@@ -511,6 +511,7 @@ def main():
                 item_effects=item_effects,
                 targets=[c.target for c in choices],
                 element_ids=element_ids,
+                macro_section=boundary.get("macro_section"),
                 module_id="portionize_ai_extract_v1",
                 run_id=args.run_id,
                 context_correction=(
@@ -565,6 +566,7 @@ def main():
                 item_effects=[],
                 targets=[],
                 element_ids=[start_element_id] if start_element_id else None,
+                macro_section=boundary.get("macro_section"),
                 module_id="portionize_ai_extract_v1",
                 run_id=args.run_id,
                 context_correction={

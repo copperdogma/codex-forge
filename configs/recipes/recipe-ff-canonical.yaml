@@ -233,13 +233,14 @@ stages:
   - id: ai_scan_fallback
     stage: portionize
     module: portionize_ai_scan_v1
-    needs: [content_types]
+    needs: [content_types, coarse_segment]
     out: section_boundaries_scan.jsonl
     inputs:
       pages: content_types
     params:
       model: gpt-4.1-mini
       max_tokens: 1000
+      coarse_segments: merged_segments.json
 
   - id: macro_locate
     stage: portionize
@@ -256,11 +257,13 @@ stages:
   - id: merge_boundaries
     stage: adapter
     module: merge_boundaries_pref_v1
-    needs: [assemble_boundaries, ai_scan_fallback]
+    needs: [assemble_boundaries, ai_scan_fallback, coarse_segment]
     out: section_boundaries_merged.jsonl
     inputs:
       primary: assemble_boundaries
       fallback: ai_scan_fallback
+    params:
+      coarse_segments: merged_segments.json
 
   - id: verify_boundaries
     stage: validate

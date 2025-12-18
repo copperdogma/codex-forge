@@ -2,6 +2,7 @@
 import argparse
 import json
 from modules.common.utils import read_jsonl, save_jsonl, ProgressLogger
+from modules.common.macro_section import macro_section_for_page, page_num_from_element_id
 
 
 def main():
@@ -11,6 +12,8 @@ def main():
     parser.add_argument("--inputs", nargs="+", help="Driver compatibility: [primary fallback]")
     parser.add_argument("--out", required=True, help="Output merged section_boundaries.jsonl")
     parser.add_argument("--elements-core", dest="elements_core", help="Optional elements_core.jsonl to filter/sort by seq")
+    parser.add_argument("--coarse-segments", "--coarse_segments", dest="coarse_segments",
+                        help="Optional coarse_segments.json or merged_segments.json for macro_section tagging")
     parser.add_argument("--progress-file")
     parser.add_argument("--state-file")
     parser.add_argument("--run-id")
@@ -29,9 +32,26 @@ def main():
     fallback = {b["section_id"]: b for b in read_jsonl(fallback_path)}
 
     id_to_seq = None
+    id_to_page = None
     if args.elements_core:
         from schemas import ElementCore
-        id_to_seq = {ElementCore(**json.loads(l)).id: ElementCore(**json.loads(l)).seq for l in open(args.elements_core)}
+        id_to_seq = {}
+        id_to_page = {}
+        with open(args.elements_core, "r", encoding="utf-8") as f:
+            for line in f:
+                elem = ElementCore(**json.loads(line))
+                id_to_seq[elem.id] = elem.seq
+                id_to_page[elem.id] = elem.page
+
+    coarse_segments = None
+    if args.coarse_segments:
+        try:
+            with open(args.coarse_segments, "r", encoding="utf-8") as f:
+                coarse_segments = json.load(f)
+        except Exception as exc:
+            logger.log("adapter", "warning", current=0, total=1,
+                       message=f"Failed to load coarse segments: {exc}", artifact=args.out,
+                       module_id="merge_boundaries_pref_v1")
 
     merged_by_sid = dict(primary)
     for sid, b in fallback.items():
@@ -61,6 +81,19 @@ def main():
         merged = filtered_nonoverlap
     else:
         merged.sort(key=lambda x: int(x["section_id"]) if x["section_id"].isdigit() else 999999)
+
+    if coarse_segments:
+        for b in merged:
+            if b.get("macro_section"):
+                continue
+            page = b.get("start_page")
+            if page is None:
+                start_id = b.get("start_element_id")
+                if id_to_page and start_id in id_to_page:
+                    page = id_to_page.get(start_id)
+                if page is None:
+                    page = page_num_from_element_id(start_id)
+            b["macro_section"] = macro_section_for_page(page, coarse_segments)
 
     save_jsonl(args.out, merged)
     logger.log("adapter", "done", current=len(merged), total=len(merged),

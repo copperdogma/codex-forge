@@ -15,6 +15,7 @@ from pathlib import Path
 from typing import Dict, List, Set, Optional, Any
 
 from modules.common.utils import read_jsonl, save_jsonl, save_json, ensure_dir, ProgressLogger
+from modules.common.macro_section import macro_section_for_page, page_num_from_element_id
 from modules.common.escalation_cache import EscalationCache
 
 
@@ -293,6 +294,23 @@ def detect_ordering_conflicts(boundaries: List[Dict], id_to_seq: Dict[str, int])
         if page_conflicts:
             conflicts[page_key] = {"sides": page_conflicts}
     return conflicts
+
+
+def assign_macro_sections(boundaries: List[Dict], elements_by_id: Dict[str, Dict],
+                          coarse_segments: Optional[Dict[str, Any]]) -> None:
+    if not coarse_segments:
+        return
+    for b in boundaries:
+        if b.get("macro_section"):
+            continue
+        page = b.get("start_page")
+        if page is None:
+            start_id = b.get("start_element_id")
+            elem = elements_by_id.get(start_id) if start_id else None
+            page = (elem.get("page") if elem else None) or (elem.get("metadata", {}).get("page_number") if elem else None)
+            if page is None:
+                page = page_num_from_element_id(start_id)
+        b["macro_section"] = macro_section_for_page(page, coarse_segments)
 
 
 def detect_span_issues(boundaries: List[Dict],
@@ -991,6 +1009,7 @@ def main():
     logger.log('load', 'running', message=f'Loading {input_path}')
     elements = list(read_jsonl(input_path))
     logger.log('load', 'done', message=f'Loaded {len(elements)} elements')
+    elements_by_id = {e.get("id"): e for e in elements if e.get("id")}
 
     # Load coarse segmentation (gameplay/frontmatter/endmatter ranges)
     coarse_segments = None
@@ -1247,6 +1266,9 @@ def main():
         artifact=args.out
     )
     
+    # Annotate macro sections (frontmatter/gameplay/endmatter) for provenance.
+    assign_macro_sections(boundaries, elements_by_id, coarse_segments)
+
     # ========================================
     # STAGE 5: Final validation
     # ========================================

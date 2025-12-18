@@ -84,7 +84,7 @@ This index tracks stories in `/docs/stories/` for the codex-forge pipeline.
 || 032 | Unstructured intake & Document IR adoption | Medium | Done | /docs/stories/story-032-unstructured-intake-and-document-ir-adoption.md |
 || 033 | ARM64-native pipeline environment & perforecipe-pagelines-repair-choices.yamlrmance | Medium | Done | /docs/stories/story-033-arm64-pipeline-conversion.md |
 || 034 | FF Unstructured follow-ups (elements, helpers, graph quality) | High | Done | /docs/stories/story-034-ff-unstructured-followups.md |
-|| 035 | Fighting Fantasy Pipeline Optimization | High | Paused | /docs/stories/story-035-ff-pipeline-optimization.md |
+|| 035 | Fighting Fantasy Pipeline Optimization | High | Done | /docs/stories/story-035-ff-pipeline-optimization.md |
 || 036 | FF OCR Recovery & Text Repair | High | Done | /docs/stories/story-036-ff-ocr-recovery-and-text-repair.md |
 || 037 | FF OCR Ensemble with BetterOCR | High | Done | /docs/stories/story-037-ocr-ensemble-with-betterocr.md |
 || 038 | Agentic Pipeline Coordinator | Medium | To Do | /docs/stories/story-038-agentic-pipeline-coordinator.md |

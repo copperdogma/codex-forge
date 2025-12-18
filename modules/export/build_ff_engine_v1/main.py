@@ -146,6 +146,7 @@ def build_section(portion: Dict[str, Any]) -> tuple[str, Dict[str, Any]]:
         "source_pages": list(range(page_start, page_end + 1)),
         "raw_text": raw_body,
         "clean_text": text_body,
+        "macro_section": portion.get("macro_section"),
         "module_id": portion.get("module_id"),
         "run_id": portion.get("run_id"),
     }

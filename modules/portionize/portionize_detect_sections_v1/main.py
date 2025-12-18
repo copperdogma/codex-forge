@@ -5,6 +5,7 @@ import os
 from typing import List, Dict
 
 from modules.common.utils import read_jsonl, append_jsonl, ProgressLogger
+from modules.common.macro_section import macro_section_for_page
 from schemas import PortionHypothesis
 
 SECTION_RE = re.compile(r"^\s*(\d{1,3})\s*$")
@@ -17,6 +18,8 @@ def main():
     parser.add_argument("--progress-file")
     parser.add_argument("--state-file")
     parser.add_argument("--run-id")
+    parser.add_argument("--coarse-segments", "--coarse_segments", dest="coarse_segments",
+                        help="Optional coarse_segments.json or merged_segments.json for macro_section tagging")
     args = parser.parse_args()
 
     # reset output
@@ -29,6 +32,14 @@ def main():
 
     pages = list(read_jsonl(args.pages))
     pages.sort(key=lambda p: p.get("page", 0))
+
+    coarse_segments = None
+    if args.coarse_segments:
+        try:
+            with open(args.coarse_segments, "r", encoding="utf-8") as f:
+                coarse_segments = json.load(f)
+        except Exception:
+            coarse_segments = None
 
     # collect line tuples
     markers: List[Dict] = []
@@ -82,6 +93,7 @@ def main():
             raw_text="\n".join(text_parts).strip(),
             source_window=[start_page, end_page],
             source_pages=list(range(start_page, end_page + 1)),
+            macro_section=macro_section_for_page(start_page, coarse_segments),
             source=["rule_section_detect"],
         )
         append_jsonl(args.out, hypo.dict())

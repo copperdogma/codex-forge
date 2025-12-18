@@ -7,6 +7,7 @@ from typing import List, Dict, Any
 from openai import OpenAI
 
 from modules.common.utils import ProgressLogger, read_jsonl, ensure_dir, append_jsonl
+from modules.common.macro_section import macro_section_for_page
 from schemas import PortionHypothesis
 
 SYSTEM_PROMPT = """You are detecting gameplay section headers inside the GAME region of a Fighting Fantasy book.
@@ -69,6 +70,8 @@ def main():
     parser.add_argument("--run-id")
     parser.add_argument("--skip-ai", action="store_true", help="Bypass LLM header detection and load stub portion hypotheses.")
     parser.add_argument("--stub", help="Stub portion_hyp jsonl to use when --skip-ai")
+    parser.add_argument("--coarse-segments", "--coarse_segments", dest="coarse_segments",
+                        help="Optional coarse_segments.json or merged_segments.json for macro_section tagging")
     args = parser.parse_args()
 
     if args.skip_ai:
@@ -96,6 +99,14 @@ def main():
     if not game_pages:
         raise SystemExit("No pages in game region")
 
+    coarse_segments = None
+    if args.coarse_segments:
+        try:
+            with open(args.coarse_segments, "r", encoding="utf-8") as f:
+                coarse_segments = json.load(f)
+        except Exception:
+            coarse_segments = None
+
     # deterministic pass: grab standalone numeric lines 1-400
     seen = set()
     numeric_hypos = []
@@ -122,6 +133,7 @@ def main():
                 source_window=[p["page"]],
                 source_pages=[p["page"]],
                 raw_text=None,
+                macro_section=macro_section_for_page(p["page"], coarse_segments) or "gameplay",
                 source=["numeric_header"],
             )
             numeric_hypos.append(hypo.dict())
@@ -167,6 +179,7 @@ def main():
                 source_window=[p["page"] for p in batch],
                 source_pages=[s.get("page")],
                 raw_text=None,
+                macro_section=macro_section_for_page(s.get("page"), coarse_segments) or "gameplay",
                 source=["llm_section_headers"],
             )
             append_jsonl(args.out, hypo.dict())

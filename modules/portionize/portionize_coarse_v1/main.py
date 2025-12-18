@@ -7,6 +7,7 @@ from openai import OpenAI
 from tqdm import tqdm
 
 from modules.common.utils import read_jsonl, append_jsonl, ensure_dir, ProgressLogger, log_llm_usage
+from modules.common.macro_section import macro_section_for_page
 from schemas import PortionHypothesis
 
 SYSTEM_PROMPT = """You are a coarse-grained book segmenter.
@@ -83,6 +84,8 @@ def main():
     parser.add_argument("--progress-file", help="Path to pipeline_events.jsonl")
     parser.add_argument("--state-file", help="Path to pipeline_state.json")
     parser.add_argument("--run-id", help="Run identifier for logging")
+    parser.add_argument("--coarse-segments", "--coarse_segments", dest="coarse_segments",
+                        help="Optional coarse_segments.json or merged_segments.json for macro_section tagging")
     args = parser.parse_args()
 
     pages = list(read_jsonl(args.pages))
@@ -108,6 +111,14 @@ def main():
 
     min_page = pages[0]["page"]
     max_page = pages[-1]["page"]
+
+    coarse_segments = None
+    if args.coarse_segments:
+        try:
+            with open(args.coarse_segments, "r", encoding="utf-8") as f:
+                coarse_segments = json.load(f)
+        except Exception:
+            coarse_segments = None
 
     priors_all = []
     if args.prior:
@@ -141,6 +152,7 @@ def main():
                     continuation_confidence=span.get("continuation_confidence"),
                     source_window=page_nums,
                     source_pages=list(range(span["page_start"], span["page_end"] + 1)),
+                    macro_section=macro_section_for_page(span["page_start"], coarse_segments),
                     source=["coarse"],
                 )
                 append_jsonl(args.out, hypo.dict())

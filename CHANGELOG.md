@@ -6,10 +6,13 @@
 - Optional extraction overrides using escalation cache and sequence-based span ordering in `portionize_ai_extract_v1`.
 - Regression tests for ordering conflicts and span issues (`tests/test_boundary_ordering_guard.py`).
 - Story 078 closure and Story 080 (central escalation cache) documentation.
+- Macro section tagging support across boundaries/portions and provenance (`macro_section` fields + helper).
 
 ### Changed
 - Canonical FF recipe now includes ordering/span guard knobs and `span_order: sequence`.
 - Story index updated to mark Story 078 done and insert Story 080 in recommended order.
+- Canonical FF recipe now wires coarse segments into fallback boundary scan/merge for macro tagging.
+- Story 035 marked done with recorded deferred items.
 
 ### Tested
 - `pytest -q tests/test_boundary_ordering_guard.py`

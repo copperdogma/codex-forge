@@ -64,6 +64,7 @@ def main():
             continuation_confidence=h.get("continuation_confidence"),
             raw_text=h.get("raw_text"),
             element_ids=h.get("element_ids"),
+            macro_section=h.get("macro_section"),
             module_id="portion_hyp_to_resolved_v1",
             run_id=args.run_id,
         )

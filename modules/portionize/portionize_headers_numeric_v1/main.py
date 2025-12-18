@@ -1,7 +1,9 @@
 import argparse
 import os
 import re
+import json
 from modules.common.utils import read_jsonl, ensure_dir, save_jsonl, ProgressLogger
+from modules.common.macro_section import macro_section_for_page
 from schemas import PortionHypothesis
 
 PAGE_RE = re.compile(r"^\s*\d{1,3}[–-]\d{1,3}\s*")
@@ -26,10 +28,20 @@ def main():
     parser.add_argument("--run-id")
     parser.add_argument("--fuzzy", action="store_true", default=True, help="Enable fuzzy detection (digits followed by a few non-digits)")
     parser.add_argument("--max-per-page", type=int, default=12, help="Cap hypotheses per page to limit noise.")
+    parser.add_argument("--coarse-segments", "--coarse_segments", dest="coarse_segments",
+                        help="Optional coarse_segments.json or merged_segments.json for macro_section tagging")
     args = parser.parse_args()
 
     pages = list(read_jsonl(args.pages))
     pages.sort(key=lambda p: p.get("page", 0))
+
+    coarse_segments = None
+    if args.coarse_segments:
+        try:
+            with open(args.coarse_segments, "r", encoding="utf-8") as f:
+                coarse_segments = json.load(f)
+        except Exception:
+            coarse_segments = None
 
     hypos = []
     for p in pages:
@@ -79,6 +91,7 @@ def main():
                 source_window=[c["page"]],
                 source_pages=[c["page"]],
                 raw_text=None,
+                macro_section=macro_section_for_page(c["page"], coarse_segments),
                 source=[c["source"]],
             ).dict())
 
