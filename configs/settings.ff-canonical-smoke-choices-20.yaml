@@ -1,0 +1,31 @@
+input:
+  pdf: input/06 deathtrap dungeon.pdf
+
+models:
+  default: gpt-4.1-mini
+
+stage_params:
+  intake:
+    dpi: 200
+    engines: ["tesseract", "easyocr"]
+    write_engine_dumps: false
+    start: 1
+    end: 20
+  easyocr_guard:
+    min_coverage: 0.80
+    allow_missing: false
+  escalate_vision:
+    # Keep costs bounded for smoke validation.
+    budget_pages: 10
+  coverage_boundaries:
+    # 20 pages will never hit full-book thresholds.
+    min_present: 2
+  gate_boundaries:
+    # Allow the pipeline to proceed for downstream-module validation.
+    min_count: 2
+  assemble_boundaries:
+    # 20 pages should find some sections; keep escalation small.
+    target_coverage: 0.03
+    max_escalation_pages: 5
+  build_ff_engine:
+    allow-stubs: true

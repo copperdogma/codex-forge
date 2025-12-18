@@ -5,9 +5,10 @@ import difflib
 import sys
 import json
 import subprocess
+import time
 from datetime import datetime
 from pathlib import Path
-from typing import Dict, Any, List, Optional
+from typing import Any, Dict, List, Optional, Set, Tuple
 import numpy as np
 
 
@@ -1607,6 +1608,75 @@ def post_edit_token(token: str) -> str:
     return token
 
 
+def repair_turn_to_phrases(lines: List[str]) -> Tuple[List[str], List[Dict[str, Any]]]:
+    """
+    Ultra-conservative phrase repair for classic gamebook instructions.
+
+    Rationale: when only one engine contributes a line, spell-weighted voting has no
+    alternate candidate to prefer. This mirrors SOTA "lexicon-aware decoding" behavior
+    but constrained to a very specific, high-signal pattern.
+
+    Repairs only:
+    - Tum -> Turn when directly followed by "to <number>"
+    - t0 / tO -> to when directly followed by "<number>"
+    """
+    import re
+
+    repairs: List[Dict[str, Any]] = []
+    out = list(lines or [])
+
+    # Keep this tight: only act on explicit instruction patterns.
+    pat = re.compile(r"\b(?P<verb>turn|tum)\b\s+(?P<to>to|t0|tO)\b\s+(?P<num>\d{1,4})\b", re.IGNORECASE)
+
+    def fix_verb(orig: str) -> str:
+        if orig.isupper():
+            return "TURN"
+        if orig[:1].isupper():
+            return "Turn"
+        return "turn"
+
+    def fix_to(orig: str) -> str:
+        if orig.isupper():
+            return "TO"
+        return "to"
+
+    for i, ln in enumerate(out):
+        s = ln or ""
+        m = pat.search(s)
+        if not m:
+            continue
+        verb = m.group("verb")
+        to_tok = m.group("to")
+        num = m.group("num")
+        to_norm = to_tok.lower()
+        needs = verb.lower() == "tum"
+        # Fix digit/letter confusions for the "to" token only when it actually looks like OCR noise.
+        if not needs:
+            if "0" in to_tok:
+                needs = True
+            elif "O" in to_tok and not to_tok.isupper():
+                # e.g., "tO" should become "to", but leave "TO" alone.
+                needs = True
+        if not needs:
+            continue
+
+        before = s
+        replacement = f"{fix_verb(verb)} {fix_to(to_tok)} {num}"
+        s2 = s[: m.start()] + replacement + s[m.end() :]
+        if s2 != before:
+            out[i] = s2
+            repairs.append(
+                {
+                    "line_index": i,
+                    "before": before,
+                    "after": s2,
+                    "reason": "turn_to_phrase_repair",
+                }
+            )
+
+    return out, repairs
+
+
 def needs_numeric_rescue(line: str) -> bool:
     stripped = line.strip()
     if len(stripped) == 0 or len(stripped) > 6:
@@ -1617,7 +1687,13 @@ def needs_numeric_rescue(line: str) -> bool:
     return digits >= 1 and letters <= 2
 
 
-def fuse_characters(primary: str, alt) -> str:
+def fuse_characters(
+    primary: str,
+    alt,
+    *,
+    enable_dict_tiebreak: bool = False,
+    vocab: Optional[Set[str]] = None,
+) -> str:
     """
     Character-level fusion of two similar lines.
 
@@ -1631,6 +1707,27 @@ def fuse_characters(primary: str, alt) -> str:
     gets a single character wrong.
     """
     from difflib import SequenceMatcher
+
+    def _vocab() -> Set[str]:
+        nonlocal vocab
+        if vocab is not None:
+            return vocab
+        try:
+            from modules.common.text_quality import load_default_wordlist
+
+            vocab = load_default_wordlist()
+        except Exception:
+            vocab = set()
+        return vocab
+
+    def _in_vocab(word: str) -> bool:
+        w = (word or "").strip().lower()
+        if not w or not w.isalpha():
+            return False
+        v = _vocab()
+        if not v:
+            return False
+        return w in v
 
     # Multi-engine convenience: allow `alt` to be a list/tuple of additional candidates.
     if isinstance(alt, (list, tuple)):
@@ -1657,7 +1754,7 @@ def fuse_characters(primary: str, alt) -> str:
                     best_ratio = r
                     best_pair = (candidates[i], candidates[j])
         if best_pair and best_ratio >= 0.8:
-            return fuse_characters(best_pair[0], best_pair[1])
+            return fuse_characters(best_pair[0], best_pair[1], enable_dict_tiebreak=enable_dict_tiebreak, vocab=vocab)
         # Too different: pick the longest (most complete).
         return max(candidates, key=lambda s: len(s.strip()))
 
@@ -1689,7 +1786,7 @@ def fuse_characters(primary: str, alt) -> str:
 
             # If same length replacement, vote per-character
             if len(p_chars) == len(a_chars):
-                for pc, ac in zip(p_chars, a_chars):
+                for off, (pc, ac) in enumerate(zip(p_chars, a_chars)):
                     # Prefer uppercase over lowercase for capitals
                     if pc.lower() == ac.lower():
                         # Same letter, different case - prefer uppercase if either is upper
@@ -1700,6 +1797,34 @@ def fuse_characters(primary: str, alt) -> str:
                     elif ac.isalpha() and pc.isdigit():
                         result.append(ac)  # Prefer letter
                     else:
+                        # Dict-aware tie-break for alpha-only differences inside a word.
+                        if enable_dict_tiebreak and pc.isalpha() and ac.isalpha():
+                            idx = i1 + off
+                            # Only attempt for longer alpha words to avoid over-triggering on short tokens.
+                            left = idx
+                            right = idx + 1
+                            while left > 0 and primary[left - 1].isalpha():
+                                left -= 1
+                            while right < len(primary) and primary[right].isalpha():
+                                right += 1
+                            word = primary[left:right]
+                            if len(word) >= 4 and word.isalpha():
+                                pos = idx - left
+                                # Avoid "correcting" proper nouns at the start of TitleCase words
+                                # (e.g., "Iain" -> "lain") where the dictionary is likely missing the name.
+                                if pos == 0 and word[:1].isupper() and word[1:].islower():
+                                    result.append(pc)
+                                    continue
+                                cand_primary = word
+                                cand_alt = word[:pos] + ac + word[pos + 1 :]
+                                in_primary = _in_vocab(cand_primary)
+                                in_alt = _in_vocab(cand_alt)
+                                if in_alt and not in_primary:
+                                    result.append(ac)
+                                    continue
+                                if in_primary and not in_alt:
+                                    result.append(pc)
+                                    continue
                         # No clear preference - use primary
                         result.append(pc)
             else:
@@ -1954,11 +2079,61 @@ def _align_spine_rows_with_engine(
     return new_rows, new_spine
 
 
+def compute_engine_spell_quality(
+    engine_lines_by_engine: Dict[str, List[str]],
+    *,
+    min_total_words: int = 10,
+) -> Tuple[Dict[str, Any], Dict[str, float]]:
+    """
+    Compute per-engine spell/garble metrics and derive a stable quality weight.
+
+    SOTA-style usage: treat language knowledge as a conservative rescoring signal
+    (tiebreaker), not as an unconditional post-correction pass.
+    """
+    metrics_by_engine: Dict[str, Any] = {}
+    quality_by_engine: Dict[str, float] = {}
+
+    for eng, lines in (engine_lines_by_engine or {}).items():
+        if not isinstance(lines, list):
+            continue
+        m = spell_garble_metrics(lines)
+        try:
+            total_words = int(m.get("dictionary_total_words", 0))
+        except Exception:
+            total_words = 0
+        eligible = total_words >= max(0, int(min_total_words))
+        m = dict(m)
+        m["eligible_for_spell_voting"] = eligible
+        metrics_by_engine[eng] = m
+
+        if not eligible:
+            continue
+        try:
+            dictionary_score = float(m.get("dictionary_score", 1.0))
+        except Exception:
+            dictionary_score = 1.0
+        try:
+            confusion_score = float(m.get("char_confusion_score", 1.0))
+        except Exception:
+            confusion_score = 1.0
+        quality = 1.0 - max(dictionary_score, confusion_score)
+        quality_by_engine[eng] = max(0.0, min(1.0, float(quality)))
+
+    return metrics_by_engine, quality_by_engine
+
+
 def _choose_fused_line(
     row: Dict[str, Any],
     *,
     distance_drop: float,
     enable_char_fusion: bool,
+    engine_spell_metrics_by_engine: Optional[Dict[str, Any]] = None,
+    engine_spell_quality_by_engine: Optional[Dict[str, float]] = None,
+    enable_spell_weighted_voting: bool = False,
+    spell_min_total_words: int = 10,
+    spell_tiebreak_conf_delta: float = 0.1,
+    spell_conf_weight: float = 0.7,
+    spell_quality_weight: float = 0.3,
 ) -> tuple:
     """
     Decide the fused output line for a multi-engine aligned row.
@@ -1966,6 +2141,69 @@ def _choose_fused_line(
     Returns: (text, source, dist)
     """
     from difflib import SequenceMatcher
+
+    def _eligible_spell_quality(eng: str) -> Optional[float]:
+        if not enable_spell_weighted_voting:
+            return None
+        q = (engine_spell_quality_by_engine or {}).get(eng)
+        if q is None:
+            return None
+        try:
+            total_words = int((engine_spell_metrics_by_engine or {}).get(eng, {}).get("dictionary_total_words", 0))
+        except Exception:
+            total_words = 0
+        if total_words < max(0, int(spell_min_total_words)):
+            return None
+        try:
+            return float(q)
+        except Exception:
+            return None
+
+    def _blend_conf_and_spell(eng: str, conf: Optional[float]) -> float:
+        c = -1.0 if conf is None else float(conf)
+        q = _eligible_spell_quality(eng)
+        if q is None:
+            return c
+        return (float(spell_conf_weight) * c) + (float(spell_quality_weight) * q)
+
+    def _as_conf(v: Any) -> Optional[float]:
+        if v is None:
+            return None
+        try:
+            return float(v)
+        except Exception:
+            return None
+
+    def _pick_confidence_with_spell(cands: List[tuple]) -> tuple:
+        """
+        Choose best candidate using confidence, with spell-quality as a conservative tiebreaker.
+        Only activates when the top-2 confidence scores are within spell_tiebreak_conf_delta.
+        """
+        scored = []
+        for eng, txt, conf in cands:
+            c = _as_conf(conf)
+            scored.append((c, eng, txt))
+
+        conf_present = [it for it in scored if it[0] is not None]
+        if len(conf_present) < 2:
+            # Preserve previous behavior: best confidence (if any), else longest.
+            c, eng, txt = max(scored, key=lambda it: (-1.0 if it[0] is None else it[0], len(it[2].strip())))
+            return eng, txt, c
+
+        conf_present.sort(key=lambda it: it[0], reverse=True)
+        best = conf_present[0]
+        second = conf_present[1]
+        if not enable_spell_weighted_voting:
+            return best[1], best[2], best[0]
+        if (best[0] - second[0]) >= float(spell_tiebreak_conf_delta):
+            return best[1], best[2], best[0]
+
+        # Confidence is ambiguous: apply a conservative blended score.
+        conf, eng, txt = max(
+            conf_present,
+            key=lambda it: (_blend_conf_and_spell(it[1], it[0]), it[0], len(it[2].strip())),
+        )
+        return eng, txt, conf
 
     candidates = []
     for eng, payload in row.items():
@@ -2001,51 +2239,43 @@ def _choose_fused_line(
 
     best_group = max(groups.values(), key=lambda g: len(g))
     if len(best_group) >= 2:
-        # Prefer the variant with the best confidence (if available), else keep stable order.
-        def score(item):
-            conf = item[2]
-            return (-1.0 if conf is None else float(conf))
-        winner = max(best_group, key=score)
-        winner_eng, winner_txt, _ = winner
+        # Prefer best confidence; use spell-quality only as a tiebreaker.
+        winner = None
+        for eng, txt, conf in best_group:
+            c = _as_conf(conf)
+            s = (_blend_conf_and_spell(eng, c), -1.0 if c is None else c, len(txt.strip()))
+            if winner is None or s > winner[0]:
+                winner = (s, eng, txt)
+        assert winner is not None
+        _, winner_eng, winner_txt = winner
         # If variants differ (e.g., casing), fuse them for small corrections.
         variants = [t for _, t, _ in best_group]
         fused_txt = winner_txt
         if enable_char_fusion and len(variants) > 1:
-            fused_txt = fuse_characters(variants[0], variants[1:])
+            fused_txt = fuse_characters(variants[0], variants[1:], enable_dict_tiebreak=enable_spell_weighted_voting)
         return fused_txt, winner_eng, max(0.0, min(1.0, dist))
 
     # No majority across 3+ engines: prefer confidence when available.
     if len(candidates) >= 3 and any(c[2] is not None for c in candidates):
-        def conf_score(item):
-            conf = item[2]
-            return -1.0 if conf is None else float(conf)
-        eng, txt, _ = max(candidates, key=conf_score)
+        eng, txt, _ = _pick_confidence_with_spell(candidates)
         return txt, eng, max(0.0, min(1.0, dist))
 
     # No majority: if very similar, attempt character fusion on the best pair.
     if enable_char_fusion and best_pair and dist <= 0.15:
         (e1, t1, _), (e2, t2, _) = best_pair
-        return fuse_characters(t1, t2), "fused", max(0.0, min(1.0, dist))
+        return (
+            fuse_characters(t1, t2, enable_dict_tiebreak=enable_spell_weighted_voting),
+            "fused",
+            max(0.0, min(1.0, dist)),
+        )
 
     # Too different overall: prefer the highest-confidence line if present; else longest.
     if dist > distance_drop:
-        scored = []
-        for eng, txt, conf in candidates:
-            c = -1.0 if conf is None else float(conf)
-            scored.append((c, len(txt.strip()), eng, txt))
-        scored.sort(reverse=True)
-        _, _, eng, txt = scored[0]
+        eng, txt, _ = _pick_confidence_with_spell(candidates)
         return txt, eng, max(0.0, min(1.0, dist))
 
     # Moderate disagreement: pick best confidence, else longer.
-    best = None
-    for eng, txt, conf in candidates:
-        c = -1.0 if conf is None else float(conf)
-        s = (c, len(txt.strip()))
-        if best is None or s > best[0]:
-            best = (s, eng, txt)
-    assert best is not None
-    _, eng, txt = best
+    eng, txt, _ = _pick_confidence_with_spell(candidates)
     return txt, eng, max(0.0, min(1.0, dist))
 
 
@@ -2055,6 +2285,13 @@ def _align_and_vote_multi(
     confidences_by_engine: Optional[Dict[str, List[float]]] = None,
     distance_drop: float = 0.35,
     enable_char_fusion: bool = True,
+    engine_spell_metrics_by_engine: Optional[Dict[str, Any]] = None,
+    engine_spell_quality_by_engine: Optional[Dict[str, float]] = None,
+    enable_spell_weighted_voting: bool = False,
+    spell_min_total_words: int = 10,
+    spell_tiebreak_conf_delta: float = 0.1,
+    spell_conf_weight: float = 0.7,
+    spell_quality_weight: float = 0.3,
 ) -> tuple:
     # Filter to engines with any content.
     filtered = {}
@@ -2102,7 +2339,18 @@ def _align_and_vote_multi(
     sources: List[str] = []
     distances: List[float] = []
     for row in rows:
-        txt, src, dist = _choose_fused_line(row, distance_drop=distance_drop, enable_char_fusion=enable_char_fusion)
+        txt, src, dist = _choose_fused_line(
+            row,
+            distance_drop=distance_drop,
+            enable_char_fusion=enable_char_fusion,
+            engine_spell_metrics_by_engine=engine_spell_metrics_by_engine,
+            engine_spell_quality_by_engine=engine_spell_quality_by_engine,
+            enable_spell_weighted_voting=enable_spell_weighted_voting,
+            spell_min_total_words=spell_min_total_words,
+            spell_tiebreak_conf_delta=spell_tiebreak_conf_delta,
+            spell_conf_weight=spell_conf_weight,
+            spell_quality_weight=spell_quality_weight,
+        )
         if txt == "" and src == "none":
             continue
         fused_lines.append(txt)
@@ -2113,7 +2361,13 @@ def _align_and_vote_multi(
 
 
 def align_and_vote(primary_lines, alt_lines, distance_drop=0.35, enable_char_fusion=True,
-                   alt_confidences=None, primary_confidences=None, confidences_by_engine=None):
+                   alt_confidences=None, primary_confidences=None, confidences_by_engine=None,
+                   engine_spell_metrics_by_engine=None, engine_spell_quality_by_engine=None,
+                   enable_spell_weighted_voting: bool = False,
+                   spell_min_total_words: int = 10,
+                   spell_tiebreak_conf_delta: float = 0.1,
+                   spell_conf_weight: float = 0.7,
+                   spell_quality_weight: float = 0.3):
     """
     Align two line lists and pick/fuse a line per position.
 
@@ -2145,6 +2399,13 @@ def align_and_vote(primary_lines, alt_lines, distance_drop=0.35, enable_char_fus
             confidences_by_engine=confidences_by_engine,
             distance_drop=distance_drop,
             enable_char_fusion=enable_char_fusion,
+            engine_spell_metrics_by_engine=engine_spell_metrics_by_engine,
+            engine_spell_quality_by_engine=engine_spell_quality_by_engine,
+            enable_spell_weighted_voting=enable_spell_weighted_voting,
+            spell_min_total_words=spell_min_total_words,
+            spell_tiebreak_conf_delta=spell_tiebreak_conf_delta,
+            spell_conf_weight=spell_conf_weight,
+            spell_quality_weight=spell_quality_weight,
         )
 
     if not alt_lines:
@@ -2308,6 +2569,86 @@ def main():
     parser.add_argument("--llm_model", dest="llm_model", default="gpt-4.1-mini")
     parser.add_argument("--escalation-threshold", dest="escalation_threshold", type=float, default=0.15)
     parser.add_argument("--escalation_threshold", dest="escalation_threshold", type=float, default=0.15)
+    parser.add_argument(
+        "--enable-spell-weighted-voting",
+        dest="enable_spell_weighted_voting",
+        action="store_true",
+        help="Use spell/garble metrics as a conservative tiebreaker during multi-engine voting",
+    )
+    parser.add_argument(
+        "--enable_spell_weighted_voting",
+        dest="enable_spell_weighted_voting",
+        action="store_true",
+        help=argparse.SUPPRESS,
+    )
+    parser.add_argument(
+        "--enable-navigation-phrase-repair",
+        dest="enable_navigation_phrase_repair",
+        action="store_true",
+        help="(Booktype-specific) Apply ultra-conservative repairs for common OCR variants of navigation phrases like 'Turn to <N>'",
+    )
+    parser.add_argument(
+        "--enable_navigation_phrase_repair",
+        dest="enable_navigation_phrase_repair",
+        action="store_true",
+        help=argparse.SUPPRESS,
+    )
+    parser.add_argument(
+        "--spell-min-total-words",
+        dest="spell_min_total_words",
+        type=int,
+        default=10,
+        help="Minimum dictionary_total_words for spell-quality weighting (default: 10)",
+    )
+    parser.add_argument(
+        "--spell_min_total_words",
+        dest="spell_min_total_words",
+        type=int,
+        default=10,
+        help=argparse.SUPPRESS,
+    )
+    parser.add_argument(
+        "--spell-tiebreak-conf-delta",
+        dest="spell_tiebreak_conf_delta",
+        type=float,
+        default=0.1,
+        help="Max confidence delta to treat as a tie for spell-quality tiebreaking (default: 0.1)",
+    )
+    parser.add_argument(
+        "--spell_tiebreak_conf_delta",
+        dest="spell_tiebreak_conf_delta",
+        type=float,
+        default=0.1,
+        help=argparse.SUPPRESS,
+    )
+    parser.add_argument(
+        "--spell-conf-weight",
+        dest="spell_conf_weight",
+        type=float,
+        default=0.7,
+        help="Confidence weight when blending (default: 0.7)",
+    )
+    parser.add_argument(
+        "--spell_conf_weight",
+        dest="spell_conf_weight",
+        type=float,
+        default=0.7,
+        help=argparse.SUPPRESS,
+    )
+    parser.add_argument(
+        "--spell-quality-weight",
+        dest="spell_quality_weight",
+        type=float,
+        default=0.3,
+        help="Spell-quality weight when blending (default: 0.3)",
+    )
+    parser.add_argument(
+        "--spell_quality_weight",
+        dest="spell_quality_weight",
+        type=float,
+        default=0.3,
+        help=argparse.SUPPRESS,
+    )
     parser.add_argument("--write-engine-dumps", action="store_true",
                         help="Persist per-engine raw text under ocr_engines/ for debugging")
     parser.add_argument("--write_engine_dumps", dest="write_engine_dumps", action="store_true", help=argparse.SUPPRESS)
@@ -2736,12 +3077,32 @@ def main():
                     part_by_engine["tesseract_excluded_as_outlier"] = True
 
                 if engine_lines_by_engine:
+                    engine_spell_metrics_by_engine = {}
+                    engine_spell_quality_by_engine = {}
+                    if getattr(args, "enable_spell_weighted_voting", False):
+                        t0 = time.perf_counter()
+                        engine_spell_metrics_by_engine, engine_spell_quality_by_engine = compute_engine_spell_quality(
+                            engine_lines_by_engine,
+                            min_total_words=getattr(args, "spell_min_total_words", 10),
+                        )
+                        part_by_engine["engine_spell_metrics_ms"] = round((time.perf_counter() - t0) * 1000.0, 3)
+                        if engine_spell_metrics_by_engine:
+                            part_by_engine["engine_spell_metrics"] = engine_spell_metrics_by_engine
+                            part_by_engine["engine_spell_quality"] = engine_spell_quality_by_engine
+
                     fused, fusion_srcs, dist = align_and_vote(
                         engine_lines_by_engine,
                         None,
                         distance_drop=0.35,
                         enable_char_fusion=True,
                         confidences_by_engine=confidences_by_engine or None,
+                        engine_spell_metrics_by_engine=engine_spell_metrics_by_engine or None,
+                        engine_spell_quality_by_engine=engine_spell_quality_by_engine or None,
+                        enable_spell_weighted_voting=getattr(args, "enable_spell_weighted_voting", False),
+                        spell_min_total_words=getattr(args, "spell_min_total_words", 10),
+                        spell_tiebreak_conf_delta=getattr(args, "spell_tiebreak_conf_delta", 0.1),
+                        spell_conf_weight=getattr(args, "spell_conf_weight", 0.7),
+                        spell_quality_weight=getattr(args, "spell_quality_weight", 0.3),
                     )
                     part_by_engine["fusion_sources"] = fusion_srcs
                     part_by_engine["fusion_distances"] = dist
@@ -2844,10 +3205,29 @@ def main():
                             confs_col["apple"] = alt_conf_col
 
                     if engine_lines_col:
+                        engine_spell_metrics_col = {}
+                        engine_spell_quality_col = {}
+                        if getattr(args, "enable_spell_weighted_voting", False):
+                            t0 = time.perf_counter()
+                            engine_spell_metrics_col, engine_spell_quality_col = compute_engine_spell_quality(
+                                engine_lines_col,
+                                min_total_words=getattr(args, "spell_min_total_words", 10),
+                            )
+                            part_by_engine.setdefault("engine_spell_metrics_cols_ms", []).append(round((time.perf_counter() - t0) * 1000.0, 3))
+                            part_by_engine.setdefault("engine_spell_metrics_cols", []).append(engine_spell_metrics_col)
+                            part_by_engine.setdefault("engine_spell_quality_cols", []).append(engine_spell_quality_col)
+
                         fused_col, fusion_srcs_col, dist_col = align_and_vote(
                             engine_lines_col,
                             None,
                             confidences_by_engine=confs_col or None,
+                            engine_spell_metrics_by_engine=engine_spell_metrics_col or None,
+                            engine_spell_quality_by_engine=engine_spell_quality_col or None,
+                            enable_spell_weighted_voting=getattr(args, "enable_spell_weighted_voting", False),
+                            spell_min_total_words=getattr(args, "spell_min_total_words", 10),
+                            spell_tiebreak_conf_delta=getattr(args, "spell_tiebreak_conf_delta", 0.1),
+                            spell_conf_weight=getattr(args, "spell_conf_weight", 0.7),
+                            spell_quality_weight=getattr(args, "spell_quality_weight", 0.3),
                         )
                     else:
                         # Fallback when no engine outputs: use empty text
@@ -2960,10 +3340,30 @@ def main():
                         engine_lines_by_engine["pdftext"] = split_lines(part_by_engine_single.get("pdftext", ""))
 
                     if engine_lines_by_engine:
+                        engine_spell_metrics_by_engine = {}
+                        engine_spell_quality_by_engine = {}
+                        if getattr(args, "enable_spell_weighted_voting", False):
+                            t0 = time.perf_counter()
+                            engine_spell_metrics_by_engine, engine_spell_quality_by_engine = compute_engine_spell_quality(
+                                engine_lines_by_engine,
+                                min_total_words=getattr(args, "spell_min_total_words", 10),
+                            )
+                            part_by_engine_single["engine_spell_metrics_ms"] = round((time.perf_counter() - t0) * 1000.0, 3)
+                            if engine_spell_metrics_by_engine:
+                                part_by_engine_single["engine_spell_metrics"] = engine_spell_metrics_by_engine
+                                part_by_engine_single["engine_spell_quality"] = engine_spell_quality_by_engine
+
                         fused, fusion_srcs, dist = align_and_vote(
                             engine_lines_by_engine,
                             None,
                             confidences_by_engine=confidences_by_engine or None,
+                            engine_spell_metrics_by_engine=engine_spell_metrics_by_engine or None,
+                            engine_spell_quality_by_engine=engine_spell_quality_by_engine or None,
+                            enable_spell_weighted_voting=getattr(args, "enable_spell_weighted_voting", False),
+                            spell_min_total_words=getattr(args, "spell_min_total_words", 10),
+                            spell_tiebreak_conf_delta=getattr(args, "spell_tiebreak_conf_delta", 0.1),
+                            spell_conf_weight=getattr(args, "spell_conf_weight", 0.7),
+                            spell_quality_weight=getattr(args, "spell_quality_weight", 0.3),
                         )
                         part_by_engine_single["fusion_sources"] = fusion_srcs
                         part_by_engine_single["fusion_distances"] = dist
@@ -3020,6 +3420,12 @@ def main():
             if rescued:
                 part_by_engine["numeric_rescues"] = rescued
             part_lines = [post_edit_token(ln) for ln in part_lines]
+            if getattr(args, "enable_navigation_phrase_repair", False):
+                t0 = time.perf_counter()
+                part_lines, repairs = repair_turn_to_phrases(part_lines)
+                part_by_engine["turn_to_phrase_repair_ms"] = round((time.perf_counter() - t0) * 1000.0, 3)
+                if repairs:
+                    part_by_engine["turn_to_phrase_repairs"] = repairs
 
             disagreement = compute_disagreement(part_by_engine)
             fusion_dist = part_by_engine.get("fusion_distances", [])

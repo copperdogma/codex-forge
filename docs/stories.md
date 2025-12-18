@@ -105,9 +105,10 @@ This index tracks stories in `/docs/stories/` for the codex-forge pipeline.
 || 069 | PDF Text Extraction Engine for OCR Ensemble | Medium | Done | /docs/stories/story-069-pdf-text-extraction-engine.md |
 || 070 | OCR Split Refinement — Zero Bad Slices | High | Done | /docs/stories/story-070-ocr-split-refinement.md |
 || 071 | Output Artifact Organization | Medium | Done | /docs/stories/story-071-output-artifact-organization.md |
-|| 072 | OCR Spell-Weighted Voting Enhancement | Medium | To Do | /docs/stories/story-072-ocr-spell-weighted-voting.md |
+|| 072 | OCR Spell-Weighted Voting Enhancement | Medium | In Progress | /docs/stories/story-072-ocr-spell-weighted-voting.md |
 || 073 | 100% Section Detection — Segmentation Architecture | High | Done | /docs/stories/story-073-100-percent-section-detection.md |
 || 074 | Missing Sections Investigation — Complete 100% Coverage | High | Done | /docs/stories/story-074-missing-sections-investigation.md |
+|| 075 | Booktype Text Cleanup Adapter (Downstream Normalization) | Medium | To Do | /docs/stories/story-075-booktype-text-cleanup-adapter.md |
 || 099 | Remove dev-only backcompat disclaimer | Low | To Do | /docs/stories/story-099-remove-dev-backcompat-note.md |
 
 ## Notes

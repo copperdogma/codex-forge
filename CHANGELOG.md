@@ -374,6 +374,23 @@
 
 ### Tested
 - Manual runs: backfill + LLM gap backfill + cleanup on `ff-redesign-v2-improved` artifacts; validation shows 382 sections (18 missing) as current best baseline.
+
+## [2025-12-18] - Spell-weighted OCR voting + downstream choice tolerance
+
+### Added
+- Per-engine spell-quality metrics (`dictionary_score`, `char_confusion_score`, etc.) and spell-weighted voting plumbing in `extract_ocr_ensemble_v1`, including conservative tie-breaking + navigation-phrase repair telemetry.
+- `tests/test_spell_weighted_voting.py` & `tests/test_extract_choices_tolerant.py` to guard the new behaviors.
+- Canonical FF smoke settings (`settings.ff-canonical-smoke-choices-20*.yaml`) to run through `extract_choices_v1`.
+- Documentation updates: AGENTS/README (reusability goal), FF-specificity audit, story 072 work log, new story 075 for downstream booktype cleanup.
+
+### Changed
+- `extract_choices_v1` now tolerates OCR variants (`tum`, `t0/tO`, digit confusions) so downstream extraction no longer depends on OCR rewrites.
+- OCR navigation phrase repair is opt-in via `enable_navigation_phrase_repair` (default off) to keep the intake generic.
+- `coarse_segment_merge_v1` now normalizes page identifiers like `012L` before merging.
+
+### Testing
+- `pytest -q tests/test_spell_weighted_voting.py tests/test_extract_choices_tolerant.py`
+- 20-page smoke runs with/without navigation repair that reach `extract_choices_v1` and validate all “turn to” references; telemetry recorded per run.
 ## [2025-12-02] - Header/choice loops & pipeline hardening
 
 ### Added

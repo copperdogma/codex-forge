@@ -22,6 +22,7 @@ This repo processes scanned (or text) books into structured JSON, using modular 
 - Specialization must be explicit and scoped:
   - Prefer recipe/module params (knobs) over branching logic.
   - If something truly is recipe-specific, keep it in a clearly scoped module and document the scope + knobs.
+- **Architecture goal (reusability):** Keep upstream intake/OCR modules as generic as possible. Push booktype-specific heuristics/normalization (e.g., gamebook navigation phrases, FF section conventions) downstream into booktype-aware modules (portionize/extract/enrich/export) or recipe-scoped adapters.
 - Prefer *signals and loops* over brittle fixes: detect → validate → targeted escalate → validate.
 - If adding deterministic corrections, they must be generic (class-based, conservative), opt-in by default, and preserve original text/provenance.
 - Validate across multiple pages/runs; add regression checks on *patterns* (coverage, bad-token occurrence, empty text rate), not exact strings.

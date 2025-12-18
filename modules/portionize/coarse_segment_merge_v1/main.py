@@ -12,10 +12,40 @@ Outputs refined segment boundaries with evidence from all sources.
 
 import argparse
 import json
+import re
 from pathlib import Path
 from typing import Dict, List, Any, Optional, Tuple
 
 from modules.common.utils import save_json
+
+
+def _page_num(v: Any) -> Optional[int]:
+    if v is None:
+        return None
+    if isinstance(v, int):
+        return v
+    if isinstance(v, str):
+        # Accept "012L", "20R", "001", etc.
+        m = re.match(r"^\s*(\d{1,4})", v)
+        if not m:
+            return None
+        try:
+            return int(m.group(1))
+        except Exception:
+            return None
+    return None
+
+
+def _normalize_page_range(rng: Any) -> Optional[List[int]]:
+    if not rng:
+        return None
+    if isinstance(rng, (list, tuple)) and len(rng) >= 2:
+        a = _page_num(rng[0])
+        b = _page_num(rng[1])
+        if a is None or b is None:
+            return None
+        return [a, b]
+    return None
 
 
 def load_json(path: str) -> Optional[Dict[str, Any]]:
@@ -80,17 +110,17 @@ def merge_segments(
     }
     
     # Get semantic segments
-    semantic_frontmatter = coarse_segments.get('frontmatter_pages', [])
-    semantic_gameplay = coarse_segments.get('gameplay_pages', [])
-    semantic_endmatter = coarse_segments.get('endmatter_pages')
+    semantic_frontmatter = _normalize_page_range(coarse_segments.get('frontmatter_pages', [])) or []
+    semantic_gameplay = _normalize_page_range(coarse_segments.get('gameplay_pages', [])) or []
+    semantic_endmatter = _normalize_page_range(coarse_segments.get('endmatter_pages'))
     
     # Get pattern regions
     pattern_regions_list = pattern_regions.get('regions', [])
     
     # Check FF override first (takes precedence)
     if ff_hints and ff_hints.get('background_found'):
-        gameplay_start = ff_hints.get('gameplay_start_page')
-        if gameplay_start:
+        gameplay_start = _page_num(ff_hints.get('gameplay_start_page'))
+        if gameplay_start is not None:
             result['override_applied'] = True
             result['notes'].append(
                 f"FF override: BACKGROUND found on page {gameplay_start}, "
@@ -100,15 +130,16 @@ def merge_segments(
             # Use FF override for gameplay start
             frontmatter_end = gameplay_start - 1
             result['frontmatter_pages'] = [1, frontmatter_end]
-            result['gameplay_pages'] = [gameplay_start, semantic_gameplay[1] if semantic_gameplay else gameplay_start + 100]
+            gameplay_end = semantic_gameplay[1] if semantic_gameplay else gameplay_start + 100
+            result['gameplay_pages'] = [gameplay_start, int(gameplay_end)]
             
             # Keep endmatter from semantic (or infer)
             if semantic_endmatter:
                 result['endmatter_pages'] = semantic_endmatter
             else:
                 # Infer endmatter: gameplay end + 1 to end of book
-                gameplay_end = result['gameplay_pages'][1]
-                total_pages = pattern_regions.get('total_pages', 113)
+                gameplay_end = int(result['gameplay_pages'][1])
+                total_pages = _page_num(pattern_regions.get('total_pages', 113)) or 113
                 if gameplay_end < total_pages:
                     result['endmatter_pages'] = [gameplay_end + 1, total_pages]
             
@@ -208,5 +239,4 @@ def main():
 
 if __name__ == '__main__':
     main()
-
 

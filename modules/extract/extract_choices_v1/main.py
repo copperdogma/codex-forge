@@ -33,6 +33,50 @@ class ChoiceCandidate:
     position: int  # Character position in text
 
 
+def _normalize_section_ref_token(token: str) -> Optional[int]:
+    """
+    Normalize common OCR confusions in a numeric section reference token.
+
+    Intended for tokens captured from "turn/go/refer to <N>" patterns where <N> is
+    expected to be numeric, but may contain OCR confusions (e.g., "1S7" -> "157").
+    """
+    if not token:
+        return None
+    raw = (token or "").strip().strip(".,;:!?()[]{}<>\"'“”’`")
+    if not raw:
+        return None
+    if raw.isdigit():
+        try:
+            return int(raw)
+        except Exception:
+            return None
+
+    # Conservative mapping: only characters that frequently appear as digit confusions.
+    digit_map = {
+        "O": "0",
+        "o": "0",
+        "D": "0",
+        "Q": "0",
+        "I": "1",
+        "l": "1",
+        "!": "1",
+        "S": "5",
+        "s": "5",
+        "Z": "2",
+        "B": "8",
+        # Keep this tight; avoid broad mappings like A->4 unless proven needed.
+    }
+    fixed = "".join(digit_map.get(ch, ch) for ch in raw)
+
+    # Only accept if the result becomes purely digits and at least one character changed.
+    if fixed == raw or not fixed.isdigit():
+        return None
+    try:
+        return int(fixed)
+    except Exception:
+        return None
+
+
 def extract_choice_patterns(text: str, min_section: int = 1, max_section: int = 400) -> List[ChoiceCandidate]:
     """
     Extract choice candidates using pattern matching.
@@ -43,33 +87,41 @@ def extract_choice_patterns(text: str, min_section: int = 1, max_section: int = 
         return []
     
     candidates = []
-    text_lower = text.lower()
     
     # Pattern definitions with confidence scores
     # High confidence: explicit choice instructions
     # Medium confidence: narrative references (might be story, not choice)
+    # Note: tolerate OCR confusions for gamebook navigation phrases:
+    # - "tum" for "turn"
+    # - "t0"/"tO" for "to"
+    # - digit/letter confusions in target section number token ("1S7" -> 157)
+    turn_word = r'(?:turn|tum)'
+    to_word = r'(?:to|t0|tO)'
+    target_token = r'([0-9A-Za-z!]{1,4})'
     patterns = [
         # High confidence patterns (explicit instructions)
-        (r'\bturn\s+to\s+(?:paragraph\s+)?(\d{1,3})\b', 0.95, 'turn_to'),
-        (r'\bgo\s+to\s+(?:section\s+)?(\d{1,3})\b', 0.90, 'go_to'),
-        (r'\brefer\s+to\s+(?:paragraph\s+)?(\d{1,3})\b', 0.85, 'refer_to'),
+        (rf'\b{turn_word}\s+{to_word}\s+(?:paragraph\s+)?{target_token}\b', 0.95, 'turn_to'),
+        (rf'\bgo\s+{to_word}\s+(?:section\s+)?{target_token}\b', 0.90, 'go_to'),
+        (rf'\brefer\s+{to_word}\s+(?:paragraph\s+)?{target_token}\b', 0.85, 'refer_to'),
         
         # Medium confidence patterns
-        (r'\bcontinue\s+(?:to\s+)?(?:paragraph\s+)?(\d{1,3})\b', 0.80, 'continue_to'),
-        (r'\bproceed\s+to\s+(?:paragraph\s+)?(\d{1,3})\b', 0.80, 'proceed_to'),
+        (rf'\bcontinue\s+(?:{to_word}\s+)?(?:paragraph\s+)?{target_token}\b', 0.80, 'continue_to'),
+        (rf'\bproceed\s+{to_word}\s+(?:paragraph\s+)?{target_token}\b', 0.80, 'proceed_to'),
         
         # Combat/test patterns (common in Fighting Fantasy)
-        (r'\bif\s+you\s+win,?\s+turn\s+to\s+(\d{1,3})\b', 0.95, 'if_win'),
-        (r'\bif\s+you\s+(?:are\s+)?lucky,?\s+turn\s+to\s+(\d{1,3})\b', 0.95, 'if_lucky'),
-        (r'\bif\s+you\s+(?:are\s+)?unlucky,?\s+turn\s+to\s+(\d{1,3})\b', 0.95, 'if_unlucky'),
+        (rf'\bif\s+you\s+win,?\s+{turn_word}\s+{to_word}\s+{target_token}\b', 0.95, 'if_win'),
+        (rf'\bif\s+you\s+(?:are\s+)?lucky,?\s+{turn_word}\s+{to_word}\s+{target_token}\b', 0.95, 'if_lucky'),
+        (rf'\bif\s+you\s+(?:are\s+)?unlucky,?\s+{turn_word}\s+{to_word}\s+{target_token}\b', 0.95, 'if_unlucky'),
     ]
     
     for pattern_str, confidence, pattern_name in patterns:
         pattern = re.compile(pattern_str, re.IGNORECASE)
         
-        for match in pattern.finditer(text_lower):
+        for match in pattern.finditer(text):
             target_str = match.group(1)
-            target = int(target_str)
+            target = _normalize_section_ref_token(target_str)
+            if target is None:
+                continue
             
             # Validate range
             if min_section <= target <= max_section:

@@ -12,6 +12,12 @@ default_params:
   use_llm: false
   llm_model: gpt-4.1-mini
   escalation_threshold: 0.15
+  enable_spell_weighted_voting: true
+  enable_navigation_phrase_repair: false
+  spell_min_total_words: 10
+  spell_tiebreak_conf_delta: 0.1
+  spell_conf_weight: 0.7
+  spell_quality_weight: 0.3
   write_engine_dumps: true
   disable_fallback: false
   psm: 4
@@ -39,6 +45,25 @@ param_schema:
     llm_model:
       type: string
     escalation_threshold:
+      type: number
+      minimum: 0
+      maximum: 1
+    enable_spell_weighted_voting:
+      type: boolean
+    enable_navigation_phrase_repair:
+      type: boolean
+    spell_min_total_words:
+      type: integer
+      minimum: 0
+    spell_tiebreak_conf_delta:
+      type: number
+      minimum: 0
+      maximum: 1
+    spell_conf_weight:
+      type: number
+      minimum: 0
+      maximum: 1
+    spell_quality_weight:
       type: number
       minimum: 0
       maximum: 1

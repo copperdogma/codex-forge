@@ -13,6 +13,8 @@ The pipeline follows a 5-stage model:
 
 Steps 1-2 are universal across all document types. Steps 3-4 vary by domain (gamebooks vs genealogies vs textbooks). Step 5 is tied to output requirements (precise layout for PDF, simplified for Markdown).
 
+**Reusability goal:** Keep upstream intake/OCR modules as generic as possible. Prefer pushing booktype-specific heuristics/normalization (e.g., gamebook navigation phrase canonicalization, FF conventions) downstream into booktype-aware portionize/extract/enrich/export modules or recipe-scoped adapters so the OCR stack can be reused across book types.
+
 The **Intermediate Representation (IR)** stays unchanged throughout; portionization and augmentation annotate/reference it rather than transforming it.
 
 ## What it does (today)
