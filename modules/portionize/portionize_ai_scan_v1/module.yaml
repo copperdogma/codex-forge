@@ -12,5 +12,8 @@ param_schema:
       type: string
     max_tokens:
       type: integer
+    coarse_segments:
+      type: string
+      description: "Optional coarse_segments.json or merged_segments.json for macro_section tagging"
   required: []
 notes: "AI-powered section boundary detection for Fighting Fantasy books. Scans all elements to find section numbers (1-400) and their element boundaries. Uses GPT-4o-mini for fast, cost-effective scanning (~$0.003/book)."

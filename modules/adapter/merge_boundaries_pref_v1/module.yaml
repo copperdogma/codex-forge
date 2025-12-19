@@ -3,4 +3,12 @@ stage: adapter
 entrypoint: modules/adapter/merge_boundaries_pref_v1/main.py
 input_schema: section_boundary_v1
 output_schema: section_boundary_v1
+param_schema:
+  properties:
+    elements_core:
+      type: string
+      description: "Optional elements_core.jsonl to filter/sort by seq"
+    coarse_segments:
+      type: string
+      description: "Optional coarse_segments.json or merged_segments.json for macro_section tagging"
 notes: "Merge two boundary sets preferring primary; fill gaps with fallback."

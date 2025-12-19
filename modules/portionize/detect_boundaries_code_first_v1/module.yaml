@@ -12,6 +12,10 @@ default_params:
   max_section: 400
   target_coverage: 1.0
   max_escalation_pages: 30
+  max_ordering_pages: 15
+  min_span_words: 5
+  min_span_alpha: 0.2
+  min_span_chars: 20
   model: gpt-4.1-mini
   escalation_model: gpt-5
 param_schema:
@@ -28,6 +32,21 @@ param_schema:
     max_escalation_pages:
       type: integer
       description: "Maximum pages to escalate with AI (default: 30)"
+    max_ordering_pages:
+      type: integer
+      description: "Maximum pages to escalate for ordering/span issues (default: 15)"
+    min_span_words:
+      type: integer
+      description: "Minimum words required in a section span (default: 5)"
+    min_span_alpha:
+      type: number
+      description: "Minimum alpha ratio required in a section span (default: 0.2)"
+    min_span_chars:
+      type: integer
+      description: "Minimum alphabetic chars required in a section span (default: 20)"
+    ordering_pages:
+      type: string
+      description: "Comma-separated page keys to escalate for ordering/span issues"
     model:
       type: string
       description: "LLM model for gap analysis (default: gpt-4.1-mini)"
@@ -45,7 +64,6 @@ notes: |
   
   Replaces classify_headers_v1 (60 AI batches) with deterministic filter + 0-30 targeted AI calls.
   Expected: 350+ boundaries from code filter, 95%+ after escalation.
-
 
 
 

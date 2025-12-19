@@ -17,5 +17,25 @@ param_schema:
       type: boolean
     stub:
       type: string
+    span_order:
+      type: string
+      description: "Choose span order: numeric or sequence"
+      enum: ["numeric", "sequence"]
+    escalation_cache_dir:
+      type: string
+      description: "Optional escalation cache dir (page_*.json) for raw_text overrides"
+    images_dir:
+      type: string
+      description: "Optional images directory (page-*.png)"
+    retry_count:
+      type: integer
+    retry_model:
+      type: string
+    fail_on_empty:
+      type: boolean
+    section_filter:
+      type: string
+    fallback_window:
+      type: integer
   required: []
 notes: "AI-powered section content extraction for Fighting Fantasy books. For each section boundary, extracts text from elements and parses gameplay data (choices, combat, luck tests, items). Uses GPT-4o for accurate parsing (~$0.03/book)."

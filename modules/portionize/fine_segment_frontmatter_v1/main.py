@@ -30,6 +30,20 @@ def filter_frontmatter_elements(elements_path: str, frontmatter_pages: List[int]
     return filtered
 
 
+def _page_num(value: Optional[object]) -> Optional[int]:
+    if value is None:
+        return None
+    if isinstance(value, int):
+        return value
+    if isinstance(value, str):
+        try:
+            digits = "".join(ch for ch in value if ch.isdigit())
+            return int(digits) if digits else None
+        except Exception:
+            return None
+    return None
+
+
 def reduce_elements(elements: List[Dict], max_lines: int = 10, max_len: int = 120) -> List[Dict]:
     """Reduce elements to compact per-page summaries."""
     # Group by page
@@ -229,7 +243,16 @@ def main():
     with open(args.coarse_segments, "r", encoding="utf-8") as f:
         coarse = json.load(f)
     
-    frontmatter_pages = list(range(coarse["frontmatter_pages"][0], coarse["frontmatter_pages"][1] + 1))
+    fm_range = coarse.get("frontmatter_pages") or []
+    if not isinstance(fm_range, list) or len(fm_range) < 2:
+        raise SystemExit("coarse_segments.frontmatter_pages missing or invalid")
+    fm_start = _page_num(fm_range[0])
+    fm_end = _page_num(fm_range[1])
+    if fm_start is None or fm_end is None:
+        raise SystemExit(f"Invalid frontmatter_pages values: {fm_range}")
+    if fm_start > fm_end:
+        fm_start, fm_end = fm_end, fm_start
+    frontmatter_pages = list(range(fm_start, fm_end + 1))
     
     # Filter and reduce elements
     logger.log("fine_segment_frontmatter", "running", current=25, total=100,
