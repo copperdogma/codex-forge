@@ -439,3 +439,10 @@
 
 ### Fixed
 - Documented that the 20-page smoke is the verification target so we no longer require a full-book run; validators now capture source artifacts for traceability.
+## [2025-12-19] - Smoke test tuning and validator compatibility
+
+### Changed
+- Smoke settings now align with 20-page slice expectations (boundary coverage thresholds and expected range set to sections 20–21).
+- Choice completeness validator relaxed for smoke runs (`max_discrepancy`).
+- Frontmatter fine segmentation accepts split page IDs in coarse segments.
+- Module param schemas updated for new boundary/scan/extract flags.

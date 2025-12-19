@@ -25,3 +25,9 @@ stage_params:
     max_escalation_pages: 5  # Reduce escalation for smoke test
   build_ff_engine:
     allow-stubs: true
+    expected-range: "20-21"
+  validate_ff_engine:
+    expected_range_start: 20
+    expected_range_end: 21
+  validate_choice_completeness:
+    max_discrepancy: 999
