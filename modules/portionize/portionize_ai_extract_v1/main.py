@@ -234,7 +234,7 @@ def main():
     parser.add_argument("--fail-on-empty", action="store_true", dest="fail_on_empty",
                         help="Fail the stage if any section text remains empty after retries/widening")
     parser.add_argument("--section-filter", help="Comma-separated list of section_ids to process (others skipped)")
-    parser.add_argument("--span-order", dest="span_order", choices=["numeric", "sequence"], default="numeric",
+    parser.add_argument("--span-order", "--span_order", dest="span_order", choices=["numeric", "sequence"], default="numeric",
                         help="How to choose the next boundary for span end: numeric (default) or sequence order")
     args = parser.parse_args()
 
