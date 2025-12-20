@@ -37,6 +37,9 @@ def _extract_lines(obj: Dict[str, Any]) -> List[str]:
 
 
 def _page_key_from_obj(obj: Dict[str, Any]) -> Optional[str]:
+    pn = obj.get("page_number")
+    if isinstance(pn, int):
+        return str(pn)
     img = obj.get("image")
     if isinstance(img, str) and "page-" in img and img.endswith(".png"):
         return Path(img).stem.replace("page-", "")
@@ -152,4 +155,3 @@ def main():
 
 if __name__ == "__main__":
     main()
-

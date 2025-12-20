@@ -116,7 +116,7 @@ This index tracks stories in `/docs/stories/` for the codex-forge pipeline.
 || 076 | AI Vision Engine Evaluation — Best Value for Pipeline | Medium | To Do | /docs/stories/story-076-ai-vision-engine-evaluation.md |
 || 077 | AI OCR Radical Simplification — Challenging the Escalation Assumption | High | To Do | /docs/stories/story-077-ai-ocr-simplification.md |
 || 078 | Boundary Ordering Guard + Targeted Escalation | High | Done | /docs/stories/story-078-boundary-ordering-escalation.md |
-|| 079 | Sequential Page Numbering Refactor — Dual-Field Provenance | High | To Do | /docs/stories/story-079-page-numbering-refactor.md |
+|| 079 | Sequential Page Numbering Refactor — Dual-Field Provenance | High | Done | /docs/stories/story-079-page-numbering-refactor.md |
 || 080 | Central Escalation Cache (Premium OCR Overlay) | High | To Do | /docs/stories/story-080-central-escalation-cache.md |
 || 099 | Remove dev-only backcompat disclaimer | Low | To Do | /docs/stories/story-099-remove-dev-backcompat-note.md |
 

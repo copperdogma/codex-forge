@@ -55,6 +55,8 @@ def main():
             portion_id=portion_id,
             page_start=h["page_start"],
             page_end=h["page_end"],
+            page_start_original=h.get("page_start_original"),
+            page_end_original=h.get("page_end_original"),
             title=h.get("title"),
             type=h.get("type"),
             confidence=h.get("confidence", 0),

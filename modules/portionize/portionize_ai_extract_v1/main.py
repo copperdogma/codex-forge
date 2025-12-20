@@ -82,22 +82,54 @@ def _resolve_images_dir(run_root: str, explicit: Optional[str] = None) -> Option
     return None
 
 
-def _page_id_from_element_id(eid: str) -> Optional[str]:
-    if not eid or "-" not in eid:
-        return None
-    return eid.split("-", 1)[0]
+def _page_key_from_element(elem: Dict) -> Optional[tuple]:
+    """
+    Return (original_page_number, spread_side) for image lookup.
+    Prefers explicit metadata fields; falls back to legacy element id parsing.
+    """
+    md = elem.get("metadata") or {}
+    orig = md.get("original_page_number") or md.get("page_number") or elem.get("page")
+    side = md.get("spread_side")
+    if side not in (None, "L", "R"):
+        side = None
+    if isinstance(orig, int):
+        return (orig, side)
+    try:
+        orig_int = int(orig)
+        return (orig_int, side)
+    except Exception:
+        pass
+    eid = elem.get("id") or ""
+    if "-" in eid:
+        page_part = eid.split("-", 1)[0]
+        digits = ""
+        suffix = ""
+        for ch in page_part:
+            if ch.isdigit():
+                digits += ch
+            else:
+                suffix = page_part[len(digits):]
+                break
+        if digits:
+            try:
+                orig_int = int(digits)
+            except Exception:
+                return None
+            legacy_side = None
+            if suffix.startswith("L") or suffix.startswith("R"):
+                legacy_side = suffix[0]
+            return (orig_int, legacy_side)
+    return None
 
 
-def _sort_page_ids(page_ids: List[str]) -> List[str]:
-    import re
+def _sort_image_keys(keys: List[tuple]) -> List[tuple]:
+    side_order = {"L": 0, "R": 1, None: 0}
 
-    def key(pid: str):
-        m = re.match(r"^(\\d+)([LR]?)$", str(pid))
-        if not m:
-            return (999999, "")
-        return (int(m.group(1)), m.group(2) or "")
+    def key_fn(k: tuple):
+        orig, side = k
+        return (int(orig), side_order.get(side, 2))
 
-    return sorted(page_ids, key=key)
+    return sorted(keys, key=key_fn)
 
 
 def extract_text_from_elements(
@@ -478,21 +510,28 @@ def main():
 
             # Create EnrichedPortion
             if not used_escalation:
-                page_ids = []
+                image_keys = []
                 for eid in element_ids:
-                    pid = _page_id_from_element_id(eid)
-                    if pid:
-                        page_ids.append(pid)
-                # If we only have integer page numbers (and split images exist), include both L/R images
+                    elem = elements_by_id.get(eid)
+                    if not elem:
+                        continue
+                    key = _page_key_from_element(elem)
+                    if key:
+                        image_keys.append(key)
+                # If we only have numeric page ranges, include both L/R images
                 # so downstream multimodal repair can see the full spread.
                 for pn in range(int(page_start), int(page_end) + 1):
-                    page_ids.append(f"{pn:03d}L")
-                    page_ids.append(f"{pn:03d}R")
-                page_ids = _sort_page_ids(sorted(set(page_ids)))
+                    image_keys.append((pn, "L"))
+                    image_keys.append((pn, "R"))
+                image_keys = _sort_image_keys(sorted(set(image_keys)))
                 source_images = []
-                if images_dir and page_ids:
-                    for pid in page_ids:
-                        cand = os.path.join(images_dir, f"page-{pid}.png")
+                if images_dir and image_keys:
+                    for orig, side in image_keys:
+                        if side in ("L", "R"):
+                            filename = f"page-{orig:03d}{side}.png"
+                        else:
+                            filename = f"page-{orig:03d}.png"
+                        cand = os.path.join(images_dir, filename)
                         if os.path.exists(cand):
                             source_images.append(cand)
             enriched = EnrichedPortion(
@@ -545,11 +584,18 @@ def main():
                 page_int = 0
             source_images = []
             if images_dir and start_element_id:
-                pid = _page_id_from_element_id(start_element_id)
-                if pid:
-                    cand = os.path.join(images_dir, f"page-{pid}.png")
-                    if os.path.exists(cand):
-                        source_images.append(cand)
+                start_elem = elements_by_id.get(start_element_id)
+                if start_elem:
+                    key = _page_key_from_element(start_elem)
+                    if key:
+                        orig, side = key
+                        if side in ("L", "R"):
+                            filename = f"page-{orig:03d}{side}.png"
+                        else:
+                            filename = f"page-{orig:03d}.png"
+                        cand = os.path.join(images_dir, filename)
+                        if os.path.exists(cand):
+                            source_images.append(cand)
             enriched = EnrichedPortion(
                 portion_id=section_id or "unknown",
                 section_id=section_id or None,

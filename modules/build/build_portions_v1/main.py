@@ -31,6 +31,8 @@ def main():
     assembled = {}
     for p in portions:
         span_pages = [i for i in range(p["page_start"], p["page_end"] + 1)]
+        page_start_original = p.get("page_start_original")
+        page_end_original = p.get("page_end_original")
         texts = []
         images = []
         for i in span_pages:
@@ -45,6 +47,8 @@ def main():
             "portion_id": p["portion_id"],
             "page_start": p["page_start"],
             "page_end": p["page_end"],
+            "page_start_original": page_start_original,
+            "page_end_original": page_end_original,
             "title": p.get("title"),
             "type": p.get("type"),
             "confidence": p.get("confidence", 0),

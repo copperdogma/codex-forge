@@ -90,15 +90,23 @@ def test_update_quality_row_dry_run_does_not_clear_needs_escalation():
 def test_should_escalate_skips_blank_half_spread(tmp_path: Path):
     from modules.adapter.ocr_escalate_gpt4v_v1.main import should_escalate_page_key
 
-    left = tmp_path / "page-001L.json"
-    right = tmp_path / "page-001R.json"
-    left.write_text(json.dumps({"lines": []}), encoding="utf-8")
-    right.write_text(json.dumps({"lines": [{"text": "This is a longer page with substantial text." * 20}]}), encoding="utf-8")
+    left = tmp_path / "page-001.json"
+    right = tmp_path / "page-002.json"
+    left.write_text(json.dumps({"lines": [], "page_number": 1, "original_page_number": 1, "spread_side": "L"}), encoding="utf-8")
+    right.write_text(
+        json.dumps({
+            "lines": [{"text": "This is a longer page with substantial text." * 20}],
+            "page_number": 2,
+            "original_page_number": 1,
+            "spread_side": "R",
+        }),
+        encoding="utf-8",
+    )
 
-    index = {"001L": str(left), "001R": str(right)}
+    index = {"1": str(left), "2": str(right)}
     pages_cache = {}
     ok, reason = should_escalate_page_key(
-        "001L",
+        "1",
         ["missing_content"],
         index=index,
         pages_cache=pages_cache,

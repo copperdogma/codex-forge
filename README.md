@@ -375,6 +375,18 @@ Artifacts appear under `output/runs/<run_id>/` as listed in the recipe; use `--s
 - Outputs land beside artifacts: `instrumentation.json` (machine-readable), `instrumentation.md` (summary tables), and raw `instrumentation_calls.jsonl` when present. Manifest entries link to the reports.
 - Modules can emit call-level usage via `modules.common.utils.log_llm_usage(...)`; the driver aggregates tokens/costs per stage and per model.
 
+## Run monitoring
+- Preferred: `scripts/run_driver_monitored.sh` (spawns driver, writes `driver.pid`, tails `pipeline_events.jsonl`).
+  - Example: `scripts/run_driver_monitored.sh --recipe configs/recipes/recipe-ff-canonical.yaml --run-id <run_id> --output-dir output/runs -- --instrument`
+  - **Important**: `run_driver_monitored.sh` expects `--output-dir` to be the parent (e.g., `output/runs`) and passes the full run dir to `driver.py`. Do not pass a run-specific path.
+  - If you pass `--force`, the script pre-deletes the run dir, strips `--force`, and adds `--allow-run-id-reuse` so the driver accepts the created run dir without wiping the log/pidfile mid-run.
+- Attach to an existing run: `scripts/monitor_run.sh output/runs/<run_id> output/runs/<run_id>/driver.pid 5`
+- Foreground one-liner (useful if background terminal support interferes):
+  - `while true; do date; tail -n 1 output/runs/<run_id>/pipeline_events.jsonl; sleep 60; done`
+- Crash visibility: prefer `scripts/run_driver_monitored.sh` so stderr is captured in `driver.log`. `scripts/monitor_run.sh` now tails `driver.log` when the PID disappears to surface hard failures (e.g., OpenMP SHM errors).
+- `scripts/monitor_run.sh` also appends a synthetic `run_monitor` failure event to `pipeline_events.jsonl` when the driver PID disappears, so tailing events shows the crash.
+- `scripts/run_driver_monitored.sh` runs `scripts/postmortem_run.sh` on exit to append a `run_postmortem` failure event when the PID is gone.
+
 ### Cost/perf presets and benchmarks
 - Preset settings live in `configs/presets/`:
   - `speed.text.yaml` (text recipe, gpt-4.1-mini, ~8s/page, ~$0.00013/page)

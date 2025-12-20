@@ -6,7 +6,7 @@ from typing import List, Dict, Any
 
 from openai import OpenAI
 
-from modules.common.utils import ProgressLogger, read_jsonl, ensure_dir, append_jsonl
+from modules.common.utils import ProgressLogger, read_jsonl, ensure_dir, append_jsonl, save_jsonl
 from modules.common.macro_section import macro_section_for_page
 from schemas import PortionHypothesis
 
@@ -139,7 +139,6 @@ def main():
             numeric_hypos.append(hypo.dict())
 
     # overwrite with numeric detections first
-    from modules.common.utils import save_jsonl
     save_jsonl(args.out, numeric_hypos)
 
     # LLM refinement/extra detection

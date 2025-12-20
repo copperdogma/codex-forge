@@ -17,11 +17,18 @@ from openai import OpenAI
 from modules.common.utils import read_jsonl, save_json, log_llm_usage, ProgressLogger
 
 
-def summarize_page(lines: List[Dict], page_id, max_lines: int = 10, max_len: int = 120) -> Dict:
+def summarize_page(
+    lines: List[Dict],
+    page_number: int,
+    original_page_number: Optional[int],
+    max_lines: int = 10,
+    max_len: int = 120,
+) -> Dict:
     """Summarize a page's elements into compact snippets.
 
     Args:
-        page_id: Page identifier (int or str like "111L" for split pages)
+        page_number: Sequential page identifier used throughout the pipeline
+        original_page_number: Source document page index (may be shared by split pages)
     """
     snippets = []
     numeric_flags = 0
@@ -35,7 +42,8 @@ def summarize_page(lines: List[Dict], page_id, max_lines: int = 10, max_len: int
             text = text[:max_len] + "…"
         snippets.append(text)
     return {
-        "page": page_id,  # Now can be "111L" or "111R" for split pages
+        "page_number": page_number,
+        "original_page_number": original_page_number,
         "snippet_lines": snippets,
         "line_count": len(lines),
         "numeric_lines": numeric_flags,
@@ -48,44 +56,65 @@ def reduce_elements(elements_path: str, max_lines: int = 8, max_len: int = 100) 
     Optimized for minimal data: only essential snippets, shorter lines, fewer per page.
     Works with full book output (226 pages from spread splitting).
 
-    CRITICAL: Preserves L/R page splits by extracting page ID from element 'id' field.
-    For spread-split books, elements have id like "111L-0000" or "111R-0000".
-    We must treat 111L and 111R as separate pages to avoid mixing gameplay/endmatter.
+    CRITICAL: Prefer sequential page_number when available. Legacy L/R element IDs
+    are supported as a fallback only.
     """
-    pages = {}
+    pages: Dict[int, Dict[str, Optional[int] | List[Dict]]] = {}
     for row in read_jsonl(elements_path):
-        # Extract page identifier from element ID (e.g., "111L-0000" -> "111L")
-        # This preserves L/R split for spread pages
-        elem_id = row.get("id", "")
-        if "-" in elem_id:
-            # Format: "{page_id}-{seq}" where page_id might be "111L" or "111R"
-            page_id = elem_id.split("-")[0]
-        else:
-            # Fallback: use integer page field if no ID or no dash
-            pg = row.get("page")
-            if pg is None:
-                # Fallback to metadata if page not directly available
-                pg = row.get("metadata", {}).get("page_number") or row.get("metadata", {}).get("page") or 0
-            if pg == 0:
-                continue  # Skip elements with no page
-            page_id = str(pg)
+        # Prefer canonical page_number when available
+        page_id = row.get("page_number")
+        if page_id is None:
+            page_id = row.get("page")
+        if page_id is None:
+            page_id = row.get("metadata", {}).get("page_number") or row.get("metadata", {}).get("page")
+        if page_id is None:
+            # Legacy fallback: extract from element id prefix
+            elem_id = row.get("id", "")
+            if "-" in elem_id:
+                page_id = elem_id.split("-")[0]
+        if page_id is None:
+            continue  # Skip elements with no page
 
-        pages.setdefault(page_id, []).append(row)
+        original_page_number = row.get("original_page_number")
+        if original_page_number is None:
+            original_page_number = row.get("metadata", {}).get("original_page_number")
+        page_entry = pages.setdefault(
+            page_id,
+            {"rows": [], "original_page_number": original_page_number},
+        )
+        if page_entry.get("original_page_number") is None and original_page_number is not None:
+            page_entry["original_page_number"] = original_page_number
+        page_entry["rows"].append(row)
 
     summaries = []
-    # Sort page IDs: numeric pages first (1, 2, ...), then L/R pages (111L, 111R)
+    # Sort page IDs: numeric pages first (1, 2, ...), then legacy L/R pages if present
     def page_sort_key(page_id):
-        # Extract numeric portion and suffix
-        import re
-        match = re.match(r'^(\d+)([LR]?)$', page_id)
-        if match:
-            num = int(match.group(1))
-            suffix = match.group(2) or ''
-            return (num, suffix)  # Sort by number first, then L before R
-        return (0, page_id)  # Fallback for non-numeric
+        if isinstance(page_id, int):
+            return (0, page_id, "")
+        digits = ""
+        suffix = ""
+        for ch in str(page_id):
+            if ch.isdigit():
+                digits += ch
+            else:
+                suffix = str(page_id)[len(digits):]
+                break
+        if digits:
+            side_order = {"L": 0, "R": 1}
+            return (0, int(digits), side_order.get(suffix[:1], 2))
+        return (1, str(page_id), "")
 
     for page_id in sorted(pages.keys(), key=page_sort_key):
-        summaries.append(summarize_page(pages[page_id], page_id, max_lines, max_len))
+        page_entry = pages[page_id]
+        summaries.append(
+            summarize_page(
+                page_entry["rows"],
+                page_id,
+                page_entry.get("original_page_number"),
+                max_lines,
+                max_len,
+            )
+        )
     return summaries
 
 
@@ -99,15 +128,17 @@ def load_prompt(prompt_path: Optional[str] = None) -> str:
     return """You are analyzing the structure of a Fighting Fantasy gamebook to identify three macro sections.
 
 INPUT: A JSON object with a "pages" array. Each page entry contains:
-- page: page identifier (integer like 1, 2, 3... OR string like "111L", "111R" for spread-split pages)
+- page_number: sequential page identifier (integer 1, 2, 3...)
+- original_page_number: source document page index (integer, may repeat when a spread is split)
 - snippets: array of short text snippets from that page (up to 8 lines, ~100 chars each)
 - line_count: total number of text lines on the page
 - numeric: count of standalone numeric lines (potential section headers)
 
 CRITICAL: You will receive ALL pages in the book (typically 100+ pages). You MUST analyze ALL pages to determine the correct boundaries.
 
-SPREAD-SPLIT PAGES: Some books have pages split into Left (L) and Right (R) spreads (e.g., "111L" and "111R").
-These are SEPARATE pages - treat "111L" and "111R" as two different pages. One may contain gameplay while the other contains ads.
+SPREAD-SPLIT PAGES: Some books split a single source page into multiple pipeline pages.
+In that case, multiple entries will share the same original_page_number, but each will have its own page_number.
+Treat each page_number as a separate page in your ranges.
 
 TASK: Identify three contiguous page ranges:
 1. frontmatter: Title pages, copyright, TOC, rules, instructions, adventure sheets (typically pages 1-15)
@@ -122,7 +153,7 @@ RULES:
 - IMPORTANT: If a page has BOTH numbered sections AND ads, it is GAMEPLAY (the numbered sections take precedence)
 - All three ranges must be contiguous (no gaps)
 - If endmatter is absent, set it to null
-- Use the page numbers from the input (do not invent page numbers)
+- Use page_number values from the input (do not invent page numbers)
 
 OUTPUT JSON (exactly this format):
 {
@@ -135,12 +166,11 @@ OUTPUT JSON (exactly this format):
 Example for a 400-page book:
 {
   "frontmatter_pages": [1, 11],
-  "gameplay_pages": [12, "111L"],
-  "endmatter_pages": ["111R", 113],
-  "notes": "Frontmatter (pp.1-11) includes title, copyright, rules. Gameplay starts at page 12 with BACKGROUND and ends at 111L (contains section 400). Endmatter starts at 111R (ads/previews begin)."
+  "gameplay_pages": [12, 402],
+  "endmatter_pages": [403, 410],
+  "notes": "Frontmatter (pp.1-11) includes title, copyright, rules. Gameplay starts at page 12 with BACKGROUND and ends at page 402 (contains section 400). Endmatter starts at page 403 (ads/previews begin)."
 }
-
-IMPORTANT: For spread-split pages, the page identifier is a STRING like "111L" or "111R", not an integer."""
+"""
 
 
 def call_llm_classify(client: OpenAI, model: str, pages: List[Dict], prompt: str) -> Dict:
@@ -149,7 +179,8 @@ def call_llm_classify(client: OpenAI, model: str, pages: List[Dict], prompt: str
     optimized_pages = []
     for p in pages:
         optimized_pages.append({
-            "page": p["page"],
+            "page_number": p["page_number"],
+            "original_page_number": p.get("original_page_number"),
             "snippets": p["snippet_lines"][:8],  # Max 8 lines (reduced from 10)
             "line_count": p["line_count"],
             "numeric": p["numeric_lines"],
@@ -184,18 +215,22 @@ def validate_ranges(result: Dict, total_pages: int) -> Tuple[bool, List[str]]:
 
     Handles both integer page IDs (1, 2, 3...) and string page IDs ("111L", "111R").
     """
-    import re
     errors = []
 
     def parse_page_id(page_id):
         """Extract numeric portion from page ID for validation."""
         if isinstance(page_id, int):
             return page_id
-        elif isinstance(page_id, str):
-            # Extract numeric portion (e.g., "111L" -> 111)
-            match = re.match(r'^(\d+)', str(page_id))
-            if match:
-                return int(match.group(1))
+        if page_id is None:
+            return None
+        digits = ""
+        for ch in str(page_id):
+            if ch.isdigit():
+                digits += ch
+            else:
+                break
+        if digits:
+            return int(digits)
         return None
 
     # Check required fields
@@ -367,4 +402,3 @@ def main():
 
 if __name__ == "__main__":
     main()
-

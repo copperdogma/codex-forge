@@ -16,6 +16,8 @@ def test_stamp_artifact_preserves_optional_pagelines_fields(tmp_path: Path):
         "module_id": "unit_test",
         "run_id": "test-run",
         "page": 1,
+        "page_number": 1,
+        "original_page_number": 1,
         "image": "x.png",
         "lines": [{"text": "Hello", "source": "tesseract"}],
         "needs_escalation": True,
@@ -37,4 +39,5 @@ def test_stamp_artifact_preserves_optional_pagelines_fields(tmp_path: Path):
     assert out["ivr"] == 0.42
     assert out["meta"] == {"note": "keep"}
     assert out["escalation_reasons"] == ["dictionary_oov"]
-
+    assert out["page_number"] == 1
+    assert out["original_page_number"] == 1

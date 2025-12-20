@@ -33,30 +33,50 @@ class EscalationCache:
         run_dir: Path,
         images_dir: Path,
         model: str = DEFAULT_VISION_MODEL,
-        logger: Optional[ProgressLogger] = None
+        logger: Optional[ProgressLogger] = None,
+        image_map: Optional[Dict[int, List[str]]] = None
     ):
         self.run_dir = Path(run_dir)
         self.cache_dir = self.run_dir / "escalation_cache"
         self.images_dir = Path(images_dir)
         self.model = model
         self.logger = logger or ProgressLogger()
+        self.image_map = image_map or {}
         
         # In-memory cache (avoid re-reading JSON)
         self._loaded: Dict[int, Dict] = {}
         
         ensure_dir(self.cache_dir)
     
-    def is_escalated(self, page: int) -> bool:
-        """Check if page already in cache."""
+    def is_escalated(self, page: int, image_paths: Optional[List[Path]] = None) -> bool:
+        """Check if page already in cache. Optionally verify image paths match."""
         if page in self._loaded:
+            if image_paths:
+                cached = self._loaded[page]
+                cached_paths = [str(p) for p in cached.get("image_paths", [])]
+                if cached_paths != [str(p) for p in image_paths]:
+                    return False
             return True
         
         cache_file = self.cache_dir / f"page_{page:03d}.json"
-        return cache_file.exists()
+        if not cache_file.exists():
+            return False
+        if not image_paths:
+            return True
+        try:
+            data = json.loads(cache_file.read_text(encoding="utf-8"))
+            cached_paths = [str(p) for p in data.get("image_paths", [])]
+            return cached_paths == [str(p) for p in image_paths]
+        except Exception:
+            return False
     
-    def get_page(self, page: int) -> Optional[Dict]:
-        """Get cached escalation data for page."""
+    def get_page(self, page: int, image_paths: Optional[List[Path]] = None) -> Optional[Dict]:
+        """Get cached escalation data for page. Optionally verify image paths match."""
         if page in self._loaded:
+            if image_paths:
+                cached_paths = [str(p) for p in self._loaded[page].get("image_paths", [])]
+                if cached_paths != [str(p) for p in image_paths]:
+                    return None
             return self._loaded[page]
         
         cache_file = self.cache_dir / f"page_{page:03d}.json"
@@ -65,6 +85,10 @@ class EscalationCache:
         
         with open(cache_file, 'r', encoding='utf-8') as f:
             data = json.load(f)
+            if image_paths:
+                cached_paths = [str(p) for p in data.get("image_paths", [])]
+                if cached_paths != [str(p) for p in image_paths]:
+                    return None
             self._loaded[page] = data
             return data
     
@@ -118,14 +142,15 @@ class EscalationCache:
         
         # Check which pages need escalation
         for page in pages:
-            if self.is_escalated(page):
+            image_paths = self._resolve_image_paths(page)
+            if self.is_escalated(page, image_paths=image_paths):
                 self.logger.log(
                     "escalation",
                     "running",
                     message=f"Page {page} already escalated (using cache)",
                     artifact=str(self.cache_dir / f"page_{page:03d}.json")
                 )
-                results[page] = self.get_page(page)
+                results[page] = self.get_page(page, image_paths=image_paths)
             else:
                 pages_to_escalate.append(page)
         
@@ -169,20 +194,7 @@ class EscalationCache:
         NOTE: For double-page spreads (L/R), this escalates BOTH sides.
         """
         # Find ALL page images (both L and R sides if they exist)
-        image_paths = []
-        patterns = [
-            f"page-{page:03d}L.png",
-            f"page-{page:03d}R.png",
-            f"{page:03d}L.png",
-            f"{page:03d}R.png",
-            f"page-{page:03d}.png",
-            f"{page:03d}.png"
-        ]
-        
-        for pattern in patterns:
-            candidate = self.images_dir / pattern
-            if candidate.exists():
-                image_paths.append(candidate)
+        image_paths = self._resolve_image_paths(page)
         
         if not image_paths:
             raise FileNotFoundError(f"No image found for page {page}")
@@ -224,6 +236,35 @@ class EscalationCache:
         self._loaded[page] = cache_record
         
         return cache_record
+
+    def _resolve_image_paths(self, page: int) -> List[Path]:
+        """
+        Resolve image paths for a page.
+        - Prefer explicit image_map (logical page mapping).
+        - Fallback to filename patterns in images_dir.
+        """
+        image_paths: List[Path] = []
+        if self.image_map and page in self.image_map:
+            for p in self.image_map.get(page, []):
+                candidate = Path(p)
+                if candidate.exists():
+                    image_paths.append(candidate)
+            if image_paths:
+                return image_paths
+
+        patterns = [
+            f"page-{page:03d}L.png",
+            f"page-{page:03d}R.png",
+            f"{page:03d}L.png",
+            f"{page:03d}R.png",
+            f"page-{page:03d}.png",
+            f"{page:03d}.png"
+        ]
+        for pattern in patterns:
+            candidate = self.images_dir / pattern
+            if candidate.exists():
+                image_paths.append(candidate)
+        return image_paths
     
     def _call_vision_model(self, image_path: Path) -> Dict[str, Dict]:
         """

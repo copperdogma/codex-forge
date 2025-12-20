@@ -69,6 +69,8 @@ class PageDoc(BaseModel):
     source: Optional[List[str]] = None
     created_at: Optional[str] = None
     page: int
+    page_number: Optional[int] = None
+    original_page_number: Optional[int] = None
     image: Optional[str] = None
     text: str
     source_path: Optional[str] = None
@@ -88,6 +90,8 @@ class PageLines(BaseModel):
     source: Optional[List[str]] = None
     created_at: Optional[str] = None
     page: int
+    page_number: Optional[int] = None
+    original_page_number: Optional[int] = None
     image: Optional[str] = None
     lines: List[PageLine]
     disagreement_score: Optional[float] = None
@@ -120,6 +124,8 @@ class ImageCrop(BaseModel):
     source: Optional[List[str]] = None
     created_at: Optional[str] = None
     page: int
+    page_number: Optional[int] = None
+    original_page_number: Optional[int] = None
     image: str
     boxes: List[BoundingBox]
     crops: List[str]
@@ -132,6 +138,8 @@ class CleanPage(BaseModel):
     source: Optional[List[str]] = None
     created_at: Optional[str] = None
     page: int
+    page_number: Optional[int] = None
+    original_page_number: Optional[int] = None
     image: Optional[str] = None
     raw_text: str
     clean_text: str
@@ -147,6 +155,8 @@ class PortionHypothesis(BaseModel):
     portion_id: Optional[str] = None
     page_start: int
     page_end: int
+    page_start_original: Optional[int] = None
+    page_end_original: Optional[int] = None
     title: Optional[str] = None
     type: Optional[str] = None
     confidence: float = 0.5
@@ -169,6 +179,8 @@ class LockedPortion(BaseModel):
     portion_id: str
     page_start: int
     page_end: int
+    page_start_original: Optional[int] = None
+    page_end_original: Optional[int] = None
     title: Optional[str] = None
     type: Optional[str] = None
     confidence: float
@@ -189,6 +201,8 @@ class ResolvedPortion(BaseModel):
     portion_id: str
     page_start: int
     page_end: int
+    page_start_original: Optional[int] = None
+    page_end_original: Optional[int] = None
     title: Optional[str] = None
     type: Optional[str] = None
     confidence: float = 0.0
@@ -211,6 +225,8 @@ class EnrichedPortion(BaseModel):
     section_id: Optional[str] = None
     page_start: int
     page_end: int
+    page_start_original: Optional[int] = None
+    page_end_original: Optional[int] = None
     title: Optional[str] = None
     type: Optional[str] = None
     confidence: float = 0.0
@@ -557,6 +573,8 @@ class ElementCore(BaseModel):
     id: str  # Original element ID from Unstructured
     seq: int  # Global reading-order index (0-based, preserved from original elements_full)
     page: int  # Page number as reported by Unstructured (1-based)
+    page_number: Optional[int] = None
+    original_page_number: Optional[int] = None
     kind: str  # "text" | "image" | "table" | "other"
     text: str  # Raw text, normalized whitespace only (non-empty after filtering)
     layout: Optional[ElementLayout] = None  # Layout hints if available

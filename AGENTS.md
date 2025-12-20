@@ -192,40 +192,57 @@ Before portionization, automatically flag pages for high-fidelity re-OCR if eith
   - **Reference**: [OpenAI Models Documentation](https://platform.openai.com/docs/models) - Check this for latest models, capabilities, and pricing
 - Defaults: `gpt-4.1-mini` with optional boost `gpt-5`; see scripts/recipes.
 
-## Environment Awareness
+## Running & Monitoring (canonical)
 
-**Always run on ARM64 + MPS (GPU) by default**
+**Always run on ARM64 + MPS by default. If that is not available, stop and fix the env before running the pipeline.**
 
-- Create/refresh env (Metal-friendly pins live in requirements.txt + constraints/metal.txt):
-  - `conda create -n codex-arm-mps python=3.11`
+### Environment (required)
+- Create/refresh env (Metal pins in `requirements.txt` + `constraints/metal.txt`):
+  - `conda config --add envs_dirs /Users/cam/.conda_envs`
+  - `conda create -n codex-arm-mps python=3.11 -y`
   - `conda activate codex-arm-mps`
-  - `pip install --no-cache-dir -r requirements.txt -c constraints/metal.txt` (pulls torch==2.9.1 / torchvision==0.24.1 / Pillow<13)
+  - `pip install --no-cache-dir -r requirements.txt -c constraints/metal.txt`
 - Activate env: `source ~/miniforge3/bin/activate codex-arm-mps`
-- Guard: `python scripts/check_arm_mps.py` (fails if not arm64 or MPS unavailable)
-- SHM-safe env (EasyOCR): `KMP_USE_SHMEM=0 KMP_CREATE_SHMEM=FALSE OMP_NUM_THREADS=1 KMP_AFFINITY=disabled KMP_INIT_AT_FORK=FALSE`
-- GPU sanity (5pp EasyOCR-only): `python driver.py --recipe configs/recipes/recipe-ff-canonical.yaml --settings configs/settings.easyocr-gpu-test.yaml --end-at intake --run-id cf-easyocr-mps-5 --output-dir /tmp/cf-easyocr-mps-5 --force`
-- After any GPU smoke, verify EasyOCR actually ran on GPU:  
-  `python scripts/regression/check_easyocr_gpu.py --debug-file /tmp/cf-easyocr-mps-5/ocr_ensemble/easyocr_debug.jsonl`
-- Shortcut: `./scripts/smoke_easyocr_gpu.sh /tmp/cf-easyocr-mps-5` (run + check in one step)
-- Smoke pipeline (5pp quick run): `python driver.py --recipe configs/recipes/recipe-ff-canonical.yaml --settings configs/settings.ff-canonical-smoke-5.yaml --run-id ff-canonical-smoke-5 --output-dir /tmp/cf-ff-canonical-smoke-5 --force`
-- If EasyOCR debug shows `gpu: false`, you are on the wrong env or missing Metal torch—switch to `codex-arm-mps`.
-- Expected warning: `pin_memory not supported on MPS` from torch DataLoader is benign.
+- Guard: `python scripts/check_arm_mps.py` (must pass)
+- SHM-safe env (required for EasyOCR/libomp stability):
+  - `KMP_USE_SHMEM=0 KMP_CREATE_SHMEM=FALSE OMP_NUM_THREADS=1 KMP_AFFINITY=disabled KMP_INIT_AT_FORK=FALSE`
+
+### Full pipeline run (preferred)
+- Use the monitored wrapper (creates pidfile + crash markers):
+  - `scripts/run_driver_monitored.sh --recipe configs/recipes/recipe-ff-canonical.yaml --run-id <run_id> --output-dir output/runs -- --instrument --force`
+- **Important**:
+  - `--output-dir` must be the **parent** (`output/runs`), not a run-specific path.
+  - `run_driver_monitored.sh` pre-deletes the run dir on `--force`, strips `--force`, and adds `--allow-run-id-reuse`.
+  - `driver.py` refuses `--force` on `output/runs` root; always pass a run-specific dir.
+
+### Monitoring (choose one)
+- Active monitor (recommended; shows crash immediately):
+  - `scripts/monitor_run.sh output/runs/<run_id> output/runs/<run_id>/driver.pid 5`
+- Foreground 60s polling loop (only if background terminals are disabled):
+  - `while true; do date; tail -n 1 output/runs/<run_id>/pipeline_events.jsonl; sleep 60; done`
+- Crash visibility:
+  - `monitor_run.sh` tails `driver.log` when PID disappears and appends a `run_monitor` failure event.
+  - `run_driver_monitored.sh` calls `scripts/postmortem_run.sh` on exit to append a `run_postmortem` failure event.
+
+### Smoke runs
+- 5pp smoke: `python driver.py --recipe configs/recipes/recipe-ff-canonical.yaml --settings configs/settings.ff-canonical-smoke-5.yaml --run-id ff-canonical-smoke-5 --output-dir /tmp/cf-ff-canonical-smoke-5 --force`
+
+### Troubleshooting (must-read)
+- **OMP SHM crash** (`Can't open SHM2`):
+  - Ensure `codex-arm-mps` env + SHM-safe vars are set.
+  - If it still fails, run outside any restricted/sandboxed shell or disable EasyOCR/torch paths.
+- **MPS unavailable**: rerun env setup; `python scripts/check_arm_mps.py` must pass.
+- **Apple Vision OCR sandbox failure** (`sysctlbyname for kern.hv_vmm_present failed`): run outside sandbox/full host permissions or disable `apple` engine.
+- **Monitoring looks idle but process died**: check `driver.log` in the run dir and confirm `run_monitor` / `run_postmortem` events exist in `pipeline_events.jsonl`.
 
 ## Safe Command Examples
 - Inspect status: `git status --short`
 - List files: `ls`, `rg --files`
 - View docs: `sed -n '1,120p' docs/stories/story-015-modular-pipeline.md`
 - Run validator: `python validate_artifact.py --schema portion_hyp_v1 --file output/...jsonl`
-- Dry-run the canonical 20-page recipe: `python driver.py --recipe configs/recipes/recipe-ff-canonical.yaml --dry-run`
-- **Monitored full run (preferred, streams progress)**:
-  - `scripts/run_driver_monitored.sh --recipe configs/recipes/recipe-ff-canonical.yaml --settings configs/settings.ff-canonical-smoke-5.yaml --run-id ff-canonical-smoke-5 --output-dir output/runs -- --instrument`
-- **Attach monitoring to an existing run** (requires a pidfile containing the driver PID):
-  - `scripts/monitor_run.sh output/runs/<run_id> output/runs/<run_id>/driver.pid 5`
-- Section coverage check (map + backfill + fail on missing): `python modules/adapter/section_target_guard_v1/main.py --inputs output/runs/ocr-enrich-sections-noconsensus/portions_enriched.jsonl --out /tmp/portions_enriched_guard.jsonl --report /tmp/section_target_report.json`
-- Legacy map/backfill adapters are obsolete; use `section_target_guard_v1` (no backward compatibility maintained).
-- **Dashboard Testing**: Serve from repo root (`python -m http.server 8000`) and access via `http://localhost:8000/docs/pipeline-visibility.html`. Do not use `file://` URIs as they block CORS/fetch.
-- **Sandbox caveat (Apple Vision OCR):** On some setups, Apple Vision OCR may fail under restricted/sandboxed execution with `sysctlbyname for kern.hv_vmm_present failed`. If that happens, rerun outside the sandbox / with full host permissions, or disable the `apple` engine for that run.
-
+- Dry-run the canonical recipe: `python driver.py --recipe configs/recipes/recipe-ff-canonical.yaml --dry-run`
+- Section coverage check: `python modules/adapter/section_target_guard_v1/main.py --inputs output/runs/ocr-enrich-sections-noconsensus/portions_enriched.jsonl --out /tmp/portions_enriched_guard.jsonl --report /tmp/section_target_report.json`
+- Dashboard: `python -m http.server 8000` then open `http://localhost:8000/docs/pipeline-visibility.html`
 ## Open Questions / WIP
 - Enrichment stage not implemented (Story 018).
 - Shared helpers now live under `modules/common` (utils, ocr); module mains should import from `modules.common.*` without mutating `sys.path`.

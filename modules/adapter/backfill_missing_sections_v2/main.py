@@ -15,20 +15,17 @@ def load_boundaries(path: str) -> List[Dict]:
 
 
 def extract_page_from_element_id(element_id: str) -> Optional[int]:
-    """Extract page number from element ID like '095L-0028' -> 95, '049R-0023' -> 49."""
+    """Extract numeric page number from element ID prefix like '095-0028'."""
     if not element_id:
         return None
-    # Match pattern like "095L" or "049R" at start
-    match = re.match(r"(\d{3})([LR]?)", element_id)
-    if match:
-        return int(match.group(1))
-    return None
+    match = re.match(r"(\d+)", element_id)
+    return int(match.group(1)) if match else None
 
 
 def get_page_from_element(element: Dict) -> Optional[int]:
     """Get page number from element (from metadata or extracted from ID)."""
     # Try metadata first
-    page = element.get("page") or element.get("metadata", {}).get("page_number")
+    page = element.get("page_number") or element.get("page") or element.get("metadata", {}).get("page_number")
     if page:
         return int(page) if isinstance(page, (int, str)) and str(page).isdigit() else None
     # Fall back to extracting from ID

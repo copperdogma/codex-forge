@@ -5,6 +5,7 @@ import re
 from typing import Dict, List, Any, Optional
 
 from modules.common.utils import save_json, ensure_dir, ProgressLogger, read_jsonl
+from modules.common.page_numbers import validate_sequential_page_numbers
 from schemas import ValidationReport
 
 
@@ -34,7 +35,7 @@ def find_hits(arr, sid: str, field="text", id_field="id", page_field="page"):
         if txt and pat.search(txt):
             hits.append({
                 "id": e.get(id_field),
-                "page": e.get("metadata", {}).get("page_number") if isinstance(e.get("metadata"), dict) else e.get(page_field),
+                "page": (e.get("page_number") or (e.get("metadata", {}).get("page_number") if isinstance(e.get("metadata"), dict) else None) or e.get(page_field)),
                 "snippet": short_text(txt, 120),
             })
     return hits[:3]
@@ -194,7 +195,7 @@ def validate_gamebook(
                 if not el:
                     return None
                 md = el.get("metadata") or {}
-                return md.get("page_number") or el.get("page")
+                return el.get("page_number") or md.get("page_number") or el.get("page")
             return {
                 "start_element_id": b.get("start_element_id"),
                 "end_element_id": b.get("end_element_id"),
@@ -294,6 +295,24 @@ def main():
             except Exception:
                 unresolved_ids = []
 
+        page_number_trace = None
+        if pages_raw:
+            ok, missing = validate_sequential_page_numbers(pages_raw, field="page_number", allow_gaps=False)
+            if not ok:
+                msg = f"pages_raw page_number sequence has gaps: {missing[:10]}" + (f" (and {len(missing) - 10} more)" if len(missing) > 10 else "")
+                errors = list(report.errors or [])
+                errors.append(msg)
+                report = report.model_copy(update={"errors": errors, "is_valid": False})
+                page_number_trace = {"artifact": pages_raw_path, "missing": missing}
+        elif pages_clean:
+            ok, missing = validate_sequential_page_numbers(pages_clean, field="page_number", allow_gaps=False)
+            if not ok:
+                msg = f"pages_clean page_number sequence has gaps: {missing[:10]}" + (f" (and {len(missing) - 10} more)" if len(missing) > 10 else "")
+                errors = list(report.errors or [])
+                errors.append(msg)
+                report = report.model_copy(update={"errors": errors, "is_valid": False})
+                page_number_trace = {"artifact": pages_clean_path, "missing": missing}
+
         # Prefer elements_core (cleaner, seq/page aligned); fall back to full elements if missing
         elem_by_id = {e.get("id"): e for e in (elements_core or elements)}
         bound_by_sid = {b.get("section_id"): b for b in boundaries}
@@ -318,8 +337,8 @@ def main():
             return {
                 "start_seq": start_seq,
                 "end_seq": end_seq,
-                "start_page": start.get("page") if start else None,
-                "end_page": end.get("page") if end else None,
+                "start_page": (start.get("page_number") if start else None) or (start.get("metadata", {}).get("page_number") if start else None) or (start.get("page") if start else None),
+                "end_page": (end.get("page_number") if end else None) or (end.get("metadata", {}).get("page_number") if end else None) or (end.get("page") if end else None),
                 "span_length": span_len,
                 "zero_length": span_len == 0 if span_len is not None else None,
                 "start_element_id": start_id,
@@ -345,9 +364,7 @@ def main():
                 return None
             start_elem = elem_by_id.get(b.get("start_element_id"))
             if start_elem:
-                if start_elem.get("metadata") and start_elem["metadata"].get("page_number"):
-                    return start_elem["metadata"]["page_number"]
-                return start_elem.get("page")
+                return start_elem.get("page_number") or (start_elem.get("metadata", {}).get("page_number") if start_elem.get("metadata") else None) or start_elem.get("page")
             return None
 
         def nearest_page_hint(sid_str: str):
@@ -391,7 +408,7 @@ def main():
                         hits.append({
                             "id": e.get("id"),
                             "seq": e.get("seq"),
-                            "page": e.get("page") or e.get("metadata", {}).get("page_number"),
+                            "page": e.get("page_number") or e.get("page") or e.get("metadata", {}).get("page_number"),
                             "text": short_text(txt),
                         })
                 return hits[:3]  # cap for brevity
@@ -425,11 +442,9 @@ def main():
                 "boundary_confidence": b.get("confidence") if b else None,
                 "start_element_id": b.get("start_element_id") if b else None,
                 "start_element_text": short_text(start_elem.get("text")) if start_elem else None,
-                "start_element_page": start_elem.get("metadata", {}).get("page_number")
-                if start_elem and start_elem.get("metadata")
-                else start_elem.get("page")
-                if start_elem
-                else None,
+                "start_element_page": (start_elem.get("page_number") if start_elem else None)
+                or (start_elem.get("metadata", {}).get("page_number") if start_elem and start_elem.get("metadata") else None)
+                or (start_elem.get("page") if start_elem else None),
                 "span": span_meta(b),
                 "portion_snippet": portion_snippet(sid),
                 "portion_length": portion_length(sid),
@@ -456,6 +471,9 @@ def main():
         for sid in report.sections_with_no_choices:
             traces.setdefault("no_choices", {})[sid] = make_trace(sid)
             traces["no_choices"][sid]["suggested_action"] = suggested_action("no_choices", sid)
+
+        if page_number_trace:
+            traces["page_number_sequence"] = page_number_trace
 
         # Mark unresolved-after-escalation
         if unresolved_ids:

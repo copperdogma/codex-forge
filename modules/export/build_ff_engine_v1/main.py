@@ -80,6 +80,8 @@ def build_section(portion: Dict[str, Any]) -> tuple[str, Dict[str, Any]]:
     section_id = str(portion.get("section_id") or portion.get("portion_id"))
     page_start = int(portion.get("page_start"))
     page_end = int(portion.get("page_end"))
+    page_start_original = portion.get("page_start_original")
+    page_end_original = portion.get("page_end_original")
 
     # AI pipeline always provides raw_text
     text_body = portion.get("raw_text", "")
@@ -144,6 +146,7 @@ def build_section(portion: Dict[str, Any]) -> tuple[str, Dict[str, Any]]:
         "continuation_confidence": portion.get("continuation_confidence"),
         "source_images": portion.get("source_images") or [],
         "source_pages": list(range(page_start, page_end + 1)),
+        "source_pages_original": list(range(page_start_original, page_end_original + 1)) if isinstance(page_start_original, int) and isinstance(page_end_original, int) else None,
         "raw_text": raw_body,
         "clean_text": text_body,
         "macro_section": portion.get("macro_section"),

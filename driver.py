@@ -342,6 +342,7 @@ def build_plan(recipe: Dict[str, Any], registry: Dict[str, Any]) -> Dict[str, An
         _validate_params(params, entry.get("param_schema"), stage_id, module_id)
         artifact_name = conf.get("out") or _artifact_name_for_stage(stage_id, stage_type, outputs_map)
         description = conf.get("description") or entry.get("notes") or entry.get("description")
+        output_schema = entry.get("output_schema") or params.get("schema_version")
         nodes[stage_id] = {
             "id": stage_id,
             "stage": stage_type,
@@ -352,7 +353,7 @@ def build_plan(recipe: Dict[str, Any], registry: Dict[str, Any]) -> Dict[str, An
             "artifact_name": artifact_name,
             "entrypoint": entry["entrypoint"],
             "input_schema": entry.get("input_schema"),
-            "output_schema": entry.get("output_schema"),
+            "output_schema": output_schema,
             "description": description,
         }
         prior_id = stage_id if linear else prior_id
@@ -667,6 +668,7 @@ def build_command(entrypoint: str, params: Dict[str, Any], stage_conf: Dict[str,
             cmd += ["--stub", stub_path, "--out", artifact_path]
             if params.get("schema_version"):
                 cmd += ["--schema-version", str(params["schema_version"])]
+                flags_added.add("--schema_version")
             flags_added.update({"--stub", "--out"})
         elif stage_conf["module"] == "merge_boundaries_pref_v1":
             inputs_list = artifact_inputs.get("inputs")
@@ -876,6 +878,8 @@ def build_command(entrypoint: str, params: Dict[str, Any], stage_conf: Dict[str,
     seen_flags = set(flags_added)
     for key, val in (params or {}).items():
         flag = f"--{key}"
+        if key == "skip_ai":
+            flag = "--skip-ai"
         # Special-case param flag normalization for modules that expect hyphens
         if stage_conf.get("module") == "fine_segment_frontmatter_v1" and key == "coarse_segments":
             flag = "--coarse-segments"
@@ -1200,6 +1204,10 @@ def main():
         elif args.force:
             # Delete and recreate directory
             import shutil
+            norm_run_dir = os.path.normpath(run_dir)
+            norm_root = os.path.normpath(os.path.join("output", "runs"))
+            if norm_run_dir == norm_root:
+                raise SystemExit("--force refused: output/runs is the runs root; set a run_id or output_dir to a subdir")
             print(f"⚠️  --force: Deleting existing directory: {run_dir}")
             shutil.rmtree(run_dir)
 

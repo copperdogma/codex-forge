@@ -193,7 +193,7 @@ def main():
         with open(page_path, 'r') as f:
             page_data = json.load(f)
         
-        page_num = page_data.get('page', 0)
+        page_num = page_data.get('page_number') or page_data.get('page', 0)
         
         # Scan raw engines for numeric headers (only if ocr_engines_dir exists)
         if ocr_engines_dir:
@@ -289,4 +289,3 @@ def main():
 
 if __name__ == '__main__':
     main()
-

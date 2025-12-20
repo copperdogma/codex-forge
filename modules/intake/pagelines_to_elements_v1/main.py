@@ -30,14 +30,11 @@ def load_index(index_path: str) -> Dict[str, str]:
 
 def extract_page_number(page_key: str) -> int:
     """
-    Extract numeric page number from page key in "001L"/"001R" format.
-    Assumes format: zero-padded 3-digit number followed by "L" or "R".
-    Example: "001L" -> 1, "042R" -> 42
+    Legacy extractor for numeric page number from page key in "001L"/"001R" format.
+    Prefer page_number from pagelines payload when available.
     """
-    # Remove trailing L/R suffix
     if page_key.endswith("L") or page_key.endswith("R"):
         page_key = page_key[:-1]
-    # Remove leading zeros and convert to int
     return int(page_key.lstrip("0") or "0")
 
 
@@ -289,12 +286,9 @@ def main():
                message="Converting pagelines → elements", module_id="pagelines_to_elements_v1", artifact=out_core,
                schema_version="element_core_v1")
 
-    # Sort by numeric page number (extract from "001L"/"001R" format)
-    def sort_key(kv):
-        page_key = kv[0]
-        return extract_page_number(page_key)
-    
-    for page_key, path in sorted(index.items(), key=sort_key):
+    # Build ordered page list using page_number from payload when available.
+    page_items = []
+    for page_key, path in index.items():
         # Check if we're reading from JSONL (unified artifact) or individual files
         if path.startswith("__jsonl_row_"):
             # Reading from unified JSONL artifact
@@ -303,11 +297,32 @@ def main():
             # Reading from individual page files (traditional path)
             with open(path, "r", encoding="utf-8") as f:
                 data = json.load(f)
+        page_items.append((page_key, data))
+
+    def sort_key(item):
+        page_key, data = item
+        pn = data.get("page_number")
+        if isinstance(pn, int):
+            return pn
+        return extract_page_number(page_key)
+
+    for page_key, data in sorted(page_items, key=sort_key):
         lines = data.get("lines", [])
         lines = sort_lines_preserving_columns(lines)
         
-        # Extract numeric page number for metadata
-        page_num = extract_page_number(page_key)
+        # Prefer canonical page_number from payload; fall back to legacy page_key
+        page_num = data.get("page_number")
+        if not isinstance(page_num, int):
+            try:
+                page_num = int(page_num)
+            except Exception:
+                page_num = extract_page_number(page_key)
+        original_page_number = data.get("original_page_number")
+        if not isinstance(original_page_number, int):
+            original_page_number = data.get("page")
+        spread_side = data.get("spread_side")
+        if spread_side is None and (page_key.endswith("L") or page_key.endswith("R")):
+            spread_side = page_key[-1]
         
         # debug column stats
         if args.columns_debug:
@@ -359,11 +374,15 @@ def main():
                 sequence=seq_global,
                 created_at=datetime.now(timezone.utc).isoformat(),
             )
-            meta = {"page_number": page_num}  # Use extracted numeric page number
+            meta = {"page_number": page_num}
+            if isinstance(original_page_number, int):
+                meta["original_page_number"] = original_page_number
+            if spread_side:
+                meta["spread_side"] = spread_side
             if "source" in line:
                 meta["source"] = line.get("source")
-            # Element ID uses page_key (preserves L/R suffix for spread pages)
-            elem_id = f"{page_key}-{seq_page:04d}"
+            # Element ID uses canonical sequential page_number
+            elem_id = f"{page_num:03d}-{seq_page:04d}"
             elem = UnstructuredElement(
                 id=elem_id,
                 type="NarrativeText",
@@ -375,7 +394,9 @@ def main():
             core = ElementCore(
                 id=elem.id,
                 seq=seq_global,
-                page=page_num,  # Use extracted numeric page number
+                page=page_num,
+                page_number=page_num,
+                original_page_number=original_page_number if isinstance(original_page_number, int) else None,
                 kind="text",
                 text=text,
                 layout=layout.model_dump() if layout else None,

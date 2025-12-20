@@ -12,10 +12,10 @@ import argparse
 import json
 from collections import defaultdict
 from pathlib import Path
-from typing import Dict, List, Set, Optional, Any
+from typing import Dict, List, Set, Optional, Any, Tuple
 
 from modules.common.utils import read_jsonl, save_jsonl, save_json, ensure_dir, ProgressLogger
-from modules.common.macro_section import macro_section_for_page, page_num_from_element_id
+from modules.common.macro_section import macro_section_for_page
 from modules.common.escalation_cache import EscalationCache
 
 
@@ -59,6 +59,29 @@ def _resolve_images_dir(run_root: Path, explicit: Optional[str]) -> Path:
     return direct
 
 
+def _load_image_map(run_root: Path) -> Dict[int, List[str]]:
+    """
+    Build logical page_number -> image path mapping from pages_raw.jsonl if available.
+    This keeps escalation aligned to logical pages (split pages or single pages).
+    """
+    candidates = [
+        run_root / "pages_raw.jsonl",
+        run_root / "01_extract_ocr_ensemble_v1" / "pages_raw.jsonl",
+    ]
+    src = next((p for p in candidates if p.exists()), None)
+    if not src:
+        return {}
+    image_map: Dict[int, List[str]] = defaultdict(list)
+    for row in read_jsonl(str(src)):
+        page_num = row.get("page_number")
+        image_path = row.get("image")
+        if not isinstance(page_num, int) or not isinstance(image_path, str):
+            continue
+        if image_path not in image_map[page_num]:
+            image_map[page_num].append(image_path)
+    return dict(image_map)
+
+
 def filter_elements_to_gameplay(elements: List[Dict], gameplay_pages: List) -> List[Dict]:
     """
     Filter elements to ONLY those in the gameplay page range.
@@ -71,54 +94,52 @@ def filter_elements_to_gameplay(elements: List[Dict], gameplay_pages: List) -> L
     Returns:
         Elements within gameplay range only (excludes frontmatter and endmatter)
     """
-    import re
-
-    def parse_page_id(elem):
-        """Extract page identifier from element (handles both integer page and L/R splits)."""
-        # First try to get from element ID (e.g., "111L-0000" -> "111L")
-        elem_id = elem.get('id', '')
-        if '-' in elem_id:
-            return elem_id.split('-')[0]
-        # Fallback to page field (integer)
-        page = elem.get('page')
-        return str(page) if page is not None else None
-
-    def page_in_range(page_id, start, end):
-        """Check if page_id is within [start, end] range (handles string page IDs)."""
-        if page_id is None:
-            return False
-
-        # Extract numeric portions for comparison
-        def extract_num_and_suffix(pid):
-            """Extract (number, suffix) from page ID. E.g., "111L" -> (111, "L"), 12 -> (12, "")"""
-            pid_str = str(pid)
-            match = re.match(r'^(\d+)([LR]?)$', pid_str)
-            if match:
-                return (int(match.group(1)), match.group(2) or '')
+    def _coerce_page_number(val: Any) -> Optional[int]:
+        if isinstance(val, int):
+            return val
+        if val is None:
+            return None
+        digits = ""
+        for ch in str(val):
+            if ch.isdigit():
+                digits += ch
+            else:
+                break
+        if not digits:
+            return None
+        try:
+            return int(digits)
+        except Exception:
             return None
 
-        page_parts = extract_num_and_suffix(page_id)
-        start_parts = extract_num_and_suffix(start)
-        end_parts = extract_num_and_suffix(end)
+    def parse_page_number(elem):
+        """Extract canonical page number from element (prefers page_number field)."""
+        if "page_number" in elem:
+            pn = _coerce_page_number(elem.get("page_number"))
+            if pn is not None:
+                return pn
+        page = elem.get("page")
+        pn = _coerce_page_number(page)
+        if pn is not None:
+            return pn
+        md = elem.get("metadata") or {}
+        return _coerce_page_number(md.get("page_number"))
 
-        if not all([page_parts, start_parts, end_parts]):
+    def page_in_range(page_num: Optional[int], start, end) -> bool:
+        """Check if page number is within [start, end] range."""
+        if page_num is None:
             return False
-
-        page_num, page_suffix = page_parts
-        start_num, start_suffix = start_parts
-        end_num, end_suffix = end_parts
-
-        # Compare: (number, suffix) tuple comparison works naturally
-        # "111L" < "111R" because ("L" < "R")
-        # "012L" < "111L" because (12 < 111)
-        return (page_num, page_suffix) >= (start_num, start_suffix) and \
-               (page_num, page_suffix) <= (end_num, end_suffix)
+        start_num = _coerce_page_number(start)
+        end_num = _coerce_page_number(end)
+        if start_num is None or end_num is None:
+            return False
+        return start_num <= page_num <= end_num
 
     start_page, end_page = gameplay_pages
     filtered = []
     for elem in elements:
-        page_id = parse_page_id(elem)
-        if page_in_range(page_id, start_page, end_page):
+        page_num = parse_page_number(elem)
+        if page_in_range(page_num, start_page, end_page):
             filtered.append(elem)
 
     return filtered
@@ -202,7 +223,7 @@ def filter_section_headers(elements: List[Dict], min_section: int, max_section: 
         
         # VALIDATION: Content type classification is a SIGNAL, not a guarantee
         # Additional checks to filter false positives (e.g., page numbers misclassified as headers)
-        page = elem.get('page')
+        page = elem.get('page_number') or elem.get('page')
         if page is not None:
             # Check layout position if available (bottom of page = likely page number footer)
             layout = elem.get('layout') or {}
@@ -216,10 +237,18 @@ def filter_section_headers(elements: List[Dict], min_section: int, max_section: 
         # Use 'id' field (element schema uses 'id', not 'element_id')
         element_id = elem.get('id') or elem.get('element_id')
         elem_idx = element_index_by_id.get(element_id) if element_id else None
+        start_original_page = elem.get("original_page_number")
+        if isinstance(start_original_page, int):
+            original_page_val = start_original_page
+        else:
+            original_page_val = None
+
         candidates.append({
             'section_id': str(section_num),
             'start_element_id': element_id,
             'start_page': page,
+            'start_original_page': original_page_val,
+            'start_element_metadata': elem.get('metadata') or {},
             'start_line_idx': elem.get('line_idx'),
             'seq_idx': elem_idx,
             'follow_text_score': _follow_text_score(elem_idx, page),
@@ -256,23 +285,30 @@ def _build_element_sequence(elements: List[Dict]) -> tuple:
     return elements_sorted, element_sequence, id_to_index, id_to_seq
 
 
-def detect_ordering_conflicts(boundaries: List[Dict], id_to_seq: Dict[str, int]) -> Dict[str, Dict]:
+def detect_ordering_conflicts(boundaries: List[Dict], id_to_seq: Dict[str, int],
+                              ignore_pages: Optional[Set[int]] = None) -> Dict[str, Dict]:
     """
     Detect pages where numeric section order contradicts element sequence order.
     Group by page side (L/R) to avoid false conflicts across spreads.
     Returns {page: {"sides": {side: {"sections_seq": [...], "sections_numeric": [...]}}}}.
     """
-    import re
-
     def page_side(b: Dict) -> str:
+        md = b.get("start_element_metadata") or {}
+        side = md.get("spread_side")
+        if side in ("L", "R"):
+            return side
         eid = str(b.get("start_element_id") or "")
-        m = re.match(r"^(\d+)([LR])-", eid)
-        return m.group(2) if m else ""
+        if isinstance(eid, str) and len(eid) >= 5 and eid[3] in ("L", "R"):
+            return eid[3]
+        return ""
 
     page_groups: Dict[str, Dict[str, List[Dict]]] = defaultdict(lambda: defaultdict(list))
+    ignore_pages = ignore_pages or set()
     for b in boundaries:
         page = b.get("start_page")
         if page is None:
+            continue
+        if int(page) in ignore_pages:
             continue
         side = page_side(b)
         page_key = f"{int(page)}{side}" if side else str(int(page))
@@ -309,7 +345,7 @@ def assign_macro_sections(boundaries: List[Dict], elements_by_id: Dict[str, Dict
             elem = elements_by_id.get(start_id) if start_id else None
             page = (elem.get("page") if elem else None) or (elem.get("metadata", {}).get("page_number") if elem else None)
             if page is None:
-                page = page_num_from_element_id(start_id)
+                page = None
         b["macro_section"] = macro_section_for_page(page, coarse_segments)
 
 
@@ -318,7 +354,8 @@ def detect_span_issues(boundaries: List[Dict],
                        elements_sorted: List[Dict],
                        min_words: int = 5,
                        min_alpha_ratio: float = 0.2,
-                       min_alpha_chars: int = 20) -> Dict[int, Dict]:
+                       min_alpha_chars: int = 20,
+                       ignore_pages: Optional[Set[int]] = None) -> Dict[int, Dict]:
     """
     Detect sections whose numeric-order span is inverted or has no real text.
     Returns {page: {"reason": "...", "section_id": "..."}}
@@ -335,6 +372,7 @@ def detect_span_issues(boundaries: List[Dict],
             continue
         next_start_by_sid[sid] = boundaries_sorted[i + 1]["start_element_id"] if i + 1 < len(boundaries_sorted) else None
 
+    ignore_pages = ignore_pages or set()
     for b in boundaries_sorted:
         sid = b.get("section_id")
         start_id = b.get("start_element_id")
@@ -346,11 +384,15 @@ def detect_span_issues(boundaries: List[Dict],
         page = b.get("start_page")
         if page is None:
             continue
-        eid = str(start_id or "")
-        side = ""
-        if isinstance(eid, str) and len(eid) >= 5 and eid[3] in ("L", "R"):
-            side = eid[3]
+        md = b.get("start_element_metadata") or {}
+        side = md.get("spread_side") if md.get("spread_side") in ("L", "R") else ""
+        if not side:
+            eid = str(start_id or "")
+            if isinstance(eid, str) and len(eid) >= 5 and eid[3] in ("L", "R"):
+                side = eid[3]
         page_key = f"{int(page)}{side}" if side else str(int(page))
+        if page is not None and int(page) in ignore_pages:
+            continue
         if end_idx < start_idx:
             issues[page_key] = {"reason": "inverted_span", "section_id": sid}
             continue
@@ -379,6 +421,84 @@ def detect_span_issues(boundaries: List[Dict],
     return issues
 
 
+def prune_headers_with_empty_between(boundaries: List[Dict],
+                                     id_to_index: Dict[str, int],
+                                     elements_sorted: List[Dict],
+                                     only_pages: Optional[Set[str]] = None) -> Tuple[List[Dict], Dict]:
+    """
+    Drop header candidates that have no intervening body text before the next header
+    on the same logical page. Only applied to conflict pages as a tie-breaker.
+    Returns (filtered_boundaries, report).
+    """
+    if not boundaries:
+        return boundaries, {}
+
+    def _page_key(b: Dict) -> Optional[str]:
+        page = b.get("start_page")
+        if page is None:
+            return None
+        md = b.get("start_element_metadata") or {}
+        side = md.get("spread_side") if md.get("spread_side") in ("L", "R") else ""
+        return f"{int(page)}{side}" if side else str(int(page))
+
+    page_to_items: Dict[str, List[Tuple[int, Dict]]] = defaultdict(list)
+    for b in boundaries:
+        start_id = b.get("start_element_id")
+        if not start_id or start_id not in id_to_index:
+            continue
+        page_key = _page_key(b)
+        if not page_key:
+            continue
+        if only_pages and page_key not in only_pages:
+            continue
+        page_to_items[page_key].append((id_to_index[start_id], b))
+
+    drop_keys: Set[Tuple[str, str]] = set()
+    report: Dict[str, Dict] = {}
+
+    for page_key, items in page_to_items.items():
+        if len(items) < 2:
+            continue
+        items.sort(key=lambda x: x[0])
+        dropped_sections: List[str] = []
+        for idx, (start_idx, b) in enumerate(items[:-1]):
+            method = (b.get("method") or "")
+            if method.startswith("vision_"):
+                continue
+            end_idx = items[idx + 1][0]
+            if end_idx <= start_idx:
+                continue
+            has_text = False
+            for e in elements_sorted[start_idx + 1:end_idx]:
+                if e.get("content_type") == "Section-header":
+                    continue
+                text = (e.get("text") or "").strip()
+                if not text:
+                    continue
+                if any(ch.isalpha() for ch in text):
+                    has_text = True
+                    break
+            if not has_text:
+                sec_id = str(b.get("section_id") or "")
+                drop_keys.add((sec_id, str(b.get("start_element_id") or "")))
+                if sec_id:
+                    dropped_sections.append(sec_id)
+        if dropped_sections:
+            report[page_key] = {
+                "dropped_sections": dropped_sections,
+                "reason": "no_text_between_headers",
+            }
+
+    if not drop_keys:
+        return boundaries, {}
+
+    filtered = [
+        b for b in boundaries
+        if (str(b.get("section_id") or ""), str(b.get("start_element_id") or "")) not in drop_keys
+    ]
+    return filtered, report
+
+
 def _filter_page_outliers(candidates: List[Dict], gameplay_pages: Optional[List] = None,
                           max_section: int = 400) -> List[Dict]:
     """
@@ -396,17 +516,41 @@ def _filter_page_outliers(candidates: List[Dict], gameplay_pages: Optional[List]
         gameplay_pages: [start, end] page range from coarse_segments (e.g., ["012L", "111L"])
         max_section: Maximum section number (default: 400)
     """
-    import re
-
     def parse_page_num(page_id):
         """Extract numeric portion from page ID (e.g., "051L" → 51, 73 → 73)."""
         if isinstance(page_id, int):
             return page_id
-        match = re.match(r'^(\d+)', str(page_id))
-        return int(match.group(1)) if match else 0
+        if page_id is None:
+            return 0
+        digits = ""
+        for ch in str(page_id):
+            if ch.isdigit():
+                digits += ch
+            else:
+                break
+        return int(digits) if digits else 0
+
+    page_to_original: Dict[int, int] = {}
+    for b in candidates:
+        page_id = b.get("start_page")
+        orig_page = b.get("start_original_page")
+        if isinstance(page_id, int) and isinstance(orig_page, int):
+            page_to_original.setdefault(page_id, orig_page)
+
+    original_pages = list(page_to_original.values())
+    orig_min = min(original_pages) if original_pages else None
+    orig_max = max(original_pages) if original_pages else None
 
     def expected_section_for_page(page_id):
         """Calculate expected section number for a page based on position in gameplay range."""
+        if isinstance(page_id, int) and page_id in page_to_original and orig_min is not None and orig_max is not None:
+            orig_page = page_to_original[page_id]
+            if orig_max == orig_min:
+                position = 0.5
+            else:
+                position = (orig_page - orig_min) / (orig_max - orig_min)
+                position = max(0, min(1, position))
+            return int(position * max_section)
         if not gameplay_pages or len(gameplay_pages) < 2:
             # Fallback: assume linear distribution across all pages
             page_num = parse_page_num(page_id)
@@ -696,6 +840,23 @@ def estimate_pages_for_sections_smart(missing_sections: List[int], detected_boun
     return sorted([p for p in suspected_pages if p > 0])
 
 
+def _pick_anchor_by_position(anchor_ids: List[str], id_to_seq: Dict[str, int], position: Optional[str]) -> Optional[str]:
+    if not anchor_ids:
+        return None
+    if not position:
+        return anchor_ids[0]
+    seq_pairs = [(aid, id_to_seq.get(aid, 999999)) for aid in anchor_ids]
+    seq_pairs.sort(key=lambda x: x[1])
+    position = position.lower()
+    if position == "top":
+        return seq_pairs[0][0]
+    if position == "bottom":
+        return seq_pairs[-1][0]
+    if position == "middle":
+        return seq_pairs[len(seq_pairs) // 2][0]
+    return seq_pairs[0][0]
+
+
 def escalate_with_vision_cache(
     pages: List[int],
     missing_sections: List[int],
@@ -703,6 +864,8 @@ def escalate_with_vision_cache(
     triggered_by: str,
     existing_boundaries: List[Dict],
     elements_by_page: Dict[int, List[Dict]],
+    elements_by_original_page: Dict[int, List[Dict]],
+    id_to_seq: Dict[str, int],
 ) -> List[Dict]:
     """
     Use vision escalation cache to find missing sections on problem pages.
@@ -719,7 +882,7 @@ def escalate_with_vision_cache(
     already_detected = {int(b['section_id']) for b in existing_boundaries}
     existing_element_ids = {e.get("id") for elems in elements_by_page.values() for e in elems if e.get("id")}
 
-    def _anchor_element_id(page: int, section_id: int) -> Optional[str]:
+    def _anchor_element_id(page: int, section_id: int, header_position: Optional[str]) -> Optional[str]:
         """
         Try to anchor a vision-found section number to a real element ID on that page.
 
@@ -729,17 +892,22 @@ def escalate_with_vision_cache(
         """
         import re
 
-        elems_all = sorted(elements_by_page.get(page, []), key=lambda e: int(e.get("seq") or 0))
+        elems_all = elements_by_page.get(page, []) or elements_by_original_page.get(page, [])
+        elems_all = sorted(elems_all, key=lambda e: int(e.get("seq") or 0))
         if not elems_all:
             return None
+        id_to_seq_all = {e.get("id"): int(e.get("seq") or 0) for e in elems_all if e.get("id")}
+        id_to_seq_all = {e.get("id"): int(e.get("seq") or 0) for e in elems_all if e.get("id")}
+        id_to_seq_all = {e.get("id"): int(e.get("seq") or 0) for e in elems_all if e.get("id")}
+        id_to_seq_all = {e.get("id"): int(e.get("seq") or 0) for e in elems_all if e.get("id")}
 
-        page_tag = f"{page:03d}"
         elems_by_side: Dict[str, List[Dict]] = {"L": [], "R": [], "": []}
         for e in elems_all:
-            eid = str(e.get("id") or "")
-            if eid.startswith(page_tag + "L-"):
+            md = e.get("metadata") or {}
+            side = md.get("spread_side")
+            if side == "L":
                 elems_by_side["L"].append(e)
-            elif eid.startswith(page_tag + "R-"):
+            elif side == "R":
                 elems_by_side["R"].append(e)
             else:
                 elems_by_side[""].append(e)
@@ -748,8 +916,9 @@ def escalate_with_vision_cache(
         pat = re.compile(rf"^\s*{section_id}\s*[\.\)\:]?\s*$")
         direct_all = [e for e in elems_all if isinstance(e.get("text"), str) and pat.match(e["text"])]
         if direct_all:
-            # Prefer the earliest occurrence in reading order.
-            return direct_all[0].get("id")
+            anchor_ids = [e.get("id") for e in direct_all if e.get("id")]
+            # Prefer by header position when available.
+            return _pick_anchor_by_position(anchor_ids, id_to_seq, header_position)
 
         for side in ["L", "R", ""]:
             elems = elems_by_side[side]
@@ -761,7 +930,7 @@ def escalate_with_vision_cache(
             if side:
                 page_bounds = [
                     b for b in page_bounds
-                    if str(b.get("start_element_id") or "").startswith(page_tag + side + "-")
+                    if (b.get("start_element_metadata") or {}).get("spread_side") == side
                 ]
             left = [b for b in page_bounds if int(b["section_id"]) < section_id]
             right = [b for b in page_bounds if int(b["section_id"]) > section_id]
@@ -792,7 +961,8 @@ def escalate_with_vision_cache(
                     if left_seq < int(e.get("seq") or 0) < right_seq
                 ]
                 if between:
-                    return between[0].get("id")
+                    anchor_ids = [e.get("id") for e in between if e.get("id")]
+                    return _pick_anchor_by_position(anchor_ids, id_to_seq, header_position)
 
         return None
     
@@ -803,12 +973,13 @@ def escalate_with_vision_cache(
     for page, page_data in escalation_data.items():
         for section_id_str, section_data in page_data.get("sections", {}).items():
             section_id = int(section_id_str)
+            header_position = section_data.get("header_position")
             
             # Add ANY section found by vision that we don't already have
             # (not just ones in the missing list - vision might find sections
             # we didn't know were missing due to page estimation errors)
             if section_id not in already_detected:
-                anchored_id = _anchor_element_id(page=page, section_id=section_id)
+                anchored_id = _anchor_element_id(page=page, section_id=section_id, header_position=header_position)
                 if not anchored_id or anchored_id not in existing_element_ids:
                     raise RuntimeError(
                         f"Vision escalation found section {section_id} on page {page} "
@@ -835,6 +1006,7 @@ def escalate_pages_replace_boundaries(
     trigger_reason: str,
     existing_boundaries: List[Dict],
     elements_by_page: Dict[int, List[Dict]],
+    elements_by_original_page: Dict[int, List[Dict]],
 ) -> List[Dict]:
     """
     Escalate specific pages and return FULL boundary replacements for those pages.
@@ -848,20 +1020,22 @@ def escalate_pages_replace_boundaries(
 
     existing_element_ids = {e.get("id") for elems in elements_by_page.values() for e in elems if e.get("id")}
 
-    def _anchor_element_id(page: int, section_id: int) -> Optional[str]:
+    def _anchor_element_id(page: int, section_id: int, header_position: Optional[str]) -> Optional[str]:
         import re
 
-        elems_all = sorted(elements_by_page.get(page, []), key=lambda e: int(e.get("seq") or 0))
+        elems_all = elements_by_page.get(page, []) or elements_by_original_page.get(page, [])
+        elems_all = sorted(elems_all, key=lambda e: int(e.get("seq") or 0))
         if not elems_all:
             return None
+        id_to_seq_all = {e.get("id"): int(e.get("seq") or 0) for e in elems_all if e.get("id")}
 
-        page_tag = f"{page:03d}"
         elems_by_side: Dict[str, List[Dict]] = {"L": [], "R": [], "": []}
         for e in elems_all:
-            eid = str(e.get("id") or "")
-            if eid.startswith(page_tag + "L-"):
+            md = e.get("metadata") or {}
+            side = md.get("spread_side")
+            if side == "L":
                 elems_by_side["L"].append(e)
-            elif eid.startswith(page_tag + "R-"):
+            elif side == "R":
                 elems_by_side["R"].append(e)
             else:
                 elems_by_side[""].append(e)
@@ -869,7 +1043,8 @@ def escalate_pages_replace_boundaries(
         pat = re.compile(rf"^\s*{section_id}\s*[\.\)\:]?\s*$")
         direct_all = [e for e in elems_all if isinstance(e.get("text"), str) and pat.match(e["text"])]
         if direct_all:
-            return direct_all[0].get("id")
+            anchor_ids = [e.get("id") for e in direct_all if e.get("id")]
+            return _pick_anchor_by_position(anchor_ids, id_to_seq_all, header_position)
 
         for side in ["L", "R", ""]:
             elems = elems_by_side[side]
@@ -879,7 +1054,7 @@ def escalate_pages_replace_boundaries(
             if side:
                 page_bounds = [
                     b for b in page_bounds
-                    if str(b.get("start_element_id") or "").startswith(page_tag + side + "-")
+                    if (b.get("start_element_metadata") or {}).get("spread_side") == side
                 ]
             left = [b for b in page_bounds if int(b["section_id"]) < section_id]
             right = [b for b in page_bounds if int(b["section_id"]) > section_id]
@@ -906,7 +1081,8 @@ def escalate_pages_replace_boundaries(
                     if left_seq < int(e.get("seq") or 0) < right_seq
                 ]
                 if between:
-                    return between[0].get("id")
+                    anchor_ids = [e.get("id") for e in between if e.get("id")]
+                    return _pick_anchor_by_position(anchor_ids, id_to_seq, header_position)
 
         return None
 
@@ -914,7 +1090,8 @@ def escalate_pages_replace_boundaries(
     for page, page_data in escalation_data.items():
         for section_id_str, section_data in page_data.get("sections", {}).items():
             section_id = int(section_id_str)
-            anchored_id = _anchor_element_id(page=page, section_id=section_id)
+            header_position = section_data.get("header_position")
+            anchored_id = _anchor_element_id(page=page, section_id=section_id, header_position=header_position)
             if not anchored_id or anchored_id not in existing_element_ids:
                 raise RuntimeError(
                     f"Vision escalation found section {section_id} on page {page} "
@@ -996,15 +1173,21 @@ def main():
     run_dir = Path(args.out).parent
     run_root = run_dir.parent
     images_dir = _resolve_images_dir(run_root=run_root, explicit=args.images_dir)
+    image_map = _load_image_map(run_root=run_root)
 
     # Initialize escalation cache
     escalation_cache = EscalationCache(
         run_dir=run_dir,
         images_dir=images_dir,
         model=args.escalation_model,
-        logger=logger
+        logger=logger,
+        image_map=image_map
     )
     logger.log('load', 'running', message=f'Using images_dir={images_dir}')
+    if image_map:
+        logger.log('load', 'running', message=f'Loaded image_map for {len(image_map)} logical pages', artifact=str(run_root))
+    else:
+        logger.log('load', 'running', message='No image_map found; escalation will use image filename patterns', artifact=str(run_root))
     
     logger.log('load', 'running', message=f'Loading {input_path}')
     elements = list(read_jsonl(input_path))
@@ -1051,7 +1234,13 @@ def main():
     # STAGE 2: Ordering/span feasibility checks (pre-extraction guard)
     # ========================================
     elements_sorted, element_sequence, id_to_index, id_to_seq = _build_element_sequence(elements)
-    ordering_conflicts = detect_ordering_conflicts(boundaries, id_to_seq)
+    escalated_pages = {
+        int(b.get("start_page"))
+        for b in boundaries
+        if b.get("method") in {"vision_escalation_ordering", "vision_escalation"}
+        and b.get("start_page") is not None
+    }
+    ordering_conflicts = detect_ordering_conflicts(boundaries, id_to_seq, ignore_pages=escalated_pages)
     span_issues = detect_span_issues(
         boundaries,
         id_to_index=id_to_index,
@@ -1059,6 +1248,7 @@ def main():
         min_words=args.min_span_words,
         min_alpha_ratio=args.min_span_alpha,
         min_alpha_chars=args.min_span_chars,
+        ignore_pages=escalated_pages,
     )
     report_path = Path(args.out).with_suffix(".ordering_report.json")
     report = {
@@ -1066,6 +1256,9 @@ def main():
         "run_id": args.run_id,
         "ordering_conflicts": ordering_conflicts,
         "span_issues": span_issues,
+        "ordering_conflicts_pruned": None,
+        "span_issues_pruned": None,
+        "heuristic_pruned": {},
         "ordering_conflicts_after": None,
         "span_issues_after": None,
         "flagged_pages": [],
@@ -1073,6 +1266,42 @@ def main():
     }
 
     if ordering_conflicts or span_issues:
+        heuristic_pages = set(ordering_conflicts.keys()) | set(span_issues.keys())
+        if heuristic_pages:
+            logger.log(
+                'validate',
+                'running',
+                message='Applying header span heuristic on ordering/span conflict pages',
+                artifact=args.out
+            )
+            pruned_boundaries, pruned_report = prune_headers_with_empty_between(
+                boundaries,
+                id_to_index=id_to_index,
+                elements_sorted=elements_sorted,
+                only_pages=heuristic_pages,
+            )
+            if pruned_report:
+                boundaries = _validate_sequential_ordering(pruned_boundaries)
+                report["heuristic_pruned"] = pruned_report
+                escalated_pages = {
+                    int(b.get("start_page"))
+                    for b in boundaries
+                    if b.get("method") in {"vision_escalation_ordering", "vision_escalation"}
+                    and b.get("start_page") is not None
+                }
+                ordering_conflicts = detect_ordering_conflicts(boundaries, id_to_seq, ignore_pages=escalated_pages)
+                span_issues = detect_span_issues(
+                    boundaries,
+                    id_to_index=id_to_index,
+                    elements_sorted=elements_sorted,
+                    min_words=args.min_span_words,
+                    min_alpha_ratio=args.min_span_alpha,
+                    min_alpha_chars=args.min_span_chars,
+                    ignore_pages=escalated_pages,
+                )
+        report["ordering_conflicts_pruned"] = ordering_conflicts
+        report["span_issues_pruned"] = span_issues
+
         logger.log(
             'validate',
             'running',
@@ -1114,18 +1343,43 @@ def main():
                     flagged_page_nums.append(num)
 
             elements_by_page: Dict[int, List[Dict]] = defaultdict(list)
+            elements_by_original_page: Dict[int, List[Dict]] = defaultdict(list)
+            page_to_original: Dict[int, int] = {}
             for e in elements:
                 page = e.get("page")
                 if isinstance(page, int):
                     elements_by_page[page].append(e)
+                orig_page = e.get("original_page_number")
+                if orig_page is None:
+                    md = e.get("metadata") or {}
+                    orig_page = md.get("original_page_number")
+                if orig_page is not None:
+                    try:
+                        orig_page = int(orig_page)
+                    except Exception:
+                        orig_page = None
+                if orig_page is not None:
+                    elements_by_original_page[orig_page].append(e)
+                if isinstance(page, int) and isinstance(orig_page, int):
+                    page_to_original.setdefault(page, orig_page)
+
+            flagged_original_pages = []
+            for page in flagged_page_nums:
+                mapped = page_to_original.get(page, page)
+                if mapped not in flagged_original_pages:
+                    flagged_original_pages.append(mapped)
+
+            use_original_pages = not image_map
+            escalation_pages = flagged_original_pages if use_original_pages else flagged_page_nums
 
             repaired = escalate_pages_replace_boundaries(
-                pages=flagged_page_nums,
+                pages=escalation_pages,
                 escalation_cache=escalation_cache,
                 triggered_by="detect_boundaries_code_first_v1",
                 trigger_reason="ordering_or_empty_span",
                 existing_boundaries=boundaries,
                 elements_by_page=elements_by_page,
+                elements_by_original_page=elements_by_original_page,
             )
 
             if repaired:
@@ -1149,7 +1403,13 @@ def main():
             )
 
         # Re-check ordering/span issues after escalation
-        ordering_conflicts = detect_ordering_conflicts(boundaries, id_to_seq)
+        escalated_pages = {
+            int(b.get("start_page"))
+            for b in boundaries
+            if b.get("method") in {"vision_escalation_ordering", "vision_escalation"}
+            and b.get("start_page") is not None
+        }
+        ordering_conflicts = detect_ordering_conflicts(boundaries, id_to_seq, ignore_pages=escalated_pages)
         span_issues = detect_span_issues(
             boundaries,
             id_to_index=id_to_index,
@@ -1157,6 +1417,7 @@ def main():
             min_words=args.min_span_words,
             min_alpha_ratio=args.min_span_alpha,
             min_alpha_chars=args.min_span_chars,
+            ignore_pages=escalated_pages,
         )
         report["ordering_conflicts_after"] = ordering_conflicts
         report["span_issues_after"] = span_issues
@@ -1243,18 +1504,43 @@ def main():
     
     # Use escalation cache for all flagged pages
     elements_by_page: Dict[int, List[Dict]] = defaultdict(list)
+    elements_by_original_page: Dict[int, List[Dict]] = defaultdict(list)
+    page_to_original: Dict[int, int] = {}
     for e in elements:
         page = e.get("page")
         if isinstance(page, int):
             elements_by_page[page].append(e)
+        orig_page = e.get("original_page_number")
+        if orig_page is None:
+            md = e.get("metadata") or {}
+            orig_page = md.get("original_page_number")
+        if orig_page is not None:
+            try:
+                orig_page = int(orig_page)
+            except Exception:
+                orig_page = None
+        if orig_page is not None:
+            elements_by_original_page[orig_page].append(e)
+        if isinstance(page, int) and isinstance(orig_page, int):
+            page_to_original.setdefault(page, orig_page)
+
+    flagged_original_pages = []
+    for page in flagged_pages:
+        mapped = page_to_original.get(page, page)
+        if mapped not in flagged_original_pages:
+            flagged_original_pages.append(mapped)
+    use_original_pages = not image_map
+    escalation_pages = flagged_original_pages if use_original_pages else flagged_pages
 
     discovered = escalate_with_vision_cache(
-        pages=flagged_pages,
+        pages=escalation_pages,
         missing_sections=missing_sections,
         escalation_cache=escalation_cache,
         triggered_by='detect_boundaries_code_first_v1',
         existing_boundaries=boundaries,
         elements_by_page=elements_by_page,
+        elements_by_original_page=elements_by_original_page,
+        id_to_seq=id_to_seq,
     )
     
     boundaries.extend(discovered)

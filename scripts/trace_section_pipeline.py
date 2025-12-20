@@ -6,8 +6,6 @@ Usage:
     python scripts/trace_section_pipeline.py --run-id <run_id> --section <section_number>
     python scripts/trace_section_pipeline.py --run-id ff-canonical --section 17
 """
-
-#!/usr/bin/env python3
 import argparse
 import json
 import sys
@@ -37,13 +35,16 @@ def find_in_elements(elements: List[Dict], section_id: int) -> List[Dict]:
             # Match standalone number or at start/end of range
             pattern = r'\b' + re.escape(section_str) + r'\b'
             if re.search(pattern, text):
+                md = elem.get("metadata") or {}
                 results.append({
                     'element_id': elem.get('id'),
-                    'page': elem.get('page'),
+                    'page_number': elem.get('page_number') or md.get('page_number') or elem.get('page'),
+                    'original_page_number': elem.get('original_page_number') or md.get('original_page_number'),
                     'seq': elem.get('seq'),
                     'text': text[:100],
                     'content_type': content_type,
-                    'layout': elem.get('layout', {})
+                    'layout': elem.get('layout', {}),
+                    'spread_side': md.get('spread_side'),
                 })
     
     return results
@@ -91,13 +92,22 @@ def trace_section(run_dir: Path, section_id: int) -> Dict[str, Any]:
         boundaries = list(read_jsonl(str(boundaries_file)))
         boundary = find_in_boundaries(boundaries, section_id)
         if boundary:
+            start_elem = None
+            end_elem = None
+            if elements_file.exists():
+                by_id = {e.get("id"): e for e in elements}
+                start_elem = by_id.get(boundary.get("start_element_id"))
+                end_elem = by_id.get(boundary.get("end_element_id")) if boundary.get("end_element_id") else None
             trace['found_at_stages'].append('section_boundaries_merged')
             trace['evidence']['boundary'] = {
-                'start_page': boundary.get('start_page'),
+                'start_page_number': boundary.get('start_page'),
+                'start_original_page_number': (start_elem or {}).get("original_page_number") or (start_elem or {}).get("metadata", {}).get("original_page_number"),
                 'start_element_id': boundary.get('start_element_id'),
-                'end_page': boundary.get('end_page'),
+                'end_page_number': boundary.get('end_page'),
+                'end_original_page_number': (end_elem or {}).get("original_page_number") or (end_elem or {}).get("metadata", {}).get("original_page_number"),
                 'end_element_id': boundary.get('end_element_id'),
-                'confidence': boundary.get('confidence')
+                'confidence': boundary.get('confidence'),
+                'spread_side': (start_elem or {}).get("metadata", {}).get("spread_side"),
             }
         else:
             trace['missing_at_stages'].append('section_boundaries_merged')
@@ -110,7 +120,10 @@ def trace_section(run_dir: Path, section_id: int) -> Dict[str, Any]:
         if portion:
             trace['found_at_stages'].append('portions_enriched_clean')
             trace['evidence']['portion'] = {
-                'page': portion.get('page'),
+                'page_start': portion.get('page_start'),
+                'page_end': portion.get('page_end'),
+                'page_start_original': portion.get('page_start_original'),
+                'page_end_original': portion.get('page_end_original'),
                 'text_length': len(portion.get('text', '')),
                 'has_choices': len(portion.get('choices', [])) > 0
             }
@@ -125,11 +138,13 @@ def trace_section(run_dir: Path, section_id: int) -> Dict[str, Any]:
         sections = {s.get('id'): s for s in gamebook.get('sections', [])}
         if str(section_id) in sections:
             section = sections[str(section_id)]
+            provenance = section.get("provenance") or {}
             trace['found_at_stages'].append('gamebook')
             trace['evidence']['gamebook_section'] = {
                 'has_text': bool(section.get('text')),
                 'is_stub': section.get('text', '').strip() == '',
-                'choice_count': len(section.get('choices', []))
+                'choice_count': len(section.get('choices', [])),
+                'source_pages_original': provenance.get("source_pages_original"),
             }
         else:
             trace['missing_at_stages'].append('gamebook')
@@ -150,19 +165,19 @@ def print_trace(trace: Dict[str, Any]):
         if stage == 'elements_core_typed' and 'elements' in trace['evidence']:
             print(f"     Elements found: {len(trace['evidence']['elements'])}")
             for elem in trace['evidence']['elements'][:3]:  # Show first 3
-                print(f"       Page {elem['page']}, seq {elem['seq']}: '{elem['text']}' ({elem['content_type']})")
+                print(f"       Page {elem['page_number']} (orig {elem.get('original_page_number')}), seq {elem['seq']}: '{elem['text']}' ({elem['content_type']})")
         elif stage == 'section_boundaries_merged' and 'boundary' in trace['evidence']:
             b = trace['evidence']['boundary']
-            print(f"     Start: page {b['start_page']}, element {b['start_element_id']}")
-            print(f"     End: page {b['end_page']}, element {b['end_element_id']}")
+            print(f"     Start: page {b['start_page_number']} (orig {b.get('start_original_page_number')}), element {b['start_element_id']}")
+            print(f"     End: page {b['end_page_number']} (orig {b.get('end_original_page_number')}), element {b['end_element_id']}")
             print(f"     Confidence: {b.get('confidence', 'N/A')}")
         elif stage == 'portions_enriched_clean' and 'portion' in trace['evidence']:
             p = trace['evidence']['portion']
-            print(f"     Page: {p['page']}, Text length: {p['text_length']}, Choices: {p['has_choices']}")
+            print(f"     Pages: {p['page_start']}-{p['page_end']} (orig {p.get('page_start_original')}-{p.get('page_end_original')}), Text length: {p['text_length']}, Choices: {p['has_choices']}")
         elif stage == 'gamebook' and 'gamebook_section' in trace['evidence']:
             gs = trace['evidence']['gamebook_section']
             stub_status = "STUB" if gs['is_stub'] else "HAS TEXT"
-            print(f"     Status: {stub_status}, Choices: {gs['choice_count']}")
+            print(f"     Status: {stub_status}, Choices: {gs['choice_count']}, Orig pages: {gs.get('source_pages_original')}")
     
     if trace['missing_at_stages']:
         print("\n❌ Missing at stages:")
@@ -212,4 +227,3 @@ def main():
 
 if __name__ == '__main__':
     exit(main())
-

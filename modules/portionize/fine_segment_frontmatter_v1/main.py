@@ -140,7 +140,13 @@ def call_llm_segment(client: OpenAI, model: str, pages: List[Dict], prompt: str)
     )
     
     response_text = completion.choices[0].message.content
-    log_llm_usage(completion, model, "fine_segment_frontmatter_v1")
+    usage = getattr(completion, "usage", None)
+    if usage is not None:
+        pt = getattr(usage, "prompt_tokens", None)
+        ct = getattr(usage, "completion_tokens", None)
+        if pt is not None and ct is not None:
+            log_llm_usage(model=model, prompt_tokens=pt, completion_tokens=ct,
+                          stage_id="fine_segment_frontmatter_v1")
     
     try:
         result = json.loads(response_text)

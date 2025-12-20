@@ -6,6 +6,7 @@ pytesseract==0.3.10
 tqdm==4.66.6
 pyyaml==6.0.2
 unstructured[pdf]==0.16.9
+easyocr==1.7.1
 
 # GPU/Metal (MPS) builds for EasyOCR on Apple Silicon
 torch==2.9.1

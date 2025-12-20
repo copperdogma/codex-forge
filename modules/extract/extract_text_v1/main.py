@@ -13,9 +13,11 @@ def read_files(paths: List[str]) -> List[dict]:
             text = f.read()
         pages.append({
             "page": idx,
+            "page_number": idx,
+            "original_page_number": idx,
             "source_path": os.path.abspath(path),
             "image": None,
-            "text": text
+            "text": text,
         })
     return pages
 
@@ -43,11 +45,14 @@ def main():
     for offset, path in enumerate(sorted(paths), start=0):
         with open(path, "r", encoding="utf-8") as f:
             text = f.read()
+        page_num = args.start_page + offset
         pages.append({
-            "page": args.start_page + offset,
+            "page": page_num,
+            "page_number": page_num,
+            "original_page_number": page_num,
             "source_path": os.path.abspath(path),
             "image": None,
-            "text": text
+            "text": text,
         })
         logger.log("extract", "running", current=offset + 1, total=len(paths),
                    message=f"Read {os.path.basename(path)}",

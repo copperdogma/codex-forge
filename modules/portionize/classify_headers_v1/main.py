@@ -517,8 +517,8 @@ def main():
             logger.log(
                 "portionize",
                 "running",
-                current=total_elements,
-                total=total_elements,
+                current=batch_idx,
+                total=total_batches,
                 message=f"Backward pass: batch {batch_idx + 1}/{total_batches}",
                 module_id="classify_headers_v1",
                 extra={
@@ -548,8 +548,8 @@ def main():
             logger.log(
                 "portionize",
                 "running",
-                current=total_elements,
-                total=total_elements,
+                current=batch_idx + 1,
+                total=total_batches,
                 message=f"Backward batch {batch_idx + 1}/{total_batches} done",
                 module_id="classify_headers_v1",
                 extra={

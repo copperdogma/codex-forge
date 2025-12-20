@@ -1,6 +1,6 @@
 # Story: Post-OCR Text Quality & Error Correction
 
-**Status**: Done  
+**Status**: In Progress  
 **Created**: 2025-12-09  
 **Parent Story**: story-054 (canonical recipe - COMPLETE)
 
@@ -14,6 +14,7 @@ Improve post-OCR text quality by adding spell-check, character confusion detecti
 - [ ] Context-aware post-processing available (BERT/T5) for fixing fragmented sentences
 - [ ] OCR errors like "sxrLL", "otk", "y0u 4re f0110win9" are caught and corrected
 - [ ] Generic text-quality reporting and repair loop shipped and validated (merged from Story 051).
+- [ ] Split-aware engine hygiene: pdftext (and other non-bboxed sources) must not leak opposite-page content into split pages; `pagelines_final.jsonl` should not include cross-page contamination.
 
 ## Context
 
@@ -77,6 +78,7 @@ Improve post-OCR text quality by adding spell-check, character confusion detecti
   - [ ] Add a settings knob for `min_quality_score` and verify it triggers escalation on “agreement but wrong” cases.
   - [x] Ensure escalation reasons are explicit (e.g., `low_dictionary_score`, `char_confusion_rate`) and emitted in artifacts/debug.
   - [x] Tune candidate ranking so dictionary/confusion pages aren’t starved under small budgets.
+  - [ ] For split pages (`spread_side` set), suppress pdftext (or any engine without reliable bboxes) from contributing numeric-only header-like lines to canonical `pagelines_final.jsonl`.
 
 - [x] **Preserve OCR Provenance Fields Through Driver Stamping**
   - Keep `engines_raw`, `quality_metrics`, `column_spans`, `ivr`, `meta`, and `escalation_reasons` so downstream guards/adapters can reason over OCR quality.
@@ -235,9 +237,14 @@ Improve post-OCR text quality by adding spell-check, character confusion detecti
 - **Result:** Success; the OCR fixes propagate downstream into reconstructed pagelines and elements IR (no residual “bad tokens” in canonical text).
 - **Run:** `PYTHONPATH=. python driver.py --recipe configs/recipes/recipe-ff-canonical.yaml --settings configs/settings.ff-canonical-smoke.yaml --run-id story-058-canonical-ocr20 --output-dir output/runs/story-058-canonical-ocr20 --end-at content_types --instrument`
   - **Note:** Had to run tesseract-only due to sandbox SHM/OMP failures when easyocr/torch initializes; settings file now reflects this.
-- **Key artifacts inspected:**
-  - Escalated pages: `output/runs/story-058-canonical-ocr20/ocr_ensemble_gpt4v/ocr_quality_report.json` (2 escalations: `005R` from `fragmented`, `009L` from `dictionary_oov`)
-  - Merged canonical lines: `output/runs/story-058-canonical-ocr20/pagelines_final.jsonl` (pages `009L` and `005R` have clean text in `lines[]`, while original OCR remains in provenance fields as expected)
+  - **Key artifacts inspected:**
+    - Escalated pages: `output/runs/story-058-canonical-ocr20/ocr_ensemble_gpt4v/ocr_quality_report.json` (2 escalations: `005R` from `fragmented`, `009L` from `dictionary_oov`)
+    - Merged canonical lines: `output/runs/story-058-canonical-ocr20/pagelines_final.jsonl` (pages `009L` and `005R` have clean text in `lines[]`, while original OCR remains in provenance fields as expected)
+
+### 20251219-1740 — New OCR contamination evidence on split pages
+- **Result:** Failure; `pagelines_final.jsonl` shows cross-page contamination and numeric-only noise on split pages.
+- **Notes:** `output/runs/ff-canonical-dual-full-20251219p/pagelines_final.jsonl` for `page_number=34` (image `page-017R.png`) contains numeric-only lines `11, 8, 8, 7, 4, 5` and pdftext-only numbers with no bboxes; `engines_raw.pdftext` clearly includes opposite-page content (left-page sections 4/5), causing downstream header false positives and ordering conflicts.
+- **Next:** Add split-aware filtering so pdftext (or any engine without bboxes) cannot contribute cross-page lines on split pages; re-run a targeted extract+reconstruct on the affected pages to validate `pagelines_final` cleanliness.
   - Downstream IR: `output/runs/story-058-canonical-ocr20/pagelines_reconstructed.jsonl`, `output/runs/story-058-canonical-ocr20/elements_core.jsonl`, `output/runs/story-058-canonical-ocr20/elements_core_typed.jsonl`
     - Verified no occurrences of known OCR-bad tokens (`staMTNA`, `SKLLL`, `SKILE`, `HINTS GN PLAY`) in downstream artifacts (only present in provenance/raw fields upstream).
 - **Next:** Decide whether to adjust driver stamping so `easyocr_guard_v1` can see `engines_raw` (currently dropped by schema stamping), or treat `easyocr_guard_v1` as a no-op when running in tesseract-only mode under sandbox.

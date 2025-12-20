@@ -39,7 +39,13 @@ def main():
         ocr_path = os.path.join(ocr_dir, f"page-{idx:03d}.txt")
         with open(ocr_path, "w", encoding="utf-8") as f:
             f.write(text)
-        pages.append({"page": idx, "image": os.path.abspath(img_path), "text": text})
+        pages.append({
+            "page": idx,
+            "page_number": idx,
+            "original_page_number": idx,
+            "image": os.path.abspath(img_path),
+            "text": text,
+        })
         logger.log("extract", "running", current=len(pages), total=total,
                    message=f"OCR page {idx}", artifact=os.path.join(args.outdir, "pages_raw.jsonl"))
 

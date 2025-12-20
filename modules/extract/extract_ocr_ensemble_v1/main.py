@@ -2764,23 +2764,25 @@ def main():
     quality_report = []
     index = {}
     page_rows = []
+    output_page_number = 0
 
     # Run-level spread decision: sample pages once, decide mode for entire book
     spread_decision = sample_spread_decision(image_paths, sample_size=5)
     is_spread_book = spread_decision["is_spread"]
     gutter_position = spread_decision["gutter_position"]
+    total_progress = total * (2 if is_spread_book else 1)
 
     # Log spread decision
     spread_log_path = os.path.join(ocr_dir, "spread_decision.json")
     save_json(spread_log_path, spread_decision)
-    logger.log("extract", "running", current=0, total=total,
+    logger.log("extract", "running", current=0, total=total_progress,
                message=f"Spread mode: {is_spread_book}, gutter: {gutter_position:.3f}",
                artifact=spread_log_path,
                module_id="extract_ocr_ensemble_v1", schema_version="pagelines_v1",
                extra={"is_spread": is_spread_book, "gutter_position": gutter_position,
                       "confidence": spread_decision["confidence"]})
 
-    logger.log("extract", "running", current=0, total=total,
+    logger.log("extract", "running", current=0, total=total_progress,
                message="Running multi-engine OCR ensemble", artifact=os.path.join(ocr_dir, "pagelines_index.json"),
                module_id="extract_ocr_ensemble_v1", schema_version="pagelines_v1")
 
@@ -2838,6 +2840,7 @@ def main():
             diff_from_center_px = actual_px - center_px
 
             logger.log("extract", "running",
+                      current=output_page_number, total=total_progress,
                       message=f"Page {idx} gutter: {actual_gutter:.3f} ({gutter_source}), "
                               f"detected: {page_gutter_frac:.3f} (contrast: {page_contrast:.3f}, "
                               f"continuity: {page_continuity:.3f}), "
@@ -2873,6 +2876,7 @@ def main():
             continue
 
         for part_idx, (img_obj, img_path_part, side) in enumerate(images_to_ocr):
+            output_page_number += 1
             # Virtual page key: use L/R suffix for spreads, plain number for single pages
             if side:
                 page_key = f"{idx:03d}{side}"  # e.g., "001L", "001R"
@@ -3632,7 +3636,9 @@ def main():
                 "schema_version": "pagelines_v1",
                 "module_id": "extract_ocr_ensemble_v1",
                 "run_id": args.run_id,
-                "page": idx,  # Numeric page number (required by schema); page_key used for index mapping
+                "page": idx,  # Original PDF page number (1-based)
+                "page_number": output_page_number,
+                "original_page_number": idx,
                 "image": os.path.abspath(img_path_part),
                 "lines": line_rows,
                 "disagreement_score": disagreement,
@@ -3700,7 +3706,7 @@ def main():
                 "escalation_reasons": escalation_reasons,
             })
 
-            logger.log("extract", "running", current=len(quality_report), total=total,
+            logger.log("extract", "running", current=len(quality_report), total=total_progress,
                        message=f"OCR ensemble page {page_key}", artifact=page_path,
                        module_id="extract_ocr_ensemble_v1", schema_version="pagelines_v1",
                        extra={"disagreement_score": disagreement, "needs_escalation": needs_escalation})
@@ -3778,11 +3784,11 @@ def main():
         print("OCR skipped per --split-only flag")
         return
 
-    logger.log("extract", "done", current=total, total=total,
+    logger.log("extract", "done", current=output_count, total=total_progress,
                message="OCR ensemble complete", artifact=index_path,
                module_id="extract_ocr_ensemble_v1", schema_version="pagelines_v1")
 
-    print(f"Saved {total} pagelines to {pages_dir}\nIndex: {index_path}\nQuality: {report_path}\nJSONL: {jsonl_path}")
+    print(f"Saved {output_count} pagelines to {pages_dir}\nIndex: {index_path}\nQuality: {report_path}\nJSONL: {jsonl_path}")
 
 
 if __name__ == "__main__":

@@ -184,6 +184,53 @@ def _page_text_stats(page_data: Dict[str, Any]) -> Dict[str, Any]:
     }
 
 
+def _load_page_data(page_key: str,
+                    index: Dict[str, str],
+                    pages_cache: Dict[str, Dict[str, Any]]) -> Optional[Dict[str, Any]]:
+    page_path = index.get(page_key)
+    if not page_path:
+        return None
+    if page_key in pages_cache:
+        return pages_cache[page_key]
+    try:
+        page_data = json.load(open(page_path, "r", encoding="utf-8"))
+        pages_cache[page_key] = page_data
+        return page_data
+    except Exception:
+        return None
+
+
+def _resolve_other_side_key(page_key: str,
+                            page_data: Optional[Dict[str, Any]],
+                            index: Dict[str, str],
+                            pages_cache: Dict[str, Dict[str, Any]]) -> Optional[str]:
+    # Legacy fast path: L/R suffix in key
+    if page_key.endswith("L") or page_key.endswith("R"):
+        return page_key[:-1] + ("R" if page_key.endswith("L") else "L")
+    if not page_data:
+        return None
+    orig = page_data.get("original_page_number")
+    side = page_data.get("spread_side")
+    if side not in ("L", "R") or not isinstance(orig, int):
+        return None
+    target = "R" if side == "L" else "L"
+    key_lr = f"{orig:03d}{target}"
+    if key_lr in index:
+        return key_lr
+    key_plain = f"{orig}{target}"
+    if key_plain in index:
+        return key_plain
+    for k in index.keys():
+        if k == page_key:
+            continue
+        other = _load_page_data(k, index, pages_cache)
+        if not other:
+            continue
+        if other.get("original_page_number") == orig and other.get("spread_side") == target:
+            return k
+    return None
+
+
 def should_escalate_page_key(page_key: str,
                             reasons: List[str],
                             *,
@@ -200,16 +247,7 @@ def should_escalate_page_key(page_key: str,
         return False, "no_reasons"
 
     # Load current page data for text stats when needed.
-    page_path = index.get(page_key)
-    page_data = None
-    if page_path and page_key in pages_cache:
-        page_data = pages_cache[page_key]
-    elif page_path:
-        try:
-            page_data = json.load(open(page_path, "r", encoding="utf-8"))
-            pages_cache[page_key] = page_data
-        except Exception:
-            page_data = None
+    page_data = _load_page_data(page_key, index, pages_cache)
 
     stats = _page_text_stats(page_data or {})
 
@@ -220,20 +258,11 @@ def should_escalate_page_key(page_key: str,
 
     # Heuristic 2: For half-spreads, empty-side pages are often truly blank.
     # If this side is empty and the other side has substantial text, skip reread.
-    if reasons == ["missing_content"] and (not stats["has_text"]) and (page_key.endswith("L") or page_key.endswith("R")):
-        other_key = page_key[:-1] + ("R" if page_key.endswith("L") else "L")
-        other_path = index.get(other_key)
-        if other_path:
-            other = pages_cache.get(other_key)
-            if other is None:
-                try:
-                    other = json.load(open(other_path, "r", encoding="utf-8"))
-                    pages_cache[other_key] = other
-                except Exception:
-                    other = None
+    if reasons == ["missing_content"] and (not stats["has_text"]):
+        other_key = _resolve_other_side_key(page_key, page_data, index, pages_cache)
+        if other_key:
+            other = _load_page_data(other_key, index, pages_cache)
             other_stats = _page_text_stats(other or {})
-            # If the other side has any text at all, treat this as a likely blank half-spread and skip.
-            # Also keep a stricter mode (via min_other_side_chars) for future tuning.
             if other_stats["has_text"] and (other_stats["char_count"] >= min_other_side_chars or other_stats["char_count"] > 0):
                 return False, "skip_blank_half_spread"
 
@@ -352,7 +381,11 @@ def main():
     for q in quality:
         if not page_needs_escalation(q, threshold=args.threshold):
             continue
-        page_key = str(q.get("page", ""))
+        q_page = q.get("page")
+        if isinstance(q_page, int):
+            page_key = str(q_page)
+        else:
+            page_key = str(q_page or "")
         reasons = page_escalation_reasons(q, threshold=args.threshold)
         ok, _skip_reason = should_escalate_page_key(
             page_key,
@@ -387,8 +420,12 @@ def main():
     new_quality = []
 
     for q in quality:
-        # Quality report uses page_key (string like "001L"/"001R") not numeric page
-        page_key = str(q["page"])
+        # Quality report uses page_key (string like "001L"/"001R") or numeric page_number
+        q_page = q.get("page")
+        if isinstance(q_page, int):
+            page_key = str(q_page)
+        else:
+            page_key = str(q_page or "")
         src_path = index.get(page_key)
         if not src_path:
             continue

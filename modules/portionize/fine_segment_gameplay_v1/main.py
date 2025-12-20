@@ -534,7 +534,13 @@ Return only JSON."""
             )
             
             response = json.loads(completion.choices[0].message.content)
-            log_llm_usage(completion, model, "fine_segment_gameplay_v1")
+            usage = getattr(completion, "usage", None)
+            if usage is not None:
+                pt = getattr(usage, "prompt_tokens", None)
+                ct = getattr(usage, "completion_tokens", None)
+                if pt is not None and ct is not None:
+                    log_llm_usage(model=model, prompt_tokens=pt, completion_tokens=ct,
+                                  stage_id="fine_segment_gameplay_v1")
             
             confirmations[sid_str] = {
                 "found": response.get("found", False),
@@ -587,7 +593,7 @@ def trace_upstream_artifacts(missing_ids: List[str], pagelines_path: Optional[st
                         for m in num_re.finditer(text):
                             if int(m.group(1)) == sid:
                                 trace["seen_in_pagelines"] = True
-                                page = page_data.get("page", "unknown")
+                                page = page_data.get("page_number") or page_data.get("page") or "unknown"
                                 if page not in trace["candidate_pages"]:
                                     trace["candidate_pages"].append(page)
                                 break
@@ -605,7 +611,7 @@ def trace_upstream_artifacts(missing_ids: List[str], pagelines_path: Optional[st
                             for m in num_re.finditer(text):
                                 if int(m.group(1)) == sid:
                                     trace["seen_in_pagelines"] = True
-                                    page = page_data.get("page", page_key)
+                                    page = page_data.get("page_number") or page_data.get("page") or page_key
                                     if page not in trace["candidate_pages"]:
                                         trace["candidate_pages"].append(page)
                                     break

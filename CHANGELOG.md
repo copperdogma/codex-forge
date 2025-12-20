@@ -446,3 +446,18 @@
 - Choice completeness validator relaxed for smoke runs (`max_discrepancy`).
 - Frontmatter fine segmentation accepts split page IDs in coarse segments.
 - Module param schemas updated for new boundary/scan/extract flags.
+## [2025-12-20] - Dual-field page numbering completion and ordering guard improvements
+
+### Added
+- Logical page numbering propagation across OCR → elements → portions, with original-page provenance fields.
+- Logical-page escalation mapping (split pages) with updated escalation cache behavior.
+- Header span heuristic to prune empty between-header candidates during ordering/span conflicts.
+- Sequential page-number validation helper and tests.
+- Monitoring docs updates and story tracking for OCR quality regressions.
+
+### Changed
+- Element IDs and downstream range checks now use sequential `page_number`.
+- Story 079 marked Done; Story 058 re-opened with split-page OCR contamination evidence.
+
+### Fixed
+- Ordering/span validation progress reporting and guard logic consistency across stages.

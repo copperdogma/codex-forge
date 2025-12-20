@@ -183,6 +183,8 @@ def main():
             })
         pages.append(PageLines(
             page=obj["page"],
+            page_number=obj["page"],
+            original_page_number=obj["page"],
             lines=lines,
             schema_version="pagelines_v1",
             module_id="extract_ocr_apple_v1",

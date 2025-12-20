@@ -7,30 +7,32 @@ from modules.portionize.detect_boundaries_code_first_v1.main import (
 )
 
 
-def _elem(eid, seq, text, page=10, content_type=None):
+def _elem(eid, seq, text, page=10, content_type=None, side=None):
     return {
         "id": eid,
         "seq": seq,
         "text": text,
         "page": page,
+        "page_number": page,
+        "metadata": {"spread_side": side} if side else {},
         "content_type": content_type,
     }
 
 
 def test_ordering_conflicts_per_side():
     elements = [
-        _elem("010L-0001", 1, "2", content_type="Section-header"),
-        _elem("010L-0002", 2, "1", content_type="Section-header"),
-        _elem("010R-0001", 3, "3", content_type="Section-header"),
-        _elem("010R-0002", 4, "4", content_type="Section-header"),
+        _elem("010-0001", 1, "2", content_type="Section-header", side="L"),
+        _elem("010-0002", 2, "1", content_type="Section-header", side="L"),
+        _elem("010-0003", 3, "3", content_type="Section-header", side="R"),
+        _elem("010-0004", 4, "4", content_type="Section-header", side="R"),
     ]
     _, _, _, id_to_seq = _build_element_sequence(elements)
 
     boundaries = [
-        {"section_id": "2", "start_element_id": "010L-0001", "start_page": 10},
-        {"section_id": "1", "start_element_id": "010L-0002", "start_page": 10},
-        {"section_id": "3", "start_element_id": "010R-0001", "start_page": 10},
-        {"section_id": "4", "start_element_id": "010R-0002", "start_page": 10},
+        {"section_id": "2", "start_element_id": "010-0001", "start_page": 10, "start_element_metadata": {"spread_side": "L"}},
+        {"section_id": "1", "start_element_id": "010-0002", "start_page": 10, "start_element_metadata": {"spread_side": "L"}},
+        {"section_id": "3", "start_element_id": "010-0003", "start_page": 10, "start_element_metadata": {"spread_side": "R"}},
+        {"section_id": "4", "start_element_id": "010-0004", "start_page": 10, "start_element_metadata": {"spread_side": "R"}},
     ]
 
     conflicts = detect_ordering_conflicts(boundaries, id_to_seq)
@@ -40,18 +42,18 @@ def test_ordering_conflicts_per_side():
 
 def test_span_issue_inverted_span():
     elements = [
-        _elem("010L-0001", 1, "2", content_type="Section-header"),
-        _elem("010L-0002", 2, "1", content_type="Section-header"),
-        _elem("010L-0003", 3, "Some text here", content_type="Text"),
-        _elem("010L-0004", 4, "3", content_type="Section-header"),
-        _elem("010L-0005", 5, "More text here", content_type="Text"),
+        _elem("010-0001", 1, "2", content_type="Section-header", side="L"),
+        _elem("010-0002", 2, "1", content_type="Section-header", side="L"),
+        _elem("010-0003", 3, "Some text here", content_type="Text", side="L"),
+        _elem("010-0004", 4, "3", content_type="Section-header", side="L"),
+        _elem("010-0005", 5, "More text here", content_type="Text", side="L"),
     ]
     elements_sorted, _, id_to_index, _ = _build_element_sequence(elements)
 
     boundaries = [
-        {"section_id": "1", "start_element_id": "010L-0002", "start_page": 10},
-        {"section_id": "2", "start_element_id": "010L-0001", "start_page": 10},
-        {"section_id": "3", "start_element_id": "010L-0004", "start_page": 10},
+        {"section_id": "1", "start_element_id": "010-0002", "start_page": 10, "start_element_metadata": {"spread_side": "L"}},
+        {"section_id": "2", "start_element_id": "010-0001", "start_page": 10, "start_element_metadata": {"spread_side": "L"}},
+        {"section_id": "3", "start_element_id": "010-0004", "start_page": 10, "start_element_metadata": {"spread_side": "L"}},
     ]
 
     issues = detect_span_issues(
@@ -67,14 +69,14 @@ def test_span_issue_inverted_span():
 
 def test_span_issue_empty_text():
     elements = [
-        _elem("010L-0001", 1, "1", content_type="Section-header"),
-        _elem("010L-0002", 2, "2", content_type="Section-header"),
+        _elem("010-0001", 1, "1", content_type="Section-header", side="L"),
+        _elem("010-0002", 2, "2", content_type="Section-header", side="L"),
     ]
     elements_sorted, _, id_to_index, _ = _build_element_sequence(elements)
 
     boundaries = [
-        {"section_id": "1", "start_element_id": "010L-0001", "start_page": 10},
-        {"section_id": "2", "start_element_id": "010L-0002", "start_page": 10},
+        {"section_id": "1", "start_element_id": "010-0001", "start_page": 10, "start_element_metadata": {"spread_side": "L"}},
+        {"section_id": "2", "start_element_id": "010-0002", "start_page": 10, "start_element_metadata": {"spread_side": "L"}},
     ]
 
     issues = detect_span_issues(

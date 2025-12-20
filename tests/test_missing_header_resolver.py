@@ -18,7 +18,7 @@ def make_index_quality(index_path, quality_path, images_dir):
     save_json(quality_path, [])
     # minimal page file
     Path(images_dir).mkdir(parents=True, exist_ok=True)
-    save_json(Path(images_dir) / "page-001.json", {"page": 1, "image": "dummy", "lines": []})
+    save_json(Path(images_dir) / "page-001.json", {"page": 1, "page_number": 1, "original_page_number": 1, "image": "dummy", "lines": []})
 
 
 def test_resolver_dry_run_no_candidates():
