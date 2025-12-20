@@ -1,0 +1,78 @@
+{
+  "sdk_http_response": {
+    "headers": {
+      "content-type": "application/json; charset=UTF-8",
+      "vary": "Origin, X-Origin, Referer",
+      "content-encoding": "gzip",
+      "date": "Sat, 20 Dec 2025 18:20:29 GMT",
+      "server": "scaffolding on HTTPServer2",
+      "x-xss-protection": "0",
+      "x-frame-options": "SAMEORIGIN",
+      "x-content-type-options": "nosniff",
+      "server-timing": "gfet4t7; dur=6410",
+      "alt-svc": "h3=\":443\"; ma=2592000,h3-29=\":443\"; ma=2592000",
+      "transfer-encoding": "chunked"
+    },
+    "body": null
+  },
+  "candidates": [
+    {
+      "content": {
+        "parts": [
+          {
+            "media_resolution": null,
+            "code_execution_result": null,
+            "executable_code": null,
+            "file_data": null,
+            "function_call": null,
+            "function_response": null,
+            "inline_data": null,
+            "text": "<p>Puffin Books, Penguin Books Ltd, Harmondsworth, Middlesex, England<br>\nPenguin Books, 40 West 23rd Street, New York, New York 10010, U.S.A.<br>\nPenguin Books Australia Ltd, Ringwood, Victoria, Australia<br>\nPenguin Books Canada Ltd, 2801 John Street, Markham, Ontario, Canada L3R 1B4<br>\nPenguin Books (N.Z.) Ltd, 182–190 Wairau Road, Auckland 10, New Zealand</p>\n\n<p>First published 1984<br>\nReprinted 1984</p>\n\n<p>Copyright © Ian Livingstone, 1984<br>\nIllustrations copyright © Iain McCaig, 1984<br>\nAll rights reserved</p>\n\n<p>Printed and bound in Great Britain by<br>\nCox &amp; Wyman Ltd, Reading<br>\nSet in 11/13 pt Linotron Palatino by<br>\nRowland Phototypesetting Ltd<br>\nBury St Edmunds, Suffolk</p>\n\n<p>Except in the United States of America,<br>\nthis book is sold subject to the condition<br>\nthat it shall not, by way of trade or otherwise,<br>\nbe lent, re-sold, hired out, or otherwise circulated<br>\nwithout the publisher's prior consent in any form of<br>\nbinding or cover other than that in which it is<br>\npublished and without a similar condition<br>\nincluding this condition being imposed<br>\non the subsequent purchaser</p>",
+            "thought": null,
+            "thought_signature": "ErUECrIEAXLI2nzAO_o1NugQu_NW6-8Qm_d6c-Gck4m96n8wqIozK0gtguCj51r8l2Ji1iHsx7vMGuLFhtPKN0LDI-ZdbFMsf5RcuKCvD6bR1IHRV8jgiDTECq0OlpI8WHXw4iS4CX1UWfPoCvTcaZxUN9_LEL-nuS1BlVZMo-6chPbgAkQrUPRbQGmAZ3OejUUj4Uv36UWrsFs4idQmgFw710yUAHxxHopbJw9XvJSe6FBGckyGvlA7KjA4ZSnJdrPMfheGr7Xr2zjxBFdmYrNP2aH-ByLIXJZlz-NLZ5Mq1gh1RL3oWRD47qhvoduoB4pg2QbZZSg9fgH13NT4KXyGC-4S5FK-7EJTL3GHVtoPYBClI4bER0K1BfABMJGUxRAocg0vp1foZQCOQwP1WdEiWPVAyPs3LcmAw_1i59axh8hTYxm4jo2ZgfzWczXyiXKEgIdRR2d_YBZAJFXfIFr1ypme1FiEoM62lplhYKxLm2ZHHeGQVHN8a2nT9mjlAE_pj5Abh-nUepy5iG3ynFHvqohsOYVrgIF3Jm75PRSo0SRIq5HT7-4MrX3TM8-K_tyiKdwVADiBma8l2HYame8bpSjMSsoxgi_HKCNK58o-rns764pn2NRY01RTv4Oa9WCy3_uM7xgkz2DohOWyqxDqO8I45V-FrchgEsg1wpHUsVvVS74mCZG7aWWfZMnqe4JS0C6d44LH5nxEBH-Y2xLduZrILe1XoidSJk0MRYQm830FbY6LUA==",
+            "video_metadata": null
+          }
+        ],
+        "role": "model"
+      },
+      "citation_metadata": null,
+      "finish_message": null,
+      "token_count": null,
+      "finish_reason": "STOP",
+      "avg_logprobs": null,
+      "grounding_metadata": null,
+      "index": 0,
+      "logprobs_result": null,
+      "safety_ratings": null,
+      "url_context_metadata": null
+    }
+  ],
+  "create_time": null,
+  "model_version": "gemini-3-pro-preview",
+  "prompt_feedback": null,
+  "response_id": "7ehGaYnwGO6kqtsPg6mzqQc",
+  "usage_metadata": {
+    "cache_tokens_details": null,
+    "cached_content_token_count": null,
+    "candidates_token_count": 382,
+    "candidates_tokens_details": null,
+    "prompt_token_count": 1407,
+    "prompt_tokens_details": [
+      {
+        "modality": "TEXT",
+        "token_count": 332
+      },
+      {
+        "modality": "IMAGE",
+        "token_count": 1075
+      }
+    ],
+    "thoughts_token_count": 118,
+    "tool_use_prompt_token_count": null,
+    "tool_use_prompt_tokens_details": null,
+    "total_token_count": 1907,
+    "traffic_type": null
+  },
+  "automatic_function_calling_history": [],
+  "parsed": null
+}

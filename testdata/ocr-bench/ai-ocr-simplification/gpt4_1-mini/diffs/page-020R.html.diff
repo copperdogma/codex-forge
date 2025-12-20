@@ -1,0 +1,132 @@
+--- gold/page-020R.html
++++ model/page-020R.html
+@@ -1,29 +1,31 @@
+-<p class="running-head">
++<p class="page-number">
+ 16-17
+ </p>
+-<h2>
++<p class="page-number">
+ 16
+-</h2>
++</p>
+ <p>
+-You just have time to hear the Gnome say, 'Three skulls' before a white bolt of energy shoots out from the lock into your chest, knocking you unconscious. Roll one die, add 1 to the number and reduce your STAMINA by the total. If you are still alive, you come to and are told by the Gnome to try again. You chose the wrong gems last time, so you won't try that combination again.
++You just have time to hear the Gnome say, 'Three skulls' before a white bolt of energy shoots out from the lock into your chest, knocking you unconscious. Roll one die, add 1 to the number and reduce your
++<em>
++STAMINA
++</em>
++by the total. If you are still alive, you come to and are told by the Gnome to try again. You chose the wrong gems last time, so you won't try that combination again.
+ </p>
+ <table>
+-<thead>
++<tbody>
+ <tr>
+-<th>
++<td>
+ A
+-</th>
+-<th>
++</td>
++<td>
+ B
+-</th>
+-<th>
++</td>
++<td>
+ C
+-</th>
+-<th>
+-</th>
++</td>
++<td>
++</td>
+ </tr>
+-</thead>
+-<tbody>
+ <tr>
+ <td>
+ Emerald
+@@ -35,7 +37,10 @@
+ Sapphire
+ </td>
+ <td>
+-Turn to 16
++Turn to
++<strong>
++16
++</strong>
+ </td>
+ </tr>
+ <tr>
+@@ -49,7 +54,10 @@
+ Emerald
+ </td>
+ <td>
+-Turn to 392
++Turn to
++<strong>
++392
++</strong>
+ </td>
+ </tr>
+ <tr>
+@@ -63,7 +71,10 @@
+ Diamond
+ </td>
+ <td>
+-Turn to 177
++Turn to
++<strong>
++177
++</strong>
+ </td>
+ </tr>
+ <tr>
+@@ -77,7 +88,10 @@
+ Diamond
+ </td>
+ <td>
+-Turn to 287
++Turn to
++<strong>
++287
++</strong>
+ </td>
+ </tr>
+ <tr>
+@@ -91,7 +105,10 @@
+ Sapphire
+ </td>
+ <td>
+-Turn to 132
++Turn to
++<strong>
++132
++</strong>
+ </td>
+ </tr>
+ <tr>
+@@ -105,15 +122,18 @@
+ Emerald
+ </td>
+ <td>
+-Turn to 249
++Turn to
++<strong>
++249
++</strong>
+ </td>
+ </tr>
+ </tbody>
+ </table>
+-<img alt="Illustration of a small rodent lying on its side">
+-<h2>
++<img alt="Illustration of a small rodent lying down">
++<p class="page-number">
+ 17
+-</h2>
++</p>
+ <p>
+ You are not strong enough to force open the heavy door. The water is now waist-high and you are exhausted from your efforts. The water level rises quickly and you find yourself floating ever upwards until your face is pressed against the ceiling. You are soon completely immersed and unable to hold your breath any longer. Your adventure ends here.
+ </p>

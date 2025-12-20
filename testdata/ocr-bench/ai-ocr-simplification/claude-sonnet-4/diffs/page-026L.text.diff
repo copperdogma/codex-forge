@@ -1,0 +1,15 @@
+--- gold/page-026L.txt
++++ model/page-026L.txt
+@@ -7,11 +7,6 @@
+ If you win, turn to 163.
+ 41
+ You walk slowly over to the alcove, carefully checking the floor for any more hidden traps. You see that the goblet contains a sparkling red liquid. Will you:
+-Drink the red liquid?
+-Turn to 98
+-Leave the goblet and walk back to search the Barbarian (if you have not done so already)?
+-Turn to 126
+-Leave the chamber to continue west?
+-Turn to 83
++Drink the red liquid? Turn to 98 Leave the goblet and walk back to search the Barbarian (if you have not done so already)? Turn to 126 Leave the chamber to continue west? Turn to 83
+ 42
+ The cobra's fangs sink deep into your wrist and you feel its poison starting to creep through your body. Lose 5 STAMINA points. If you are still alive, the Dwarf has no mercy but tells you to try again. Roll two dice. If the total is the same as or less than your SKILL, turn to 55. If the total is greater than your SKILL, turn to 202.

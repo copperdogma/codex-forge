@@ -1,0 +1,29 @@
+--- gold/page-035R.html
++++ model/page-035R.html
+@@ -1,15 +1,11 @@
+ <p class="running-head">
+-79-82
++79–82
+ </p>
+ <h2>
+ 79
+ </h2>
+ <p>
+-You grip the arms of the chair tightly, half expecting a surge of energy or pain to rush through your body.
+-<em>
+-Test your Luck.
+-</em>
+-If you are Lucky, turn to 106. If you are Unlucky, turn to 383.
++You grip the arms of the chair tightly, half expecting a surge of energy or pain to rush through your body. Test your Luck. If you are Lucky, turn to 106. If you are Unlucky, turn to 383.
+ </p>
+ <h2>
+ 80
+@@ -17,7 +13,7 @@
+ <p>
+ You take your time and manage to step over the last pole without having touched any of them. You hurry on east, still following the two pairs of footprints. Turn to 313.
+ </p>
+-<img alt="illustration of a rat lying on the ground">
++<img alt="Sleeping animal illustration">
+ <h2>
+ 81
+ </h2>

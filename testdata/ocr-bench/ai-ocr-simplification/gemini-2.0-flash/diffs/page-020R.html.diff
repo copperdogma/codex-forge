@@ -1,0 +1,22 @@
+--- gold/page-020R.html
++++ model/page-020R.html
+@@ -1,4 +1,5 @@
+-<p class="running-head">
++```html
++<p class="page-number">
+ 16-17
+ </p>
+ <h2>
+@@ -110,10 +111,11 @@
+ </tr>
+ </tbody>
+ </table>
+-<img alt="Illustration of a small rodent lying on its side">
++<img alt="Illustration of a rat-like creature">
+ <h2>
+ 17
+ </h2>
+ <p>
+ You are not strong enough to force open the heavy door. The water is now waist-high and you are exhausted from your efforts. The water level rises quickly and you find yourself floating ever upwards until your face is pressed against the ceiling. You are soon completely immersed and unable to hold your breath any longer. Your adventure ends here.
+-</p>+</p>
++```

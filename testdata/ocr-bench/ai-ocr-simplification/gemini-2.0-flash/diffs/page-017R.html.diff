@@ -1,0 +1,22 @@
+--- gold/page-017R.html
++++ model/page-017R.html
+@@ -1,4 +1,4 @@
+-<p class="running-head">
++<p class="page-number">
+ 6-8
+ </p>
+ <h2>
+@@ -25,11 +25,11 @@
+ 7
+ </h2>
+ <p>
+-Before you have time to reach a doorway, the boulder is upon you. You cry out in pain and terror as it crushes you to the floor. Your adventure ends here.
++Before you have time to reach a doorway, the boul- der is upon you. You cry out in pain and terror as it crushes you to the floor. Your adventure ends here.
+ </p>
+ <h2>
+ 8
+ </h2>
+ <p>
+-The Mirror Demon grabs you by the wrist. Immediately it starts to pull you towards the mirror. Its strength is incredible, and, despite all your efforts, you cannot prevent it from pulling you relentlessly towards the mirror. When it touches the mirror, it seems to disappear straight through it. With horror you see your own arm disappear, followed by the rest of your body. You are now in a mirror world of another dimension, from which you can never return.
++The Mirror Demon grabs you by the wrist. Im- mediately it starts to pull you towards the mirror. Its strength is incredible, and, despite all your efforts, you cannot prevent it from pulling you relentlessly towards the mirror. When it touches the mirror, it seems to disappear straight through it. With horror you see your own arm disappear, followed by the rest of your body. You are now in a mirror world of another dimension, from which you can never return.
+ </p>

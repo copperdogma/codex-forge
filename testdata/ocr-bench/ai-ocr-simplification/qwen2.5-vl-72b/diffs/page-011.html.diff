@@ -1,0 +1,229 @@
+--- gold/page-011.html
++++ model/page-011.html
+@@ -1,130 +1,117 @@
+ <h1>
+-ADVENTURE SHEET
++Adventure Sheet
+ </h1>
++<dl>
++<dt>
++SKILL
++</dt>
++<dd>
++Initial Skill =
++</dd>
++<dt>
++STAMINA
++</dt>
++<dd>
++Initial Stamina =
++</dd>
++<dt>
++LUCK
++</dt>
++<dd>
++Initial Luck =
++</dd>
++</dl>
+ <p>
+-<strong>
+-SKILL
+-</strong>
++ITEMS OF EQUIPMENT CARRIED
+ </p>
+ <p>
+-Initial Skill =
++GOLD
+ </p>
+ <p>
+-<strong>
+-STAMINA
+-</strong>
++JEWELS
+ </p>
+ <p>
+-Initial Stamina =
++POTIONS
+ </p>
+ <p>
+-<strong>
+-LUCK
+-</strong>
+-</p>
+-<p>
+-Initial Luck =
+-</p>
+-<p>
+-<strong>
+-ITEMS OF EQUIPMENT CARRIED
+-</strong>
+-</p>
+-<p>
+-<strong>
+-GOLD
+-</strong>
+-</p>
+-<p>
+-<strong>
+-JEWELS
+-</strong>
+-</p>
+-<p>
+-<strong>
+-POTIONS
+-</strong>
+-</p>
+-<p>
+-<strong>
+ PROVISIONS REMAINING
+-</strong>
+ </p>
+ <h2>
+ MONSTER ENCOUNTER BOXES
+ </h2>
+-<img alt="Small sword illustration above the section header">
+-<ul>
+-<li>
+-<p>
++<table>
++<thead>
++<tr>
++<th>
+ Skill =
+-</p>
+-<p>
++</th>
++<th>
++Skill =
++</th>
++<th>
++Skill =
++</th>
++</tr>
++<tr>
++<th>
+ Stamina =
+-</p>
+-</li>
+-<li>
+-<p>
+-Skill =
+-</p>
+-<p>
++</th>
++<th>
+ Stamina =
+-</p>
+-</li>
+-<li>
+-<p>
+-Skill =
+-</p>
+-<p>
++</th>
++<th>
+ Stamina =
+-</p>
+-</li>
+-<li>
+-<p>
+-Skill =
+-</p>
+-<p>
+-Stamina =
+-</p>
+-</li>
+-<li>
+-<p>
+-Skill =
+-</p>
+-<p>
+-Stamina =
+-</p>
+-</li>
+-<li>
+-<p>
+-Skill =
+-</p>
+-<p>
+-Stamina =
+-</p>
+-</li>
+-<li>
+-<p>
+-Skill =
+-</p>
+-<p>
+-Stamina =
+-</p>
+-</li>
+-<li>
+-<p>
+-Skill =
+-</p>
+-<p>
+-Stamina =
+-</p>
+-</li>
+-<li>
+-<p>
+-Skill =
+-</p>
+-<p>
+-Stamina =
+-</p>
+-</li>
+-</ul>+</th>
++</tr>
++</thead>
++<tbody>
++<tr>
++<td>
++</td>
++<td>
++</td>
++<td>
++</td>
++</tr>
++<tr>
++<td>
++</td>
++<td>
++</td>
++<td>
++</td>
++</tr>
++<tr>
++<td>
++</td>
++<td>
++</td>
++<td>
++</td>
++</tr>
++<tr>
++<td>
++</td>
++<td>
++</td>
++<td>
++</td>
++</tr>
++<tr>
++<td>
++</td>
++<td>
++</td>
++<td>
++</td>
++</tr>
++<tr>
++<td>
++</td>
++<td>
++</td>
++<td>
++</td>
++</tr>
++</tbody>
++</table>

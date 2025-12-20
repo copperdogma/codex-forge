@@ -1,0 +1,97 @@
+{
+  "sdk_http_response": {
+    "headers": {
+      "content-type": "application/json; charset=UTF-8",
+      "vary": "Origin, X-Origin, Referer",
+      "content-encoding": "gzip",
+      "date": "Sat, 20 Dec 2025 18:21:36 GMT",
+      "server": "scaffolding on HTTPServer2",
+      "x-xss-protection": "0",
+      "x-frame-options": "SAMEORIGIN",
+      "x-content-type-options": "nosniff",
+      "server-timing": "gfet4t7; dur=7087",
+      "alt-svc": "h3=\":443\"; ma=2592000,h3-29=\":443\"; ma=2592000",
+      "transfer-encoding": "chunked"
+    },
+    "body": null
+  },
+  "candidates": [
+    {
+      "content": {
+        "parts": [
+          {
+            "media_resolution": null,
+            "code_execution_result": null,
+            "executable_code": null,
+            "file_data": null,
+            "function_call": null,
+            "function_response": null,
+            "inline_data": null,
+            "text": "<p class=\"running-head\">40-42</p>\n\n<h2>40</h2>\n<p>You call out to the Dwarf that you are ready to fight the MINOTAUR. The wooden door rises slowly and you see the fearsome beast, half man, half bull, step into the arena. Steam blows from its nostrils as it works itself up into a rage, ready to attack. Suddenly it rushes forward, swinging its double-headed axe.</p>\n<dl>\n    <dt>MINOTAUR</dt>\n    <dd>SKILL 9</dd>\n    <dd>STAMINA 9</dd>\n</dl>\n<p>If you win, turn to <strong>163</strong>.</p>\n\n<h2>41</h2>\n<p>You walk slowly over to the alcove, carefully checking the floor for any more hidden traps. You see that the goblet contains a sparkling red liquid. Will you:</p>\n<table>\n    <tbody>\n        <tr>\n            <td>Drink the red liquid?</td>\n            <td>Turn to <strong>98</strong></td>\n        </tr>\n        <tr>\n            <td>Leave the goblet and walk back to search the Barbarian (if you have not done so already)?</td>\n            <td>Turn to <strong>126</strong></td>\n        </tr>\n        <tr>\n            <td>Leave the chamber to continue west?</td>\n            <td>Turn to <strong>83</strong></td>\n        </tr>\n    </tbody>\n</table>\n\n<h2>42</h2>\n<p>The cobra’s fangs sink deep into your wrist and you feel its poison starting to creep through your body. Lose 5 STAMINA points. If you are still alive, the Dwarf has no mercy but tells you to try again. Roll two dice. If the total is the same as or less than your SKILL, turn to <strong>55</strong>. If the total is greater than your SKILL, turn to <strong>202</strong>.</p>",
+            "thought": null,
+            "thought_signature": "EvADCu0DAXLI2nxdvGB57QaXvUpDI7jVMfJ4qnQoyBzz4Nt9vNtwrfDllxWvbijkvZv7XnBJsTFEWrQC6cAWjWMP_qCX1cVdK67e3YuRiMbTdOWs0NO3NNmT_rWkonvObFd1BVj8NWjfiJhpoPh_kM3LwadShyrDKv7UWqeOPEV2ifRoUUGZqTLMUS8TUhFJ-fgaxf8BSEGEp6uoHsOM1tiIheiPQ4ZJMm82MRPq7fXeQ5_-vojmAbgd4Tbrsy6Vi1LGUGC3-BuO5P9xuSHYheJ5Fd9wVk-P6hOHL4cNCVYWeAFh3jkF9oPdr1ir0F9hhLAm_haIYmE_ARLXujNO_HmoZPx5Htw9zSLFYjclK5jpQhFBS1wcKieGWWQsmR-tLS_TLDqkwuSgRoROvYbUjCNbMiGa0zI4iUSmIxFoUvO5PGqXslOteEy7OIn8RhnG7JNqTuatPopboLpyxDpW_mynRIcT-AXhBHc-ZZC553IEaXnVQ3rJYGGNJMCdPkVYF9v9ftkA0MwGbKQX-yyKEdKAnImEQ-6jfZEM78S1g63ZHoTrHflqEo0JaIThsV3Gd7YlXjyoAD2UQQp7ofIJNEJCGqX6cATqjUff0YCYAKoe8zmQecZ2iHtrLSG-iPOzd_JIOMIWjGsPALQQ5znPKwd6hw==",
+            "video_metadata": null
+          }
+        ],
+        "role": "model"
+      },
+      "citation_metadata": {
+        "citations": [
+          {
+            "end_index": 350,
+            "license": "",
+            "publication_date": null,
+            "start_index": 50,
+            "title": null,
+            "uri": "https://www.annarchive.com/files/FF6%20Deathtrap%20Dungeon_NEW.pdf"
+          },
+          {
+            "end_index": 1450,
+            "license": "",
+            "publication_date": null,
+            "start_index": 1170,
+            "title": null,
+            "uri": "https://www.annarchive.com/files/FF6%20Deathtrap%20Dungeon_NEW.pdf"
+          }
+        ]
+      },
+      "finish_message": null,
+      "token_count": null,
+      "finish_reason": "STOP",
+      "avg_logprobs": null,
+      "grounding_metadata": null,
+      "index": 0,
+      "logprobs_result": null,
+      "safety_ratings": null,
+      "url_context_metadata": null
+    }
+  ],
+  "create_time": null,
+  "model_version": "gemini-3-pro-preview",
+  "prompt_feedback": null,
+  "response_id": "MOlGacOgC_OzmtkPl-OIgA4",
+  "usage_metadata": {
+    "cache_tokens_details": null,
+    "cached_content_token_count": null,
+    "candidates_token_count": 416,
+    "candidates_tokens_details": null,
+    "prompt_token_count": 1407,
+    "prompt_tokens_details": [
+      {
+        "modality": "IMAGE",
+        "token_count": 1075
+      },
+      {
+        "modality": "TEXT",
+        "token_count": 332
+      }
+    ],
+    "thoughts_token_count": 137,
+    "tool_use_prompt_token_count": null,
+    "tool_use_prompt_tokens_details": null,
+    "total_token_count": 1960,
+    "traffic_type": null
+  },
+  "automatic_function_calling_history": [],
+  "parsed": null
+}

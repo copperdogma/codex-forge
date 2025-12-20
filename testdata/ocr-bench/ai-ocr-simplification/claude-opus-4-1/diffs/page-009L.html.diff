@@ -1,0 +1,30 @@
+--- gold/page-009L.html
++++ model/page-009L.html
+@@ -15,9 +15,11 @@
+ <h2>
+ Restoring Skill, Stamina and Luck
+ </h2>
+-<h3>
++<p>
++<em>
+ Skill
+-</h3>
++</em>
++</p>
+ <p>
+ Your SKILL score will not change much during your adventure. Occasionally, a page may give instructions to increase or decrease your SKILL score. A Magic Weapon may increase your SKILL, but remember that only one weapon can be used at a time! You cannot claim 2 SKILL bonuses for carrying two Magic Swords. Your SKILL score can never exceed its
+ <em>
+@@ -29,9 +31,11 @@
+ </em>
+ level at any time.
+ </p>
+-<h3>
++<p>
++<em>
+ Stamina and Provisions
+-</h3>
++</em>
++</p>
+ <p>
+ Your STAMINA score will change a lot during your adventure as you fight monsters and undertake arduous tasks. As you near your goal, your STAMINA level may be dangerously low and battles may be particularly risky, so be careful!
+ </p>

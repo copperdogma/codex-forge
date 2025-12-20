@@ -1,0 +1,41 @@
+--- gold/page-054R.html
++++ model/page-054R.html
+@@ -1,3 +1,4 @@
++```html
+ <p class="running-head">
+ 164-166
+ </p>
+@@ -17,7 +18,11 @@
+ 166
+ </h2>
+ <p>
+-As you touch the emerald eye of the idol, you hear a creaking sound below you. Looking down, you are shocked to see the two stuffed birds taking flight. Their wings flap in jerky movements, but they are soon above you and look set to attack. Fight the FLYING GUARDIANS one at a time, but reduce your SKILL by 3 during this combat because of your restricted position.
++As you touch the emerald eye of the idol, you hear a creaking sound below you. Looking down, you are shocked to see the two stuffed birds taking flight. Their wings flap in jerky movements, but they are soon above you and look set to attack. Fight the FLYING GUARDIANS one at a time, but reduce your
++<strong>
++SKILL
++</strong>
++by 3 during this combat because of your restricted position.
+ </p>
+ <table>
+ <thead>
+@@ -25,10 +30,14 @@
+ <th>
+ </th>
+ <th>
++<strong>
+ SKILL
++</strong>
+ </th>
+ <th>
++<strong>
+ STAMINA
++</strong>
+ </th>
+ </tr>
+ </thead>
+@@ -59,4 +68,5 @@
+ </table>
+ <p>
+ If you win, turn to 11.
+-</p>+</p>
++```

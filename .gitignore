@@ -7,6 +7,7 @@ models/
 .venv/
 .cursor/
 .DS_Store
+.env
 
 # Stray local debug logs accidentally written to repo root
 /detect_boundaries_code_first_v1

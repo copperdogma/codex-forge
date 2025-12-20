@@ -1,0 +1,17 @@
+--- gold/page-020R.html
++++ model/page-020R.html
+@@ -1,4 +1,4 @@
+-<p class="running-head">
++<p class="page-number">
+ 16-17
+ </p>
+ <h2>
+@@ -110,7 +110,7 @@
+ </tr>
+ </tbody>
+ </table>
+-<img alt="Illustration of a small rodent lying on its side">
++<img alt="A rat lying on the ground">
+ <h2>
+ 17
+ </h2>

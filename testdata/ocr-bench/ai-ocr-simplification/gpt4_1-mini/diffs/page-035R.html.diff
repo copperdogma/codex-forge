@@ -1,0 +1,105 @@
+--- gold/page-035R.html
++++ model/page-035R.html
+@@ -1,52 +1,64 @@
+-<p class="running-head">
++<p class="page-number">
+ 79-82
+ </p>
+-<h2>
++<p>
+ 79
+-</h2>
+-<p>
++<br>
+ You grip the arms of the chair tightly, half expecting a surge of energy or pain to rush through your body.
+ <em>
+ Test your Luck.
+ </em>
+-If you are Lucky, turn to 106. If you are Unlucky, turn to 383.
++If you are Lucky, turn to
++<strong>
++106
++</strong>
++. If you are Unlucky, turn to
++<strong>
++383
++</strong>
++.
+ </p>
+-<h2>
++<p>
+ 80
+-</h2>
++<br>
++You take your time and manage to step over the last pole without having touched any of them. You hurry on east, still following the two pairs of footprints. Turn to
++<strong>
++313
++</strong>
++.
++</p>
++<img alt="Illustration of a rat or mouse in black and white">
+ <p>
+-You take your time and manage to step over the last pole without having touched any of them. You hurry on east, still following the two pairs of footprints. Turn to 313.
++81
++<br>
++The only furniture in the Goblin’s room is a table, two chairs and a cupboard on the wall. There are two closed doors, one in the west wall and the other in the north wall. Will you:
+ </p>
+-<img alt="illustration of a rat lying on the ground">
+-<h2>
+-81
+-</h2>
++<ul>
++<li>
++Open the cupboard?
++<strong>
++Turn to 307
++</strong>
++</li>
++<li>
++Open the west door?
++<strong>
++Turn to 263
++</strong>
++</li>
++<li>
++Open the north door?
++<strong>
++Turn to 136
++</strong>
++</li>
++</ul>
+ <p>
+-The only furniture in the Goblin's room is a table, two chairs and a cupboard on the wall. There are two closed doors, one in the west wall and the other in the north wall. Will you:
+-</p>
+-<dl>
+-<dt>
+-Open the cupboard?
+-</dt>
+-<dd>
+-Turn to 307
+-</dd>
+-<dt>
+-Open the west door?
+-</dt>
+-<dd>
+-Turn to 263
+-</dd>
+-<dt>
+-Open the north door?
+-</dt>
+-<dd>
+-Turn to 136
+-</dd>
+-</dl>
+-<h2>
+ 82
+-</h2>
+-<p>
+-As the Pit Fiend slams its body against the wall, you let go of the rope and drop safely to the floor. You run towards the double doors and are relieved to feel them swing open as you push on them. You let them swing shut behind you and head north along the tunnel. Turn to 214.
++<br>
++As the Pit Fiend slams its body against the wall, you let go of the rope and drop safely to the floor. You run towards the double doors and are relieved to feel them swing open as you push on them. You let them swing shut behind you and head north along the tunnel.
++<strong>
++Turn to 214
++</strong>
++.
+ </p>

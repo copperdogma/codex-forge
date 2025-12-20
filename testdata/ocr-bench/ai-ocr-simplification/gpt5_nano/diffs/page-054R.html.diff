@@ -1,0 +1,25 @@
+--- gold/page-054R.html
++++ model/page-054R.html
+@@ -1,11 +1,11 @@
+-<p class="running-head">
+-164-166
++<p class="page-number">
++164–166
+ </p>
+ <h2>
+ 164
+ </h2>
+ <p>
+-As you walk along, droplets of water again start falling from the tunnel ceiling. You see wet footprints, made by the same boots that you followed earlier, heading west. The footprints lead to a closed iron door in the right-hand wall of the tunnel, but do not seem to go any further. If you wish to open the door, turn to 299. If you would rather keep going west, turn to 83.
++As you walk along, droplets of water again start falling from the tunnel ceiling. You see wet footprints, made by the same boots that you followed earlier, heading west. The footprints lead to a closed iron door in the right-hand wall of the tunnel], but do not seem to go any further. If you wish to open the door, turn to 299. If you would rather keep going west, turn to 83.
+ </p>
+ <h2>
+ 165
+@@ -23,6 +23,7 @@
+ <thead>
+ <tr>
+ <th>
++Name
+ </th>
+ <th>
+ SKILL

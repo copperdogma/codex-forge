@@ -446,6 +446,17 @@
 - Choice completeness validator relaxed for smoke runs (`max_discrepancy`).
 - Frontmatter fine segmentation accepts split page IDs in coarse segments.
 - Module param schemas updated for new boundary/scan/extract flags.
+## [2025-12-20] - AI OCR benchmark suite and GPT‑5.1 pipeline planning
+
+### Added
+- OCR benchmark harness + vendor runners (OpenAI, Anthropic, Gemini, Mistral, Azure DI, AWS Textract, HF/Qwen) with HTML/text diffing and cost aggregation.
+- Benchmark dashboard (`docs/ocr-bench.html`) and data (`docs/ocr-bench-data.json`) with adjustable page counts and dropped‑page metrics.
+- New GPT‑5.1 AI‑first pipeline story (`story-081`) and GPT‑5.1 recipe scaffold copy.
+
+### Changed
+- Story 077 marked Done; pipeline redesign work moved to Story 081.
+- Story index updated with Story 081.
+
 ## [2025-12-20] - Dual-field page numbering completion and ordering guard improvements
 
 ### Added

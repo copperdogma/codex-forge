@@ -1,0 +1,75 @@
+{
+  "sdk_http_response": {
+    "headers": {
+      "content-type": "application/json; charset=UTF-8",
+      "vary": "Origin, X-Origin, Referer",
+      "content-encoding": "gzip",
+      "date": "Sat, 20 Dec 2025 18:21:22 GMT",
+      "server": "scaffolding on HTTPServer2",
+      "x-xss-protection": "0",
+      "x-frame-options": "SAMEORIGIN",
+      "x-content-type-options": "nosniff",
+      "server-timing": "gfet4t7; dur=7638",
+      "alt-svc": "h3=\":443\"; ma=2592000,h3-29=\":443\"; ma=2592000",
+      "transfer-encoding": "chunked"
+    },
+    "body": null
+  },
+  "candidates": [
+    {
+      "content": {
+        "parts": null,
+        "role": null
+      },
+      "citation_metadata": {
+        "citations": [
+          {
+            "end_index": 416,
+            "license": "",
+            "publication_date": null,
+            "start_index": 102,
+            "title": null,
+            "uri": "https://www.annarchive.com/files/FF6%20Deathtrap%20Dungeon_NEW.pdf"
+          }
+        ]
+      },
+      "finish_message": null,
+      "token_count": null,
+      "finish_reason": "RECITATION",
+      "avg_logprobs": null,
+      "grounding_metadata": null,
+      "index": 0,
+      "logprobs_result": null,
+      "safety_ratings": null,
+      "url_context_metadata": null
+    }
+  ],
+  "create_time": null,
+  "model_version": "gemini-3-pro-preview",
+  "prompt_feedback": null,
+  "response_id": "IulGafnqBP-UmtkP3O6B8Ag",
+  "usage_metadata": {
+    "cache_tokens_details": null,
+    "cached_content_token_count": null,
+    "candidates_token_count": null,
+    "candidates_tokens_details": null,
+    "prompt_token_count": 1388,
+    "prompt_tokens_details": [
+      {
+        "modality": "IMAGE",
+        "token_count": 1056
+      },
+      {
+        "modality": "TEXT",
+        "token_count": 332
+      }
+    ],
+    "thoughts_token_count": 129,
+    "tool_use_prompt_token_count": null,
+    "tool_use_prompt_tokens_details": null,
+    "total_token_count": 1517,
+    "traffic_type": null
+  },
+  "automatic_function_calling_history": [],
+  "parsed": null
+}

@@ -1,0 +1,13 @@
+--- gold/page-017R.txt
++++ model/page-017R.txt
+@@ -1,9 +1,6 @@
+-6-8
+ 6
+ Knowing that the Manticore will fire the spikes in its tail at you, you run for cover behind one of the pillars. Before you reach it, a volley of spikes flies through the air and one of them sinks into your arm. Lose 2 STAMINA points. If you are still alive, you waste no time and attack the Manticore with your sword before it has time to unleash more of its deadly spikes.
+-MANTICORE
+-SKILL 11
+-STAMINA 11
++MANTICORE SKILL 11 STAMINA 11
+ If you win, turn to 364.
+ 7
+ Before you have time to reach a doorway, the boulder is upon you. You cry out in pain and terror as it crushes you to the floor. Your adventure ends here.

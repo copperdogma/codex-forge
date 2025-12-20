@@ -1,0 +1,89 @@
+{
+  "sdk_http_response": {
+    "headers": {
+      "content-type": "application/json; charset=UTF-8",
+      "vary": "Origin, X-Origin, Referer",
+      "content-encoding": "gzip",
+      "date": "Sat, 20 Dec 2025 18:21:08 GMT",
+      "server": "scaffolding on HTTPServer2",
+      "x-xss-protection": "0",
+      "x-frame-options": "SAMEORIGIN",
+      "x-content-type-options": "nosniff",
+      "server-timing": "gfet4t7; dur=5834",
+      "alt-svc": "h3=\":443\"; ma=2592000,h3-29=\":443\"; ma=2592000",
+      "transfer-encoding": "chunked"
+    },
+    "body": null
+  },
+  "candidates": [
+    {
+      "content": {
+        "parts": [
+          {
+            "media_resolution": null,
+            "code_execution_result": null,
+            "executable_code": null,
+            "file_data": null,
+            "function_call": null,
+            "function_response": null,
+            "inline_data": null,
+            "text": "<p class=\"running-head\">3-5</p>\n\n<h2>3</h2>\n<p>The Gnome shakes his head and says, &lsquo;I am afraid you have failed the Trial of Champions. Baron Sukumvit&rsquo;s Deathtrap Dungeon will keep its secrets for another year, as you will not be allowed to leave here. You are appointed my servant for the rest of your days, to prepare and modify the dungeon for future contestants. Perhaps in another life you will succeed . . .&rsquo;</p>\n\n<h2>4</h2>\n<p>In the total darkness you do not see the pipe&rsquo;s downward turn. You slip and, unable to get a grip on the slimy pipe, slide over the edge. Your screams echo down the pipe as you fall the fifty metres to the bottom. You have failed the Trial of Champions.</p>\n\n<img alt=\"Illustration of bubbling slime containing skulls and bones\">\n\n<h2>5</h2>\n<p>You crawl along the floor and find yourself in the lair of a tribe of TROGLODYTES. As you creep past them, your scabbard bangs against a rock on the floor. <em>Test your Luck</em>. If you are Lucky, turn to <strong>185</strong>. If you are Unlucky, turn to <strong>395</strong>.</p>",
+            "thought": null,
+            "thought_signature": "EuwDCukDAXLI2nyU4ruiEy3QMlMDN_jeoAzAjNkmst1lZmSEO94ZUiL3eHhZjM_Q1y9tQMpN3OucLf2wJ56uFQL4cABL3bKYHEXCeI4HJHMCQGSbNGwmZwIbWa5j3xemr3Jlg2lvJNRmU74uRz5NGPuf1zuafFKv2gdZMClrW8JN3b9GZp4xe349AMfy48vTw14ahg7yakZuXwl8btyJ2nVq0hHhwADJD5sy_ldRYkVK7h9PJi7yFPd43aVGejU6yPzUeAOeFxr92FknFMwNxmWVjy56OnwI-wCPYRwVvdOX-L30AN8BGva3xvZVrBt1IGVxWG2D75b8LfSwWl7sANgYC6Mu7yvkUuvwOpqzqwYg2LTpX7hoHkXocR5QgDBXUzKFvTiQWwPG9kW6KA3XCbnwmTcRYUZylyc_zySBxdodimRtCbsjE_k3lTdJrhFmdieotQBJyaP2ToQnnbvnZEE4U6mmaKvyWYoKkA-zqZZnkxfntv1kHQPR48GMrmfwiYF8MayncLxsyCPCZpadExVCJlqZmUNCN8G72-Z3JdGJx-A-ziMUC3vXKLaNMwiemxggfe6bM1uwAz5PR7WjbGUGT2GBwZxMOic1jM7BOhe50UxqWFXntcg0sFDa7lT9-61c5rk_P2U3dOOtwuyf",
+            "video_metadata": null
+          }
+        ],
+        "role": "model"
+      },
+      "citation_metadata": {
+        "citations": [
+          {
+            "end_index": 395,
+            "license": "",
+            "publication_date": null,
+            "start_index": 163,
+            "title": null,
+            "uri": "https://www.annarchive.com/files/FF6%20Deathtrap%20Dungeon_NEW.pdf"
+          }
+        ]
+      },
+      "finish_message": null,
+      "token_count": null,
+      "finish_reason": "STOP",
+      "avg_logprobs": null,
+      "grounding_metadata": null,
+      "index": 0,
+      "logprobs_result": null,
+      "safety_ratings": null,
+      "url_context_metadata": null
+    }
+  ],
+  "create_time": null,
+  "model_version": "gemini-3-pro-preview",
+  "prompt_feedback": null,
+  "response_id": "FOlGaZ6qEcO2qtsP5KuLsQ0",
+  "usage_metadata": {
+    "cache_tokens_details": null,
+    "cached_content_token_count": null,
+    "candidates_token_count": 281,
+    "candidates_tokens_details": null,
+    "prompt_token_count": 1407,
+    "prompt_tokens_details": [
+      {
+        "modality": "TEXT",
+        "token_count": 332
+      },
+      {
+        "modality": "IMAGE",
+        "token_count": 1075
+      }
+    ],
+    "thoughts_token_count": 136,
+    "tool_use_prompt_token_count": null,
+    "tool_use_prompt_tokens_details": null,
+    "total_token_count": 1824,
+    "traffic_type": null
+  },
+  "automatic_function_calling_history": [],
+  "parsed": null
+}

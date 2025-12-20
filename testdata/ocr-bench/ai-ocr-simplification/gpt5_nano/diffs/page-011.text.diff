@@ -1,0 +1,56 @@
+--- gold/page-011.txt
++++ model/page-011.txt
+@@ -1,32 +1,31 @@
+ ADVENTURE SHEET
+ SKILL
+-Initial Skill =
++Initial
++Stat =
+ STAMINA
+-Initial Stamina =
++Initial
++Stamina =
+ LUCK
+-Initial Luck =
++Initial
++Luck =
+ ITEMS OF EQUIPMENT CARRIED
+ GOLD
+ JEWELS
+ POTIONS
+ PROVISIONS REMAINING
+ MONSTER ENCOUNTER BOXES
+-[image: Small sword illustration above the section header]
+-Skill =
+-Stamina =
+-Skill =
+-Stamina =
+-Skill =
+-Stamina =
+-Skill =
+-Stamina =
+-Skill =
+-Stamina =
+-Skill =
+-Stamina =
+-Skill =
+-Stamina =
+-Skill =
+-Stamina =
+-Skill =
+-Stamina =
++Skill = Stamina =
++Skill = Stamina =
++Skill = Stamina =
++Skill = Stamina =
++Skill = Stamina =
++Skill = Stamina =
++Skill = Stamina =
++Skill = Stamina =
++Skill = Stamina =
++Skill = Stamina =
++Skill = Stamina =
++Skill = Stamina =
++Skill = Stamina =
++Skill = Stamina =
++Skill = Stamina =

@@ -1,0 +1,219 @@
+--- gold/page-011.html
++++ model/page-011.html
+@@ -1,130 +1,99 @@
+ <h1>
+ ADVENTURE SHEET
+ </h1>
++<dl>
++<dt>
++SKILL
++</dt>
++<dd>
++Initial Skill =
++</dd>
++<dt>
++STAMINA
++</dt>
++<dd>
++Initial Stamina =
++</dd>
++<dt>
++LUCK
++</dt>
++<dd>
++Initial Luck =
++</dd>
++</dl>
+ <p>
+-<strong>
+-SKILL
+-</strong>
++ITEMS OF EQUIPMENT CARRIED
+ </p>
+-<p>
+-Initial Skill =
+-</p>
+-<p>
+-<strong>
+-STAMINA
+-</strong>
+-</p>
+-<p>
+-Initial Stamina =
+-</p>
+-<p>
+-<strong>
+-LUCK
+-</strong>
+-</p>
+-<p>
+-Initial Luck =
+-</p>
+-<p>
+-<strong>
+-ITEMS OF EQUIPMENT CARRIED
+-</strong>
+-</p>
+-<p>
+-<strong>
++<dl>
++<dt>
+ GOLD
+-</strong>
+-</p>
+-<p>
+-<strong>
++</dt>
++<dd>
++</dd>
++<dt>
+ JEWELS
+-</strong>
+-</p>
+-<p>
+-<strong>
++</dt>
++<dd>
++</dd>
++<dt>
+ POTIONS
+-</strong>
+-</p>
+-<p>
+-<strong>
++</dt>
++<dd>
++</dd>
++<dt>
+ PROVISIONS REMAINING
+-</strong>
+-</p>
++</dt>
++<dd>
++</dd>
++</dl>
+ <h2>
+ MONSTER ENCOUNTER BOXES
+ </h2>
+-<img alt="Small sword illustration above the section header">
+-<ul>
+-<li>
+-<p>
+-Skill =
+-</p>
+-<p>
+-Stamina =
+-</p>
+-</li>
+-<li>
+-<p>
+-Skill =
+-</p>
+-<p>
+-Stamina =
+-</p>
+-</li>
+-<li>
+-<p>
+-Skill =
+-</p>
+-<p>
+-Stamina =
+-</p>
+-</li>
+-<li>
+-<p>
+-Skill =
+-</p>
+-<p>
+-Stamina =
+-</p>
+-</li>
+-<li>
+-<p>
+-Skill =
+-</p>
+-<p>
+-Stamina =
+-</p>
+-</li>
+-<li>
+-<p>
+-Skill =
+-</p>
+-<p>
+-Stamina =
+-</p>
+-</li>
+-<li>
+-<p>
+-Skill =
+-</p>
+-<p>
+-Stamina =
+-</p>
+-</li>
+-<li>
+-<p>
+-Skill =
+-</p>
+-<p>
+-Stamina =
+-</p>
+-</li>
+-<li>
+-<p>
+-Skill =
+-</p>
+-<p>
+-Stamina =
+-</p>
+-</li>
+-</ul>+<table>
++<tbody>
++<tr>
++<td>
++Skill =Stamina =
++</td>
++<td>
++Skill =Stamina =
++</td>
++<td>
++Skill =Stamina =
++</td>
++</tr>
++<tr>
++<td>
++Skill =Stamina =
++</td>
++<td>
++Skill =Stamina =
++</td>
++<td>
++Skill =Stamina =
++</td>
++</tr>
++<tr>
++<td>
++Skill =Stamina =
++</td>
++<td>
++Skill =Stamina =
++</td>
++<td>
++Skill =Stamina =
++</td>
++</tr>
++<tr>
++<td>
++Skill =Stamina =
++</td>
++<td>
++Skill =Stamina =
++</td>
++<td>
++Skill =Stamina =
++</td>
++</tr>
++</tbody>
++</table>

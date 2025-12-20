@@ -1,0 +1,8 @@
+--- gold/page-026L.txt
++++ model/page-026L.txt
+@@ -14,4 +14,4 @@
+ Leave the chamber to continue west?
+ Turn to 83
+ 42
+-The cobra's fangs sink deep into your wrist and you feel its poison starting to creep through your body. Lose 5 STAMINA points. If you are still alive, the Dwarf has no mercy but tells you to try again. Roll two dice. If the total is the same as or less than your SKILL, turn to 55. If the total is greater than your SKILL, turn to 202.
++The cobra’s fangs sink deep into your wrist and you feel its poison starting to creep through your body. Lose 5 STAMINA points. If you are still alive, the Dwarf has no mercy but tells you to try again. Roll two dice. If the total is the same as or less than your SKILL, turn to 55. If the total is greater than your SKILL, turn to 202.

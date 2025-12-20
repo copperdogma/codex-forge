@@ -1,0 +1,7 @@
+--- gold/page-009L.txt
++++ model/page-009L.txt
+@@ -5,4 +5,3 @@
+ Your SKILL score will not change much during your adventure. Occasionally, a page may give instructions to increase or decrease your SKILL score. A Magic Weapon may increase your SKILL, but remember that only one weapon can be used at a time! You cannot claim 2 SKILL bonuses for carrying two Magic Swords. Your SKILL score can never exceed its Initial value unless specifically instructed. Drinking the Potion of Skill (see later) will restore your SKILL to its Initial level at any time.
+ Stamina and Provisions
+ Your STAMINA score will change a lot during your adventure as you fight monsters and undertake arduous tasks. As you near your goal, your STAMINA level may be dangerously low and battles may be particularly risky, so be careful!
+-14

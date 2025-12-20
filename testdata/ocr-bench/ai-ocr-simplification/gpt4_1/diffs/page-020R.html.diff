@@ -1,0 +1,98 @@
+--- gold/page-020R.html
++++ model/page-020R.html
+@@ -1,11 +1,15 @@
+ <p class="running-head">
+-16-17
++16–17
+ </p>
+ <h2>
+ 16
+ </h2>
+ <p>
+-You just have time to hear the Gnome say, 'Three skulls' before a white bolt of energy shoots out from the lock into your chest, knocking you unconscious. Roll one die, add 1 to the number and reduce your STAMINA by the total. If you are still alive, you come to and are told by the Gnome to try again. You chose the wrong gems last time, so you won't try that combination again.
++You just have time to hear the Gnome say, ‘Three skulls’ before a white bolt of energy shoots out from the lock into your chest, knocking you unconscious. Roll one die, add 1 to the number and reduce your
++<strong>
++STAMINA
++</strong>
++by the total. If you are still alive, you come to and are told by the Gnome to try again. You chose the wrong gems last time, so you won’t try that combination again.
+ </p>
+ <table>
+ <thead>
+@@ -35,7 +39,10 @@
+ Sapphire
+ </td>
+ <td>
+-Turn to 16
++Turn to
++<strong>
++16
++</strong>
+ </td>
+ </tr>
+ <tr>
+@@ -49,7 +56,10 @@
+ Emerald
+ </td>
+ <td>
+-Turn to 392
++Turn to
++<strong>
++392
++</strong>
+ </td>
+ </tr>
+ <tr>
+@@ -63,7 +73,10 @@
+ Diamond
+ </td>
+ <td>
+-Turn to 177
++Turn to
++<strong>
++177
++</strong>
+ </td>
+ </tr>
+ <tr>
+@@ -77,7 +90,10 @@
+ Diamond
+ </td>
+ <td>
+-Turn to 287
++Turn to
++<strong>
++287
++</strong>
+ </td>
+ </tr>
+ <tr>
+@@ -91,7 +107,10 @@
+ Sapphire
+ </td>
+ <td>
+-Turn to 132
++Turn to
++<strong>
++132
++</strong>
+ </td>
+ </tr>
+ <tr>
+@@ -105,12 +124,15 @@
+ Emerald
+ </td>
+ <td>
+-Turn to 249
++Turn to
++<strong>
++249
++</strong>
+ </td>
+ </tr>
+ </tbody>
+ </table>
+-<img alt="Illustration of a small rodent lying on its side">
++<img alt="A small illustration of a dead rat lying on its side." />
+ <h2>
+ 17
+ </h2>

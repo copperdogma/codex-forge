@@ -1,0 +1,25 @@
+--- gold/page-020R.html
++++ model/page-020R.html
+@@ -1,11 +1,11 @@
+-<p class="running-head">
++<p class="page-number">
+ 16-17
+ </p>
+ <h2>
+ 16
+ </h2>
+ <p>
+-You just have time to hear the Gnome say, 'Three skulls' before a white bolt of energy shoots out from the lock into your chest, knocking you unconscious. Roll one die, add 1 to the number and reduce your STAMINA by the total. If you are still alive, you come to and are told by the Gnome to try again. You chose the wrong gems last time, so you won't try that combination again.
++You just have time to hear the Gnome say, "Three skulls" before a white bolt of energy shoots out from the lock into your chest, knocking you unconscious. Roll one die, add 1 to the number and reduce your STAMINA by the total. If you are still alive, you come to and are told by the Gnome to try again. You chose the wrong gems last time, so you won't try that combination again.
+ </p>
+ <table>
+ <thead>
+@@ -110,7 +110,7 @@
+ </tr>
+ </tbody>
+ </table>
+-<img alt="Illustration of a small rodent lying on its side">
++<img alt="Small illustration of a rat or mouse">
+ <h2>
+ 17
+ </h2>

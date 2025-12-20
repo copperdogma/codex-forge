@@ -1,0 +1,97 @@
+{
+  "sdk_http_response": {
+    "headers": {
+      "content-type": "application/json; charset=UTF-8",
+      "vary": "Origin, X-Origin, Referer",
+      "content-encoding": "gzip",
+      "date": "Sat, 20 Dec 2025 18:21:48 GMT",
+      "server": "scaffolding on HTTPServer2",
+      "x-xss-protection": "0",
+      "x-frame-options": "SAMEORIGIN",
+      "x-content-type-options": "nosniff",
+      "server-timing": "gfet4t7; dur=6279",
+      "alt-svc": "h3=\":443\"; ma=2592000,h3-29=\":443\"; ma=2592000",
+      "transfer-encoding": "chunked"
+    },
+    "body": null
+  },
+  "candidates": [
+    {
+      "content": {
+        "parts": [
+          {
+            "media_resolution": null,
+            "code_execution_result": null,
+            "executable_code": null,
+            "file_data": null,
+            "function_call": null,
+            "function_response": null,
+            "inline_data": null,
+            "text": "<p class=\"running-head\">164-166</p>\n\n<h2>164</h2>\n<p>As you walk along, droplets of water again start falling from the tunnel ceiling. You see wet footprints, made by the same boots that you followed earlier, heading west. The footprints lead to a closed iron door in the right-hand wall of the tunnel, but do not seem to go any further. If you wish to open the door, turn to <strong>299</strong>. If you would rather keep going west, turn to <strong>83</strong>.</p>\n\n<h2>165</h2>\n<p>There is a slot in the padlock into which you place the coin. Immediately the lock clicks apart, and you are able to unchain the stilts. You place them on your shoulder and once again set off north. Turn to <strong>234</strong>.</p>\n\n<h2>166</h2>\n<p>As you touch the emerald eye of the idol, you hear a creaking sound below you. Looking down, you are shocked to see the two stuffed birds taking flight. Their wings flap in jerky movements, but they are soon above you and look set to attack. Fight the FLYING GUARDIANS one at a time, but reduce your SKILL by 3 during this combat because of your restricted position.</p>\n\n<table>\n<thead>\n<tr>\n<th></th>\n<th>SKILL</th>\n<th>STAMINA</th>\n</tr>\n</thead>\n<tbody>\n<tr>\n<td>First FLYING GUARDIAN</td>\n<td>7</td>\n<td>8</td>\n</tr>\n<tr>\n<td>Second FLYING GUARDIAN</td>\n<td>8</td>\n<td>8</td>\n</tr>\n</tbody>\n</table>\n\n<p>If you win, turn to <strong>11</strong>.</p>",
+            "thought": null,
+            "thought_signature": "EtADCs0DAXLI2nxLmRB5p_lTpcigyWyhT7NsnkDRAhWEPxdfyIdW3NFzCizdPKqo_wlXPv63o2jmwusHcek1U1dfllP1M167NEnI0A6bY4qEHR1YSdur8z_YDmzfHGF5X_AQAYoWzoc9apzXwga6I2OnF_f9rq8UnFyiyR8xBT18QYfDh4D36qa44w931ummIhlu6bHc60qjmGFCFgXT-ckMosKfGzduUOgAuKJL4SdR7mIvdFtyXKqafshHfiCGEPU-xwgB3hxy9kTzR24BG8wIuec1VSxFtUCyoOCv0CiRooYmhjh-LnVKBOW-EioxMUpMC7Q-UhW820_07bX5nURG52Li9Fpkd-8mYMpoPJNn_7GQ6GWfUiSInYeaRl7j0JDb1r1JzD1pSmHk471eqyUpbyI7sXoBrZNkspkSni0SZ0VBvW-goIcS8v_Ah6-sd_p_taq_gHuB9NQU_HkyIBZgyM95sBPkk0zywJZ9AbiJCQCYJp4HGIsLLRsmZyOLIr71G2GDzgEiVzWZ28_iEaS5uXTReKqyUwvOKIDjNUKfeidDKfKTVhrkHUyr3fsg0-ELH35EwIb0stc2KmWJtRNHjJHhA6VjUYCn3WnlvwghdO4=",
+            "video_metadata": null
+          }
+        ],
+        "role": "model"
+      },
+      "citation_metadata": {
+        "citations": [
+          {
+            "end_index": 371,
+            "license": "",
+            "publication_date": null,
+            "start_index": 53,
+            "title": null,
+            "uri": "https://www.annarchive.com/files/FF6%20Deathtrap%20Dungeon_NEW.pdf"
+          },
+          {
+            "end_index": 1084,
+            "license": "",
+            "publication_date": null,
+            "start_index": 738,
+            "title": null,
+            "uri": "https://www.annarchive.com/files/FF6%20Deathtrap%20Dungeon_NEW.pdf"
+          }
+        ]
+      },
+      "finish_message": null,
+      "token_count": null,
+      "finish_reason": "STOP",
+      "avg_logprobs": null,
+      "grounding_metadata": null,
+      "index": 0,
+      "logprobs_result": null,
+      "safety_ratings": null,
+      "url_context_metadata": null
+    }
+  ],
+  "create_time": null,
+  "model_version": "gemini-3-pro-preview",
+  "prompt_feedback": null,
+  "response_id": "POlGaae3N4ysz7IPi9KRqQY",
+  "usage_metadata": {
+    "cache_tokens_details": null,
+    "cached_content_token_count": null,
+    "candidates_token_count": 373,
+    "candidates_tokens_details": null,
+    "prompt_token_count": 1407,
+    "prompt_tokens_details": [
+      {
+        "modality": "IMAGE",
+        "token_count": 1075
+      },
+      {
+        "modality": "TEXT",
+        "token_count": 332
+      }
+    ],
+    "thoughts_token_count": 131,
+    "tool_use_prompt_token_count": null,
+    "tool_use_prompt_tokens_details": null,
+    "total_token_count": 1911,
+    "traffic_type": null
+  },
+  "automatic_function_calling_history": [],
+  "parsed": null
+}

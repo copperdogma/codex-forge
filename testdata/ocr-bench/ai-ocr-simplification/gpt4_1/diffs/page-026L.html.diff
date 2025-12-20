@@ -1,0 +1,78 @@
+--- gold/page-026L.html
++++ model/page-026L.html
+@@ -12,10 +12,16 @@
+ MINOTAUR
+ </dt>
+ <dd>
+-SKILL 9
++<strong>
++SKILL
++</strong>
++9
+ </dd>
+ <dd>
+-STAMINA 9
++<strong>
++STAMINA
++</strong>
++9
+ </dd>
+ </dl>
+ <p>
+@@ -27,29 +33,41 @@
+ <p>
+ You walk slowly over to the alcove, carefully checking the floor for any more hidden traps. You see that the goblet contains a sparkling red liquid. Will you:
+ </p>
+-<dl>
+-<dt>
++<ul>
++<li>
+ Drink the red liquid?
+-</dt>
+-<dd>
++<em>
+ Turn to 98
+-</dd>
+-<dt>
++</em>
++</li>
++<li>
+ Leave the goblet and walk back to search the Barbarian (if you have not done so already)?
+-</dt>
+-<dd>
++<em>
+ Turn to 126
+-</dd>
+-<dt>
++</em>
++</li>
++<li>
+ Leave the chamber to continue west?
+-</dt>
+-<dd>
++<em>
+ Turn to 83
+-</dd>
+-</dl>
++</em>
++</li>
++</ul>
+ <h2>
+ 42
+ </h2>
+ <p>
+-The cobra's fangs sink deep into your wrist and you feel its poison starting to creep through your body. Lose 5 STAMINA points. If you are still alive, the Dwarf has no mercy but tells you to try again. Roll two dice. If the total is the same as or less than your SKILL, turn to 55. If the total is greater than your SKILL, turn to 202.
++The cobra’s fangs sink deep into your wrist and you feel its poison starting to creep through your body. Lose 5
++<strong>
++STAMINA
++</strong>
++points. If you are still alive, the Dwarf has no mercy but tells you to try again. Roll two dice. If the total is the same as or less than your
++<strong>
++SKILL
++</strong>
++, turn to 55. If the total is greater than your
++<strong>
++SKILL
++</strong>
++, turn to 202.
+ </p>

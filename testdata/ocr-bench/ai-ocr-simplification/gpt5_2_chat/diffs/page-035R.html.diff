@@ -1,0 +1,69 @@
+--- gold/page-035R.html
++++ model/page-035R.html
+@@ -1,5 +1,5 @@
+-<p class="running-head">
+-79-82
++<p class="page-number">
++79–82
+ </p>
+ <h2>
+ 79
+@@ -7,9 +7,9 @@
+ <p>
+ You grip the arms of the chair tightly, half expecting a surge of energy or pain to rush through your body.
+ <em>
+-Test your Luck.
++Test your Luck
+ </em>
+-If you are Lucky, turn to 106. If you are Unlucky, turn to 383.
++. If you are Lucky, turn to 106. If you are Unlucky, turn to 383.
+ </p>
+ <h2>
+ 80
+@@ -17,33 +17,24 @@
+ <p>
+ You take your time and manage to step over the last pole without having touched any of them. You hurry on east, still following the two pairs of footprints. Turn to 313.
+ </p>
+-<img alt="illustration of a rat lying on the ground">
++<img alt="Illustration of a goblin lying on the ground">
+ <h2>
+ 81
+ </h2>
+ <p>
+-The only furniture in the Goblin's room is a table, two chairs and a cupboard on the wall. There are two closed doors, one in the west wall and the other in the north wall. Will you:
++The only furniture in the Goblin’s room is a table, two chairs and a cupboard on the wall. There are two closed doors, one in the west wall and the other in the north wall. Will you:
+ </p>
+-<dl>
+-<dt>
+-Open the cupboard?
+-</dt>
+-<dd>
+-Turn to 307
+-</dd>
+-<dt>
+-Open the west door?
+-</dt>
+-<dd>
+-Turn to 263
+-</dd>
+-<dt>
+-Open the north door?
+-</dt>
+-<dd>
+-Turn to 136
+-</dd>
+-</dl>
++<ul>
++<li>
++Open the cupboard? Turn to 307
++</li>
++<li>
++Open the west door? Turn to 263
++</li>
++<li>
++Open the north door? Turn to 136
++</li>
++</ul>
+ <h2>
+ 82
+ </h2>

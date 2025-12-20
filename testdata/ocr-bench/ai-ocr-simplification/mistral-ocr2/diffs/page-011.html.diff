@@ -1,0 +1,136 @@
+--- gold/page-011.html
++++ model/page-011.html
+@@ -1,130 +1,12 @@
+ <h1>
+-ADVENTURE SHEET
++ADUENCARE SBEEC
+ </h1>
+ <p>
+-<strong>
+-SKILL
+-</strong>
+-</p>
+-<p>
+-Initial Skill =
+-</p>
+-<p>
+-<strong>
+-STAMINA
+-</strong>
+-</p>
+-<p>
+-Initial Stamina =
+-</p>
+-<p>
+-<strong>
+-LUCK
+-</strong>
+-</p>
+-<p>
+-Initial Luck =
+-</p>
+-<p>
+-<strong>
+-ITEMS OF EQUIPMENT CARRIED
+-</strong>
+-</p>
+-<p>
+-<strong>
+-GOLD
+-</strong>
+-</p>
+-<p>
+-<strong>
+-JEWELS
+-</strong>
+-</p>
+-<p>
+-<strong>
+-POTIONS
+-</strong>
+-</p>
+-<p>
+-<strong>
+-PROVISIONS REMAINING
+-</strong>
++<img alt="img-0.jpeg">
+ </p>
+ <h2>
+ MONSTER ENCOUNTER BOXES
+ </h2>
+-<img alt="Small sword illustration above the section header">
+-<ul>
+-<li>
+ <p>
+-Skill =
+-</p>
+-<p>
+-Stamina =
+-</p>
+-</li>
+-<li>
+-<p>
+-Skill =
+-</p>
+-<p>
+-Stamina =
+-</p>
+-</li>
+-<li>
+-<p>
+-Skill =
+-</p>
+-<p>
+-Stamina =
+-</p>
+-</li>
+-<li>
+-<p>
+-Skill =
+-</p>
+-<p>
+-Stamina =
+-</p>
+-</li>
+-<li>
+-<p>
+-Skill =
+-</p>
+-<p>
+-Stamina =
+-</p>
+-</li>
+-<li>
+-<p>
+-Skill =
+-</p>
+-<p>
+-Stamina =
+-</p>
+-</li>
+-<li>
+-<p>
+-Skill =
+-</p>
+-<p>
+-Stamina =
+-</p>
+-</li>
+-<li>
+-<p>
+-Skill =
+-</p>
+-<p>
+-Stamina =
+-</p>
+-</li>
+-<li>
+-<p>
+-Skill =
+-</p>
+-<p>
+-Stamina =
+-</p>
+-</li>
+-</ul>+<img alt="img-1.jpeg">
++</p>

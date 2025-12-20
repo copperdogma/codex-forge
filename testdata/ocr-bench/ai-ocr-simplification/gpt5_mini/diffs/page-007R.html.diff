@@ -1,0 +1,14 @@
+--- gold/page-007R.html
++++ model/page-007R.html
+@@ -3,7 +3,10 @@
+ <em>
+ Adventure Sheet
+ </em>
+-. The scores for each creature are given in the book each time you have an encounter. The sequence of combat is then:
++. The scores for each creature are given in the book each time you have an encounter.
++</p>
++<p>
++The sequence of combat is then:
+ </p>
+ <ol>
+ <li>

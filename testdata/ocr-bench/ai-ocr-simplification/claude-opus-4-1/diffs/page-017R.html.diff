@@ -1,0 +1,20 @@
+--- gold/page-017R.html
++++ model/page-017R.html
+@@ -1,4 +1,4 @@
+-<p class="running-head">
++<p class="page-number">
+ 6-8
+ </p>
+ <h2>
+@@ -12,10 +12,7 @@
+ MANTICORE
+ </dt>
+ <dd>
+-SKILL 11
+-</dd>
+-<dd>
+-STAMINA 11
++SKILL 11 STAMINA 11
+ </dd>
+ </dl>
+ <p>

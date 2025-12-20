@@ -1,0 +1,97 @@
+{
+  "sdk_http_response": {
+    "headers": {
+      "content-type": "application/json; charset=UTF-8",
+      "vary": "Origin, X-Origin, Referer",
+      "content-encoding": "gzip",
+      "date": "Sat, 20 Dec 2025 18:20:48 GMT",
+      "server": "scaffolding on HTTPServer2",
+      "x-xss-protection": "0",
+      "x-frame-options": "SAMEORIGIN",
+      "x-content-type-options": "nosniff",
+      "server-timing": "gfet4t7; dur=18805",
+      "alt-svc": "h3=\":443\"; ma=2592000,h3-29=\":443\"; ma=2592000",
+      "transfer-encoding": "chunked"
+    },
+    "body": null
+  },
+  "candidates": [
+    {
+      "content": {
+        "parts": [
+          {
+            "media_resolution": null,
+            "code_execution_result": null,
+            "executable_code": null,
+            "file_data": null,
+            "function_call": null,
+            "function_response": null,
+            "inline_data": null,
+            "text": "<p>First record the creature’s SKILL and STAMINA scores in the first vacant Monster Encounter Box on your <em>Adventure Sheet</em>. The scores for each creature are given in the book each time you have an encounter.</p>\n<p>The sequence of combat is then:</p>\n<ol>\n<li>Roll both dice once for the creature. Add its SKILL score. This total is the creature’s Attack Strength.</li>\n<li>Roll both dice once for yourself. Add the number rolled to your current SKILL score. This total is your Attack Strength.</li>\n<li>If your Attack Strength is higher than that of the creature, you have wounded it. Proceed to step 4. If the creature’s Attack Strength is higher than yours, it has wounded you. Proceed to step 5. If both Attack Strength totals are the same, you have avoided each other’s blows – start the next Attack Round from step 1 above.</li>\n<li>You have wounded the creature, so subtract 2 points from its STAMINA score. You may use your LUCK here to do additional damage (see over).</li>\n<li>The creature has wounded you, so subtract 2 points from your own STAMINA score. Again you may use LUCK at this stage (see over).</li>\n<li>Make the appropriate adjustments to either the creature’s or your own STAMINA scores (and your LUCK score if you used LUCK – see over).</li>\n<li>Begin the next Attack Round by returning to your current SKILL score and repeating steps</li>\n</ol>\n<p class=\"page-number\">11</p>",
+            "thought": null,
+            "thought_signature": "EpQ2CpE2AXLI2nxQQomAO2E_wcQiLDYf-lp5G3fzsl2-gpDmEW98K51GgDSca4DrsbAN6HyK03mpggVpuLAitTbMT4POsWHAJCOMtAC9exAEnx_tzn1LpezRY2ITV3gRbVJU-Mc5qCbW8BWVZUD1su1IWxhxWUShAJtB37RjznSLm2ApxN_nh9B23e6MLUI8QpzW_faw-EbHBvmvctCGMym2El5QRpYZdWCxpaRbetPIx9O0B3LP9AgPRFWbMJtR1DNc1wc-Ut_rK-OlX2YqIvFVKTP-SglWLS-bv27mTKiPw2zrOrPY0L3AF9v7ml9oMsSeGB_u_S7JKJAnLFRlVdR6KQakD_lliuRqP3svXBHu9we8EN7wvhYZOVsOY0OxLkHBluQR9GxAE_hPsyDtBtyQjVC-4NqvxDnkg57SA8VhH50XGv6Mb7zNFwjHwzeNvpJp7pdkgRryhTPbDn21yId9ZcC_IPtpD2v8TOjWHMeVQ0jgW2nQoJ1MYqQAYwwUTJojKy6AXXk2x4BoGd-BtphugW4Zzk1eYQflBa_Hav9KJLbaGmG7KkxaKxkPAPnIJkwiCS9N7yVBNGSlUDdxIIfSQ9ZhBnA2eQ7TUB7IVv_A2vzTwv6CngQnmiIj8jurF685yPxDDnZU0P1LQWK35WswRDrQvGSHIWVsDj7ef2NUEAGRCXPxu9MFqFep70MiLQtie5N0ukLkafBYP4Jx3j_MuQrL4SlJ7eLnCHTOazZnWVHVAy36bdQgDeSPK6N3scBp6rw_fbZdPEvI2pe7TftxG0B-dB6cGxRzLtL5d5TfvC8V9zzVr41lnYwXRJae2IYp5Ot7qL45cciE0BItB1KQdN0YrNkLyqLeTDr8hV0mlS39g2J14LoJCnu9BMQV8wL_X0uCLxXR_LHNfVd6kEBUUHvo5wCUmS3oYTprnQnLJ92XXpLgHFXLWfKc2_bb2CZFu_d92hh0c28mEBB9w-jOdEO0YR-nZqNwSQ42xsqiGzLRcvyfLML5HYp_cUoy_lMhBNiafr28GJvD0Pq1OFF2R5tBXzrTnbrrGR3_TYyxo8vTFJVh65ervIw90jnLYJuwWDUlLY3Cw2EWqxcoymN3Micv6tNvDkBT0E6LuVfJonBoYIY-rpLvi7x600YbiE6Bu5VWdYGSgVujSiiKX9MJJjrbhASaqUMNHatySg4Q8P7nlM2Xyqpfn8lyEOUv5GP-3YXQKCybMOEkNb5GkNviR-6mf9FghFV51IvBpM0ntUq7x1EQZxd3kVfa_6QzTTqlx2wT7_dNn4t-5etdcZWhOs8LFVJWu92bs1Rbdqtq57uEj3qPNGHpaH18qOJw9fg4XyQApRNen5aQDzRnwZMc3cblF8FsW3kdyAKK-xFQcBAWLBBMtttF8m7lMTfgyYM7vUth0qexoP3hHdQV2UQcT-BJCZ-5S_kMfpp06JhPhnRPjM2pkf6CLE5AfbkoIHhoS2GZSUGDOAXeNvO-li3ckR6EMGdLhc6Qsw5eWqXPdHBTI5fRPdtGtlTUkaWYR5dxZaY0GLOc5FqqPOlK2hM_1ttgkaTtaDF6wpM_kI5BZobcPYsd60SFxGR0mgY_a6pGOAdFZ8_9LB0LTFzjlC3jwvdGDse8v1zwfKEvS8GHOHjMk6wO8sGxSHZ7f8w-KeWOvfjUzKDMBN_OKX_N0htSgaFkEz5SAY7yaKtsflNGTgHmYbOZzKIPi5h27kxWH3qW451DWnmLV8bDbD-n_JEdP5IjTpLPtUOUximOg-svVKbapCBAXhnOjud14ZCm3XBk0nDpL6LPaJOR6U6hdubCkkGh7-10quQM_nejsnJjktE3eYI-IKZBGCG4aVY35fVuZjbMGCVVe_01lgQsE5qhvYR58vguMwbFU4PhU43pjOsk7mARMEjAKDQynHiYBJMoaVn1X8HpuBsMcf_mADTa4ULi5RTpk1cHAQYtgJBdA6YQpRqLbUbcCl87qMaErCuNsRYPhVDmonpMnSKaC5V_4ZHEUEqI6Wodrrc7FZaL3GMoF0qkxPj_mxwv025zqM5QBuNvBZWtJMxWVJ11RgDUV8yQ34Ph4psan3WPC3kUw0_EXqHz04Czu1LoV5EwXR5cha292FkDh_LZRDQ5k__DEk1bGP_GP9kJKcG-Z_C9QX-m6lqs-dI8MUV9UoT0aQcZetl-Lq4FeV6DKnW_4kBGuo1DiQqv-NN3C7qwQPy5EDGR1zOXGLCK3rw9WvxijbCPwHgeBpb6qTGNCpokkLjb2FEnwTn8stsxGDdqQmpVzq4nirQOGibTecrdAEB74kwSuTG31ukNjMJ6lxMvPNkUnXuYXIwfIQB5r8FqHmXMCdzUn4x9jtMq4XIo8hmp7ogDeLZqqemFcs9PfOq30YImdcsPKFUIgXzMaJLrX56rxIUtzn8knJ8TER2JzDucVsWb5vzl7GB6WOKp3CAcnDw909pnURuJ369fjgAG1Vwxxm9aU1j6CrR3LB-2dwqaWWIu2QOlRRaEpS9REIQFfzuCjL77kjqql0BzQE5-HJnZW_u7rWptknQNUyvvuXz_4rNbJfvkuhrw1m2wiTgOt80sm57TZri9huzFrdv_RvTUEEWRi7Usl-gpkrYGNx1Rjouu_9JyQ2zU4tOB5mZg4bcjsClYO7ZFPz_8rLptsGMMSVOSZnGaHjsHqeRtcA5hg3crK98UO2rRNSCZ9JxQnlfG764aoyCsMGIqrk3mR0gCiTsLctXarn_jCXpAw57DClch1gvyqsgWQTZuXmQ6Ba7QX2oyGvOEAE2PkgGs8MOHX9ZzTkjHYYVql0m8bixMmxtBrqiCm4gp_rWSbcrYlEHI5qxse-Q7sEmYgWFeYUIamwMNfw8SRLIArC9ghgFk3XRp7bwqLIjpS3PLMVYSyvawzvKj_QYxM3qna5dTL50Xah-f_o1Yo5GNYysbXLAOE0an_ZDqEcgJp4qdQeoB5mRs5-CFObDeWGCiYzWC5slX67CPw5pvJrB94uGArG_PVpIJ4Eo9eze--fkez8FdXvTqyLFQS5V_-Ire1Lhp74Ccy7rfgiEuUVaaUcad5VoVyVz_FgtggsN3LdWZzlJi2mCGzYZ5S2b4DOv9WRtKhsG8Zc96mDKJNb5tt20Nrqfy5APDf0axbAraopm5S1ofARuR3jjY45j0TQBOcGe-hGcmStZG3eAU5eqpnO7d31PDss8vggS0zqFNDAwJlZRI_tLW6mh4xUT7gv7xIQ7yIPn5eRUSG_FXp4O2Zto6QSZJunIA0RMX2RjYhJ5WU-Y9XL9FLwIQVFtCcMYy83AP8NwVNUIspoNM_-rCTTKC21B-_mi7kuYg5IhyXd-qdCNrCJTwihI21giyxdUKrNQBDYGppGIAgXLOLmgAmC78-IrdDqqsmu3gm6XfVMfls9ciHzJI6X4JwCLwEKm0zCFTxPUKPBIndXjtcx97QVgfWNkEw_i6Lvz1QtrBAFFcx6GUDmFq_jSfdVfu2_fmzMoy_ogVEPdQLlJvnLNulobG2Mhis5axIPJUfjBJzycw0itV5XNUOGO9YE8xXujSzFpLEbX5sfmRbjvcNmRejAgalShOR6l5EkS1WRwRRSJEYE6emvEa0LutW0zc5xZyMIhM0HSUWuzBjVRVXaVMCQ-eXmZ1JZkxL-leXEMRfh_NrB-l03QzzBg6Zwq_RpV5KKOULawx3R71hTLNZtHkb-ZGknJ6vD6ybYMmA1rHekguH6VZPp0jTt3lceJ88ARhvA6osfBbxaHCgJ6aND9_SX7n45OAtWcKcXSgZ-f0EY2TjP13lk_khVDUwPgX5OWXHSv-nKeMY_ABq90OI0yTJztYgkevSJgpLCnYYSKsG0cjvwSoi39jPwqccz0GFomwlhKStVPKbuQE94A-86vdXRbdQkKWAcuB_ThNBORvqqZDF-KrWx49BsPWv_vWEmo4bFLzwDjpwGelnAB-d5IDYQpy9RjVlJlWEmZ71F1Qzxy8VzQpOLhFrqqPGJIITttrLldHlFgvWuIunqmg3vGDSExXR46Kukiv9lbSNczqVaNN51TH0a0Iw3dLs3rPF5o6VofIK1l7W4E4SzjdAmu468GGcjLvXascPkuSL88pENAwbaoPzg44ZMq9gIJCSQfWQhTazGZYbRkIlXcDyTwbvFhGqVZzeCT0VVTnCoU089L-9SzVg2693VY9qLnF7D8P6ku0tUJGsdrR0pR_pe5V0xGk3u0wmwd9I2Sg8rvowWrykuOdqo1k75PD9NPtPX9zi47nzG1hl3OgJUPmLYb-ITeBIfXxwaJ_817HOMiHlAxrCi-KYTgj5_VRFyNgYSRnnrldynMjcjynRLYaMn8jiCO6xR51KwldyNZ8ek25aXU2Mo9UFzbZlF5i17jvRMP2mkCvczpWhfIfIG8gSFHGvAkGSObNvJoHhv8jr8cLBguTjY10O9YwCReRFwP5dUfFNglNO7n5q0dOl0qhwNNhviqLV5BQNhwWO-MSwod_5shEMPiOj-EUGxBt5_luLXenxey74vRzKTdC9RRLvLpzoGfvNrhZag49fKglE-T22Jk2oH0NMRBRlCPWzDPXM_p2P0xgGYOmQDqwyJo5uxeXVXITneEhr-83B6u6wHeoJOabfLDuvhdQwEtqFA4kJ5pMtOX83DIMK2Rb4LKzPHclmuAmejEVI7sb3OlXm3lL-UfDML_Vq86xmwE8N4TVfzXcN9yydcz6PopDU3M8KE2DXeFiFASR9HYY5AQ8msmQ_TugrKf4zmjxTGHolFrhYVVt2yZDgDvB3qZ8yXwMgkfBmWBlUIxh5Cgvo_fXSpn3UWrAL96kNVULMzknS3hqT2s9iTxoUTc-kKJM3ra4LWwJS1gFosjOrpyfQhhr9yEhbkk1de2cYNc8UXwEOqsboP-FV3COY1fMDwSd5ucGfmOtvsiRaSPNrtfjSi1qUZYRjG-0jZleILnAGX-_HPeJsJYpG-8PRqwKDAdL37yGQKSi7Th6PGHsIN3AvVP4Km79u2qDOauPb74p-2cKzDBHrDvSgM3z4KI59qImmxbL57iHswrmjqAWEk1yxgeUDfqHztSBWWwWBvZ4MxYcmXkhO_XRFjtYKmfoAL1fU5Dw_4gUkcNOJ9U4wippSkqs-bXb6Qn3sap9ZRqpS4q-w4cyly4e4b62kYWzUuPGnuFfUjhxo3ZAft5RWHQJGAPleeBHzo4TM4ORcSdNGsFTgq35RuJjOL4ecDYYGQtFqxSprqVysj9fJBQG8ng-g8sEUNlzV4ASGn3ihkRqoShCdNbeAYZ7edOLfuyoWKFYZteyJF9FeDit1eCetOhzFBmjieNcDH58A2KH1VLmh7qwWAHLyvHqqzPQwNrRYaZPln0W7QudJSqk1T4oeeMUTbyeW5omsqDKgzuXWdlz6K3c_XmPBqCNQnyI8IbtJzvAdtnMaXQLU-fTaqiH8_g1JNQQsF6uzF38ULRqzRpVYQorkLRxJPm9tM4IjW6v7zwlGXWJwj4cswG5Mga3rrOjJBRt1avTW8CVK2mb7o62SL5vGYhxh0LT26stInvBh88Xgb6BSNCZFxCxp1mfnJqmPvgZKdwwRIjtfrR80nbwnNtYEENHlAP87QknZIFZPc6d6DW4HOsnSHVYHl1yj_HyYix-nhui5gnDIejyreKY6XzPtFq-2YaPDVAOGe4S0ZFnPzqAmt9FHo3qDJVDhjkmqu9HuceoSR17Bhj82GiV81OzEL3DoqQbegp5tDt53ceosHSbwFQj-v0xVmldwzgOhW7oT-1qQ_LpCY021_Ph0zUrCZVia0h5qgCznagKVt-0UTLTIYfieCZ-jxoOdkfOwC2pP7jF0EBFFgamH21p1_oN0KJQTKe9ogIKj1T2J_xmKVCbfgZf1aUyAYyS-tMDEWBMVXQ2cAH6xfHOx49p6wWLsXFOT-CIczV9bWGVpDgbuxmM-sZ1UD90n3QalIvm4FqIC5ARZKOgS7dWM1Mad3_rRtCTeYZAEBWxa75WIFLn8y7NNjLLsZnkHdbTQxQPk145rUbPFPXm_kkOlV8bqFxsaSssumS3wecd8pZgtVM5fEPZR9BVhClFy4MRLOrpVuR5w_lSF5mQKwHd_LVwHZdXiIJpIvbkEcHrw2T61CsCnSF1N7MQ8P8fZFbBB-RkraB4fOsPIDbFAgydzoNvACei5o4kwL8Vsk8CM6P7I6-awRZF77b9mT4VXv4IKG_sij8apQkW20ORqZI_SGhWkVpoMG8LWqJ8e_9q8Mj2_2knPlC6BYiNZ9CU0NwRkzqL8zXX-dvXNw9lF71rCmh6UAUMpEGpix7N7hg5A0sx4HpxoqDCSG71kOkW8lTNHdPwsOxtXcrfWGY1oEgqtI2zZ1gEwxVbp07yzBkQLpNKgt7wo7CnXQRme9jxDMUZ5kEHq6ePR0pSwZh-OfI3EamaqGfy7vXNrdmdH-YS0NrtyczIpdPM_frR9UXxor6BW0qOSzKWco_j-azG-galOTKBAOYGOrt5G0KG3Dv1XzMHJoRzL_tPnfZWOhjzIS-EbSRfCdZqUm-t1YOuXFDuauG5iWAoCkI5sdxPPaOXV_21zMmBrtU_8ez41Wt0Jk38UbkqAeY3UxLx9T4la0v3QAaJxl7hyU7GDqhSM5fJ1bXXVpCh7NRX2qfL0u3jtp9fx2LGj6-jfGNenusoV2rEd0xjIbHS5hi7kCVPJF5dNrYVFPwRSarvEpe5cJk3Mt-snBiPNGY3iyWWLqPh8nrm0I0av1O2Cejbpc7HraKc1LfW4AKkDwoeRTYcICvpw8tz46zk85TEcQ3djpxj1Fe03iL7B_bBCzt-zkeO0zM2QRw2nDh43uHPogQypzdkorr0maBgO5AxOxylhSP4CgMBkqkOBtXyPjXb2r1SlgNOInYd9Y7hXGaGTTg-3N80BBZ_slKNkeoBM_uQ20pzOfWIA4t0VECq5tMz1_bA9hjtlxiWCCdjqMwCa7swHyKOMkUBtf1mK1KB5gQ_2WmeiFZOFkeE1_cT1Pn01jP2hYbrkXSaFBix5mPyA0f235-yfFpBlwCGkgCzv1WHsgpENKBNWnAe1vCFBoFOvPI1Fg68iTcesyxY71O9cEmpXyGX8jFs6B9H3pOb7Wgnyl64VejOgTBadSi4Qtw3hLy_nAz69QqehJOzHpWapqZNvtrufrNgnn8s0EvS8owbm0yyOLIYd4lRcIu_tGkyIil1TOK_pE8s7choXEPPulTq3NUixwHDX_8Jogm9uY6dBCDTvZnwgiPG0HxUKi4QecaWn-0yS9QzeAXh8967cfPVKuvaePL_MGL5ToKny4J4Lsi1tUd3soywCKvQcfGUgkLNA3_HLKOLWm_H0Iz069dJ50IY1VonL9toEYKSeBKc7kTSLA0C7Hqh_zRRKfWOg3wkEjZ11dw2mc-BfvQmlx4ZFS0F0jzEJL1bfa8uSPIsftxDEOwUvn4wS904ob9zMupow4HpdLTV6njeD8uJrbRd1DCLP9clt87-6zvY9WDpX8MGXX_2ZvVPmF_-IUUBqktmbLdUYEiQluXx9_AND1xZ9FbknBIkpkUocNvAQ4eqWAdfT9nOoZo89LilLEQRBYTCUNo0XLXKpGCS3JxEFq5ckzBFegp3ywHLaWGld8PZoL25wBNx4W_CW2BGbKg4vMcODlT9cjWsXBQsB6t6YRxbnzAvalFFXHECEe6eJzjju8slgj0r3i3cxlrFNbBbpS47ihRX1sqQI9_UkLkpDzPpG2BmyvysvjzW2U_bfKiV2qwMCh2-QtT291KkKg8GhwDU8CbiyZrZ2guZCJ9Yx_hTVqBIRqObuZ0R5cv84nQVO-GLLjOqoEL-NYG6BIUCLGWlDPADmj6KOjKgfvCGqn4FoyPoj2ZbVG0kCA1UEPuKIxD8SexC5ePnAepdKx6G2mCAwETROlsSjZLGPua1QAqtxG1nCAjZHbZhRwt3YWYuKnrjzuDZuygu2nMmmj-fgCK9puyFTV_CK879k42Bh0ZNzdCcZbS1M0DeTy56rl_CijEGKPgVw2YaxxVH2FVme84T7jasE0baZMzItS5F8ExpvmCjs4fQ6h65LXyIMtZKGrP6ys_nga5_jqQjV2LOJmyPcUMg7_g7bR8VKWNhtS8M277aAaBUg3nWSm1FbcAyTTYheflHKeVr6u2FoMkuMtjPbV4XlHN9iEO8hSF-5S2fRhcq_vwLgdInkz_DhC6zswSmuj0zJoXYBQtU8o1uBUbBFWtzh18HCauj0K0ZsnaMsM1HkmHqFfFLXhpKJ1SNS8FuHe0_vBPG9R5YgAl_S_lQ5bm8cUQnFL4wKRxptLY3kSSI4j9mxczUJmy608_o42ZqGjWujCgW8yuky0LDDpWSlv3cJVwkpsD_V4vr0nQYZT6LqZckg-HAMjkVnL3ZvW-jjSRwA5LOKJFvrSlgGCy7yxXHfe0jtDH88LFXZm3FGneVJ8nmGm12aOdP81rh8YWvMhOYLju8vQ6aDhtDEFa4Cb72qloc_s6sIV4GetptMrSQ9OB5OS4MTRNsMHojgaLTsMVmB8cBcHy0OJ5BdqAp-WaS_tGubYnq1r5vS5LbP-8nkQhMzdEmtyO73OHpshsB5SGxlHOm15RDsV0udCX-AFSUH7s7AUy5ohedH4L8KMLeQbIOExkXX-J_Sdt1G0HDqZ8SxwYpGI1m4UXWKXWBTA7yELIoZr5ExvCPtl5_7CAWrXAMBiEW8WGHPcUqKyq4xZF5rQqWYSkNl-1PgHGnpgUrl1wMKFmQRyql6PAftz6A_2em8Gco6GtJzOSjAC7CUPnwf2BBY44Zs-SlK8SYFfxIaUEasWlAfg1bWY2tKttPfJbyY8AKCbrQsjiBOVK6wrP6YqercqVrBd--uZEFCYWHQCgirtA0eXfZN5F4CZwSfYN9HMWCnBsTTvybZ3CuNrQztdln9MMIHk8FrQp6viyv-w-1m4Rvth3B_VjmjTRwAVn5rE3eRfExfOMC8QkBwQv4K_Rji_CghdXTAnL6FDhzkWIEKR4uSQK9NEVcuCRrx2A0pUT-WoFVoumBz1_XnSnHnLTrt-oA0zshtYmeh7jtbsVEUxSVDuWYWjh5q0mghid20gw66_9IplEYU-jca-QoW5eKdmogbLaTqVqcQtL8hQhR7liZTZ3BFVtC3kWboE_GuL9T6LwUwB5Hc31Cap_lqhqa4TGKfPNopiIQCiPABbyV4e3Whe6jLNQfUKEiZToM1tcTi96Xn4h3Gi45vqGGSMWefxm0pZY=",
+            "video_metadata": null
+          }
+        ],
+        "role": "model"
+      },
+      "citation_metadata": {
+        "citations": [
+          {
+            "end_index": 632,
+            "license": "",
+            "publication_date": null,
+            "start_index": 392,
+            "title": null,
+            "uri": "https://github.com/Dwake5/Fantasy-book"
+          },
+          {
+            "end_index": 834,
+            "license": "",
+            "publication_date": null,
+            "start_index": 512,
+            "title": null,
+            "uri": "https://www.scribd.com/document/638492303/FF05-City-of-Thieves"
+          }
+        ]
+      },
+      "finish_message": null,
+      "token_count": null,
+      "finish_reason": "STOP",
+      "avg_logprobs": null,
+      "grounding_metadata": null,
+      "index": 0,
+      "logprobs_result": null,
+      "safety_ratings": null,
+      "url_context_metadata": null
+    }
+  ],
+  "create_time": null,
+  "model_version": "gemini-3-pro-preview",
+  "prompt_feedback": null,
+  "response_id": "AOlGabuMFfHUz7IP-uTQqAQ",
+  "usage_metadata": {
+    "cache_tokens_details": null,
+    "cached_content_token_count": null,
+    "candidates_token_count": 343,
+    "candidates_tokens_details": null,
+    "prompt_token_count": 1407,
+    "prompt_tokens_details": [
+      {
+        "modality": "TEXT",
+        "token_count": 332
+      },
+      {
+        "modality": "IMAGE",
+        "token_count": 1075
+      }
+    ],
+    "thoughts_token_count": 1720,
+    "tool_use_prompt_token_count": null,
+    "tool_use_prompt_tokens_details": null,
+    "total_token_count": 3470,
+    "traffic_type": null
+  },
+  "automatic_function_calling_history": [],
+  "parsed": null
+}

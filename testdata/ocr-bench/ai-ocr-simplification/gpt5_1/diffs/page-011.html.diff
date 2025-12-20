@@ -1,0 +1,332 @@
+--- gold/page-011.html
++++ model/page-011.html
+@@ -1,130 +1,214 @@
+ <h1>
+ ADVENTURE SHEET
+ </h1>
+-<p>
+-<strong>
++<table>
++<tbody>
++<tr>
++<td>
++<p>
+ SKILL
+-</strong>
+-</p>
+-<p>
+-Initial Skill =
+-</p>
+-<p>
+-<strong>
++</p>
++<p>
++<em>
++Initial
++</em>
++</p>
++<p>
++<em>
++Skill =
++</em>
++</p>
++</td>
++<td>
++<p>
+ STAMINA
+-</strong>
+-</p>
+-<p>
+-Initial Stamina =
+-</p>
+-<p>
+-<strong>
++</p>
++<p>
++<em>
++Initial
++</em>
++</p>
++<p>
++<em>
++Stamina =
++</em>
++</p>
++</td>
++<td>
++<p>
+ LUCK
+-</strong>
+-</p>
+-<p>
+-Initial Luck =
+-</p>
+-<p>
+-<strong>
++</p>
++<p>
++<em>
++Initial
++</em>
++</p>
++<p>
++<em>
++Luck =
++</em>
++</p>
++</td>
++</tr>
++<tr>
++<td>
++<p>
+ ITEMS OF EQUIPMENT CARRIED
+-</strong>
+-</p>
+-<p>
+-<strong>
++</p>
++</td>
++<td>
++<p>
+ GOLD
+-</strong>
+-</p>
+-<p>
+-<strong>
++</p>
++</td>
++<td>
++<p>
+ JEWELS
+-</strong>
+-</p>
+-<p>
+-<strong>
++</p>
++</td>
++</tr>
++<tr>
++<td>
++</td>
++<td>
++<p>
+ POTIONS
+-</strong>
+-</p>
+-<p>
+-<strong>
++</p>
++</td>
++<td>
++</td>
++</tr>
++<tr>
++<td>
++</td>
++<td>
++<p>
+ PROVISIONS REMAINING
+-</strong>
+-</p>
++</p>
++</td>
++<td>
++</td>
++</tr>
++</tbody>
++</table>
+ <h2>
+ MONSTER ENCOUNTER BOXES
+ </h2>
+-<img alt="Small sword illustration above the section header">
+-<ul>
+-<li>
+-<p>
+-Skill =
+-</p>
+-<p>
+-Stamina =
+-</p>
+-</li>
+-<li>
+-<p>
+-Skill =
+-</p>
+-<p>
+-Stamina =
+-</p>
+-</li>
+-<li>
+-<p>
+-Skill =
+-</p>
+-<p>
+-Stamina =
+-</p>
+-</li>
+-<li>
+-<p>
+-Skill =
+-</p>
+-<p>
+-Stamina =
+-</p>
+-</li>
+-<li>
+-<p>
+-Skill =
+-</p>
+-<p>
+-Stamina =
+-</p>
+-</li>
+-<li>
+-<p>
+-Skill =
+-</p>
+-<p>
+-Stamina =
+-</p>
+-</li>
+-<li>
+-<p>
+-Skill =
+-</p>
+-<p>
+-Stamina =
+-</p>
+-</li>
+-<li>
+-<p>
+-Skill =
+-</p>
+-<p>
+-Stamina =
+-</p>
+-</li>
+-<li>
+-<p>
+-Skill =
+-</p>
+-<p>
+-Stamina =
+-</p>
+-</li>
+-</ul>+<table>
++<tbody>
++<tr>
++<td>
++<p>
++<em>
++Skill =
++</em>
++</p>
++<p>
++<em>
++Stamina =
++</em>
++</p>
++</td>
++<td>
++<p>
++<em>
++Skill =
++</em>
++</p>
++<p>
++<em>
++Stamina =
++</em>
++</p>
++</td>
++<td>
++<p>
++<em>
++Skill =
++</em>
++</p>
++<p>
++<em>
++Stamina =
++</em>
++</p>
++</td>
++</tr>
++<tr>
++<td>
++<p>
++<em>
++Skill =
++</em>
++</p>
++<p>
++<em>
++Stamina =
++</em>
++</p>
++</td>
++<td>
++<p>
++<em>
++Skill =
++</em>
++</p>
++<p>
++<em>
++Stamina =
++</em>
++</p>
++</td>
++<td>
++<p>
++<em>
++Skill =
++</em>
++</p>
++<p>
++<em>
++Stamina =
++</em>
++</p>
++</td>
++</tr>
++<tr>
++<td>
++<p>
++<em>
++Skill =
++</em>
++</p>
++<p>
++<em>
++Stamina =
++</em>
++</p>
++</td>
++<td>
++<p>
++<em>
++Skill =
++</em>
++</p>
++<p>
++<em>
++Stamina =
++</em>
++</p>
++</td>
++<td>
++<p>
++<em>
++Skill =
++</em>
++</p>
++<p>
++<em>
++Stamina =
++</em>
++</p>
++</td>
++</tr>
++</tbody>
++</table>

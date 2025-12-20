@@ -1,0 +1,89 @@
+{
+  "sdk_http_response": {
+    "headers": {
+      "content-type": "application/json; charset=UTF-8",
+      "vary": "Origin, X-Origin, Referer",
+      "content-encoding": "gzip",
+      "date": "Sat, 20 Dec 2025 18:21:42 GMT",
+      "server": "scaffolding on HTTPServer2",
+      "x-xss-protection": "0",
+      "x-frame-options": "SAMEORIGIN",
+      "x-content-type-options": "nosniff",
+      "server-timing": "gfet4t7; dur=6245",
+      "alt-svc": "h3=\":443\"; ma=2592000,h3-29=\":443\"; ma=2592000",
+      "transfer-encoding": "chunked"
+    },
+    "body": null
+  },
+  "candidates": [
+    {
+      "content": {
+        "parts": [
+          {
+            "media_resolution": null,
+            "code_execution_result": null,
+            "executable_code": null,
+            "file_data": null,
+            "function_call": null,
+            "function_response": null,
+            "inline_data": null,
+            "text": "<p class=\"running-head\">79-82</p>\n\n<h2>79</h2>\n<p>You grip the arms of the chair tightly, half expecting a surge of energy or pain to rush through your body. <em>Test your Luck</em>. If you are Lucky, turn to <strong>106</strong>. If you are Unlucky, turn to <strong>383</strong>.</p>\n\n<h2>80</h2>\n<p>You take your time and manage to step over the last pole without having touched any of them. You hurry on east, still following the two pairs of footprints. Turn to <strong>313</strong>.</p>\n\n<img alt=\"A small rat or creature scurrying\" />\n\n<h2>81</h2>\n<p>The only furniture in the Goblin’s room is a table, two chairs and a cupboard on the wall. There are two closed doors, one in the west wall and the other in the north wall. Will you:</p>\n\n<table>\n  <tbody>\n    <tr>\n      <td>Open the cupboard?</td>\n      <td>Turn to <strong>307</strong></td>\n    </tr>\n    <tr>\n      <td>Open the west door?</td>\n      <td>Turn to <strong>263</strong></td>\n    </tr>\n    <tr>\n      <td>Open the north door?</td>\n      <td>Turn to <strong>136</strong></td>\n    </tr>\n  </tbody>\n</table>\n\n<h2>82</h2>\n<p>As the Pit Fiend slams its body against the wall, you let go of the rope and drop safely to the floor. You run towards the double doors and are relieved to feel them swing open as you push on them. You let them swing shut behind you and head north along the tunnel. Turn to <strong>214</strong>.</p>",
+            "thought": null,
+            "thought_signature": "Ev8DCvwDAXLI2nwQhFMct1bPtB4afOsS6SrfVD7boBASPJrptKRql4EzfPQ7yqkY9XjV1YbL5PC78VoPfSNE5Bf5HiMYIrRt_Z_Dx_IOfEdfix6YW9__E1MwZPwhmdNpElkpQ7HV0Gwekw8rDgilYyFVWbSxxLsbIwvf9_qsPm_PPiZwoNkMUwJGCVijRU9oyfvO5jj_O2JOd8mUDfFzYiyoaF1hbpO_o9mjMKCOoRxk23PGvGXRYxrABb7xQyDLMBN2yyykZni8lbBNfj24YXKJx1k1obUFf3CMkxwGQtF6-aH6EhBInzF6UICrxv1lwIkTcfVE8IK0ZPp0Gj-dbp_nHzK_a_rTml61qHtKCmbwZ1jtAV6i6rHFjxKYekV0uSFjk0lb8BY3UloLb9V2zhRMKZzqouUnfons2_u3NcZxbEa0c7RfmO5YiE4fQg4kozH9ImMkSLamyotqBPLBrXWm8EdbKoBTdbak3QZ5wBXcMc-Dys1VQqTXfB-gvUwAqNJDDjipK74Ey9Tvc1Lx6GL5x9vEV2F9pUsVQLbVKGWFEJksCkyIVKlnOcA2WrpdVm7zgsxtuFJGwSH7jOaPTCo5F067oMp3MDzWMQlOqQ_e7HvLr7a4pVOAFXYf4LU8ifJHTqPvl_tcMb0ZvMYH299-OsPZT0ZsJDJGHw4nJ8VKgw==",
+            "video_metadata": null
+          }
+        ],
+        "role": "model"
+      },
+      "citation_metadata": {
+        "citations": [
+          {
+            "end_index": 1359,
+            "license": "",
+            "publication_date": null,
+            "start_index": 1093,
+            "title": null,
+            "uri": "http://www.tgdmb.com/phpBB3/viewtopic.php?p=559701"
+          }
+        ]
+      },
+      "finish_message": null,
+      "token_count": null,
+      "finish_reason": "STOP",
+      "avg_logprobs": null,
+      "grounding_metadata": null,
+      "index": 0,
+      "logprobs_result": null,
+      "safety_ratings": null,
+      "url_context_metadata": null
+    }
+  ],
+  "create_time": null,
+  "model_version": "gemini-3-pro-preview",
+  "prompt_feedback": null,
+  "response_id": "NulGaZqfH4W2qtsPrsDz0QU",
+  "usage_metadata": {
+    "cache_tokens_details": null,
+    "cached_content_token_count": null,
+    "candidates_token_count": 376,
+    "candidates_tokens_details": null,
+    "prompt_token_count": 1407,
+    "prompt_tokens_details": [
+      {
+        "modality": "TEXT",
+        "token_count": 332
+      },
+      {
+        "modality": "IMAGE",
+        "token_count": 1075
+      }
+    ],
+    "thoughts_token_count": 116,
+    "tool_use_prompt_token_count": null,
+    "tool_use_prompt_tokens_details": null,
+    "total_token_count": 1899,
+    "traffic_type": null
+  },
+  "automatic_function_calling_history": [],
+  "parsed": null
+}

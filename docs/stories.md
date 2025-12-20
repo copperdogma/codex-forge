@@ -114,10 +114,11 @@ This index tracks stories in `/docs/stories/` for the codex-forge pipeline.
 || 074 | Missing Sections Investigation — Complete 100% Coverage | High | Done | /docs/stories/story-074-missing-sections-investigation.md |
 || 075 | Booktype Text Cleanup Adapter (Downstream Normalization) | Medium | To Do | /docs/stories/story-075-booktype-text-cleanup-adapter.md |
 || 076 | AI Vision Engine Evaluation — Best Value for Pipeline | Medium | To Do | /docs/stories/story-076-ai-vision-engine-evaluation.md |
-|| 077 | AI OCR Radical Simplification — Challenging the Escalation Assumption | High | To Do | /docs/stories/story-077-ai-ocr-simplification.md |
+|| 077 | AI OCR Radical Simplification — Challenging the Escalation Assumption | High | Done | /docs/stories/story-077-ai-ocr-simplification.md |
 || 078 | Boundary Ordering Guard + Targeted Escalation | High | Done | /docs/stories/story-078-boundary-ordering-escalation.md |
 || 079 | Sequential Page Numbering Refactor — Dual-Field Provenance | High | Done | /docs/stories/story-079-page-numbering-refactor.md |
 || 080 | Central Escalation Cache (Premium OCR Overlay) | High | To Do | /docs/stories/story-080-central-escalation-cache.md |
+|| 081 | GPT‑5.1 AI‑First OCR Pipeline (HTML‑First) | High | To Do | /docs/stories/story-081-ai-ocr-gpt51-pipeline.md |
 || 099 | Remove dev-only backcompat disclaimer | Low | To Do | /docs/stories/story-099-remove-dev-backcompat-note.md |
 
 ## Notes

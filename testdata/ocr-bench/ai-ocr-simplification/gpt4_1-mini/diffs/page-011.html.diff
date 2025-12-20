@@ -1,0 +1,234 @@
+--- gold/page-011.html
++++ model/page-011.html
+@@ -1,130 +1,137 @@
+ <h1>
+ ADVENTURE SHEET
+ </h1>
+-<p>
+-<strong>
++<dl>
++<dt>
+ SKILL
+-</strong>
+-</p>
+-<p>
++</dt>
++<dd>
+ Initial Skill =
+-</p>
+-<p>
+-<strong>
++</dd>
++</dl>
++<dl>
++<dt>
+ STAMINA
+-</strong>
+-</p>
+-<p>
++</dt>
++<dd>
+ Initial Stamina =
+-</p>
+-<p>
+-<strong>
++</dd>
++</dl>
++<dl>
++<dt>
+ LUCK
+-</strong>
+-</p>
+-<p>
++</dt>
++<dd>
+ Initial Luck =
+-</p>
+-<p>
+-<strong>
++</dd>
++</dl>
++<dl>
++<dt>
+ ITEMS OF EQUIPMENT CARRIED
+-</strong>
+-</p>
+-<p>
+-<strong>
++</dt>
++<dd>
++</dd>
++</dl>
++<dl>
++<dt>
+ GOLD
+-</strong>
+-</p>
+-<p>
+-<strong>
++</dt>
++<dd>
++</dd>
++</dl>
++<dl>
++<dt>
+ JEWELS
+-</strong>
+-</p>
+-<p>
+-<strong>
++</dt>
++<dd>
++</dd>
++</dl>
++<dl>
++<dt>
+ POTIONS
+-</strong>
+-</p>
+-<p>
+-<strong>
++</dt>
++<dd>
++</dd>
++</dl>
++<dl>
++<dt>
+ PROVISIONS REMAINING
+-</strong>
+-</p>
++</dt>
++<dd>
++</dd>
++</dl>
+ <h2>
+ MONSTER ENCOUNTER BOXES
+ </h2>
+-<img alt="Small sword illustration above the section header">
+-<ul>
+-<li>
+-<p>
++<table>
++<tbody>
++<tr>
++<td>
+ Skill =
+-</p>
+-<p>
++<br>
+ Stamina =
+-</p>
+-</li>
+-<li>
+-<p>
++</td>
++<td>
+ Skill =
+-</p>
+-<p>
++<br>
+ Stamina =
+-</p>
+-</li>
+-<li>
+-<p>
++</td>
++<td>
+ Skill =
+-</p>
+-<p>
++<br>
+ Stamina =
+-</p>
+-</li>
+-<li>
+-<p>
++</td>
++</tr>
++<tr>
++<td>
+ Skill =
+-</p>
+-<p>
++<br>
+ Stamina =
+-</p>
+-</li>
+-<li>
+-<p>
++</td>
++<td>
+ Skill =
+-</p>
+-<p>
++<br>
+ Stamina =
+-</p>
+-</li>
+-<li>
+-<p>
++</td>
++<td>
+ Skill =
+-</p>
+-<p>
++<br>
+ Stamina =
+-</p>
+-</li>
+-<li>
+-<p>
++</td>
++</tr>
++<tr>
++<td>
+ Skill =
+-</p>
+-<p>
++<br>
+ Stamina =
+-</p>
+-</li>
+-<li>
+-<p>
++</td>
++<td>
+ Skill =
+-</p>
+-<p>
++<br>
+ Stamina =
+-</p>
+-</li>
+-<li>
+-<p>
++</td>
++<td>
+ Skill =
+-</p>
+-<p>
++<br>
+ Stamina =
+-</p>
+-</li>
+-</ul>+</td>
++</tr>
++<tr>
++<td>
++Skill =
++<br>
++Stamina =
++</td>
++<td>
++Skill =
++<br>
++Stamina =
++</td>
++<td>
++Skill =
++<br>
++Stamina =
++</td>
++</tr>
++</tbody>
++</table>

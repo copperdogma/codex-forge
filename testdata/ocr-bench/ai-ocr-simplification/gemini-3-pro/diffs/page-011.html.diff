@@ -1,0 +1,216 @@
+--- gold/page-011.html
++++ model/page-011.html
+@@ -1,6 +1,10 @@
+ <h1>
+ ADVENTURE SHEET
+ </h1>
++<table>
++<tbody>
++<tr>
++<td>
+ <p>
+ <strong>
+ SKILL
+@@ -9,6 +13,8 @@
+ <p>
+ Initial Skill =
+ </p>
++</td>
++<td>
+ <p>
+ <strong>
+ STAMINA
+@@ -17,6 +23,8 @@
+ <p>
+ Initial Stamina =
+ </p>
++</td>
++<td>
+ <p>
+ <strong>
+ LUCK
+@@ -25,106 +33,162 @@
+ <p>
+ Initial Luck =
+ </p>
++</td>
++</tr>
++<tr>
++<td>
+ <p>
+ <strong>
+ ITEMS OF EQUIPMENT CARRIED
+ </strong>
+ </p>
++</td>
++<td>
+ <p>
+ <strong>
+ GOLD
+ </strong>
+ </p>
++</td>
++</tr>
++<tr>
++<td>
+ <p>
+ <strong>
+ JEWELS
+ </strong>
+ </p>
++</td>
++</tr>
++<tr>
++<td>
+ <p>
+ <strong>
+ POTIONS
+ </strong>
+ </p>
++</td>
++</tr>
++<tr>
++<td>
+ <p>
+ <strong>
+ PROVISIONS REMAINING
+ </strong>
+ </p>
+-<h2>
++</td>
++</tr>
++</tbody>
++</table>
++<img alt="A simple sword illustration pointing to the right">
++<h1>
+ MONSTER ENCOUNTER BOXES
+-</h2>
+-<img alt="Small sword illustration above the section header">
+-<ul>
+-<li>
++</h1>
++<table>
++<tbody>
++<tr>
++<td>
+ <p>
+ Skill =
+ </p>
+ <p>
+ Stamina =
+ </p>
+-</li>
+-<li>
++</td>
++<td>
+ <p>
+ Skill =
+ </p>
+ <p>
+ Stamina =
+ </p>
+-</li>
+-<li>
++</td>
++<td>
+ <p>
+ Skill =
+ </p>
+ <p>
+ Stamina =
+ </p>
+-</li>
+-<li>
++</td>
++</tr>
++<tr>
++<td>
+ <p>
+ Skill =
+ </p>
+ <p>
+ Stamina =
+ </p>
+-</li>
+-<li>
++</td>
++<td>
+ <p>
+ Skill =
+ </p>
+ <p>
+ Stamina =
+ </p>
+-</li>
+-<li>
++</td>
++<td>
+ <p>
+ Skill =
+ </p>
+ <p>
+ Stamina =
+ </p>
+-</li>
+-<li>
++</td>
++</tr>
++<tr>
++<td>
+ <p>
+ Skill =
+ </p>
+ <p>
+ Stamina =
+ </p>
+-</li>
+-<li>
++</td>
++<td>
+ <p>
+ Skill =
+ </p>
+ <p>
+ Stamina =
+ </p>
+-</li>
+-<li>
++</td>
++<td>
+ <p>
+ Skill =
+ </p>
+ <p>
+ Stamina =
+ </p>
+-</li>
+-</ul>+</td>
++</tr>
++<tr>
++<td>
++<p>
++Skill =
++</p>
++<p>
++Stamina =
++</p>
++</td>
++<td>
++<p>
++Skill =
++</p>
++<p>
++Stamina =
++</p>
++</td>
++<td>
++<p>
++Skill =
++</p>
++<p>
++Stamina =
++</p>
++</td>
++</tr>
++</tbody>
++</table>

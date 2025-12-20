@@ -1,0 +1,89 @@
+{
+  "sdk_http_response": {
+    "headers": {
+      "content-type": "application/json; charset=UTF-8",
+      "vary": "Origin, X-Origin, Referer",
+      "content-encoding": "gzip",
+      "date": "Sat, 20 Dec 2025 18:20:55 GMT",
+      "server": "scaffolding on HTTPServer2",
+      "x-xss-protection": "0",
+      "x-frame-options": "SAMEORIGIN",
+      "x-content-type-options": "nosniff",
+      "server-timing": "gfet4t7; dur=6638",
+      "alt-svc": "h3=\":443\"; ma=2592000,h3-29=\":443\"; ma=2592000",
+      "transfer-encoding": "chunked"
+    },
+    "body": null
+  },
+  "candidates": [
+    {
+      "content": {
+        "parts": [
+          {
+            "media_resolution": null,
+            "code_execution_result": null,
+            "executable_code": null,
+            "file_data": null,
+            "function_call": null,
+            "function_response": null,
+            "inline_data": null,
+            "text": "<p>If the creature has just wounded you, you may <em>Test your Luck</em> to try to minimize the wound. If you are lucky, you have managed to avoid the full damage of the blow. Restore 1 point of <strong>STAMINA</strong> (i.e. instead of doing 2 points of damage it has done only 1). If you are unlucky, you have taken a more serious blow. Subtract 1 extra <strong>STAMINA</strong> point.</p>\n<p>Remember that you must subtract 1 point from your own <strong>LUCK</strong> score each time you <em>Test your Luck</em>.</p>\n<h2>Restoring Skill, Stamina and Luck</h2>\n<h3><em>Skill</em></h3>\n<p>Your <strong>SKILL</strong> score will not change much during your adventure. Occasionally, a page may give instructions to increase or decrease your <strong>SKILL</strong> score. A Magic Weapon may increase your <strong>SKILL</strong>, but remember that only one weapon can be used at a time! You cannot claim 2 <strong>SKILL</strong> bonuses for carrying two Magic Swords. Your <strong>SKILL</strong> score can never exceed its <em>Initial</em> value unless specifically instructed. Drinking the Potion of Skill (see later) will restore your <strong>SKILL</strong> to its <em>Initial</em> level at any time.</p>\n<h3><em>Stamina and Provisions</em></h3>\n<p>Your <strong>STAMINA</strong> score will change a lot during your adventure as you fight monsters and undertake arduous tasks. As you near your goal, your <strong>STAMINA</strong> level may be dangerously low and battles may be particularly risky, so be careful!</p>\n<p class=\"page-number\">14</p>",
+            "thought": null,
+            "thought_signature": "EpYECpMEAXLI2nzjM2ihJ8IjfsXhRkBwqNOX-NVjyMrej7CqociEgKGVcHnmaoxlDeLs3HC4Kx5M57L_oxLZJkuERPmxKu1Gb2vO739aC9O_UXeMNk5-Ft87dWZjkS8Yd8djJc2toCDk4T_ZnJqmhRwO2ey5IB1qVsEyCqeiUAWXkiHEOcl9knfi8jNGyo6pjzGWBitWfkXi-kfG7YXK-x0ybmHF69Of_LbeYVXJLcmKaO-hkuqMpTo011sBk4_59kOewSojshrKkAcLZiBgZneguxSPn3SXZG9TGZBUtzxmF3-9wlma8yUWYawIox3Zx40YnWzSoSclSjxcGOtiKHrbnO7wqoauQlCbBBmmeKxp0VM9xBWnfeIMEKhIA3O0inMb6jlvnveIVp_vV05Ez7OXwqm-UkEXEJePYF543H3Twqf9QhJidkWcSjI-qfRpGUk2hVzEGBm4TffOoHotP9Xx0o44rSzRkJid8ncrxDVTxlnCZ338QCdUahCX3boTCLGf3_oD_w7ocmz5kuXkDB4IVr8dNW-t768Y1rFXYyeOMdAGXRGYiNpPgDeeVr5OEJssWCJP8CbZSW2gHWlftZjpTTzsED8-AQAnoVgB5SeBwYliEZLh5aX0AR_XDnonvWZwEy42SL9emoHIRxEdwn3PvirhLgTTEu9ttQQ3VtizS5Dywh-DERKM86HegnI0WByKpyaFCdJU",
+            "video_metadata": null
+          }
+        ],
+        "role": "model"
+      },
+      "citation_metadata": {
+        "citations": [
+          {
+            "end_index": 339,
+            "license": "",
+            "publication_date": null,
+            "start_index": 76,
+            "title": null,
+            "uri": "https://github.com/delacannon/oldschool-dungeon-crawler-book"
+          }
+        ]
+      },
+      "finish_message": null,
+      "token_count": null,
+      "finish_reason": "STOP",
+      "avg_logprobs": null,
+      "grounding_metadata": null,
+      "index": 0,
+      "logprobs_result": null,
+      "safety_ratings": null,
+      "url_context_metadata": null
+    }
+  ],
+  "create_time": null,
+  "model_version": "gemini-3-pro-preview",
+  "prompt_feedback": null,
+  "response_id": "B-lGae6UBO6eqtsP_Ye5kAQ",
+  "usage_metadata": {
+    "cache_tokens_details": null,
+    "cached_content_token_count": null,
+    "candidates_token_count": 364,
+    "candidates_tokens_details": null,
+    "prompt_token_count": 1407,
+    "prompt_tokens_details": [
+      {
+        "modality": "IMAGE",
+        "token_count": 1075
+      },
+      {
+        "modality": "TEXT",
+        "token_count": 332
+      }
+    ],
+    "thoughts_token_count": 131,
+    "tool_use_prompt_token_count": null,
+    "tool_use_prompt_tokens_details": null,
+    "total_token_count": 1902,
+    "traffic_type": null
+  },
+  "automatic_function_calling_history": [],
+  "parsed": null
+}

@@ -1,0 +1,34 @@
+--- gold/page-017R.html
++++ model/page-017R.html
+@@ -1,21 +1,25 @@
+-<p class="running-head">
+-6-8
+-</p>
++<h1>
++6–8
++</h1>
+ <h2>
+ 6
+ </h2>
+ <p>
+-Knowing that the Manticore will fire the spikes in its tail at you, you run for cover behind one of the pillars. Before you reach it, a volley of spikes flies through the air and one of them sinks into your arm. Lose 2 STAMINA points. If you are still alive, you waste no time and attack the Manticore with your sword before it has time to unleash more of its deadly spikes.
++Knowing that the Manticore will fire the spikes in its tail at you, you run for cover behind one of the pillars. Before you reach it, a volley of spikes flies through the air and one of them sinks into your arm. Lose 2
++<strong>
++stamina
++</strong>
++points. If you are still alive, you waste no time and attack the Manticore with your sword before it has time to unleash more of its deadly spikes.
+ </p>
+ <dl>
+ <dt>
+ MANTICORE
+ </dt>
+ <dd>
+-SKILL 11
++skill 11
+ </dd>
+ <dd>
+-STAMINA 11
++stamina 11
+ </dd>
+ </dl>
+ <p>

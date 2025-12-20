@@ -1,0 +1,17 @@
+--- gold/page-017R.html
++++ model/page-017R.html
+@@ -12,10 +12,12 @@
+ MANTICORE
+ </dt>
+ <dd>
++<strong>
+ SKILL 11
+-</dd>
+-<dd>
++</strong>
++<strong>
+ STAMINA 11
++</strong>
+ </dd>
+ </dl>
+ <p>

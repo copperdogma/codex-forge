@@ -1,0 +1,19 @@
+--- gold/page-054R.txt
++++ model/page-054R.txt
+@@ -1,12 +1,15 @@
+ 164-166
+ 164
+-As you walk along, droplets of water again start falling from the tunnel ceiling. You see wet footprints, made by the same boots that you followed earlier, heading west. The footprints lead to a closed iron door in the right-hand wall of the tunnel, but do not seem to go any further. If you wish to open the door, turn to 299. If you would rather keep going west, turn to 83.
++As you walk along, droplets of water again start falling from the tunnel ceiling. You see wet foot- prints, made by the same boots that you followed earlier, heading west. The footprints lead to a closed iron door in the right-hand wall of the tunnel, but do not seem to go any further. If you wish to open the door, turn to 299. If you would rather keep going west, turn to 83.
+ 165
+ There is a slot in the padlock into which you place the coin. Immediately the lock clicks apart, and you are able to unchain the stilts. You place them on your shoulder and once again set off north. Turn to 234.
+ 166
+ As you touch the emerald eye of the idol, you hear a creaking sound below you. Looking down, you are shocked to see the two stuffed birds taking flight. Their wings flap in jerky movements, but they are soon above you and look set to attack. Fight the FLYING GUARDIANS one at a time, but reduce your SKILL by 3 during this combat because of your restricted position.
+ SKILL
+ STAMINA
++SKILL STAMINA
++First FLYING GUARDIAN 7 8
++Second FLYING GUARDIAN 8 8
+ First FLYING GUARDIAN
+ 7
+ 8

@@ -1,0 +1,10 @@
+--- gold/page-011.txt
++++ model/page-011.txt
+@@ -11,7 +11,6 @@
+ POTIONS
+ PROVISIONS REMAINING
+ MONSTER ENCOUNTER BOXES
+-[image: Small sword illustration above the section header]
+ Skill =
+ Stamina =
+ Skill =

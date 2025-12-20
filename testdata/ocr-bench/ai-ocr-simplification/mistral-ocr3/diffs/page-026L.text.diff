@@ -1,0 +1,25 @@
+--- gold/page-026L.txt
++++ model/page-026L.txt
+@@ -1,17 +1,6 @@
+ 40-42
+-40
+-You call out to the Dwarf that you are ready to fight the MINOTAUR. The wooden door rises slowly and you see the fearsome beast, half man, half bull, step into the arena. Steam blows from its nostrils as it works itself up into a rage, ready to attack. Suddenly it rushes forward, swinging its double-headed axe.
+-MINOTAUR
+-SKILL 9
+-STAMINA 9
+-If you win, turn to 163.
+-41
+-You walk slowly over to the alcove, carefully checking the floor for any more hidden traps. You see that the goblet contains a sparkling red liquid. Will you:
+-Drink the red liquid?
+-Turn to 98
+-Leave the goblet and walk back to search the Barbarian (if you have not done so already)?
+-Turn to 126
+-Leave the chamber to continue west?
+-Turn to 83
+-42
+-The cobra's fangs sink deep into your wrist and you feel its poison starting to creep through your body. Lose 5 STAMINA points. If you are still alive, the Dwarf has no mercy but tells you to try again. Roll two dice. If the total is the same as or less than your SKILL, turn to 55. If the total is greater than your SKILL, turn to 202.
++40 You call out to the Dwarf that you are ready to fight the MINOTAUR. The wooden door rises slowly and you see the fearsome beast, half man, half bull, step into the arena. Steam blows from its nostrils as it works itself up into a rage, ready to attack. Suddenly it rushes forward, swinging its double-headed axe.
++MINOTAUR SKILL 9 STAMINA 9 If you win, turn to 163.
++41 You walk slowly over to the alcove, carefully checking the floor for any more hidden traps. You see that the goblet contains a sparkling red liquid. Will you:
++Drink the red liquid? Turn to 98 Leave the goblet and walk back to search the Barbarian (if you have not done so already)? Turn to 126 Leave the chamber to continue west? Turn to 83
++42 The cobra's fangs sink deep into your wrist and you feel its poison starting to creep through your body. Lose 5 STAMINA points. If you are still alive, the Dwarf has no mercy but tells you to try again. Roll two dice. If the total is the same as or less than your SKILL, turn to 55. If the total is greater than your SKILL, turn to 202.

@@ -1,0 +1,17 @@
+--- gold/page-054R.txt
++++ model/page-054R.txt
+@@ -5,12 +5,8 @@
+ There is a slot in the padlock into which you place the coin. Immediately the lock clicks apart, and you are able to unchain the stilts. You place them on your shoulder and once again set off north. Turn to 234.
+ 166
+ As you touch the emerald eye of the idol, you hear a creaking sound below you. Looking down, you are shocked to see the two stuffed birds taking flight. Their wings flap in jerky movements, but they are soon above you and look set to attack. Fight the FLYING GUARDIANS one at a time, but reduce your SKILL by 3 during this combat because of your restricted position.
+-SKILL
+-STAMINA
+ First FLYING GUARDIAN
+-7
+-8
++SKILL 7 STAMINA 8
+ Second FLYING GUARDIAN
+-8
+-8
++SKILL 8 STAMINA 8
+ If you win, turn to 11.

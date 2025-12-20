@@ -1,0 +1,19 @@
+--- gold/page-017L.html
++++ model/page-017L.html
+@@ -13,14 +13,10 @@
+ <p>
+ In the total darkness you do not see the pipe's downward turn. You slip and, unable to get a grip on the slimy pipe, slide over the edge. Your screams echo down the pipe as you fall the fifty metres to the bottom. You have failed the Trial of Champions.
+ </p>
+-<img alt="Skull and bones amid splashing water at the bottom of a pipe">
++<img alt="Illustration of a skull resting among scattered bones and stones.">
+ <h2>
+ 5
+ </h2>
+ <p>
+-You crawl along the floor and find yourself in the lair of a tribe of TROGLODYTES. As you creep past them, your scabbard bangs against a rock on the floor.
+-<em>
+-Test your Luck.
+-</em>
+-If you are Lucky, turn to 185. If you are Unlucky, turn to 395.
++You crawl along the floor and find yourself in the lair of a tribe of TROGLODYTES. As you creep past them, your scabbard bangs against a rock on the floor. Test your Luck. If you are Lucky, turn to 185. If you are Unlucky, turn to 395.
+ </p>

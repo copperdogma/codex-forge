@@ -1,0 +1,69 @@
+--- gold/page-011.txt
++++ model/page-011.txt
+@@ -1,32 +1,45 @@
+-ADVENTURE SHEET
++ADVENCURE SHEET
++C
++6
++MONSTER ENCOUNTER BOXES
++Skill =
++STAMINA
++Skill =
+ SKILL
+-Initial Skill =
+-STAMINA
+-Initial Stamina =
++Skill =
+ LUCK
+-Initial Luck =
+-ITEMS OF EQUIPMENT CARRIED
++Initial
++Stamma =
++Initial
++Stamina -
++Initial
++Stamina =
++Skill =
++Stamina -
++Luck =
++ITEMS OF
+ GOLD
++Skill =
++Skill -
++Skill =
++EQUIPMENT
++Stamina =
++Stanina =
++Stamina -
++CARRIED
+ JEWELS
+ POTIONS
+-PROVISIONS REMAINING
+-MONSTER ENCOUNTER BOXES
+-[image: Small sword illustration above the section header]
++Skill -
++Skill =
+ Skill =
+ Stamina =
+-Skill =
++Stamina -
+ Stamina =
+-Skill =
++PROVISIONS
++REMAINING
++Skill -
++Skill -
++Skill .
+ Stamina =
+-Skill =
+ Stamina =
+-Skill =
+ Stamina =
+-Skill =
+-Stamina =
+-Skill =
+-Stamina =
+-Skill =
+-Stamina =
+-Skill =
+-Stamina =

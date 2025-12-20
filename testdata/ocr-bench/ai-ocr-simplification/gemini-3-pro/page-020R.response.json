@@ -1,0 +1,97 @@
+{
+  "sdk_http_response": {
+    "headers": {
+      "content-type": "application/json; charset=UTF-8",
+      "vary": "Origin, X-Origin, Referer",
+      "content-encoding": "gzip",
+      "date": "Sat, 20 Dec 2025 18:21:29 GMT",
+      "server": "scaffolding on HTTPServer2",
+      "x-xss-protection": "0",
+      "x-frame-options": "SAMEORIGIN",
+      "x-content-type-options": "nosniff",
+      "server-timing": "gfet4t7; dur=6839",
+      "alt-svc": "h3=\":443\"; ma=2592000,h3-29=\":443\"; ma=2592000",
+      "transfer-encoding": "chunked"
+    },
+    "body": null
+  },
+  "candidates": [
+    {
+      "content": {
+        "parts": [
+          {
+            "media_resolution": null,
+            "code_execution_result": null,
+            "executable_code": null,
+            "file_data": null,
+            "function_call": null,
+            "function_response": null,
+            "inline_data": null,
+            "text": "<p class=\"running-head\">16-17</p>\n\n<h2>16</h2>\n<p>You just have time to hear the Gnome say, &lsquo;Three skulls&rsquo; before a white bolt of energy shoots out from the lock into your chest, knocking you unconscious. Roll one die, add 1 to the number and reduce your STAMINA by the total. If you are still alive, you come to and are told by the Gnome to try again. You chose the wrong gems last time, so you won&rsquo;t try that combination again.</p>\n\n<table>\n<thead>\n<tr>\n<th>A</th>\n<th>B</th>\n<th>C</th>\n<th></th>\n</tr>\n</thead>\n<tbody>\n<tr>\n<td>Emerald</td>\n<td>Diamond</td>\n<td>Sapphire</td>\n<td>Turn to <strong>16</strong></td>\n</tr>\n<tr>\n<td>Diamond</td>\n<td>Sapphire</td>\n<td>Emerald</td>\n<td>Turn to <strong>392</strong></td>\n</tr>\n<tr>\n<td>Sapphire</td>\n<td>Emerald</td>\n<td>Diamond</td>\n<td>Turn to <strong>177</strong></td>\n</tr>\n<tr>\n<td>Emerald</td>\n<td>Sapphire</td>\n<td>Diamond</td>\n<td>Turn to <strong>287</strong></td>\n</tr>\n<tr>\n<td>Diamond</td>\n<td>Emerald</td>\n<td>Sapphire</td>\n<td>Turn to <strong>132</strong></td>\n</tr>\n<tr>\n<td>Sapphire</td>\n<td>Diamond</td>\n<td>Emerald</td>\n<td>Turn to <strong>249</strong></td>\n</tr>\n</tbody>\n</table>\n\n<img alt=\"A small rat or creature crouching on the ground.\" />\n\n<h2>17</h2>\n<p>You are not strong enough to force open the heavy door. The water is now waist-high and you are exhausted from your efforts. The water level rises quickly and you find yourself floating ever upwards until your face is pressed against the ceiling. You are soon completely immersed and unable to hold your breath any longer. Your adventure ends here.</p>",
+            "thought": null,
+            "thought_signature": "EtADCs0DAXLI2nzO1y4PLFrfN3OZFLd1-oW31ISv0O9nEx7ilcDyLAuPKHWgfZgem4LsjBUM-BrvY_3hckohmXcgElJmlLg7zk8SEUSV7Gdfm0BsxbF3Mpzj4TOK9OmY3XthJbpUnpAM3_01Ys7rh0ZSRG8lUPAlRcfenHx7gY3jrEcz9VeX-6G5P16Q9wXTfWMfrcbNV5SORAdnfiCgpAS6EKFOeI-ZQkMRnhhe4JxEyoAq_spjrADmTLbZHqLcPNIfJLD6iNX6Tvpn3ukKAwW2nqamIYN8aEwmAhfGYmLGD7CfP2V1GpZvRTpywhlrvAnYRKRodT0PV_gSusB0co1kRl0Hxr-EGVPk2NSH_QiaW84k51w0oNAdREaRt84dhJDukz6taR-T2VXmlEVmJGhOKQEZOACjPPcTxsALZiZ2B3NVxA5TXXwSD2Bmqhy3fc6H2nx1wYKpKCbhRG7wQ6AG_BfrV5MaceP2MR-q_d_gTY44xwq9Eni68jKh_MW2SYah86qWcNtMVha-f-LDlUeF6wMCHUmz8y0Yi4zsbWVRrGauJ5mWJ9-hqTgg1eDbpnqA7YVHAF_WAsjCBIOXj4px4DZbnhph2FDBVu45RDoauZo=",
+            "video_metadata": null
+          }
+        ],
+        "role": "model"
+      },
+      "citation_metadata": {
+        "citations": [
+          {
+            "end_index": 412,
+            "license": "",
+            "publication_date": null,
+            "start_index": 119,
+            "title": null,
+            "uri": "https://www.annarchive.com/files/FF6%20Deathtrap%20Dungeon_NEW.pdf"
+          },
+          {
+            "end_index": 1593,
+            "license": "",
+            "publication_date": null,
+            "start_index": 1243,
+            "title": null,
+            "uri": "https://github.com/michelangelopolice/Deathtrap-Dungeon"
+          }
+        ]
+      },
+      "finish_message": null,
+      "token_count": null,
+      "finish_reason": "STOP",
+      "avg_logprobs": null,
+      "grounding_metadata": null,
+      "index": 0,
+      "logprobs_result": null,
+      "safety_ratings": null,
+      "url_context_metadata": null
+    }
+  ],
+  "create_time": null,
+  "model_version": "gemini-3-pro-preview",
+  "prompt_feedback": null,
+  "response_id": "KelGacdo57qa2Q-co4uIBA",
+  "usage_metadata": {
+    "cache_tokens_details": null,
+    "cached_content_token_count": null,
+    "candidates_token_count": 416,
+    "candidates_tokens_details": null,
+    "prompt_token_count": 1407,
+    "prompt_tokens_details": [
+      {
+        "modality": "TEXT",
+        "token_count": 332
+      },
+      {
+        "modality": "IMAGE",
+        "token_count": 1075
+      }
+    ],
+    "thoughts_token_count": 120,
+    "tool_use_prompt_token_count": null,
+    "tool_use_prompt_tokens_details": null,
+    "total_token_count": 1943,
+    "traffic_type": null
+  },
+  "automatic_function_calling_history": [],
+  "parsed": null
+}

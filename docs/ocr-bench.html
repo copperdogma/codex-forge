@@ -1,0 +1,407 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>AI OCR Benchmark — codex-forge</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=Fraunces:opsz,wght@9..144,500;9..144,700&display=swap" rel="stylesheet" />
+  <style>
+    :root {
+      --ink: #111318;
+      --muted: #5a616b;
+      --paper: #f4f1ea;
+      --accent: #ff6b3d;
+      --accent-2: #2b7a78;
+      --accent-3: #f7c948;
+      --card: #fffdf8;
+      --border: #e7e0d5;
+      --shadow: 0 12px 30px rgba(0,0,0,0.08);
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      font-family: "Space Grotesk", system-ui, sans-serif;
+      color: var(--ink);
+      background:
+        radial-gradient(1200px 600px at 10% -10%, #ffe4d6, transparent 60%),
+        radial-gradient(900px 500px at 110% 0%, #d7f0ee, transparent 55%),
+        var(--paper);
+    }
+    .wrap {
+      max-width: 1200px;
+      margin: 0 auto;
+      padding: 32px 20px 80px;
+    }
+    header {
+      display: grid;
+      gap: 12px;
+      align-items: start;
+    }
+    .kicker {
+      text-transform: uppercase;
+      letter-spacing: 0.12em;
+      font-size: 12px;
+      color: var(--muted);
+    }
+    h1 {
+      font-family: "Fraunces", serif;
+      font-size: clamp(32px, 4vw, 56px);
+      margin: 0;
+      line-height: 1.05;
+    }
+    .sub {
+      color: var(--muted);
+      font-size: 16px;
+      max-width: 820px;
+    }
+
+    .panel {
+      margin-top: 24px;
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: 16px;
+      padding: 18px 20px;
+      box-shadow: var(--shadow);
+    }
+
+    .controls {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+      gap: 16px;
+      align-items: end;
+    }
+    .field label {
+      display: block;
+      font-size: 12px;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      color: var(--muted);
+      margin-bottom: 8px;
+    }
+    .field input, .field select {
+      width: 100%;
+      padding: 10px 12px;
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      background: #fff;
+      font-size: 14px;
+      font-family: inherit;
+    }
+    .toggle {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      font-size: 13px;
+      color: var(--muted);
+      margin-top: 6px;
+    }
+
+    .summary-grid {
+      margin-top: 20px;
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+      gap: 14px;
+    }
+    .summary-card {
+      background: #fff;
+      border: 1px solid var(--border);
+      border-radius: 14px;
+      padding: 14px;
+    }
+    .summary-card .label {
+      font-size: 12px;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      color: var(--muted);
+    }
+    .summary-card .value {
+      font-size: 22px;
+      font-weight: 700;
+      margin-top: 6px;
+    }
+
+    .table-wrap {
+      margin-top: 24px;
+      overflow: auto;
+      border-radius: 16px;
+      border: 1px solid var(--border);
+      background: #fff;
+      box-shadow: var(--shadow);
+    }
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 14px;
+    }
+    thead {
+      background: #f8f4ee;
+    }
+    th, td {
+      padding: 12px 14px;
+      text-align: left;
+      border-bottom: 1px solid var(--border);
+      vertical-align: middle;
+    }
+    th {
+      font-size: 12px;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      color: var(--muted);
+    }
+    .badge {
+      display: inline-block;
+      padding: 4px 8px;
+      border-radius: 999px;
+      font-size: 11px;
+      letter-spacing: 0.06em;
+      text-transform: uppercase;
+      border: 1px solid transparent;
+      background: #ffeede;
+      color: #9a3d22;
+      margin-left: 6px;
+    }
+    .badge.best {
+      background: #e8fbf4;
+      color: #117a65;
+      border-color: #bceee0;
+    }
+    .badge.warn {
+      background: #fff0f0;
+      color: #a61b1b;
+      border-color: #f5b5b5;
+      margin-left: 0;
+    }
+    .chip {
+      background: #f1f4f8;
+      color: #2e3a4a;
+      border-radius: 10px;
+      padding: 2px 8px;
+      font-size: 12px;
+      margin-left: 6px;
+    }
+    .note {
+      font-size: 11px;
+      color: var(--muted);
+    }
+
+    .notes {
+      margin-top: 18px;
+      color: var(--muted);
+      font-size: 13px;
+    }
+
+    @media (max-width: 640px) {
+      th:nth-child(4), td:nth-child(4),
+      th:nth-child(8), td:nth-child(8) {
+        display: none;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <header>
+      <div class="kicker">AI OCR Benchmark</div>
+      <h1>Choosing the Fastest Path to Clean Gamebook Text</h1>
+      <div class="sub">Live comparison across OCR engines and vision models. Structural accuracy matters as much as raw text. Adventure Sheet (page‑011) is a known outlier; metrics default to excluding it.</div>
+    </header>
+
+    <section class="panel">
+      <div class="controls">
+        <div class="field">
+          <label for="pageCount">Pages to price</label>
+          <input id="pageCount" type="number" min="1" step="1" value="226" />
+        </div>
+        <div class="field">
+          <label for="sortBy">Sort by</label>
+          <select id="sortBy">
+            <option value="avg_html_ratio_excl">HTML accuracy (excl. Adv. Sheet)</option>
+            <option value="avg_text_ratio_excl">Text accuracy (excl. Adv. Sheet)</option>
+            <option value="avg_html_ratio_ignore_dropped">HTML accuracy (ignore dropped)</option>
+            <option value="avg_text_ratio_ignore_dropped">Text accuracy (ignore dropped)</option>
+            <option value="page011_text_ratio">Adventure Sheet (text)</option>
+            <option value="avg_html_ratio_incl">HTML accuracy (incl. Adv. Sheet)</option>
+            <option value="avg_text_ratio_incl">Text accuracy (incl. Adv. Sheet)</option>
+            <option value="cost_total">Total cost</option>
+          </select>
+        </div>
+        <div class="field">
+          <label for="direction">Direction</label>
+          <select id="direction">
+            <option value="desc">High → Low</option>
+            <option value="asc">Low → High</option>
+          </select>
+        </div>
+      </div>
+      <div class="toggle">
+        <input type="checkbox" id="includeAdv" />
+        <label for="includeAdv">Include Adventure Sheet in averages</label>
+      </div>
+
+      <div class="summary-grid" id="summary"></div>
+    </section>
+
+    <section class="table-wrap">
+      <table>
+        <thead>
+          <tr>
+            <th>Model</th>
+            <th>Provider</th>
+            <th>Tier</th>
+            <th>HTML Avg</th>
+            <th>Text Avg</th>
+            <th>Adventure Sheet (Text)</th>
+            <th>Dropped Pages</th>
+            <th>Cost / Page</th>
+            <th>Cost / Book</th>
+          </tr>
+        </thead>
+        <tbody id="tableBody"></tbody>
+      </table>
+    </section>
+
+    <div class="notes">
+      Data from `testdata/ocr-bench/ai-ocr-simplification/*/diffs/diff_summary.json`. Cost is computed from provider pricing when token or per‑page data is available. Page count is adjustable; default is 226 pages.
+    </div>
+  </div>
+
+  <script>
+    const formatPct = (v) => (v == null ? "—" : (v * 100).toFixed(2) + "%");
+    const formatUsd = (v) => (v == null ? "—" : "$" + v.toFixed(4));
+
+    const state = {
+      data: null,
+      pageCount: 226,
+      sortBy: "avg_html_ratio_excl",
+      direction: "desc",
+      includeAdv: false,
+    };
+
+    function computeCost(entry, pages) {
+      if (entry.cost_per_page_usd == null) return null;
+      return entry.cost_per_page_usd * pages;
+    }
+
+    function bestBy(key) {
+      const values = state.data.entries.map(e => e[key]).filter(v => v != null);
+      if (!values.length) return null;
+      return Math.max(...values);
+    }
+
+    function renderSummary() {
+      const htmlKey = state.includeAdv ? 'avg_html_ratio_incl' : 'avg_html_ratio_excl';
+      const textKey = state.includeAdv ? 'avg_text_ratio_incl' : 'avg_text_ratio_excl';
+      const bestHtml = bestBy(htmlKey);
+      const bestText = bestBy(textKey);
+      const bestAdv = bestBy('page011_text_ratio');
+      const summary = document.getElementById('summary');
+      summary.innerHTML = `
+        <div class="summary-card">
+          <div class="label">Best HTML Accuracy</div>
+          <div class="value">${formatPct(bestHtml)}</div>
+        </div>
+        <div class="summary-card">
+          <div class="label">Best Text Accuracy</div>
+          <div class="value">${formatPct(bestText)}</div>
+        </div>
+        <div class="summary-card">
+          <div class="label">Best Adventure Sheet (Text)</div>
+          <div class="value">${formatPct(bestAdv)}</div>
+        </div>
+        <div class="summary-card">
+          <div class="label">Pages Priced</div>
+          <div class="value">${state.pageCount}</div>
+        </div>
+      `;
+    }
+
+    function renderTable() {
+      const tbody = document.getElementById('tableBody');
+      const htmlKey = state.includeAdv ? 'avg_html_ratio_incl' : 'avg_html_ratio_excl';
+      const textKey = state.includeAdv ? 'avg_text_ratio_incl' : 'avg_text_ratio_excl';
+      const bestHtml = bestBy(htmlKey);
+      const bestText = bestBy(textKey);
+      const bestAdv = bestBy('page011_text_ratio');
+
+      const rows = [...state.data.entries].map(e => {
+        const costTotal = computeCost(e, state.pageCount);
+        return {
+          ...e,
+          cost_total: costTotal,
+        };
+      });
+
+      rows.sort((a, b) => {
+        const key = state.sortBy;
+        const dir = state.direction === 'desc' ? -1 : 1;
+        const av = a[key] == null ? -Infinity : a[key];
+        const bv = b[key] == null ? -Infinity : b[key];
+        return (av - bv) * dir;
+      });
+
+      tbody.innerHTML = rows.map(e => {
+        const htmlVal = e[htmlKey];
+        const textVal = e[textKey];
+        const htmlBadge = htmlVal === bestHtml ? '<span class="badge best">best</span>' : '';
+        const textBadge = textVal === bestText ? '<span class="badge best">best</span>' : '';
+        const advBadge = e.page011_text_ratio === bestAdv ? '<span class="badge best">best</span>' : '';
+        const cost = e.cost_per_page_usd == null ? '—' : formatUsd(e.cost_per_page_usd);
+        const costBook = e.cost_per_page_usd == null ? '—' : formatUsd(e.cost_total);
+        const est = e.cost_estimated ? '<div class="note">est.</div>' : '';
+        const note = e.cost_note ? `<div class=\"note\">${e.cost_note}</div>` : '';
+        const dropped = (e.dropped_pages && e.dropped_pages.length)
+          ? `<span class=\"badge warn\">${e.dropped_pages.length} dropped</span><div class=\"note\">${e.dropped_pages.join(', ')}</div>`
+          : '—';
+        return `
+          <tr>
+            <td><strong>${e.name}</strong></td>
+            <td>${e.provider}</td>
+            <td>${e.tier ? `<span class=\"chip\">${e.tier}</span>` : ''}</td>
+            <td>${formatPct(htmlVal)} ${htmlBadge}</td>
+            <td>${formatPct(textVal)} ${textBadge}</td>
+            <td>${formatPct(e.page011_text_ratio)} ${advBadge}</td>
+            <td>${dropped}</td>
+            <td>${cost} ${est}${note}</td>
+            <td>${costBook}</td>
+          </tr>
+        `;
+      }).join('');
+    }
+
+    async function init() {
+      const res = await fetch('ocr-bench-data.json');
+      state.data = await res.json();
+      const pageInput = document.getElementById('pageCount');
+      state.pageCount = state.data.pages_default || 226;
+      pageInput.value = state.pageCount;
+
+      document.getElementById('sortBy').addEventListener('change', (e) => {
+        state.sortBy = e.target.value;
+        renderTable();
+      });
+      document.getElementById('direction').addEventListener('change', (e) => {
+        state.direction = e.target.value;
+        renderTable();
+      });
+      pageInput.addEventListener('input', (e) => {
+        const v = parseInt(e.target.value || '0', 10);
+        state.pageCount = Number.isFinite(v) && v > 0 ? v : 226;
+        renderSummary();
+        renderTable();
+      });
+      document.getElementById('includeAdv').addEventListener('change', (e) => {
+        state.includeAdv = e.target.checked;
+        renderSummary();
+        renderTable();
+      });
+
+      renderSummary();
+      renderTable();
+    }
+
+    init();
+  </script>
+</body>
+</html>

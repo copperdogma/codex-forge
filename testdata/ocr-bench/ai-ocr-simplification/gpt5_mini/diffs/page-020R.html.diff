@@ -1,0 +1,28 @@
+--- gold/page-020R.html
++++ model/page-020R.html
+@@ -1,3 +1,6 @@
++<p class="page-number">
++16
++</p>
+ <p class="running-head">
+ 16-17
+ </p>
+@@ -20,6 +23,7 @@
+ C
+ </th>
+ <th>
++Turn to
+ </th>
+ </tr>
+ </thead>
+@@ -110,7 +114,9 @@
+ </tr>
+ </tbody>
+ </table>
+-<img alt="Illustration of a small rodent lying on its side">
++<p>
++<img alt="Illustration of a sleeping rat">
++</p>
+ <h2>
+ 17
+ </h2>

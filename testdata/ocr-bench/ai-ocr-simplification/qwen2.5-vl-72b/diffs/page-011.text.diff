@@ -1,0 +1,33 @@
+--- gold/page-011.txt
++++ model/page-011.txt
+@@ -1,4 +1,4 @@
+-ADVENTURE SHEET
++Adventure Sheet
+ SKILL
+ Initial Skill =
+ STAMINA
+@@ -11,22 +11,9 @@
+ POTIONS
+ PROVISIONS REMAINING
+ MONSTER ENCOUNTER BOXES
+-[image: Small sword illustration above the section header]
++Skill =
++Skill =
+ Skill =
+ Stamina =
+-Skill =
+ Stamina =
+-Skill =
+ Stamina =
+-Skill =
+-Stamina =
+-Skill =
+-Stamina =
+-Skill =
+-Stamina =
+-Skill =
+-Stamina =
+-Skill =
+-Stamina =
+-Skill =
+-Stamina =

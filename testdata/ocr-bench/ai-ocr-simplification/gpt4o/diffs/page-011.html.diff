@@ -1,0 +1,254 @@
+--- gold/page-011.html
++++ model/page-011.html
+@@ -1,130 +1,135 @@
++```html
+ <h1>
+ ADVENTURE SHEET
+ </h1>
+-<p>
++<table>
++<tr>
++<td>
++<dl>
++<dt>
++SKILL
++</dt>
++<dd>
++Initial Skill =
++</dd>
++</dl>
++<dl>
++<dt>
++STAMINA
++</dt>
++<dd>
++Initial Stamina =
++</dd>
++</dl>
++<dl>
++<dt>
++LUCK
++</dt>
++<dd>
++Initial Luck =
++</dd>
++</dl>
++</td>
++<td>
+ <strong>
+-SKILL
++MONSTER ENCOUNTER BOXES
+ </strong>
+-</p>
+-<p>
+-Initial Skill =
+-</p>
+-<p>
+-<strong>
+-STAMINA
+-</strong>
+-</p>
+-<p>
+-Initial Stamina =
+-</p>
+-<p>
+-<strong>
+-LUCK
+-</strong>
+-</p>
+-<p>
+-Initial Luck =
+-</p>
+-<p>
++<table>
++<tr>
++<td>
++Skill =
++<br>
++Stamina =
++</td>
++<td>
++Skill =
++<br>
++Stamina =
++</td>
++<td>
++Skill =
++<br>
++Stamina =
++</td>
++</tr>
++<tr>
++<td>
++Skill =
++<br>
++Stamina =
++</td>
++<td>
++Skill =
++<br>
++Stamina =
++</td>
++<td>
++Skill =
++<br>
++Stamina =
++</td>
++</tr>
++<tr>
++<td>
++Skill =
++<br>
++Stamina =
++</td>
++<td>
++Skill =
++<br>
++Stamina =
++</td>
++<td>
++Skill =
++<br>
++Stamina =
++</td>
++</tr>
++</table>
++</td>
++</tr>
++<tr>
++<td>
+ <strong>
+ ITEMS OF EQUIPMENT CARRIED
+ </strong>
++<p>
++[Blank]
+ </p>
+-<p>
+-<strong>
++</td>
++<td>
++<table>
++<tr>
++<td>
+ GOLD
+-</strong>
+-</p>
+-<p>
+-<strong>
++<br>
++[Blank]
++</td>
++</tr>
++<tr>
++<td>
+ JEWELS
+-</strong>
+-</p>
+-<p>
+-<strong>
++<br>
++[Blank]
++</td>
++</tr>
++<tr>
++<td>
+ POTIONS
+-</strong>
+-</p>
+-<p>
+-<strong>
++<br>
++[Blank]
++</td>
++</tr>
++<tr>
++<td>
+ PROVISIONS REMAINING
+-</strong>
+-</p>
+-<h2>
+-MONSTER ENCOUNTER BOXES
+-</h2>
+-<img alt="Small sword illustration above the section header">
+-<ul>
+-<li>
+-<p>
+-Skill =
+-</p>
+-<p>
+-Stamina =
+-</p>
+-</li>
+-<li>
+-<p>
+-Skill =
+-</p>
+-<p>
+-Stamina =
+-</p>
+-</li>
+-<li>
+-<p>
+-Skill =
+-</p>
+-<p>
+-Stamina =
+-</p>
+-</li>
+-<li>
+-<p>
+-Skill =
+-</p>
+-<p>
+-Stamina =
+-</p>
+-</li>
+-<li>
+-<p>
+-Skill =
+-</p>
+-<p>
+-Stamina =
+-</p>
+-</li>
+-<li>
+-<p>
+-Skill =
+-</p>
+-<p>
+-Stamina =
+-</p>
+-</li>
+-<li>
+-<p>
+-Skill =
+-</p>
+-<p>
+-Stamina =
+-</p>
+-</li>
+-<li>
+-<p>
+-Skill =
+-</p>
+-<p>
+-Stamina =
+-</p>
+-</li>
+-<li>
+-<p>
+-Skill =
+-</p>
+-<p>
+-Stamina =
+-</p>
+-</li>
+-</ul>+<br>
++[Blank]
++</td>
++</tr>
++</table>
++</td>
++</tr>
++</table>
++```

@@ -1,0 +1,229 @@
+--- gold/page-011.html
++++ model/page-011.html
+@@ -1,130 +1,127 @@
++<table>
++<tbody>
++<tr>
++<td>
+ <h1>
+ ADVENTURE SHEET
+ </h1>
++<dl>
++<dt>
++SKILL
++</dt>
++<dd>
++Initial
++</dd>
++<dd>
++Stat =
++</dd>
++</dl>
++<dl>
++<dt>
++STAMINA
++</dt>
++<dd>
++Initial
++</dd>
++<dd>
++Stamina =
++</dd>
++</dl>
++<dl>
++<dt>
++LUCK
++</dt>
++<dd>
++Initial
++</dd>
++<dd>
++Luck =
++</dd>
++</dl>
+ <p>
+-<strong>
+-SKILL
+-</strong>
++ITEMS OF EQUIPMENT CARRIED
+ </p>
+-<p>
+-Initial Skill =
+-</p>
+-<p>
+-<strong>
+-STAMINA
+-</strong>
+-</p>
+-<p>
+-Initial Stamina =
+-</p>
+-<p>
+-<strong>
+-LUCK
+-</strong>
+-</p>
+-<p>
+-Initial Luck =
+-</p>
+-<p>
+-<strong>
+-ITEMS OF EQUIPMENT CARRIED
+-</strong>
+-</p>
+-<p>
+-<strong>
++<dl>
++<dt>
+ GOLD
+-</strong>
+-</p>
+-<p>
+-<strong>
++</dt>
++<dd>
++</dd>
++</dl>
++<dl>
++<dt>
+ JEWELS
+-</strong>
+-</p>
+-<p>
+-<strong>
++</dt>
++<dd>
++</dd>
++</dl>
++<dl>
++<dt>
+ POTIONS
+-</strong>
+-</p>
+-<p>
+-<strong>
++</dt>
++<dd>
++</dd>
++</dl>
++<dl>
++<dt>
+ PROVISIONS REMAINING
+-</strong>
+-</p>
++</dt>
++<dd>
++</dd>
++</dl>
++</td>
++<td>
+ <h2>
+ MONSTER ENCOUNTER BOXES
+ </h2>
+-<img alt="Small sword illustration above the section header">
+-<ul>
++<ol>
+ <li>
+-<p>
+-Skill =
+-</p>
+-<p>
+-Stamina =
+-</p>
++Skill = Stamina =
+ </li>
+ <li>
+-<p>
+-Skill =
+-</p>
+-<p>
+-Stamina =
+-</p>
++Skill = Stamina =
+ </li>
+ <li>
+-<p>
+-Skill =
+-</p>
+-<p>
+-Stamina =
+-</p>
++Skill = Stamina =
+ </li>
+ <li>
+-<p>
+-Skill =
+-</p>
+-<p>
+-Stamina =
+-</p>
++Skill = Stamina =
+ </li>
+ <li>
+-<p>
+-Skill =
+-</p>
+-<p>
+-Stamina =
+-</p>
++Skill = Stamina =
+ </li>
+ <li>
+-<p>
+-Skill =
+-</p>
+-<p>
+-Stamina =
+-</p>
++Skill = Stamina =
+ </li>
+ <li>
+-<p>
+-Skill =
+-</p>
+-<p>
+-Stamina =
+-</p>
++Skill = Stamina =
+ </li>
+ <li>
+-<p>
+-Skill =
+-</p>
+-<p>
+-Stamina =
+-</p>
++Skill = Stamina =
+ </li>
+ <li>
+-<p>
+-Skill =
+-</p>
+-<p>
+-Stamina =
+-</p>
++Skill = Stamina =
+ </li>
+-</ul>+<li>
++Skill = Stamina =
++</li>
++<li>
++Skill = Stamina =
++</li>
++<li>
++Skill = Stamina =
++</li>
++<li>
++Skill = Stamina =
++</li>
++<li>
++Skill = Stamina =
++</li>
++<li>
++Skill = Stamina =
++</li>
++</ol>
++</td>
++</tr>
++</tbody>
++</table>

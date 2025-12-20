@@ -1,0 +1,61 @@
+--- gold/page-026L.html
++++ model/page-026L.html
+@@ -1,5 +1,8 @@
+ <p class="running-head">
+ 40-42
++</p>
++<p class="page-number">
++40
+ </p>
+ <h2>
+ 40
+@@ -12,10 +15,7 @@
+ MINOTAUR
+ </dt>
+ <dd>
+-SKILL 9
+-</dd>
+-<dd>
+-STAMINA 9
++SKILL 9 STAMINA 9
+ </dd>
+ </dl>
+ <p>
+@@ -27,26 +27,17 @@
+ <p>
+ You walk slowly over to the alcove, carefully checking the floor for any more hidden traps. You see that the goblet contains a sparkling red liquid. Will you:
+ </p>
+-<dl>
+-<dt>
+-Drink the red liquid?
+-</dt>
+-<dd>
+-Turn to 98
+-</dd>
+-<dt>
+-Leave the goblet and walk back to search the Barbarian (if you have not done so already)?
+-</dt>
+-<dd>
+-Turn to 126
+-</dd>
+-<dt>
+-Leave the chamber to continue west?
+-</dt>
+-<dd>
+-Turn to 83
+-</dd>
+-</dl>
++<ul>
++<li>
++Drink the red liquid? Turn to 98
++</li>
++<li>
++Leave the goblet and walk back to search the Barbarian (if you have not done so already)? Turn to 126
++</li>
++<li>
++Leave the chamber to continue west? Turn to 83
++</li>
++</ul>
+ <h2>
+ 42
+ </h2>

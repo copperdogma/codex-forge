@@ -1,0 +1,78 @@
+{
+  "sdk_http_response": {
+    "headers": {
+      "content-type": "application/json; charset=UTF-8",
+      "vary": "Origin, X-Origin, Referer",
+      "content-encoding": "gzip",
+      "date": "Sat, 20 Dec 2025 18:21:02 GMT",
+      "server": "scaffolding on HTTPServer2",
+      "x-xss-protection": "0",
+      "x-frame-options": "SAMEORIGIN",
+      "x-content-type-options": "nosniff",
+      "server-timing": "gfet4t7; dur=7210",
+      "alt-svc": "h3=\":443\"; ma=2592000,h3-29=\":443\"; ma=2592000",
+      "transfer-encoding": "chunked"
+    },
+    "body": null
+  },
+  "candidates": [
+    {
+      "content": {
+        "parts": [
+          {
+            "media_resolution": null,
+            "code_execution_result": null,
+            "executable_code": null,
+            "file_data": null,
+            "function_call": null,
+            "function_response": null,
+            "inline_data": null,
+            "text": "<h1>ADVENTURE SHEET</h1>\n\n<table>\n  <thead>\n    <tr>\n      <th>SKILL</th>\n      <th>STAMINA</th>\n      <th>LUCK</th>\n    </tr>\n  </thead>\n  <tbody>\n    <tr>\n      <td>\n        Initial<br>\n        Skill =\n      </td>\n      <td>\n        Initial<br>\n        Stamina =\n      </td>\n      <td>\n        Initial<br>\n        Luck =\n      </td>\n    </tr>\n  </tbody>\n</table>\n\n<table>\n  <tbody>\n    <tr>\n      <td rowspan=\"4\">\n        <strong>ITEMS OF EQUIPMENT CARRIED</strong>\n      </td>\n      <td>\n        <strong>GOLD</strong>\n      </td>\n    </tr>\n    <tr>\n      <td>\n        <strong>JEWELS</strong>\n      </td>\n    </tr>\n    <tr>\n      <td>\n        <strong>POTIONS</strong>\n      </td>\n    </tr>\n    <tr>\n      <td>\n        <strong>PROVISIONS REMAINING</strong>\n      </td>\n    </tr>\n  </tbody>\n</table>\n\n<img alt=\"Small illustration of a sword pointing right\">\n\n<h1>MONSTER ENCOUNTER BOXES</h1>\n\n<table>\n  <tbody>\n    <tr>\n      <td>\n        Skill =<br>\n        Stamina =\n      </td>\n      <td>\n        Skill =<br>\n        Stamina =\n      </td>\n      <td>\n        Skill =<br>\n        Stamina =\n      </td>\n    </tr>\n    <tr>\n      <td>\n        Skill =<br>\n        Stamina =\n      </td>\n      <td>\n        Skill =<br>\n        Stamina =\n      </td>\n      <td>\n        Skill =<br>\n        Stamina =\n      </td>\n    </tr>\n    <tr>\n      <td>\n        Skill =<br>\n        Stamina =\n      </td>\n      <td>\n        Skill =<br>\n        Stamina =\n      </td>\n      <td>\n        Skill =<br>\n        Stamina =\n      </td>\n    </tr>\n    <tr>\n      <td>\n        Skill =<br>\n        Stamina =\n      </td>\n      <td>\n        Skill =<br>\n        Stamina =\n      </td>\n      <td>\n        Skill =<br>\n        Stamina =\n      </td>\n    </tr>\n  </tbody>\n</table>",
+            "thought": null,
+            "thought_signature": "EtQECtEEAXLI2nxom6oQcAKhCBNYcQ6YN_EBp4oIqN_fXKFR-E9yinckPSnF65-W9v3oi4h96wNBpbK2uSXMp7SRj-hvxNLnTPkbAELZSYaQse26ayTbqRGEs451IStjVXoTdEzbsvVTmRogFqBH1P8stJ4gDIiXzobQj8_VainjjcLJmXaj3_MG6Qdvgf6DBWKV3rAIENXGc2qBd6o61Y7ZGk394cTQ28L2CrUrwsSSNf5VWbZ1GqKpJYSpQ2RC_8YFJP7YWCzhp8W5425f9uF4EFxAxtikZY2R91bhg5XQlRNCnC5jDNZUxl9mT1aSZpGycl1-fOOZeqg3YgHRdgsaBIt6J6cFNOfcTm8AcQIGtY_aQDr1nSJwRmWb44uzA3nfzBxRrh78w4p53NhfBoIbOwJ19d-UuvnIySLfUGcaajFBUuVOLGnly9_JKI9btCYrXjoGgH_NUwCFDHuUyoIo8ArFpCod9pDv79tiI7DnXmHsJ7L8udc2WR_HIsSbtzLnuUrc9tSw3iNsWr9ZmVVK7vjce6bvQR1zqyynLTW-rM5ZBftBfICeDZKQJv4bkG68BFJJqKGU7BIhyfAWFvaUd_pT6f1yHCzi3FhZchoS7k-RsxIR_YeOvP06O9ONq_3Zwcelan-YQdqUQWwFTT8oP56Zp_FnXgN_ZSO73YdMQs2uK_5sh0I-UQcYcxJ3dUFJzrg4cY65Cbs-XrSpTyEMuf261V7q3oSNUdAVnHIh1f82QFApQhd0Ol4wOWqvECxc4bC2mjdjkos5K8EQJRffD3qMd54=",
+            "video_metadata": null
+          }
+        ],
+        "role": "model"
+      },
+      "citation_metadata": null,
+      "finish_message": null,
+      "token_count": null,
+      "finish_reason": "STOP",
+      "avg_logprobs": null,
+      "grounding_metadata": null,
+      "index": 0,
+      "logprobs_result": null,
+      "safety_ratings": null,
+      "url_context_metadata": null
+    }
+  ],
+  "create_time": null,
+  "model_version": "gemini-3-pro-preview",
+  "prompt_feedback": null,
+  "response_id": "DulGaZXTFsi6qtsP4eOmoAg",
+  "usage_metadata": {
+    "cache_tokens_details": null,
+    "cached_content_token_count": null,
+    "candidates_token_count": 479,
+    "candidates_tokens_details": null,
+    "prompt_token_count": 1412,
+    "prompt_tokens_details": [
+      {
+        "modality": "IMAGE",
+        "token_count": 1080
+      },
+      {
+        "modality": "TEXT",
+        "token_count": 332
+      }
+    ],
+    "thoughts_token_count": 142,
+    "tool_use_prompt_token_count": null,
+    "tool_use_prompt_tokens_details": null,
+    "total_token_count": 2033,
+    "traffic_type": null
+  },
+  "automatic_function_calling_history": [],
+  "parsed": null
+}

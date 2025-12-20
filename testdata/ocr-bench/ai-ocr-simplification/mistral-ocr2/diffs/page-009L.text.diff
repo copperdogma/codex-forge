@@ -1,0 +1,15 @@
+--- gold/page-009L.txt
++++ model/page-009L.txt
+@@ -1,8 +1,7 @@
+-If the creature has just wounded you, you may Test your Luck to try to minimize the wound. If you are lucky, you have managed to avoid the full damage of the blow. Restore 1 point of STAMINA (i.e. instead of doing 2 points of damage it has done only 1). If you are unlucky, you have taken a more serious blow. Subtract 1 extra STAMINA point.
+-Remember that you must subtract 1 point from your own LUCK score each time you Test your Luck.
++If the creature has just wounded you, you may Test your Luck to try to minimize the wound. If you are lucky, you have managed to avoid the full damage of the blow. Restore 1 point of stamina (i.e. instead of doing 2 points of damage it has done only 1). If you are unlucky, you have taken a more serious blow. Subtract 1 extra stamina point.
++Remember that you must subtract 1 point from your own Luck score each time you Test your Luck.
+ Restoring Skill, Stamina and Luck
+ Skill
+-Your SKILL score will not change much during your adventure. Occasionally, a page may give instructions to increase or decrease your SKILL score. A Magic Weapon may increase your SKILL, but remember that only one weapon can be used at a time! You cannot claim 2 SKILL bonuses for carrying two Magic Swords. Your SKILL score can never exceed its Initial value unless specifically instructed. Drinking the Potion of Skill (see later) will restore your SKILL to its Initial level at any time.
++Your skill score will not change much during your adventure. Occasionally, a page may give instructions to increase or decrease your skill score. A Magic Weapon may increase your skill, but remember that only one weapon can be used at a time! You cannot claim 2 skill bonuses for carrying two Magic Swords. Your skile score can never exceed its Initial value unless specifically instructed. Drinking the Potion of Skill (see later) will restore your skill to its Initial level at any time.
+ Stamina and Provisions
+-Your STAMINA score will change a lot during your adventure as you fight monsters and undertake arduous tasks. As you near your goal, your STAMINA level may be dangerously low and battles may be particularly risky, so be careful!
+-14
++Your stamina score will change a lot during your adventure as you fight monsters and undertake arduous tasks. As you near your goal, your stamina level may be dangerously low and battles may be particularly risky, so be careful!

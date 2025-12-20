@@ -1,0 +1,225 @@
+--- gold/page-011.html
++++ model/page-011.html
+@@ -1,130 +1,135 @@
+-<h1>
+-ADVENTURE SHEET
+-</h1>
+ <p>
+-<strong>
+-SKILL
+-</strong>
++ADVENCURE SHEET
+ </p>
+ <p>
+-Initial Skill =
++C
+ </p>
+ <p>
+-<strong>
+-STAMINA
+-</strong>
++6
+ </p>
+ <p>
+-Initial Stamina =
++MONSTER ENCOUNTER BOXES
+ </p>
+ <p>
+-<strong>
+-LUCK
+-</strong>
++Skill =
+ </p>
+ <p>
+-Initial Luck =
++STAMINA
+ </p>
+ <p>
+-<strong>
+-ITEMS OF EQUIPMENT CARRIED
+-</strong>
++Skill =
+ </p>
+ <p>
+-<strong>
+-GOLD
+-</strong>
++SKILL
+ </p>
+ <p>
+-<strong>
+-JEWELS
+-</strong>
++Skill =
+ </p>
+ <p>
+-<strong>
+-POTIONS
+-</strong>
++LUCK
+ </p>
+ <p>
+-<strong>
+-PROVISIONS REMAINING
+-</strong>
++Initial
+ </p>
+-<h2>
+-MONSTER ENCOUNTER BOXES
+-</h2>
+-<img alt="Small sword illustration above the section header">
+-<ul>
+-<li>
++<p>
++Stamma =
++</p>
++<p>
++Initial
++</p>
++<p>
++Stamina -
++</p>
++<p>
++Initial
++</p>
++<p>
++Stamina =
++</p>
++<p>
++Skill =
++</p>
++<p>
++Stamina -
++</p>
++<p>
++Luck =
++</p>
++<p>
++ITEMS OF
++</p>
++<p>
++GOLD
++</p>
++<p>
++Skill =
++</p>
++<p>
++Skill -
++</p>
++<p>
++Skill =
++</p>
++<p>
++EQUIPMENT
++</p>
++<p>
++Stamina =
++</p>
++<p>
++Stanina =
++</p>
++<p>
++Stamina -
++</p>
++<p>
++CARRIED
++</p>
++<p>
++JEWELS
++</p>
++<p>
++POTIONS
++</p>
++<p>
++Skill -
++</p>
++<p>
++Skill =
++</p>
+ <p>
+ Skill =
+ </p>
+ <p>
+ Stamina =
+ </p>
+-</li>
+-<li>
+ <p>
+-Skill =
++Stamina -
+ </p>
+ <p>
+ Stamina =
+ </p>
+-</li>
+-<li>
+ <p>
+-Skill =
++PROVISIONS
++</p>
++<p>
++REMAINING
++</p>
++<p>
++Skill -
++</p>
++<p>
++Skill -
++</p>
++<p>
++Skill .
+ </p>
+ <p>
+ Stamina =
+ </p>
+-</li>
+-<li>
+ <p>
+-Skill =
++Stamina =
+ </p>
+ <p>
+ Stamina =
+-</p>
+-</li>
+-<li>
+-<p>
+-Skill =
+-</p>
+-<p>
+-Stamina =
+-</p>
+-</li>
+-<li>
+-<p>
+-Skill =
+-</p>
+-<p>
+-Stamina =
+-</p>
+-</li>
+-<li>
+-<p>
+-Skill =
+-</p>
+-<p>
+-Stamina =
+-</p>
+-</li>
+-<li>
+-<p>
+-Skill =
+-</p>
+-<p>
+-Stamina =
+-</p>
+-</li>
+-<li>
+-<p>
+-Skill =
+-</p>
+-<p>
+-Stamina =
+-</p>
+-</li>
+-</ul>+</p>

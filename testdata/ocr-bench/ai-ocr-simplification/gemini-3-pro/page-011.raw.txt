@@ -1,0 +1,120 @@
+<h1>ADVENTURE SHEET</h1>
+
+<table>
+  <thead>
+    <tr>
+      <th>SKILL</th>
+      <th>STAMINA</th>
+      <th>LUCK</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td>
+        Initial<br>
+        Skill =
+      </td>
+      <td>
+        Initial<br>
+        Stamina =
+      </td>
+      <td>
+        Initial<br>
+        Luck =
+      </td>
+    </tr>
+  </tbody>
+</table>
+
+<table>
+  <tbody>
+    <tr>
+      <td rowspan="4">
+        <strong>ITEMS OF EQUIPMENT CARRIED</strong>
+      </td>
+      <td>
+        <strong>GOLD</strong>
+      </td>
+    </tr>
+    <tr>
+      <td>
+        <strong>JEWELS</strong>
+      </td>
+    </tr>
+    <tr>
+      <td>
+        <strong>POTIONS</strong>
+      </td>
+    </tr>
+    <tr>
+      <td>
+        <strong>PROVISIONS REMAINING</strong>
+      </td>
+    </tr>
+  </tbody>
+</table>
+
+<img alt="Small illustration of a sword pointing right">
+
+<h1>MONSTER ENCOUNTER BOXES</h1>
+
+<table>
+  <tbody>
+    <tr>
+      <td>
+        Skill =<br>
+        Stamina =
+      </td>
+      <td>
+        Skill =<br>
+        Stamina =
+      </td>
+      <td>
+        Skill =<br>
+        Stamina =
+      </td>
+    </tr>
+    <tr>
+      <td>
+        Skill =<br>
+        Stamina =
+      </td>
+      <td>
+        Skill =<br>
+        Stamina =
+      </td>
+      <td>
+        Skill =<br>
+        Stamina =
+      </td>
+    </tr>
+    <tr>
+      <td>
+        Skill =<br>
+        Stamina =
+      </td>
+      <td>
+        Skill =<br>
+        Stamina =
+      </td>
+      <td>
+        Skill =<br>
+        Stamina =
+      </td>
+    </tr>
+    <tr>
+      <td>
+        Skill =<br>
+        Stamina =
+      </td>
+      <td>
+        Skill =<br>
+        Stamina =
+      </td>
+      <td>
+        Skill =<br>
+        Stamina =
+      </td>
+    </tr>
+  </tbody>
+</table>

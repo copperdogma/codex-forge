@@ -1,0 +1,25 @@
+--- gold/page-035R.txt
++++ model/page-035R.txt
+@@ -1,16 +1,13 @@
+-79-82
++79–82
+ 79
+ You grip the arms of the chair tightly, half expecting a surge of energy or pain to rush through your body. Test your Luck. If you are Lucky, turn to 106. If you are Unlucky, turn to 383.
+ 80
+ You take your time and manage to step over the last pole without having touched any of them. You hurry on east, still following the two pairs of footprints. Turn to 313.
+-[image: illustration of a rat lying on the ground]
++[image: Illustration of a goblin lying on the ground]
+ 81
+-The only furniture in the Goblin's room is a table, two chairs and a cupboard on the wall. There are two closed doors, one in the west wall and the other in the north wall. Will you:
+-Open the cupboard?
+-Turn to 307
+-Open the west door?
+-Turn to 263
+-Open the north door?
+-Turn to 136
++The only furniture in the Goblin’s room is a table, two chairs and a cupboard on the wall. There are two closed doors, one in the west wall and the other in the north wall. Will you:
++Open the cupboard? Turn to 307
++Open the west door? Turn to 263
++Open the north door? Turn to 136
+ 82
+ As the Pit Fiend slams its body against the wall, you let go of the rope and drop safely to the floor. You run towards the double doors and are relieved to feel them swing open as you push on them. You let them swing shut behind you and head north along the tunnel. Turn to 214.
