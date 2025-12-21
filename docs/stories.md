@@ -22,20 +22,18 @@ Guiding priorities: **perfect OCR first**, then move downstream stage‑by‑sta
    Achieved 100% section-id coverage (400/400), with missing-from-source explicitly recorded.
 8. DONE: **078 — Boundary Ordering Guard + Targeted Escalation**
    Prevent empty sections by enforcing span feasibility and escalating out‑of‑order headers. (Resume 035 after 078.)
-9. **080 — Central Escalation Cache (Premium OCR Overlay)**
-   Consolidate vision escalations into a shared cache consumed by multiple modules. (Optional but recommended after 078.)
-10. **035 — Fighting Fantasy Pipeline Optimization** *(Paused)*
+9.  **035 — Fighting Fantasy Pipeline Optimization** *(Paused)*
    Drive missing/no‑text/no‑choice to targets using the new OCR + boundary stack. (Resume after 078/080.)
-8. **050 — FF Ending Detection Verification**  
+10. **050 — FF Ending Detection Verification**  
    Verify ending/dead‑end classification quality on FF outputs (no book‑specific tuning).
-9. **056 — Validation Forensics Automation (remaining items)**  
+11. **056 — Validation Forensics Automation (remaining items)**  
    Finish ending‑aware traces, boundary‑source reasoning, toggles/docs, optional HTML/CSV view.
-10. **066 — FF Pipeline Accel + Accuracy Guardrails**  
-    Only after 035 is Done; speed up clean/extract with hard regression guards.
+12. **066 — FF Pipeline Accel + Accuracy Guardrails**  
+    Only after 035 is Done; profile + cost guardrails for GPT‑5.1 pipeline.
 
-11. **009 — Layout‑Preserving Extractor**  
+13. **009 — Layout‑Preserving Extractor**  
     Build layout/table preservation needed for non‑FF books.
-12. **026 — Onward to the Unknown pilot (Arthur L'Heureux)**  
+14. **026 — Onward to the Unknown pilot (Arthur L'Heureux)**  
     Run end‑to‑end with layout‑aware table handling once 009 lands.
 
 Later / non‑blocking:
@@ -44,7 +42,7 @@ Later / non‑blocking:
 - 021 Dashboard UI polish
 - 038 Agentic pipeline coordinator
 - 011 AI planner to assemble pipelines
-- 028 Market discovery, 029 Model audit, 099 Remove dev backcompat note
+- 028 Market discovery, 029 Model audit (obsolete), 099 Remove dev backcompat note
 
 This index tracks stories in `/docs/stories/` for the codex-forge pipeline.
 
@@ -78,7 +76,7 @@ This index tracks stories in `/docs/stories/` for the codex-forge pipeline.
 || 026 | Onward to the Unknown — Arthur L'Heureux pilot | Medium | To Do | /docs/stories/story-026-onward-unknown-arthur-lheureux.md |
 || 027 | Contact-sheet intake for automatic book type planning | Medium | Done | /docs/stories/story-027-contact-sheet-auto-intake.md |
 || 028 | Market Discovery for codex-forge | Medium | In Progress | /docs/stories/story-028-market-discovery.md |
-|| 029 | Audit model lineup vs latest OpenAI sheets | Medium | To Do | /docs/stories/story-029-model-audit-openai.md |
+|| 029 | Audit model lineup vs latest OpenAI sheets | Medium | Obsolete | /docs/stories/story-029-model-audit-openai.md |
 || 030 | Fighting Fantasy Engine format export | High | Done | /docs/stories/story-030-ff-engine-format.md |
 || 031 | Fighting Fantasy output refinement | High | Done | /docs/stories/story-031-ff-output-refinement.md |
 || 032 | Unstructured intake & Document IR adoption | Medium | Done | /docs/stories/story-032-unstructured-intake-and-document-ir-adoption.md |
@@ -109,11 +107,11 @@ This index tracks stories in `/docs/stories/` for the codex-forge pipeline.
 || 069 | PDF Text Extraction Engine for OCR Ensemble | Medium | Done | /docs/stories/story-069-pdf-text-extraction-engine.md |
 || 070 | OCR Split Refinement — Zero Bad Slices | High | Done | /docs/stories/story-070-ocr-split-refinement.md |
 || 071 | Output Artifact Organization | Medium | Done | /docs/stories/story-071-output-artifact-organization.md |
-|| 072 | OCR Spell-Weighted Voting Enhancement | Medium | In Progress | /docs/stories/story-072-ocr-spell-weighted-voting.md |
+|| 072 | OCR Spell-Weighted Voting Enhancement | Medium | Obsolete | /docs/stories/story-072-ocr-spell-weighted-voting.md |
 || 073 | 100% Section Detection — Segmentation Architecture | High | Done | /docs/stories/story-073-100-percent-section-detection.md |
 || 074 | Missing Sections Investigation — Complete 100% Coverage | High | Done | /docs/stories/story-074-missing-sections-investigation.md |
 || 075 | Booktype Text Cleanup Adapter (Downstream Normalization) | Medium | To Do | /docs/stories/story-075-booktype-text-cleanup-adapter.md |
-|| 076 | AI Vision Engine Evaluation — Best Value for Pipeline | Medium | To Do | /docs/stories/story-076-ai-vision-engine-evaluation.md |
+|| 076 | AI Vision Engine Evaluation — Best Value for Pipeline | Medium | Done | /docs/stories/story-076-ai-vision-engine-evaluation.md |
 || 077 | AI OCR Radical Simplification — Challenging the Escalation Assumption | High | Done | /docs/stories/story-077-ai-ocr-simplification.md |
 || 078 | Boundary Ordering Guard + Targeted Escalation | High | Done | /docs/stories/story-078-boundary-ordering-escalation.md |
 || 079 | Sequential Page Numbering Refactor — Dual-Field Provenance | High | Done | /docs/stories/story-079-page-numbering-refactor.md |

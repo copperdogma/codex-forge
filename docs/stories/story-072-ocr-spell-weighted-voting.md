@@ -1,6 +1,6 @@
 # Story: OCR Spell-Weighted Voting Enhancement
 
-**Status**: In Progress
+**Status**: Obsolete
 **Created**: 2025-12-18
 **Parent Story**: story-070 (OCR Split Refinement - COMPLETE)
 **Related Stories**: story-063 (OCR Ensemble Three-Engine Voting - DONE), story-069 (PDF Text Extraction Engine - DONE)
@@ -160,6 +160,10 @@ Enhance the OCR ensemble voting algorithm to use per-engine spell quality as a t
 ---
 
 ## Work Log
+### 20251221-1605 — Marked obsolete
+- **Result:** Success.
+- **Notes:** Superseded by GPT‑5.1 HTML‑first OCR pipeline; ensemble voting no longer on critical path. Keep as historical reference only.
+- **Next:** None.
 
 ### 2025-12-19 — Story Created
 - **Context**: Extracted from Story-070 Priority 6 (Spell-Weighted Voting Enhancement)

@@ -2,6 +2,7 @@
 
 **Status**: To Do  
 **Created**: 2025-12-18  
+**Priority**: Low
 **Parent Stories**: story-078 (boundary ordering escalation), story-035 (FF pipeline optimization)  
 **Related Stories**: story-068 (FF boundary detection), story-073 (segmentation architecture), story-074 (100% coverage)
 
@@ -21,6 +22,8 @@ Today, escalation is **module‑local**: each module uses its own `EscalationCac
 - fragmented provenance.
 
 A central escalation cache makes sense if the escalation output is **generic premium OCR** that any module can consume.
+
+**Note:** With GPT‑5.1 HTML‑first OCR as the baseline, this cache may be **optional** if escalation frequency drops to near‑zero. Re‑evaluate after a full‑book run; keep the story for now in case targeted escalations still appear.
 
 ---
 
@@ -59,6 +62,15 @@ A central escalation cache makes sense if the escalation output is **generic pre
 ---
 
 ## Work Log
+### 20251221-1555 — Added GPT‑5.1 context note
+- **Result:** Success.
+- **Notes:** Central cache may be unnecessary if GPT‑5.1 OCR eliminates most escalations; keep but re‑evaluate after full‑book run.
+- **Next:** Decide whether to proceed based on escalation frequency in the new pipeline.
+
+### 20251221-1616 — Lowered priority
+- **Result:** Success.
+- **Notes:** Set priority to Low pending evidence that escalations are still needed.
+- **Next:** Reassess after additional runs.
 
 ### 20251218-1620 — Story created (central cache proposal)
 - **Result:** Success; story scoped for a shared escalation cache and premium OCR overlay.

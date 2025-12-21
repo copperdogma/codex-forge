@@ -1,6 +1,6 @@
 # Story: Audit model lineup vs latest OpenAI sheets
 
-**Status**: To Do
+**Status**: Obsolete
 
 ---
 
@@ -31,6 +31,10 @@
 - Add model aliases/snapshots in settings to lock behavior (`gpt-5.1-2025-11-13`) for reproducibility.
 
 ## Work Log
+### 20251221-1600 — Marked obsolete
+- **Result:** Success.
+- **Notes:** Superseded by story-076 (AI vision engine evaluation) and subsequent GPT‑5.1 pipeline work; no further action planned here.
+- **Next:** None.
 ### 20251126-1230 — Source collection
 - **Result:** Compiled current model/pricing info from OpenAI pricing pages, model docs, and release notes; noted new GPT-5.1-Codex-Max and priority processing tier.
 - **Next:** Audit repo configs to see where `gpt-4.1-mini`/`gpt-5` are set; draft swap matrix and cost deltas per stage.

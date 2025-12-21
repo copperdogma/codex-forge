@@ -2,18 +2,19 @@
 
 **Status**: To Do  
 **Created**: 2025-12-18  
+**Priority**: Low
 **Related Stories**: story-072 (spell-weighted voting + downstream tolerance), story-058 (post-OCR text quality & repair)  
 
 ---
 
 ## Goal
 
-Add a **booktype-aware, downstream text cleanup** stage that can normalize OCR output for domain-specific conventions (gamebooks/CYOA, math-heavy texts, tables, etc.) **without making upstream OCR modules book-specific**.
+Add a **booktype-aware, downstream text cleanup** stage that normalizes **HTML output** (not pagelines) for domain-specific conventions (gamebooks/CYOA, math-heavy texts, tables, etc.) **without making upstream OCR modules book-specific**.
 
 **First target profile:** `gamebook` (CYOA / Fighting Fantasy-style navigation + section references).
 
 This is intentionally separate from OCR itself:
-- OCR stages should aim to be **generic** and preserve “what we saw”.
+- OCR stages should aim to be **generic** and preserve “what we saw” (HTML).
 - Cleanup stages can be **opinionated**, **recipe-scoped**, and **provenance-rich**.
 
 ---
@@ -33,11 +34,12 @@ We also want consistent architecture:
 ## Success Criteria
 
 - [ ] **OCR remains generic by default:** No required booktype-specific rewrites in OCR/intake modules (any domain normalization is opt-in and recipe-scoped).
-- [ ] **Dedicated cleanup stage exists:** New module produces a cleaned text artifact from upstream OCR artifacts.
+- [ ] **Dedicated cleanup stage exists:** New module produces a cleaned **HTML** artifact from upstream OCR HTML.
 - [ ] **Provenance is explicit:** Output includes per-change records (what changed, why, where, confidence) and preserves the original text as available upstream.
 - [ ] **Configurable by booktype:** Recipe/settings can select a “profile” (e.g., `gamebook`, `math`, `tables`) plus optional dictionary/pattern files.
 - [ ] **Leans on existing tools:** Candidate generation uses an existing library (Hunspell/SymSpell/etc.) and/or Tesseract assets, not bespoke heuristics.
 - [ ] **Safe-by-default:** Cleanup is conservative; if uncertain, it flags and leaves text unchanged (or emits a suggested patch with low confidence).
+  - Note: This may be lower priority if GPT‑5.1 OCR proves clean enough; re-evaluate after baseline run.
 - [ ] **Validation on sample:** Run the 20-page sample through the pipeline up to the cleanup stage and manually inspect output artifacts:
   - Confirm the cleanup triggers on real cases (at least 1).
   - Confirm it does not introduce regressions (diff bounded to intended changes).
@@ -56,8 +58,8 @@ We also want consistent architecture:
 ### New module (preferred)
 
 `modules/adapter/booktype_text_cleanup_v1/`
-- **Input:** `pagelines_v1` (e.g., `pagelines_final.jsonl` or `pagelines_reconstructed.jsonl`)
-- **Output:** `pagelines_v1` (new artifact), plus a **sidecar** patch log (e.g., `cleanup_patches.jsonl`)
+- **Input:** HTML pages (e.g., `pages_html.jsonl`)
+- **Output:** HTML pages (new artifact), plus a **sidecar** patch log (e.g., `cleanup_patches.jsonl`)
 - **Behavior:**
   - Generate candidate corrections per token/line using:
     - a dictionary / lexicon (booktype- or book-specific)
@@ -78,8 +80,8 @@ We also want consistent architecture:
 ## Tasks
 
 ### Task 1: Define the cleanup contract
-- [ ] Decide where cleanup plugs in (preferred: after `reconstruct_text_v1`).
-- [ ] Decide artifact outputs (cleaned `pagelines_v1` + `cleanup_patches.jsonl` sidecar).
+- [ ] Decide where cleanup plugs in (preferred: after OCR HTML output).
+- [ ] Decide artifact outputs (cleaned HTML + `cleanup_patches.jsonl` sidecar).
 - [ ] Add schema/validator if needed for patches (or reuse existing jsonl conventions).
 
 ### Task 2: Implement `booktype_text_cleanup_v1` module scaffold
@@ -99,7 +101,7 @@ We also want consistent architecture:
 ### Task 5: 20-page sample validation
 - [ ] Run the 20-page sample from the beginning up to the cleanup stage
 - [ ] Manually inspect:
-  - `.../pages_raw.jsonl` or `.../pagelines_reconstructed.jsonl` (input)
+  - `.../pages_html.jsonl` (input)
   - `.../booktype_text_cleanup_v1/<output>.jsonl` (output)
   - `.../cleanup_patches.jsonl` (evidence)
 - [ ] Confirm: at least one real cleanup applied, no unexpected diffs
@@ -107,6 +109,15 @@ We also want consistent architecture:
 ---
 
 ## Work Log
+### 20251221-1550 — Reframed for HTML-first OCR
+- **Result:** Success.
+- **Notes:** Updated scope to operate on HTML output (not pagelines). Likely lower priority given GPT‑5.1 OCR quality; re‑evaluate after baseline runs.
+- **Next:** Confirm whether this stage is still needed after full‑book QA.
+
+### 20251221-1615 — Lowered priority
+- **Result:** Success.
+- **Notes:** Set priority to Low based on GPT‑5.1 HTML‑first baseline quality.
+- **Next:** Reassess after additional full‑book QA.
 
 ### 20251218-0000 — Story created
 - **Result:** Success.
