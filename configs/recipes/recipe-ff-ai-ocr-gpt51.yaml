@@ -1,399 +1,133 @@
-# Canonical Fighting Fantasy Pipeline (2025-12)
-#
-# Design:
-# - Starts from Unstructured intake (elements IR) — current best-supported path for FF modules.
-# - Runs the redesigned header/structure/boundary stack, then AI extract, optional text clean, build, validate.
-# - Supports smoke runs via settings overrides (e.g., settings.smoke.yaml: input.pdf, models.default)
-#   and portionize_ai_extract_v1's skip_ai/stub parameters for offline stubs.
-#
-# Notes:
-# - All modules referenced exist in-repo as of 2025-12-06.
-# - Deprecated/legacy FF recipes remain for historical reference but should not be used.
+# GPT‑5.1 AI‑first OCR pipeline (HTML‑first)
+# New modules only; existing OCR modules remain untouched.
 
-run_id: ff-canonical
+run_id: ff-ai-ocr-gpt51
 input:
   pdf: input/06 deathtrap dungeon.pdf
-output_dir: output/runs/ff-canonical
+output_dir: output/runs/ff-ai-ocr-gpt51
 
 stages:
-  - id: intake
+  - id: split_pages
     stage: extract
-    module: extract_ocr_ensemble_v1
-    out: pages_raw.jsonl
+    module: split_pages_v1
+    out: pages_split_manifest.jsonl
     params:
       dpi: 300
-      # 4-engine voting: tesseract, easyocr, apple (macOS Vision), pdftext (embedded PDF text)
-      # pdftext recommended: 1-2% quality improvement, minimal cost (~1ms/page), graceful degradation
-      engines: ["tesseract", "easyocr", "apple", "pdftext"]
-      write_engine_dumps: true
-      escalation_threshold: 0.15
       start: 1
-      end: 113  # full book; override to 20 via settings for smoke runs
+      end: 113  # full book; override via settings for smoke runs
 
-  - id: easyocr_guard
-    stage: adapter
-    module: easyocr_guard_v1
-    needs: [intake]
+  - id: ocr_ai
+    stage: extract
+    module: ocr_ai_gpt51_v1
+    needs: [split_pages]
     inputs:
-      inputs: intake
-    out: pages_raw_guarded.jsonl
+      pages: split_pages
+    out: pages_html.jsonl
     params:
-      min_coverage: 0.95
+      model: gpt-5.1
+      ocr_hints: |
+        - This book uses either running heads OR page numbers, not both on the same page.
+        - In gameplay pages, section numbers are centered standalone digits (1–3 digits) and should be <h2>.
+        - Do not treat running heads (e.g., \"16-17\") as section headers.
 
-  - id: pick_best_engine
+  - id: html_blocks_raw
     stage: adapter
-    module: pick_best_engine_v1
-    needs: [easyocr_guard]
+    module: html_to_blocks_v1
+    needs: [ocr_ai]
     inputs:
-      inputs: easyocr_guard
-    out: pages_raw_picked.jsonl
-    params:
-      preferred_engines: ["easyocr", "tesseract", "apple"]
-      min_chars: 40
+      pages: ocr_ai
+    out: page_blocks.jsonl
 
-  - id: inject_missing_headers
-    stage: adapter
-    module: inject_missing_headers_v1
-    needs: [pick_best_engine]
-    out: pages_raw_injected.jsonl
-    params:
-      min_value: 1
-      max_value: 400
-
-  - id: escalate_vision
-    stage: adapter
-    module: ocr_escalate_gpt4v_v1
-    needs: [inject_missing_headers]
-    inputs:
-      inputs: inject_missing_headers
-    params:
-      threshold: 0.4
-      max_pages: 40
-      budget_pages: 30  # Increased to 30 for 100% coverage requirement
-      model: gpt-4.1
-
-  - id: merge_ocr
-    stage: adapter
-    module: merge_ocr_escalated_v1
-    needs: [inject_missing_headers, escalate_vision]
-    inputs:
-      inputs: [inject_missing_headers, escalate_vision]
-    out: adapter_out.jsonl
-
-  - id: reconstruct_text
-    stage: adapter
-    module: reconstruct_text_v1
-    needs: [merge_ocr]
-    out: pagelines_reconstructed.jsonl
-    inputs:
-      inputs: merge_ocr
-    params:
-      input: pagelines_final.jsonl
-      out: pagelines_reconstructed.jsonl
-
-  - id: reduce_ir
-    stage: intake
-    module: pagelines_to_elements_v1
-    needs: [reconstruct_text]
-    out: elements_core.jsonl
-    inputs:
-      pages: reconstruct_text
-    params:
-      inputs: reconstruct_text
-      out: elements_core.jsonl
-      columns_debug: columns_debug.jsonl
-
-  - id: content_types
-    stage: adapter
-    module: elements_content_type_v1
-    needs: [reduce_ir]
-    out: elements_core_typed.jsonl
-    inputs:
-      inputs: reduce_ir
-    params:
-      out: elements_core_typed.jsonl
-      debug_out: elements_content_type_debug.jsonl
-      patterns_out: elements_patterns.jsonl
-      disabled: false
-      use_llm: false
-      # Note: coarse_segments will be added as input when available from coarse_segment stage
-
-  - id: coarse_segment_semantic
+  - id: coarse_segment_html
     stage: portionize
-    module: coarse_segment_v1
-    needs: [content_types]
+    module: coarse_segment_html_v1
+    needs: [html_blocks_raw]
+    inputs:
+      pages: html_blocks_raw
     out: coarse_segments.json
-    inputs:
-      elements: content_types
-    params:
-      elements: elements_core_typed.jsonl
-      out: coarse_segments.json
-      model: gpt-5
-      retry_model: gpt-5
-      max_retries: 2
-      max_lines: 8
-      max_len: 100
 
-  - id: coarse_segment_patterns
+  - id: html_repair_loop
     stage: portionize
-    module: coarse_segment_patterns_v1
-    needs: [content_types]
-    out: pattern_regions.json
+    module: detect_boundaries_html_loop_v1
+    needs: [ocr_ai, coarse_segment_html]
     inputs:
-      inputs: content_types
-    params:
-      inputs: elements_core_typed.jsonl
-      out: pattern_regions.json
-
-  - id: coarse_segment_ff_override
-    stage: portionize
-    module: coarse_segment_ff_override_v1
-    needs: [content_types, coarse_segment_semantic, coarse_segment_patterns]
-    out: ff_segment_hints.json
-    inputs:
-      inputs: content_types
-    params:
-      inputs: elements_core_typed.jsonl
-      coarse_segments: coarse_segments.json
-      pattern_regions: pattern_regions.json
-      out: ff_segment_hints.json
-
-  - id: coarse_segment
-    stage: portionize
-    module: coarse_segment_merge_v1
-    needs: [coarse_segment_semantic, coarse_segment_patterns, coarse_segment_ff_override]
-    out: merged_segments.json
-    params:
-      coarse_segments: coarse_segments.json
-      pattern_regions: pattern_regions.json
-      ff_hints: ff_segment_hints.json
-      out: merged_segments.json
-
-  - id: fine_segment_frontmatter
-    stage: portionize
-    module: fine_segment_frontmatter_v1
-    needs: [content_types, coarse_segment]
-    out: frontmatter_portions.json
-    inputs:
-      elements: content_types
-    params:
-      elements: elements_core_typed.jsonl
-      coarse_segments: merged_segments.json
-      out: frontmatter_portions.json
-      model: gpt-4.1-mini
-      retry_model: gpt-5
-      max_retries: 2
-      max_lines: 10
-      max_len: 120
-
-  - id: classify_headers
-    stage: portionize
-    module: classify_headers_v1
-    needs: [content_types]
-    out: header_candidates.jsonl
-    inputs:
-      pages: content_types
-    params:
-      model: gpt-4.1
-      batch_size: 50
-      redundancy: forward_backward
-
-  - id: structure_globally
-    stage: portionize
-    module: structure_globally_v1
-    needs: [classify_headers, content_types]
-    out: sections_structured.json
-    inputs:
-      pages: classify_headers
-      elements: content_types
-    params:
-      skip_ai: true
-      stub: modules/portionize/structure_globally_v1/stub.empty.json
-
-  - id: assemble_boundaries
-    stage: portionize
-    module: detect_boundaries_code_first_v1
-    needs: [content_types, coarse_segment]
-    out: section_boundaries.jsonl
-    inputs:
-      pages: content_types
-      coarse_segments: coarse_segment
+      pages: ocr_ai
+      coarse_segments: coarse_segment_html
+    out: pages_html_repaired.jsonl
     params:
       min_section: 1
       max_section: 400
-      target_coverage: 1.0
-      max_escalation_pages: 30
-      max_ordering_pages: 14
-      min_span_words: 5
-      min_span_alpha: 0.2
-      min_span_chars: 20
-      model: gpt-4.1-mini
-      escalation_model: gpt-5
+      allow_missing: true
 
-  - id: ai_scan_fallback
-    stage: portionize
-    module: portionize_ai_scan_v1
-    needs: [content_types, coarse_segment]
-    out: section_boundaries_scan.jsonl
-    inputs:
-      pages: content_types
-    params:
-      model: gpt-4.1-mini
-      max_tokens: 1000
-      coarse_segments: merged_segments.json
-
-  - id: macro_locate
-    stage: portionize
-    module: macro_locate_ff_v1
-    needs: [content_types]
-    out: macro_sections.json
-    inputs:
-      pages: content_types
-    params:
-      pages: elements_core_typed.jsonl
-      model: gpt-4.1
-      max_tokens: 400
-
-  - id: merge_boundaries
+  - id: html_blocks_repaired
     stage: adapter
-    module: merge_boundaries_pref_v1
-    needs: [assemble_boundaries, ai_scan_fallback, coarse_segment]
-    out: section_boundaries_merged.jsonl
+    module: html_to_blocks_v1
+    needs: [html_repair_loop]
     inputs:
-      primary: assemble_boundaries
-      fallback: ai_scan_fallback
-    params:
-      coarse_segments: merged_segments.json
+      pages: html_repair_loop
+    out: page_blocks_repaired.jsonl
 
-  - id: verify_boundaries
-    stage: validate
-    module: verify_boundaries_v1
-    needs: [merge_boundaries, content_types]
-    out: boundary_verification.json
-    inputs:
-      boundaries: merge_boundaries
-      elements: content_types
-    params:
-      sample_count: 8
-      model: gpt-4.1-nano
-
-  - id: coverage_boundaries
-    stage: validate
-    module: validate_boundary_coverage_v1
-    needs: [merge_boundaries]
-    out: boundary_coverage.json
-    inputs:
-      boundaries: merge_boundaries
-    params:
-      min_present: 320
-      range: "1-400"
-
-  - id: gate_boundaries
-    stage: validate
-    module: validate_boundaries_gate_v1
-    needs: [merge_boundaries, content_types, coverage_boundaries]
-    out: boundary_gate.json
-    inputs:
-      boundaries: merge_boundaries
-      elements: content_types
-    params:
-      min_count: 240
-      max_gap: null
-
-  - id: ai_extract
+  - id: detect_boundaries_html
     stage: portionize
-    module: portionize_ai_extract_v1
-    needs: [merge_boundaries, gate_boundaries, content_types]
+    module: detect_boundaries_html_v1
+    needs: [html_blocks_repaired, coarse_segment_html]
+    inputs:
+      pages: html_blocks_repaired
+      coarse_segments: coarse_segment_html
+    out: section_boundaries.jsonl
+
+  - id: portionize_html
+    stage: portionize
+    module: portionize_html_extract_v1
+    needs: [html_blocks_repaired, detect_boundaries_html]
+    inputs:
+      pages: html_blocks_repaired
+      boundaries: detect_boundaries_html
     out: portions_enriched.jsonl
-    inputs:
-      pages: content_types
-      boundaries: merge_boundaries
-    params:
-      model: gpt-4.1
-      max_tokens: 2000
-      skip_ai: false
-      span_order: sequence
-      # For smoke/offline runs: set skip_ai: true and provide stub path via params.stub
-
-  - id: detect_repair_candidates
-    stage: clean
-    module: repair_candidates_v1
-    needs: [ai_extract]
-    out: repair_candidates.jsonl
-    inputs:
-      portions: ai_extract
-    params:
-      pagelines: pagelines_final.jsonl
-      char_confusion_threshold: 0.25
-      dictionary_oov_threshold: 0.35
-      max_candidates: 32
-      include_escalation_reasons: true
-      force_pages: "7,19"
-
-  - id: repair_loop
-    stage: clean
-    module: repair_portions_v1
-    needs: [detect_repair_candidates]
-    out: repaired_portions.jsonl
-    inputs:
-      portions: detect_repair_candidates
-    params:
-      max_repairs: 24
-
-  - id: strip_numbers
-    stage: clean
-    module: strip_section_numbers_v1
-    needs: [repair_loop]
-    out: portions_enriched_clean.jsonl
-    inputs:
-      portions: repair_loop
 
   - id: extract_choices
     stage: extract
-    module: extract_choices_v1
-    needs: [strip_numbers]
+    module: extract_choices_relaxed_v1
+    needs: [portionize_html]
+    inputs:
+      pages: portionize_html
     out: portions_with_choices.jsonl
-    inputs:
-      inputs: strip_numbers
-    params: {}
 
-  - id: build_ff_engine
-    stage: build
-    module: build_ff_engine_v1
+  - id: repair_choices
+    stage: enrich
+    module: choices_repair_relaxed_v1
     needs: [extract_choices]
-    out: gamebook.json
-    out: gamebook.json
     inputs:
-      portions: strip_numbers
+      pages: html_blocks_repaired
+      inputs: extract_choices
+    out: portions_with_choices_repaired.jsonl
     params:
-      title: "Deathtrap Dungeon"
-      author: "Ian Livingstone"
-      start_section: "1"
-      format_version: "1.0.0"
-      # default: fail on stubs; set allow-stubs: true for smoke/debug if needed
+      model: gpt-5.1
+      max_sources: 50
+      max_calls: 50
 
-  - id: validate_ff_engine
+  - id: report_pipeline_issues
+    stage: adapter
+    module: report_pipeline_issues_v1
+    needs: [repair_choices]
+    out: issues_report.jsonl
+
+  - id: build_gamebook
+    stage: build
+    module: build_ff_engine_with_issues_v1
+    needs: [report_pipeline_issues, repair_choices]
+    inputs:
+      portions: repair_choices
+      issues_report: report_pipeline_issues
+    out: gamebook.json
+    params:
+      title: Deathtrap Dungeon
+      author: Ian Livingstone
+
+  - id: validate_gamebook
     stage: validate
-    module: validate_ff_engine_v2
-    needs: [build_ff_engine]
+    module: validate_gamebook_smoke_v1
+    needs: [build_gamebook]
+    inputs:
+      gamebook: build_gamebook
     out: validation_report.json
-    inputs:
-      gamebook: build_ff_engine
-    params:
-      gamebook: placeholder  # populated dynamically by driver using stage inputs
-      out: placeholder       # populated dynamically by driver to artifact path
-      expected_range_start: 1
-      expected_range_end: 400
-
-  - id: validate_choice_completeness
-    stage: validate
-    module: validate_choice_completeness_v1
-    needs: [build_ff_engine]
-    out: choice_completeness_report.json
-    inputs:
-      gamebook: build_ff_engine
-    params:
-      gamebook: placeholder
-      out: placeholder
-      max_discrepancy: 1
-      expected_range: "1-400"

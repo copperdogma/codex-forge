@@ -1,0 +1,23 @@
+module_id: split_pages_v1
+stage: extract
+entrypoint: modules/extract/split_pages_v1/main.py
+input_schema: pdf_path
+output_schema: page_image_v1
+default_params:
+  start: 1
+  end: null
+  dpi: 300
+param_schema:
+  properties:
+    start:
+      type: integer
+      minimum: 1
+    end:
+      type: integer
+      minimum: 1
+    dpi:
+      type: integer
+      minimum: 72
+      maximum: 1200
+  required: [start, dpi]
+notes: "Split-only PDF intake that emits page image manifests (no OCR)."

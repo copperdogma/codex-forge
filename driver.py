@@ -844,6 +844,14 @@ def build_command(entrypoint: str, params: Dict[str, Any], stage_conf: Dict[str,
             raise SystemExit(f"Stage {stage_conf['id']} missing build inputs (pages/portions)")
         cmd += ["--pages", pages_path, "--portions", portions_path, "--out", artifact_path]
         flags_added.update({"--pages", "--portions", "--out"})
+        for extra_key, extra_val in artifact_inputs.items():
+            if extra_key in {"pages", "portions"}:
+                continue
+            flag = "--" + extra_key.replace("_", "-")
+            if flag in flags_added:
+                continue
+            cmd += [flag, str(extra_val)]
+            flags_added.add(flag)
     elif stage_conf["stage"] == "enrich":
         pages_path = artifact_inputs.get("pages")
         portions_path = artifact_inputs.get("portions") or artifact_inputs.get("input")
@@ -1446,6 +1454,14 @@ def main():
                     raise SystemExit(f"Stage {stage_id} requires pages+portions inputs; specify via inputs map")
                 artifact_inputs["pages"] = artifact_index[pages_from]["path"]
                 artifact_inputs["portions"] = artifact_index[portions_from]["path"]
+                # Pass through any extra build inputs (e.g., issues_report)
+                for extra_key, extra_origin in inputs_map.items():
+                    if extra_key in {"pages", "portions"}:
+                        continue
+                    if extra_origin in artifact_index:
+                        artifact_inputs[extra_key] = artifact_index[extra_origin]["path"]
+                    else:
+                        artifact_inputs[extra_key] = extra_origin
                 # Schema checks
                 pages_schema = artifact_index[pages_from].get("schema")
                 portions_schema = artifact_index[portions_from].get("schema")

@@ -1,0 +1,13 @@
+module_id: html_to_blocks_v1
+stage: adapter
+entrypoint: modules/adapter/html_to_blocks_v1/main.py
+input_schema: page_html_v1
+output_schema: page_html_blocks_v1
+default_params:
+  drop_empty_blocks: true
+param_schema:
+  properties:
+    drop_empty_blocks:
+      type: boolean
+  required: []
+notes: "Parse per-page HTML into ordered block lists; drops empty blocks and flags blank pages."

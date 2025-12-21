@@ -1,0 +1,30 @@
+module_id: build_ff_engine_with_issues_v1
+stage: build
+entrypoint: modules/export/build_ff_engine_with_issues_v1/main.py
+input_schema: enriched_portion_v1
+output_schema: ff_engine_gamebook_v1
+default_params:
+  title: ""
+  author: ""
+  start_section: "1"
+  format_version: "1.0.0"
+param_schema:
+  properties:
+    title:
+      type: string
+    author:
+      type: string
+    start_section:
+      type: string
+    format_version:
+      type: string
+    allow_stubs:
+      type: boolean
+    expected_range:
+      type: string
+    unresolved_missing:
+      type: string
+    issues_report:
+      type: string
+  required: []
+notes: "Build FF engine gamebook with issues provenance propagation; copied from build_ff_engine_v1 and extended." 

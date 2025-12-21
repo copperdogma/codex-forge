@@ -1,0 +1,30 @@
+module_id: choices_repair_relaxed_v1
+stage: enrich
+entrypoint: modules/enrich/choices_repair_relaxed_v1/main.py
+input_schema: enriched_portion_v1
+output_schema: enriched_portion_v1
+default_params:
+  model: gpt-5.1
+  max_sources: 50
+  max_calls: 50
+  min_target: 1
+  max_target: 400
+param_schema:
+  properties:
+    model:
+      type: string
+      description: "LLM model for targeted choice confirmation"
+    max_sources:
+      type: integer
+      description: "Max source sections to inspect"
+    max_calls:
+      type: integer
+      description: "Max LLM calls"
+    min_target:
+      type: integer
+      description: "Minimum valid target section"
+    max_target:
+      type: integer
+      description: "Maximum valid target section"
+  required: []
+notes: "Uses relaxed reference index to target LLM confirmation for orphan choices, then merges confirmed choices into portions."

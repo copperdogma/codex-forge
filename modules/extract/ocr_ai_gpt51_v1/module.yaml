@@ -1,0 +1,30 @@
+module_id: ocr_ai_gpt51_v1
+stage: extract
+entrypoint: modules/extract/ocr_ai_gpt51_v1/main.py
+input_schema: page_image_v1
+output_schema: page_html_v1
+default_params:
+  model: gpt-5.1
+  max_output_tokens: 4096
+  temperature: 0.0
+  allow_empty: false
+  save_raw: false
+param_schema:
+  properties:
+    model:
+      type: string
+    max_output_tokens:
+      type: integer
+      minimum: 256
+    temperature:
+      type: number
+      minimum: 0
+      maximum: 2
+    allow_empty:
+      type: boolean
+    save_raw:
+      type: boolean
+    ocr_hints:
+      type: string
+  required: [model]
+notes: "GPT-5.1 vision OCR to per-page HTML. Consumes page_image_v1 manifest."

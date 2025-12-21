@@ -472,3 +472,20 @@
 
 ### Fixed
 - Ordering/span validation progress reporting and guard logic consistency across stages.
+## [2025-12-21] - GPT‑5.1 HTML-first OCR pipeline and validation
+
+### Added
+- GPT‑5.1 HTML OCR pipeline modules (split-only intake, OCR HTML, HTML→blocks, coarse segmentation, boundary detection + repair loop, HTML portionizer).
+- Relaxed choice extraction + targeted repair loop with issues reporting.
+- Gamebook smoke validator and OCR HTML schema validator.
+- New schemas for page images, HTML pages, HTML blocks, and pipeline issues.
+
+### Changed
+- GPT‑5.1 recipe wired to HTML-first pipeline with issue reporting and gamebook validation.
+- Build stage now accepts extra inputs (issues report) and propagates manual-review notes into gamebook provenance.
+- Story 081 marked Done with full-book validation evidence.
+
+### Tested
+- `PYTHONPATH=. pytest -q tests/test_ocr_ai_gpt51_schema.py`
+- 20-page end-to-end run: `/tmp/cf-ff-ai-ocr-gpt51-smoke-20`
+- Full-book run: `/tmp/cf-ff-ai-ocr-gpt51-full-`

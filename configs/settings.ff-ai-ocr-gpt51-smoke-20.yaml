@@ -1,0 +1,8 @@
+input:
+  pdf: input/06 deathtrap dungeon.pdf
+
+stage_params:
+  split_pages:
+    dpi: 300
+    start: 1
+    end: 20

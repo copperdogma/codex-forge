@@ -1,0 +1,24 @@
+module_id: portionize_html_extract_v1
+stage: portionize
+entrypoint: modules/portionize/portionize_html_extract_v1/main.py
+input_schema: page_html_blocks_v1
+output_schema: enriched_portion_v1
+default_params:
+  skip_running_heads: true
+  skip_page_numbers: true
+  min_section: 1
+  max_section: 400
+param_schema:
+  properties:
+    skip_running_heads:
+      type: boolean
+    skip_page_numbers:
+      type: boolean
+    min_section:
+      type: integer
+    max_section:
+      type: integer
+    boundaries:
+      type: string
+  required: []
+notes: "Extract per-section text from HTML blocks using section boundaries."

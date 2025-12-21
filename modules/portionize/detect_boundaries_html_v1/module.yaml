@@ -1,0 +1,23 @@
+module_id: detect_boundaries_html_v1
+stage: portionize
+entrypoint: modules/portionize/detect_boundaries_html_v1/main.py
+input_schema: page_html_blocks_v1
+output_schema: section_boundary_v1
+default_params:
+  min_section: 1
+  max_section: 400
+  require_text_between: true
+param_schema:
+  properties:
+    min_section:
+      type: integer
+      minimum: 1
+    max_section:
+      type: integer
+      minimum: 1
+    require_text_between:
+      type: boolean
+    coarse_segments:
+      type: string
+  required: [min_section, max_section]
+notes: "Detect section boundaries from HTML blocks (<h2> numeric headers)."

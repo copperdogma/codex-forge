@@ -76,6 +76,64 @@ class PageDoc(BaseModel):
     source_path: Optional[str] = None
 
 
+class PageImage(BaseModel):
+    schema_version: str = "page_image_v1"
+    module_id: Optional[str] = None
+    run_id: Optional[str] = None
+    source: Optional[List[str]] = None
+    created_at: Optional[str] = None
+    page: int
+    page_number: Optional[int] = None
+    original_page_number: Optional[int] = None
+    image: str
+    spread_side: Optional[str] = None
+
+
+class PageHtml(BaseModel):
+    schema_version: str = "page_html_v1"
+    module_id: Optional[str] = None
+    run_id: Optional[str] = None
+    source: Optional[List[str]] = None
+    created_at: Optional[str] = None
+    page: int
+    page_number: Optional[int] = None
+    original_page_number: Optional[int] = None
+    image: Optional[str] = None
+    spread_side: Optional[str] = None
+    html: str
+
+
+class HtmlBlock(BaseModel):
+    block_type: str
+    text: str
+    order: int
+    attrs: Optional[Dict[str, Any]] = None
+
+
+class PageHtmlBlocks(BaseModel):
+    schema_version: str = "page_html_blocks_v1"
+    module_id: Optional[str] = None
+    run_id: Optional[str] = None
+    source: Optional[List[str]] = None
+    created_at: Optional[str] = None
+    page: int
+    page_number: Optional[int] = None
+    original_page_number: Optional[int] = None
+    image: Optional[str] = None
+    spread_side: Optional[str] = None
+    is_blank: bool = False
+    blocks: List[HtmlBlock] = Field(default_factory=list)
+
+
+class PipelineIssues(BaseModel):
+    schema_version: str = "pipeline_issues_v1"
+    module_id: Optional[str] = None
+    run_id: Optional[str] = None
+    created_at: Optional[str] = None
+    summary: Dict[str, Any]
+    issues: List[Dict[str, Any]]
+
+
 class PageLine(BaseModel):
     text: str
     source: Optional[str] = None  # e.g., "betterocr", "gpt4v", "llm_reconcile"
@@ -232,6 +290,7 @@ class EnrichedPortion(BaseModel):
     confidence: float = 0.0
     source_images: List[str] = Field(default_factory=list)
     raw_text: Optional[str] = None
+    raw_html: Optional[str] = None
     continuation_of: Optional[str] = None
     continuation_confidence: Optional[float] = None
     choices: List[Choice] = Field(default_factory=list)
