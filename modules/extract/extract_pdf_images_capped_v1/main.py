@@ -1,5 +1,7 @@
 import argparse
 import os
+import shutil
+import subprocess
 from datetime import datetime
 from typing import Dict, Any, Optional, List, Tuple
 
@@ -26,6 +28,32 @@ def _load_pdf_reader(pdf_path: str):
             return PdfReader(pdf_path)
         except Exception:
             return None
+
+
+def _log_pdfinfo_warnings(pdf_path: str, logger: ProgressLogger):
+    pdfinfo = shutil.which("pdfinfo")
+    if not pdfinfo:
+        return
+    try:
+        proc = subprocess.run(
+            [pdfinfo, pdf_path],
+            capture_output=True,
+            text=True,
+            check=False,
+        )
+    except Exception:
+        return
+    stderr = (proc.stderr or "").strip()
+    if not stderr:
+        return
+    logger.log(
+        "extract",
+        "warning",
+        message=f"pdfinfo (poppler): {stderr}",
+        module_id="extract_pdf_images_capped_v1",
+        schema_version="page_image_v1",
+        extra={"tool": "pdfinfo", "stderr": stderr},
+    )
 
 
 def _resolve_obj(obj):
@@ -234,6 +262,8 @@ def main() -> None:
     sweep_report = args.sweep_report
 
     logger = ProgressLogger(state_path=args.state_file, progress_path=args.progress_file, run_id=args.run_id)
+
+    _log_pdfinfo_warnings(args.pdf, logger)
 
     images_dir = os.path.join(args.outdir, "images")
     ensure_dir(images_dir)

@@ -216,15 +216,19 @@ def main() -> None:
         )
 
     save_jsonl(out_path, out_rows)
+    total_blocks = sum(len(row.get("blocks", [])) for row in out_rows)
+    # Determine stage name based on output filename (html_blocks_raw vs html_blocks_repaired)
+    stage_name = "html_blocks_repaired" if "repaired" in str(out_path) else "html_blocks_raw"
     logger.log(
-        "adapter",
+        stage_name,
         "done",
         current=total,
         total=total,
-        message="HTML→blocks complete",
+        message=f"HTML→blocks complete: {total} pages, {total_blocks} blocks",
         artifact=out_path,
         module_id="html_to_blocks_v1",
         schema_version="page_html_blocks_v1",
+        extra={"summary_metrics": {"pages_count": total, "blocks_count": total_blocks}},
     )
 
 

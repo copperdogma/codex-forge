@@ -243,10 +243,12 @@ def main() -> None:
     )
 
     out_rows: List[Dict[str, Any]] = []
+    skipped = 0
     for idx, b in enumerate(boundaries_sorted, start=1):
         section_id = b.get("section_id")
         start_id = b.get("start_element_id")
         if not start_id or start_id not in id_to_index:
+            skipped += 1
             continue
         start_idx = id_to_index[start_id]
         end_id = b.get("end_element_id")
@@ -307,16 +309,19 @@ def main() -> None:
         )
 
     save_jsonl(args.out, out_rows)
+    summary_msg = f"Extracted {len(out_rows)} sections (skipped {skipped} of {len(boundaries_sorted)} boundaries)"
     logger.log(
-        "portionize",
+        "portionize_html",
         "done",
         current=len(out_rows),
         total=len(out_rows),
-        message=f"Extracted {len(out_rows)} sections",
+        message=summary_msg,
         artifact=args.out,
         module_id="portionize_html_extract_v1",
         schema_version="enriched_portion_v1",
+        extra={"summary_metrics": {"portions_created_count": len(out_rows), "sections_extracted_count": len(out_rows), "boundaries_skipped": skipped, "boundaries_total": len(boundaries_sorted)}},
     )
+    print(f"[summary] portionize_html_extract_v1: {summary_msg}")
 
 
 if __name__ == "__main__":

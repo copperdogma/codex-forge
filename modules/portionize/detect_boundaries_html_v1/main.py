@@ -269,16 +269,21 @@ def main() -> None:
     apply_macro_section(boundaries, coarse)
 
     save_jsonl(args.out, boundaries)
+    summary_msg = (
+        f"Boundaries: {len(boundaries)} (candidates {len(candidates)}, deduped {len(deduped)})"
+    )
     logger.log(
-        "portionize",
+        "detect_boundaries_html",
         "done",
         current=len(boundaries),
         total=len(boundaries),
-        message=f"Detected {len(boundaries)} section boundaries",
+        message=summary_msg,
         artifact=args.out,
         module_id="detect_boundaries_html_v1",
         schema_version="section_boundary_v1",
+        extra={"summary_metrics": {"boundaries_detected_count": len(boundaries), "candidates_count": len(candidates), "deduped_count": len(deduped)}},
     )
+    print(f"[summary] detect_boundaries_html_v1: {summary_msg}")
 
 
 if __name__ == "__main__":

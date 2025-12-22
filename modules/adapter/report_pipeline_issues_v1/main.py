@@ -11,7 +11,7 @@ from datetime import datetime
 from pathlib import Path
 from typing import Dict, List, Optional
 
-from modules.common.utils import ensure_dir
+from modules.common.utils import ensure_dir, ProgressLogger
 
 
 def _utc() -> str:
@@ -120,6 +120,9 @@ def main() -> None:
     ap.add_argument("--inputs", nargs="*", help="(ignored) driver compatibility")
     ap.add_argument("--out", required=True, help="Output JSONL report path")
     ap.add_argument("--run-dir", dest="run_dir", help="Optional run directory override")
+    ap.add_argument("--progress-file")
+    ap.add_argument("--state-file")
+    ap.add_argument("--run-id")
     args = ap.parse_args()
 
     out_path = os.path.abspath(args.out)
@@ -151,6 +154,33 @@ def main() -> None:
         f.write(json.dumps(row, ensure_ascii=True) + "\n")
 
     _write_unresolved_missing(run_dir, issues)
+
+    progress_path = args.progress_file or os.path.join(run_dir, "pipeline_events.jsonl")
+    run_id = args.run_id or os.path.basename(run_dir)
+    logger = ProgressLogger(state_path=args.state_file, progress_path=progress_path, run_id=run_id)
+    summary_msg = (
+        f"Issues: missing {summary['missing_section_count']}, "
+        f"orphans {summary['orphaned_section_count']}, "
+        f"orphans_no_sources {summary['orphaned_section_no_sources_count']} → {out_path}"
+    )
+    status = "warning" if summary["issue_count"] else "done"
+    logger.log(
+        "report_pipeline_issues",
+        status,
+        current=summary["issue_count"],
+        total=summary["issue_count"],
+        message=summary_msg,
+        artifact=out_path,
+        module_id="report_pipeline_issues_v1",
+        schema_version="pipeline_issues_v1",
+        extra={"summary_metrics": {
+            "missing_section_count": summary["missing_section_count"],
+            "orphaned_section_count": summary["orphaned_section_count"],
+            "orphaned_section_no_sources_count": summary["orphaned_section_no_sources_count"],
+            "issue_count": summary["issue_count"],
+        }},
+    )
+    print(f"[summary] report_pipeline_issues_v1: {summary_msg}")
 
 
 if __name__ == "__main__":

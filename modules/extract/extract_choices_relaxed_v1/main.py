@@ -22,6 +22,7 @@ import os
 import re
 from typing import List, Dict, Tuple, Optional, Set
 from dataclasses import dataclass
+from pathlib import Path
 
 from modules.common.utils import read_jsonl, save_jsonl, ProgressLogger
 from modules.common.html_utils import html_to_text
@@ -78,6 +79,33 @@ def _normalize_section_ref_token(token: str) -> Optional[int]:
         return int(fixed)
     except Exception:
         return None
+
+
+def _coerce_int(val: Optional[str]) -> Optional[int]:
+    if val is None:
+        return None
+    if isinstance(val, int):
+        return val
+    digits = ""
+    for ch in str(val):
+        if ch.isdigit():
+            digits += ch
+        else:
+            break
+    if digits:
+        return int(digits)
+    return None
+
+
+def _guess_issues_report_path(out_path: str) -> str:
+    try:
+        run_dir = Path(out_path).resolve().parents[1]
+    except Exception:
+        return ""
+    for child in run_dir.iterdir():
+        if child.is_dir() and child.name.endswith("report_pipeline_issues_v1"):
+            return str(child / "issues_report.jsonl")
+    return str(run_dir / "<ordinal>_report_pipeline_issues_v1" / "issues_report.jsonl")
 
 
 def extract_choice_patterns(text: str, min_section: int = 1, max_section: int = 400) -> List[ChoiceCandidate]:
@@ -389,15 +417,26 @@ def main():
     # Find orphaned sections
     orphans = find_orphaned_sections(output_portions, (min_section, max_section), choices_key="choices")
     orphans_relaxed = find_orphaned_sections(output_portions, (min_section, max_section), choices_key="choices_relaxed")
+
+    found_sections = set()
+    for portion in output_portions:
+        sec = _coerce_int(portion.get("section_id"))
+        if sec is not None:
+            found_sections.add(sec)
+    missing_sections = [i for i in range(min_section, max_section + 1) if i not in found_sections]
     
     # Save output
     save_jsonl(out_path, output_portions)
     
     # Save stats
+    issues_report_path = _guess_issues_report_path(out_path)
+    stats['missing_sections'] = missing_sections
+    stats['missing_count'] = len(missing_sections)
     stats['orphaned_sections'] = sorted(list(orphans))
     stats['orphaned_count'] = len(orphans)
     stats['orphaned_sections_relaxed'] = sorted(list(orphans_relaxed))
     stats['orphaned_count_relaxed'] = len(orphans_relaxed)
+    stats['issues_report_path'] = issues_report_path
     if relaxed_reference_index:
         stats['relaxed_reference_index'] = {
             target: sorted(list(sources))
@@ -413,10 +452,21 @@ def main():
         "done",
         current=total,
         total=total,
-        message=f"Extracted {stats['total_choices_extracted']} choices from {stats['portions_with_choices']} portions",
+        message=(
+            f"Choices: {stats['total_choices_extracted']} from {stats['portions_with_choices']} portions; "
+            f"missing {stats['missing_count']}; orphans {stats['orphaned_count']}; "
+            f"issues_report {issues_report_path}"
+        ),
         artifact=out_path,
         module_id="extract_choices_relaxed_v1",
-        schema_version="enriched_portion_v1"
+        schema_version="enriched_portion_v1",
+        extra={"summary_metrics": {
+            "choices_extracted_count": stats['total_choices_extracted'],
+            "portions_with_choices_count": stats['portions_with_choices'],
+            "total_portions_count": stats['total_portions'],
+            "missing_section_count": stats['missing_count'],
+            "orphaned_section_count": stats['orphaned_count'],
+        }},
     )
     
     # Print summary
@@ -427,6 +477,8 @@ def main():
     print(f"Low confidence choices: {stats['low_confidence_count']}")
     print(f"Portions with relaxed refs: {stats['portions_with_relaxed_refs']}")
     print(f"Total relaxed refs: {stats['total_relaxed_refs']}")
+    print(f"Missing sections: {stats['missing_count']}")
+    print(f"Issues report (if run): {issues_report_path}")
     
     if orphans:
         print(f"\n⚠️ Found {len(orphans)} orphaned sections (never referenced):")
@@ -443,6 +495,9 @@ def main():
     elif not orphans_relaxed and orphans:
         print(f"\n✅ Relaxed scan references all sections (diagnostic only).")
     
+    if stats['missing_count'] > 0:
+        print(f"\nMissing sections list in: {stats_path}")
+
     print(f"\nStats saved to: {stats_path}")
 
 

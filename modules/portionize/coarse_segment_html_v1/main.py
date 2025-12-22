@@ -335,31 +335,54 @@ def main() -> None:
 
     save_json(args.out, output)
 
+    endmatter_range = output.get("endmatter_pages")
+    endmatter_label = "None" if not endmatter_range else f"{endmatter_range[0]}-{endmatter_range[1]}"
+    frontmatter_range = output.get("frontmatter_pages")
+    gameplay_range = output.get("gameplay_pages")
+    summary_msg = (
+        f"Segments: front={frontmatter_range[0]}-{frontmatter_range[1]}, "
+        f"gameplay={gameplay_range[0]}-{gameplay_range[1]}, "
+        f"end={endmatter_label}"
+    )
+
+    metrics = {
+        "frontmatter_start": frontmatter_range[0],
+        "frontmatter_end": frontmatter_range[1],
+        "gameplay_start": gameplay_range[0],
+        "gameplay_end": gameplay_range[1],
+    }
+    if endmatter_range:
+        metrics["endmatter_start"] = endmatter_range[0]
+        metrics["endmatter_end"] = endmatter_range[1]
+    
     if errors:
         logger.log(
-            "coarse_segment",
+            "coarse_segment_html",
             "warning",
             current=100,
             total=100,
-            message=f"Completed with validation warnings: {', '.join(errors)}",
+            message=f"{summary_msg} (warnings: {', '.join(errors)})",
             artifact=args.out,
             module_id="coarse_segment_html_v1",
+            extra={"summary_metrics": metrics},
         )
     else:
         logger.log(
-            "coarse_segment",
+            "coarse_segment_html",
             "done",
             current=100,
             total=100,
-            message="Coarse segmentation completed successfully",
+            message=summary_msg,
             artifact=args.out,
             module_id="coarse_segment_html_v1",
+            extra={"summary_metrics": metrics},
         )
 
     print(f"✅ Coarse segmentation → {args.out}")
     print(f"   Frontmatter: {output['frontmatter_pages']}")
     print(f"   Gameplay: {output['gameplay_pages']}")
     print(f"   Endmatter: {output['endmatter_pages']}")
+    print(f"[summary] coarse_segment_html_v1: {summary_msg}")
 
 
 if __name__ == "__main__":

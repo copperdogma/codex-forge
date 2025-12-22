@@ -388,10 +388,10 @@ def main():
     msg = f"Wrote {len(sections)} sections → {args.out}"
     if stub_count:
         msg += f" (stubs added: {stub_count})"
-    logger.log("build_ff_engine", "done", current=len(portions), total=len(portions),
+    logger.log("build_gamebook", "done", current=len(portions), total=len(portions),
                message=msg, artifact=args.out,
-               module_id="build_ff_engine_v1", schema_version="ff_engine_gamebook_v1",
-               extra={"stub_count": stub_count})
+               module_id="build_ff_engine_with_issues_v1", schema_version="ff_engine_gamebook_v1",
+               extra={"summary_metrics": {"sections_count": len(sections), "stubs_count": stub_count}})
     print(f"Wrote gamebook with {len(sections)} sections to {args.out}")
 
 

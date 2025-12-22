@@ -3,6 +3,8 @@ import argparse
 import json
 from typing import Dict, List, Set
 
+from modules.common.utils import ProgressLogger
+
 
 def _load_gamebook(path: str) -> Dict:
     with open(path, "r", encoding="utf-8") as f:
@@ -98,6 +100,23 @@ def main() -> None:
 
     with open(args.out, "w", encoding="utf-8") as f:
         json.dump(report, f, indent=2, ensure_ascii=True)
+
+    logger = ProgressLogger(state_path=args.state_file, progress_path=args.progress_file, run_id=args.run_id)
+    status = "done" if not errors else "failed"
+    logger.log(
+        "validate_gamebook",
+        status,
+        current=len(sections),
+        total=len(sections),
+        message=f"Validation: {len(sections)} sections, {len(errors)} errors, {len(warnings)} warnings",
+        artifact=args.out,
+        module_id="validate_gamebook_smoke_v1",
+        extra={"summary_metrics": {
+            "sections_validated_count": len(sections),
+            "error_count": len(errors),
+            "warning_count": len(warnings),
+        }},
+    )
 
     if errors:
         raise SystemExit(f"Validation failed with {len(errors)} errors")

@@ -175,7 +175,7 @@ def main() -> None:
 
         logger = ProgressLogger(state_path=args.state_file, progress_path=args.progress_file, run_id=args.run_id)
         logger.log(
-            "extract",
+            "ocr_ai",
             "running",
             current=0,
             total=total,
@@ -339,7 +339,7 @@ def main() -> None:
                 )
 
         logger.log(
-            "extract",
+            "ocr_ai",
             "done",
             current=total,
             total=total,
@@ -347,11 +347,12 @@ def main() -> None:
             artifact=str(out_path),
             module_id="ocr_ai_gpt51_v1",
             schema_version="page_html_v1",
+            extra={"summary_metrics": {"pages_processed_count": total}},
         )
     except Exception as exc:
         logger = ProgressLogger(state_path=args.state_file, progress_path=args.progress_file, run_id=args.run_id)
         logger.log(
-            "extract",
+            "ocr_ai",
             "failed",
             message=f"Unhandled OCR failure: {exc}",
             module_id="ocr_ai_gpt51_v1",

@@ -480,7 +480,7 @@ def main() -> None:
             )
 
     logger.log(
-        "adapter",
+        "table_rescue",
         "done",
         current=total,
         total=total,
@@ -488,6 +488,7 @@ def main() -> None:
         artifact=str(out_path),
         module_id="table_rescue_html_v1",
         schema_version="page_html_v1",
+        extra={"summary_metrics": {"tables_rescued_count": rescued, "tables_attempted_count": attempted}},
     )
 
 

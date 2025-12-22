@@ -392,6 +392,7 @@ def main() -> None:
         raise RuntimeError("openai package required") from _OPENAI_IMPORT_ERROR
     client = OpenAI()
 
+    total_blocks_repaired = 0
     for attempt in range(args.max_retries + 1):
         logger.log(
             "portionize",
@@ -420,6 +421,7 @@ def main() -> None:
         apply_macro_section(boundaries, coarse)
 
         missing = _compute_missing(boundaries, args.min_section, args.max_section)
+        expected_total = args.max_section - args.min_section + 1
         boundaries_out_path = os.path.join(out_dir, args.boundaries_out)
         missing_path = os.path.join(out_dir, args.missing_out)
         with open(missing_path, "w", encoding="utf-8") as f:
@@ -430,16 +432,19 @@ def main() -> None:
             save_jsonl(boundaries_out_path, boundaries)
             save_jsonl(out_pages_path, pages_html)
             save_jsonl(os.path.join(out_dir, args.out_blocks), blocks_rows)
+            summary_msg = f"Coverage: {len(boundaries)}/{expected_total} sections; missing 0"
             logger.log(
-                "portionize",
+                "html_repair_loop",
                 "done",
                 current=len(boundaries),
                 total=len(boundaries),
-                message=f"Coverage met: {len(boundaries)}/{args.max_section - args.min_section + 1}",
+                message=summary_msg,
                 artifact=out_pages_path,
                 module_id="detect_boundaries_html_loop_v1",
                 schema_version="page_html_v1",
+                extra={"summary_metrics": {"blocks_repaired_count": total_blocks_repaired, "sections_found": len(boundaries), "missing_count": 0}},
             )
+            print(f"[summary] detect_boundaries_html_loop_v1: {summary_msg}")
             return
 
         if attempt >= args.max_retries:
@@ -447,31 +452,38 @@ def main() -> None:
             save_jsonl(out_pages_path, pages_html)
             save_jsonl(os.path.join(out_dir, args.out_blocks), blocks_rows)
             page_numbers = [p.get("page_number") for p in pages_for_detection if p.get("page_number") is not None]
+            section_pages = _build_section_page_map(boundaries)
             page_map = _suspected_pages_for_missing(missing, section_pages, page_numbers, args.adjacent_window)
             bundle_dir = _build_missing_bundles(out_dir, missing, boundaries, pages_html, page_map)
+            summary_msg = f"Missing sections: {len(missing)}/{expected_total}; missing list: {missing_path}; bundles: {bundle_dir}"
+            metrics = {"blocks_repaired_count": total_blocks_repaired, "sections_found": len(boundaries), "missing_count": len(missing)}
             if args.allow_missing:
                 logger.log(
-                    "portionize",
+                    "html_repair_loop",
                     "warning",
                     current=len(boundaries),
                     total=len(boundaries),
-                    message=f"Missing sections after {args.max_retries} retries: {len(missing)}; bundles in {bundle_dir}",
+                    message=f"Missing sections after {args.max_retries} retries. {summary_msg}",
                     artifact=bundle_dir,
                     module_id="detect_boundaries_html_loop_v1",
                     schema_version="page_html_v1",
+                    extra={"summary_metrics": metrics},
                 )
+                print(f"[summary] detect_boundaries_html_loop_v1: {summary_msg}")
                 return
             else:
                 logger.log(
-                    "portionize",
+                    "html_repair_loop",
                     "failed",
                     current=len(boundaries),
                     total=len(boundaries),
-                    message=f"Missing sections after {args.max_retries} retries: {len(missing)}; bundles in {bundle_dir}",
+                    message=f"Missing sections after {args.max_retries} retries. {summary_msg}",
                     artifact=bundle_dir,
                     module_id="detect_boundaries_html_loop_v1",
                     schema_version="page_html_v1",
+                    extra={"summary_metrics": metrics},
                 )
+                print(f"[summary] detect_boundaries_html_loop_v1: {summary_msg}")
                 raise SystemExit(
                     f"Missing sections after {args.max_retries} retries: {len(missing)} missing"
                 )
@@ -550,6 +562,7 @@ def main() -> None:
             )
             repaired += 1
 
+        total_blocks_repaired += repaired
         logger.log(
             "portionize",
             "running",

@@ -1685,12 +1685,9 @@ def main():
         record_stage_instrumentation(stage_id, module_id, "done", artifact_path, out_schema,
                                      stage_started_at, stage_wall_start, stage_cpu_start)
         stage_timings[stage_id] = time.perf_counter() - stage_wall_start
-        try:
-            logger.log(stage_id, "done", artifact=artifact_path, module_id=module_id,
-                       message=f"Stage completed in {stage_timings[stage_id]:.2f}s",
-                       extra={"elapsed_seconds": round(stage_timings[stage_id], 2)})
-        except Exception:
-            pass
+        # Don't log generic "Stage completed" message - let modules log their own summaries
+        # This prevents overwriting module-specific messages with generic ones
+        # wall_seconds is already captured in timing_summary from stage_timings
 
         if args.end_at and stage_id == args.end_at:
             print(f"[end-at] stopping after {stage_id} per --end-at")
@@ -1707,10 +1704,74 @@ def main():
         save_json(instr_json_path, instrumentation_run)
         _render_instrumentation_md(instrumentation_run, instr_md_path)
 
-    # Lightweight timing summary (always emit, even on failure)
+    # Lightweight summary (always emit, even on failure)
     timing_summary = {}
     for sid, seconds in stage_timings.items():
         timing_summary[sid] = {"wall_seconds": round(seconds, 2)}
+    try:
+        if progress_path and os.path.exists(progress_path):
+            # Build mapping from module_id to recipe stage IDs (for modules used in multiple stages)
+            module_to_stage_ids: Dict[str, List[str]] = {}
+            for sid, node in plan["nodes"].items():
+                module_id = node.get("module")
+                if module_id:
+                    module_to_stage_ids.setdefault(module_id, []).append(sid)
+            
+            last_messages = {}
+            last_metrics = {}
+            with open(progress_path, "r", encoding="utf-8") as f:
+                for line in f:
+                    if not line.strip():
+                        continue
+                    try:
+                        evt = json.loads(line)
+                    except Exception:
+                        continue
+                    stage = evt.get("stage")
+                    status = evt.get("status")
+                    message = evt.get("message")
+                    module_id = evt.get("module_id")
+                    
+                    # Map module stage name to recipe stage ID
+                    # If stage is already a recipe stage ID, use it directly
+                    # Otherwise, try to map via module_id
+                    recipe_stage_id = stage
+                    if stage and stage not in plan["nodes"] and module_id:
+                        # Stage name doesn't match recipe ID, try to find via module_id
+                        candidate_stages = module_to_stage_ids.get(module_id, [])
+                        if len(candidate_stages) == 1:
+                            # Only one stage uses this module, use it
+                            recipe_stage_id = candidate_stages[0]
+                        elif len(candidate_stages) > 1:
+                            # Multiple stages use this module - need to disambiguate
+                            # For now, prefer the one that matches the stage name pattern or use the first
+                            # This is a heuristic - ideally modules would log with recipe stage IDs
+                            recipe_stage_id = candidate_stages[0]  # Fallback to first
+                    
+                    if recipe_stage_id and message and status in {"done", "warning", "failed"}:
+                        last_messages[recipe_stage_id] = message
+                    if recipe_stage_id and status in {"done", "warning", "failed"}:
+                        metrics = (evt.get("extra") or {}).get("summary_metrics")
+                        if isinstance(metrics, dict):
+                            last_metrics[recipe_stage_id] = metrics
+            for sid, msg in last_messages.items():
+                if sid not in timing_summary:
+                    timing_summary[sid] = {}
+                # Only add summary if it's not a generic "Stage completed in Xs" message
+                # Those should just use wall_seconds instead
+                if msg and not msg.startswith("Stage completed in"):
+                    timing_summary[sid]["summary"] = msg
+            for sid, metrics in last_metrics.items():
+                if sid not in timing_summary:
+                    timing_summary[sid] = {}
+                timing_summary[sid]["metrics"] = metrics
+            # Ensure all stages in timing_summary have wall_seconds (from stage_timings)
+            # This should already be there, but ensure it for any stages added via messages/metrics
+            for sid in list(timing_summary.keys()):
+                if "wall_seconds" not in timing_summary[sid] and sid in stage_timings:
+                    timing_summary[sid]["wall_seconds"] = round(stage_timings[sid], 2)
+    except Exception:
+        pass
     try:
         # Add pages/min for intake/extract when possible
         for sid, node in plan["nodes"].items():
@@ -1727,8 +1788,17 @@ def main():
         pass
     try:
         timing_path = os.path.join(run_dir, "timing_summary.json")
-        save_json(timing_path, timing_summary)
-        print("[timing] summary:", json.dumps(timing_summary, indent=2))
+        # Build ordered summary using topological execution order
+        ordered_summary = {}
+        for sid in plan.get("topo", []):
+            if sid in timing_summary:
+                ordered_summary[sid] = timing_summary[sid]
+        # Include any stages in timing_summary that aren't in topo (shouldn't happen, but be safe)
+        for sid, data in timing_summary.items():
+            if sid not in ordered_summary:
+                ordered_summary[sid] = data
+        save_json(timing_path, ordered_summary)
+        print("[summary] run:", json.dumps(ordered_summary, indent=2))
     except Exception:
         pass
 

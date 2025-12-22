@@ -295,7 +295,7 @@ def main():
         json.dump(stats_out, f, indent=2)
 
     logger.log(
-        "enrich",
+        "repair_choices",
         "done",
         current=len(source_sections),
         total=len(source_sections),
@@ -303,6 +303,14 @@ def main():
         artifact=args.out,
         module_id="choices_repair_relaxed_v1",
         schema_version="enriched_portion_v1",
+        extra={"summary_metrics": {
+            "issues_detected_count": len(orphans),
+            "issues_repaired_count": added_choices,
+            "choices_added_count": added_choices,
+            "repair_calls": calls,
+            "orphaned_count_before": len(orphans),
+            "orphaned_count_after": len(orphans_after),
+        }},
     )
 
 
