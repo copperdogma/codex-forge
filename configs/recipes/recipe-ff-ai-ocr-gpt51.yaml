@@ -30,12 +30,27 @@ stages:
         - In gameplay pages, section numbers are centered standalone digits (1–3 digits) and should be <h2>.
         - Do not treat running heads (e.g., \"16-17\") as section headers.
 
-  - id: html_blocks_raw
+  - id: table_rescue
     stage: adapter
-    module: html_to_blocks_v1
+    module: table_rescue_html_v1
     needs: [ocr_ai]
     inputs:
       pages: ocr_ai
+    out: pages_html_rescued.jsonl
+    params:
+      model: gpt-5.1
+      max_pages: 10
+      crop_bottom: 0.42
+      rescue_hints: |
+        - When options are presented in columns or rows, preserve the grid as a <table>.
+        - Preserve row/column separation for repeated option lists and references.
+
+  - id: html_blocks_raw
+    stage: adapter
+    module: html_to_blocks_v1
+    needs: [table_rescue]
+    inputs:
+      pages: table_rescue
     out: page_blocks.jsonl
 
   - id: coarse_segment_html
@@ -49,9 +64,9 @@ stages:
   - id: html_repair_loop
     stage: portionize
     module: detect_boundaries_html_loop_v1
-    needs: [ocr_ai, coarse_segment_html]
+    needs: [table_rescue, coarse_segment_html]
     inputs:
-      pages: ocr_ai
+      pages: table_rescue
       coarse_segments: coarse_segment_html
     out: pages_html_repaired.jsonl
     params:

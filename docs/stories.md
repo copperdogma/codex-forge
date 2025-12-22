@@ -42,10 +42,12 @@ Guiding priorities: **perfect OCR first**, then move downstream stage‑by‑sta
     Ensure HTML survives to final artifacts (no lossy plain-text-only outputs).
 18. **087 — Retire Legacy OCR-Only Recipe**
     Deprecate/remove legacy OCR-only recipes now superseded by GPT‑5.1 pipeline.
+19. **088 — Choice Parsing Enhancements**
+    Improve choice parsing and add semantic choice markup in HTML.
 
-19. **009 — Layout‑Preserving Extractor**  
+20. **009 — Layout‑Preserving Extractor**  
     Build layout/table preservation needed for non‑FF books.
-20. **026 — Onward to the Unknown pilot (Arthur L'Heureux)**  
+21. **026 — Onward to the Unknown pilot (Arthur L'Heureux)**  
     Run end‑to‑end with layout‑aware table handling once 009 lands.
 
 Later / non‑blocking:
@@ -132,9 +134,10 @@ This index tracks stories in `/docs/stories/` for the codex-forge pipeline.
 || 082 | Large-Image PDF Cost Optimization | High | To Do | /docs/stories/story-082-large-image-pdf-cost-optimization.md |
 || 083 | Game-Ready Validation Checklist | High | To Do | /docs/stories/story-083-game-ready-validation-checklist.md |
 || 084 | Fast PDF Image Extraction (Embedded Streams) | Medium | To Do | /docs/stories/story-084-fast-pdf-image-extraction.md |
-|| 085 | Table Rescue OCR Pass | High | To Do | /docs/stories/story-085-table-rescue-ocr.md |
+|| 085 | Table Rescue OCR Pass | High | Done | /docs/stories/story-085-table-rescue-ocr.md |
 || 086 | Preserve HTML Through Final Gamebook | High | Done | /docs/stories/story-086-preserve-html-final-output.md |
 || 087 | Retire Legacy OCR-Only Recipe | Medium | To Do | /docs/stories/story-087-retire-legacy-ocr-recipe.md |
+|| 088 | Choice Parsing Enhancements | High | To Do | /docs/stories/story-088-choice-parsing-enhancements.md |
 || 099 | Remove dev-only backcompat disclaimer | Low | To Do | /docs/stories/story-099-remove-dev-backcompat-note.md |
 
 ## Notes

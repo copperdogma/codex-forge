@@ -29,6 +29,17 @@
 - Build/export modules support dropping text and provenance text (HTML is source of truth).
 - Choice repair and extraction now derive text from HTML where appropriate.
 
+## [2025-12-22] - Table rescue OCR pipeline stage
+
+### Added
+- `table_rescue_html_v1` module to detect collapsed tables and re-read targeted crops with GPT-5.1.
+- Table-rescue smoke settings (`configs/settings.ff-ai-ocr-gpt51-table-rescue-smoke.yaml`).
+- Story 088 for choice parsing enhancements.
+
+### Changed
+- GPT-5.1 recipe now runs `table_rescue_html_v1` before HTML block extraction and boundary detection.
+- Story 085 marked Done with detailed validation logs.
+
 ## [2025-12-12] - GPU “pit of success” for EasyOCR on Apple Silicon
 
 ### Added
