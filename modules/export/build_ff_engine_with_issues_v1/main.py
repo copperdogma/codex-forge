@@ -4,6 +4,7 @@ import os
 from typing import Any, Dict, List, Optional
 
 from modules.common.utils import read_jsonl, save_json, ProgressLogger
+from modules.common.html_utils import html_to_text
 
 
 def make_navigation(portion: Dict[str, Any]) -> List[Dict[str, Any]]:
@@ -38,6 +39,7 @@ def classify_type(section_id: str, portion: Dict[str, Any], text_body: str) -> s
         "rules",
         "adventure_sheet",
         "template",
+        "background",
     }
     if portion.get("section_type") in allowed_types:
         return portion["section_type"]
@@ -45,6 +47,8 @@ def classify_type(section_id: str, portion: Dict[str, Any], text_body: str) -> s
         return portion["type"]
     if section_id.isdigit():
         return "section"
+    if section_id.lower() == "background":
+        return "intro"
 
     lower = (text_body or "").lower()
     if "table of contents" in lower or "contents" in lower:
@@ -66,12 +70,14 @@ def is_gameplay(section_id: str, portion: Dict[str, Any], candidate_type: Option
         return bool(portion["is_gameplay"])
     if candidate_type == "section" or section_id.isdigit():
         return True
+    if section_id.lower() == "background":
+        return True
     if portion.get("choices") or portion.get("combat") or portion.get("test_luck") or portion.get("item_effects"):
         return True
     return False
 
 
-def build_section(portion: Dict[str, Any]) -> tuple[str, Dict[str, Any]]:
+def build_section(portion: Dict[str, Any], emit_text: bool, emit_provenance_text: bool) -> tuple[str, Dict[str, Any]]:
     """
     Build a Fighting Fantasy Engine section from an EnrichedPortion.
 
@@ -83,22 +89,30 @@ def build_section(portion: Dict[str, Any]) -> tuple[str, Dict[str, Any]]:
     page_start_original = portion.get("page_start_original")
     page_end_original = portion.get("page_end_original")
 
-    # AI pipeline always provides raw_text
-    text_body = portion.get("raw_text", "")
+    html_body = portion.get("raw_html", "")
+    text_body = portion.get("raw_text") or html_to_text(html_body)
     raw_body = text_body
 
     nav_links = make_navigation(portion)
+    if not nav_links and section_id.lower() == "background":
+        nav_links = [{
+            "targetSection": "1",
+            "choiceText": "Turn to 1",
+            "isConditional": False,
+        }]
 
     candidate_type = classify_type(section_id, portion, text_body)
 
     section: Dict[str, Any] = {
         "id": section_id,
-        "text": text_body,
+        "html": html_body,
         "pageStart": page_start,
         "pageEnd": page_end,
         "isGameplaySection": is_gameplay(section_id, portion, candidate_type),
         "type": candidate_type,
     }
+    if emit_text:
+        section["text"] = text_body
 
     if nav_links:
         section["navigationLinks"] = nav_links
@@ -147,12 +161,13 @@ def build_section(portion: Dict[str, Any]) -> tuple[str, Dict[str, Any]]:
         "source_images": portion.get("source_images") or [],
         "source_pages": list(range(page_start, page_end + 1)),
         "source_pages_original": list(range(page_start_original, page_end_original + 1)) if isinstance(page_start_original, int) and isinstance(page_end_original, int) else None,
-        "raw_text": raw_body,
-        "clean_text": text_body,
         "macro_section": portion.get("macro_section"),
         "module_id": portion.get("module_id"),
         "run_id": portion.get("run_id"),
     }
+    if emit_provenance_text:
+        provenance["raw_text"] = raw_body
+        provenance["clean_text"] = text_body
     section["provenance"] = provenance
     return section_id, section
 
@@ -202,6 +217,16 @@ def main():
                         help="Permit stub backfill for missing targets (default: fail if stubs needed)")
     parser.add_argument("--expected-range", "--expected_range", default="1-400", dest="expected_range",
                         help="Expected section id range (e.g., 1-400). Targets outside are ignored.")
+    parser.add_argument("--emit-text", "--emit_text", dest="emit_text", action="store_true",
+                        help="Include plain text in section outputs (default: true)")
+    parser.add_argument("--drop-text", "--drop_text", dest="emit_text", action="store_false",
+                        help="Omit plain text from section outputs")
+    parser.set_defaults(emit_text=True)
+    parser.add_argument("--emit-provenance-text", "--emit_provenance_text", dest="emit_provenance_text",
+                        action="store_true", help="Include raw/clean text in provenance (default: true)")
+    parser.add_argument("--drop-provenance-text", "--drop_provenance_text", dest="emit_provenance_text",
+                        action="store_false", help="Omit raw/clean text from provenance")
+    parser.set_defaults(emit_provenance_text=True)
     parser.add_argument("--unresolved-missing", "--unresolved_missing", dest="unresolved_missing",
                         help="Optional path to unresolved_missing.json (sections verified missing from source).")
     parser.add_argument("--issues-report", "--issues_report", dest="issues_report",
@@ -244,7 +269,7 @@ def main():
         if "error" in portion:
             continue
 
-        section_id, section = build_section(portion)
+        section_id, section = build_section(portion, args.emit_text, args.emit_provenance_text)
         sections[section_id] = section
         if idx % 20 == 0:
             logger.log("build_ff_engine", "running", current=idx, total=len(portions),
@@ -292,15 +317,20 @@ def main():
         reason = "backfilled missing target"
         if mid in unresolved_allow:
             reason = "verified_missing_from_source"
-        sections[mid] = {
+        stub_section = {
             "id": mid,
-            "text": "",
+            "html": "",
             "isGameplaySection": True,
             "type": "section",
             "provenance": {"stub": True, "reason": reason},
         }
+        if args.emit_text:
+            stub_section["text"] = ""
+        sections[mid] = stub_section
 
     start_section = str(args.start_section)
+    if "background" in sections:
+        start_section = "background"
     if start_section not in sections and sections:
         # prefer numeric "1" if present, else first section id
         if "1" in sections:

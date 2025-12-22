@@ -1,0 +1,155 @@
+--- gold/page-020R.html
++++ model/page-020R.html
+@@ -1,119 +1,43 @@
+ <p class="running-head">
+-16-17
++18-21
+ </p>
+ <h2>
+-16
++18
+ </h2>
+ <p>
+-You just have time to hear the Gnome say, 'Three skulls' before a white bolt of energy shoots out from the lock into your chest, knocking you unconscious. Roll one die, add 1 to the number and reduce your STAMINA by the total. If you are still alive, you come to and are told by the Gnome to try again. You chose the wrong gems last time, so you won't try that combination again.
++Luckily for you, the cobra's fangs sink into your leather wristband. The snake recoils quickly, ready to strike again, as the Dwarf tells you to have another try. Roll two dice. If the total is the same as or less than your
++<strong>
++SKILL
++</strong>
++, turn to 55. If the total is greater than your
++<strong>
++SKILL
++</strong>
++, turn to 202.
+ </p>
+-<table>
+-<thead>
+-<tr>
+-<th>
+-A
+-</th>
+-<th>
+-B
+-</th>
+-<th>
+-C
+-</th>
+-<th>
+-</th>
+-</tr>
+-</thead>
+-<tbody>
+-<tr>
+-<td>
+-Emerald
+-</td>
+-<td>
+-Diamond
+-</td>
+-<td>
+-Sapphire
+-</td>
+-<td>
+-Turn to 16
+-</td>
+-</tr>
+-<tr>
+-<td>
+-Diamond
+-</td>
+-<td>
+-Sapphire
+-</td>
+-<td>
+-Emerald
+-</td>
+-<td>
+-Turn to 392
+-</td>
+-</tr>
+-<tr>
+-<td>
+-Sapphire
+-</td>
+-<td>
+-Emerald
+-</td>
+-<td>
+-Diamond
+-</td>
+-<td>
+-Turn to 177
+-</td>
+-</tr>
+-<tr>
+-<td>
+-Emerald
+-</td>
+-<td>
+-Sapphire
+-</td>
+-<td>
+-Diamond
+-</td>
+-<td>
+-Turn to 287
+-</td>
+-</tr>
+-<tr>
+-<td>
+-Diamond
+-</td>
+-<td>
+-Emerald
+-</td>
+-<td>
+-Sapphire
+-</td>
+-<td>
+-Turn to 132
+-</td>
+-</tr>
+-<tr>
+-<td>
+-Sapphire
+-</td>
+-<td>
+-Diamond
+-</td>
+-<td>
+-Emerald
+-</td>
+-<td>
+-Turn to 249
+-</td>
+-</tr>
+-</tbody>
+-</table>
+-<img alt="Illustration of a small rodent lying on its side">
+ <h2>
+-17
++19
+ </h2>
+ <p>
+-You are not strong enough to force open the heavy door. The water is now waist-high and you are exhausted from your efforts. The water level rises quickly and you find yourself floating ever upwards until your face is pressed against the ceiling. You are soon completely immersed and unable to hold your breath any longer. Your adventure ends here.
++You cannot resist the Medusa's beguiling gaze as she looks into your eyes. You feel your limbs begin to stiffen and you panic helplessly as you turn to stone. Your adventure ends here.
++</p>
++<h2>
++20
++</h2>
++<p>
++Only your incredible strength could withstand the poisonous spider's bite. However, you are weakened and you notice your hand trembling as you pocket the Gold Piece. Reduce your
++<strong>
++SKILL
++</strong>
++by 1 point. You curse the person who dropped the backpack and set off north again. Turn to 279.
++</p>
++<h2>
++21
++</h2>
++<p>
++The wound has had no effect on the Bloodbeast, and it continues to attack you as furiously as before. Continue your combat and as soon as you win your next Attack Round,
++<em>
++Test your Luck
++</em>
++. If you are Lucky, turn to 97. If you are Unlucky, turn to 116.
+ </p>

@@ -91,8 +91,11 @@ def sanitize_html(html: str) -> str:
     return parser.get_html()
 
 
-def find_images(pages: List[str]) -> dict:
-    search_roots = [
+def find_images(pages: List[str], images_root: Optional[str] = None) -> dict:
+    search_roots = []
+    if images_root:
+        search_roots.append(Path(images_root))
+    search_roots += [
         Path("output/runs/ff-canonical-dual-full-20251219p/01_extract_ocr_ensemble_v1/images"),
         Path("output/runs/ff-canonical-dual-full-20251219o/01_extract_ocr_ensemble_v1/images"),
         Path("output/runs/ff-canonical-dual-full-20251219n/01_extract_ocr_ensemble_v1/images"),
@@ -127,6 +130,8 @@ def main() -> int:
     parser.add_argument("--model", default="gpt-5.2")
     parser.add_argument("--out-dir", required=True)
     parser.add_argument("--force", action="store_true")
+    parser.add_argument("--images-root", help="Preferred root directory for benchmark images")
+    parser.add_argument("--ocr-hints", dest="ocr_hints", help="Extra OCR hints appended to the system prompt")
     args = parser.parse_args()
 
     load_dotenv(Path(".env"))
@@ -148,7 +153,14 @@ def main() -> int:
         "page-054R.png",
     ]
 
-    resolved = find_images(pages)
+    if args.images_root:
+        images_root = Path(args.images_root)
+        pages = [p for p in pages if (images_root / p).exists()]
+        if not pages:
+            pages = [p.name for p in images_root.glob("*.*")]
+        if not pages:
+            raise SystemExit(f"No benchmark pages found under {images_root}")
+    resolved = find_images(pages, images_root=args.images_root)
     out_dir = Path(args.out_dir)
     out_dir.mkdir(parents=True, exist_ok=True)
     usage_path = out_dir / "openai_usage.jsonl"
@@ -162,32 +174,61 @@ def main() -> int:
         mime = "image/jpeg" if path.suffix.lower() in {".jpg", ".jpeg"} else "image/png"
         b64 = base64.b64encode(path.read_bytes()).decode("utf-8")
         print(f"OpenAI OCR: {name}")
-        resp = client.responses.create(
-            model=args.model,
-            input=[
-                {
-                    "role": "system",
-                    "content": [{"type": "input_text", "text": SYSTEM_PROMPT}],
-                },
-                {
-                    "role": "user",
-                    "content": [
-                        {"type": "input_text", "text": "Return HTML only."},
-                        {"type": "input_image", "image_url": f"data:{mime};base64,{b64}"},
-                    ],
-                },
-            ],
-        )
-        raw = resp.output_text or ""
+        system_prompt = SYSTEM_PROMPT
+        if args.ocr_hints:
+            system_prompt = SYSTEM_PROMPT + "\n\nRecipe hints:\n" + args.ocr_hints.strip() + "\n"
+
+        if hasattr(client, "responses"):
+            resp = client.responses.create(
+                model=args.model,
+                input=[
+                    {
+                        "role": "system",
+                        "content": [{"type": "input_text", "text": system_prompt}],
+                    },
+                    {
+                        "role": "user",
+                        "content": [
+                            {"type": "input_text", "text": "Return HTML only."},
+                            {"type": "input_image", "image_url": f"data:{mime};base64,{b64}"},
+                        ],
+                    },
+                ],
+            )
+            raw = resp.output_text or ""
+            usage = getattr(resp, "usage", None)
+            response_id = getattr(resp, "id", None)
+            usage_row = usage.model_dump() if usage else None
+        else:
+            resp = client.chat.completions.create(
+                model=args.model,
+                messages=[
+                    {
+                        "role": "system",
+                        "content": system_prompt,
+                    },
+                    {
+                        "role": "user",
+                        "content": [
+                            {"type": "text", "text": "Return HTML only."},
+                            {"type": "image_url", "image_url": {"url": f"data:{mime};base64,{b64}"}},
+                        ],
+                    },
+                ],
+            )
+            raw = resp.choices[0].message.content or ""
+            usage = getattr(resp, "usage", None)
+            response_id = getattr(resp, "id", None)
+            usage_row = usage.model_dump() if usage else None
+
         cleaned = sanitize_html(raw)
         out_path.write_text(cleaned, encoding="utf-8")
 
-        usage = getattr(resp, "usage", None)
         row = {
             "page": name,
             "model": args.model,
-            "response_id": getattr(resp, "id", None),
-            "usage": usage.model_dump() if usage else None,
+            "response_id": response_id,
+            "usage": usage_row,
         }
         with open(usage_path, "a", encoding="utf-8") as f:
             f.write(json.dumps(row, ensure_ascii=False) + "\n")

@@ -7,6 +7,7 @@ default_params:
   min_section: 1
   max_section: 400
   require_text_between: true
+  include_background: true
   max_retries: 3
   html_only_retries: 1
   adjacent_scan_window: 2
@@ -22,6 +23,8 @@ param_schema:
       type: integer
       minimum: 1
     require_text_between:
+      type: boolean
+    include_background:
       type: boolean
     coarse_segments:
       type: string

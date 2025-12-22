@@ -30,10 +30,22 @@ Guiding priorities: **perfect OCR first**, then move downstream stage‑by‑sta
    Finish ending‑aware traces, boundary‑source reasoning, toggles/docs, optional HTML/CSV view.
 12. **066 — FF Pipeline Accel + Accuracy Guardrails**  
     Only after 035 is Done; profile + cost guardrails for GPT‑5.1 pipeline.
+13. **082 — Large-Image PDF Cost Optimization**
+    Validate image sizes and downscale policy to balance OCR quality vs cost.
+14. **083 — Game-Ready Validation Checklist**
+    Define strict criteria and validation steps for “game-ready” artifacts.
+15. **084 — Fast PDF Image Extraction (Embedded Streams)**
+    Investigate ripping embedded page images vs full rasterization.
+16. **085 — Table Rescue OCR Pass**
+    Add a targeted table-rescue step for collapsed grids/choice tables.
+17. **086 — Preserve HTML Through Final Gamebook**
+    Ensure HTML survives to final artifacts (no lossy plain-text-only outputs).
+18. **087 — Retire Legacy OCR-Only Recipe**
+    Deprecate/remove legacy OCR-only recipes now superseded by GPT‑5.1 pipeline.
 
-13. **009 — Layout‑Preserving Extractor**  
+19. **009 — Layout‑Preserving Extractor**  
     Build layout/table preservation needed for non‑FF books.
-14. **026 — Onward to the Unknown pilot (Arthur L'Heureux)**  
+20. **026 — Onward to the Unknown pilot (Arthur L'Heureux)**  
     Run end‑to‑end with layout‑aware table handling once 009 lands.
 
 Later / non‑blocking:
@@ -117,6 +129,12 @@ This index tracks stories in `/docs/stories/` for the codex-forge pipeline.
 || 079 | Sequential Page Numbering Refactor — Dual-Field Provenance | High | Done | /docs/stories/story-079-page-numbering-refactor.md |
 || 080 | Central Escalation Cache (Premium OCR Overlay) | High | To Do | /docs/stories/story-080-central-escalation-cache.md |
 || 081 | GPT‑5.1 AI‑First OCR Pipeline (HTML‑First) | High | Done | /docs/stories/story-081-ai-ocr-gpt51-pipeline.md |
+|| 082 | Large-Image PDF Cost Optimization | High | To Do | /docs/stories/story-082-large-image-pdf-cost-optimization.md |
+|| 083 | Game-Ready Validation Checklist | High | To Do | /docs/stories/story-083-game-ready-validation-checklist.md |
+|| 084 | Fast PDF Image Extraction (Embedded Streams) | Medium | To Do | /docs/stories/story-084-fast-pdf-image-extraction.md |
+|| 085 | Table Rescue OCR Pass | High | To Do | /docs/stories/story-085-table-rescue-ocr.md |
+|| 086 | Preserve HTML Through Final Gamebook | High | Done | /docs/stories/story-086-preserve-html-final-output.md |
+|| 087 | Retire Legacy OCR-Only Recipe | Medium | To Do | /docs/stories/story-087-retire-legacy-ocr-recipe.md |
 || 099 | Remove dev-only backcompat disclaimer | Low | To Do | /docs/stories/story-099-remove-dev-backcompat-note.md |
 
 ## Notes

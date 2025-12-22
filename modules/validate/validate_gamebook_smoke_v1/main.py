@@ -29,6 +29,8 @@ def main() -> None:
     gamebook = _load_gamebook(args.gamebook)
     sections: Dict[str, Dict] = gamebook.get("sections") or {}
     provenance = gamebook.get("provenance") or {}
+    metadata = gamebook.get("metadata") or {}
+    start_section = metadata.get("startSection")
     expected_range = provenance.get("expected_range") or "1-400"
     min_section, max_section = _parse_expected_range(expected_range)
     unresolved_missing = set(str(x) for x in (provenance.get("unresolved_missing") or []))
@@ -39,22 +41,37 @@ def main() -> None:
 
     if not sections:
         errors.append("gamebook.sections is empty")
+    if not start_section:
+        errors.append("metadata.startSection is missing")
+    elif start_section not in sections:
+        errors.append(f"metadata.startSection {start_section} not found in sections")
+    if "background" in sections and start_section != "background":
+        errors.append("background section present but metadata.startSection is not 'background'")
 
     # Validate section IDs and gameplay content
     for sid, section in sections.items():
-        if not str(sid).isdigit():
+        sid_str = str(sid)
+        if sid_str.lower() == "background":
+            is_numeric = False
+        elif not sid_str.isdigit():
             errors.append(f"non-numeric section id: {sid}")
             continue
-        n = int(sid)
-        if not (min_section <= n <= max_section):
-            warnings.append(f"section id {sid} outside expected range {expected_range}")
-        if section.get("isGameplaySection") and not (section.get("text") or "").strip():
-            if sid in stub_targets:
-                warnings.append(f"empty text for stub target section {sid}")
-            elif sid in unresolved_missing:
-                warnings.append(f"empty text for unresolved-missing section {sid}")
-            else:
-                errors.append(f"empty text for gameplay section {sid}")
+        else:
+            is_numeric = True
+        if is_numeric:
+            n = int(sid_str)
+            if not (min_section <= n <= max_section):
+                warnings.append(f"section id {sid} outside expected range {expected_range}")
+        if section.get("isGameplaySection"):
+            text = (section.get("text") or "").strip()
+            html = (section.get("html") or "").strip()
+            if not text and not html:
+                if sid in stub_targets:
+                    warnings.append(f"empty text/html for stub target section {sid}")
+                elif sid in unresolved_missing:
+                    warnings.append(f"empty text/html for unresolved-missing section {sid}")
+                else:
+                    errors.append(f"empty text/html for gameplay section {sid}")
 
         # Validate navigation targets
         for link in section.get("navigationLinks") or []:

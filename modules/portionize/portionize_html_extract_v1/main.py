@@ -32,6 +32,14 @@ def _coerce_int(val: Any) -> Optional[int]:
     return None
 
 
+def _section_sort_key(section_id: str) -> Tuple[int, Any]:
+    if section_id.lower() == "background":
+        return (0, 0)
+    if section_id.isdigit():
+        return (1, int(section_id))
+    return (2, section_id)
+
+
 def build_elements(pages: List[Dict[str, Any]]) -> Tuple[List[Dict[str, Any]], Dict[str, int], Dict[int, str]]:
     elements: List[Dict[str, Any]] = []
     id_to_index: Dict[str, int] = {}
@@ -187,6 +195,11 @@ def main() -> None:
     parser.add_argument("--max-section", dest="max_section", type=int, default=None)
     parser.add_argument("--max_section", dest="max_section", type=int, default=None)
     parser.set_defaults(skip_page_numbers=True)
+    parser.add_argument("--emit-raw-text", dest="emit_raw_text", action="store_true")
+    parser.add_argument("--emit_raw_text", dest="emit_raw_text", action="store_true")
+    parser.add_argument("--drop-raw-text", dest="emit_raw_text", action="store_false")
+    parser.add_argument("--drop_raw_text", dest="emit_raw_text", action="store_false")
+    parser.set_defaults(emit_raw_text=False)
     parser.add_argument("--progress-file")
     parser.add_argument("--state-file")
     parser.add_argument("--run-id")
@@ -215,7 +228,7 @@ def main() -> None:
     if not elements:
         raise SystemExit("No HTML blocks found to extract")
 
-    boundaries_sorted = sorted(boundaries, key=lambda b: int(b.get("section_id") or 0))
+    boundaries_sorted = sorted(boundaries, key=lambda b: _section_sort_key(str(b.get("section_id") or "")))
 
     logger = ProgressLogger(state_path=args.state_file, progress_path=args.progress_file, run_id=args.run_id)
     logger.log(
@@ -240,7 +253,7 @@ def main() -> None:
         end_idx = id_to_index.get(end_id, len(elements)) if end_id else len(elements)
 
         span = elements[start_idx:end_idx]
-        raw_text = _assemble_text(span, args.skip_running_heads, args.skip_page_numbers)
+        raw_text = _assemble_text(span, args.skip_running_heads, args.skip_page_numbers) if args.emit_raw_text else ""
 
         page_numbers = [e["page_number"] for e in span if e.get("page_number") is not None]
         if page_numbers:

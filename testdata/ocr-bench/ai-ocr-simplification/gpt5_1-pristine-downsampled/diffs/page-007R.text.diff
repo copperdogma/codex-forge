@@ -1,0 +1,20 @@
+--- gold/page-007R.txt
++++ model/page-007R.txt
+@@ -1,9 +1,8 @@
+-First record the creature's SKILL and STAMINA scores in the first vacant Monster Encounter Box on your Adventure Sheet. The scores for each creature are given in the book each time you have an encounter. The sequence of combat is then:
+-Roll both dice once for the creature. Add its SKILL score. This total is the creature's Attack Strength.
+-Roll both dice once for yourself. Add the number rolled to your current SKILL score. This total is your Attack Strength.
+-If your Attack Strength is higher than that of the creature, you have wounded it. Proceed to step 4. If the creature's Attack Strength is higher than yours, it has wounded you. Proceed to step 5. If both Attack Strength totals are the same, you have avoided each other's blows - start the next Attack Round from step 1 above.
+-You have wounded the creature, so subtract 2 points from its STAMINA score. You may use your LUCK here to do additional damage (see over).
+-The creature has wounded you, so subtract 2 points from your own STAMINA score. Again you may use LUCK at this stage (see over).
+-Make the appropriate adjustments to either the creature's or your own STAMINA scores (and your LUCK score if you used LUCK - see over).
+-Begin the next Attack Round by returning to your current SKILL score and repeating steps
+-11
++1-6. This sequence continues until the STAMINA score of either you or the creature you are fighting has been reduced to zero (death).
++Escaping
++On some pages you may be given the option of running away from a battle should things be going badly for you. However, if you do run away, the creature automatically gets in one wound on you (subtract 2 STAMINA points) as you flee. Such is the price of cowardice. Note that you may use LUCK on this wound in the normal way (see below). You may only Escape if that option is specifically given to you on the page.
++Fighting More Than One Creature
++If you come across more than one creature in a particular encounter, the instructions on that page will tell you how to handle the battle. Sometimes you will treat them as a single monster; sometimes you will fight each one in turn.
++Luck
++At various times during your adventure, either in battles or when you come across situations in which you could either be lucky or unlucky (details of these are given on the pages themselves), you may call on your luck to make the outcome more favour-
++12

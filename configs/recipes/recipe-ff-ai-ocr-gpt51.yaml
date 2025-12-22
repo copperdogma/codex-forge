@@ -75,6 +75,8 @@ stages:
       pages: html_blocks_repaired
       coarse_segments: coarse_segment_html
     out: section_boundaries.jsonl
+    params:
+      include_background: true
 
   - id: portionize_html
     stage: portionize
@@ -84,6 +86,8 @@ stages:
       pages: html_blocks_repaired
       boundaries: detect_boundaries_html
     out: portions_enriched.jsonl
+    params:
+      drop_raw_text: true
 
   - id: extract_choices
     stage: extract
@@ -123,6 +127,8 @@ stages:
     params:
       title: Deathtrap Dungeon
       author: Ian Livingstone
+      emit_text: false
+      emit_provenance_text: false
 
   - id: validate_gamebook
     stage: validate

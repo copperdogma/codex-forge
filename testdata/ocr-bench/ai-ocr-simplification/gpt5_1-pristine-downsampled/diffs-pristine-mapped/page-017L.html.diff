@@ -1,0 +1,17 @@
+--- gold/page-017L.html
++++ model/page-017L.html
+@@ -1,4 +1,4 @@
+-<p class="running-head">
++<p>
+ 3-5
+ </p>
+ <h2>
+@@ -13,7 +13,7 @@
+ <p>
+ In the total darkness you do not see the pipe's downward turn. You slip and, unable to get a grip on the slimy pipe, slide over the edge. Your screams echo down the pipe as you fall the fifty metres to the bottom. You have failed the Trial of Champions.
+ </p>
+-<img alt="Skull and bones amid splashing water at the bottom of a pipe">
++<img alt="Skeleton emerging from slime or water at bottom of shaft">
+ <h2>
+ 5
+ </h2>

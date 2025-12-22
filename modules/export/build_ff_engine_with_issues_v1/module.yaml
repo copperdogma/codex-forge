@@ -8,6 +8,8 @@ default_params:
   author: ""
   start_section: "1"
   format_version: "1.0.0"
+  emit_text: true
+  emit_provenance_text: true
 param_schema:
   properties:
     title:
@@ -26,5 +28,9 @@ param_schema:
       type: string
     issues_report:
       type: string
+    emit_text:
+      type: boolean
+    emit_provenance_text:
+      type: boolean
   required: []
 notes: "Build FF engine gamebook with issues provenance propagation; copied from build_ff_engine_v1 and extended." 

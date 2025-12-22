@@ -1,0 +1,72 @@
+--- gold/page-035R.html
++++ model/page-035R.html
+@@ -1,52 +1,30 @@
+-<p class="running-head">
+-79-82
++<p>
++83-85
+ </p>
+ <h2>
+-79
++83
+ </h2>
+ <p>
+-You grip the arms of the chair tightly, half expecting a surge of energy or pain to rush through your body.
+-<em>
+-Test your Luck.
+-</em>
+-If you are Lucky, turn to 106. If you are Unlucky, turn to 383.
++The passage soon leads to a junction. You notice more footprints on the floor, possibly as many as three pairs, heading north from the south passage. You decide to follow them. Turn to 37.
+ </p>
+ <h2>
+-80
++84
+ </h2>
+ <p>
+-You take your time and manage to step over the last pole without having touched any of them. You hurry on east, still following the two pairs of footprints. Turn to 313.
++Roll two dice. If the total is more than eight, turn to
++<strong>
++152
++</strong>
++. If the total is eight or less, turn to
++<strong>
++121
++</strong>
++.
+ </p>
+-<img alt="illustration of a rat lying on the ground">
++<img alt="Illustration of monstrous faces and creatures within a circular frame">
+ <h2>
+-81
++85
+ </h2>
+ <p>
+-The only furniture in the Goblin's room is a table, two chairs and a cupboard on the wall. There are two closed doors, one in the west wall and the other in the north wall. Will you:
+-</p>
+-<dl>
+-<dt>
+-Open the cupboard?
+-</dt>
+-<dd>
+-Turn to 307
+-</dd>
+-<dt>
+-Open the west door?
+-</dt>
+-<dd>
+-Turn to 263
+-</dd>
+-<dt>
+-Open the north door?
+-</dt>
+-<dd>
+-Turn to 136
+-</dd>
+-</dl>
+-<h2>
+-82
+-</h2>
+-<p>
+-As the Pit Fiend slams its body against the wall, you let go of the rope and drop safely to the floor. You run towards the double doors and are relieved to feel them swing open as you push on them. You let them swing shut behind you and head north along the tunnel. Turn to 214.
++Before you are able to do anything else, the old man mumbles a few strange words into the air. You feel your muscles harden and your skin go taut. You start to panic, but there is nothing you can do to stop the petrification of your body. Your adventure ends here.
+ </p>

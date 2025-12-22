@@ -1,0 +1,48 @@
+--- gold/page-009L.html
++++ model/page-009L.html
+@@ -1,40 +1,15 @@
+ <p>
+-If the creature has just wounded you, you may
+-<em>
+-Test your Luck
+-</em>
+-to try to minimize the wound. If you are lucky, you have managed to avoid the full damage of the blow. Restore 1 point of STAMINA (i.e. instead of doing 2 points of damage it has done only 1). If you are unlucky, you have taken a more serious blow. Subtract 1 extra STAMINA point.
++Your backpack contains enough Provisions for ten meals. You may rest and eat at any time except when engaged in a Battle. Eating a meal restores 4 STAMINA points. When you eat a meal, add 4 points to your STAMINA score and deduct 1 point from your Provisions. A separate Provisions Remaining box is provided on the Adventure Sheet for recording details of Provisions. Remember that you have a long way to go, so use your Provisions wisely!
+ </p>
+ <p>
+-Remember that you must subtract 1 point from your own LUCK score each time you
+-<em>
+-Test your Luck
+-</em>
+-.
++Remember also that your STAMINA score may never exceed its Initial value unless specifically instructed on a page. Drinking the Potion of Strength (see later) will restore your STAMINA to its Initial level at any time.
+ </p>
+-<h2>
+-Restoring Skill, Stamina and Luck
+-</h2>
+-<h3>
+-Skill
+-</h3>
+ <p>
+-Your SKILL score will not change much during your adventure. Occasionally, a page may give instructions to increase or decrease your SKILL score. A Magic Weapon may increase your SKILL, but remember that only one weapon can be used at a time! You cannot claim 2 SKILL bonuses for carrying two Magic Swords. Your SKILL score can never exceed its
+-<em>
+-Initial
+-</em>
+-value unless specifically instructed. Drinking the Potion of Skill (see later) will restore your SKILL to its
+-<em>
+-Initial
+-</em>
+-level at any time.
++Luck
+ </p>
+-<h3>
+-Stamina and Provisions
+-</h3>
+ <p>
+-Your STAMINA score will change a lot during your adventure as you fight monsters and undertake arduous tasks. As you near your goal, your STAMINA level may be dangerously low and battles may be particularly risky, so be careful!
++Additions to your LUCK score are awarded through the adventure when you have been particularly lucky. Details are given on the pages of the book. Remember that, as with SKILL and STAMINA, your LUCK score may never exceed its Initial value unless specifically instructed on a page. Drinking the Potion of Fortune (see later) will restore your LUCK to its Initial level at any time, and increase your Initial LUCK by 1 point.
+ </p>
+ <p class="page-number">
+-14
++15
+ </p>

@@ -342,6 +342,11 @@ def main() -> None:
     parser.add_argument("--allow-empty-between", dest="require_text_between", action="store_false")
     parser.add_argument("--allow_empty_between", dest="require_text_between", action="store_false")
     parser.set_defaults(require_text_between=True)
+    parser.add_argument("--include-background", dest="include_background", action="store_true")
+    parser.add_argument("--include_background", dest="include_background", action="store_true")
+    parser.add_argument("--exclude-background", dest="include_background", action="store_false")
+    parser.add_argument("--exclude_background", dest="include_background", action="store_false")
+    parser.set_defaults(include_background=True)
     parser.add_argument("--max-retries", dest="max_retries", type=int, default=3)
     parser.add_argument("--max_retries", dest="max_retries", type=int, default=3)
     parser.add_argument("--html-only-retries", dest="html_only_retries", type=int, default=1)
@@ -408,6 +413,7 @@ def main() -> None:
             args.min_section,
             args.max_section,
             args.require_text_between,
+            args.include_background,
         )
         deduped = dedupe_candidates(candidates)
         boundaries = build_boundaries(deduped)

@@ -1,0 +1,45 @@
+--- gold/page-020R.txt
++++ model/page-020R.txt
+@@ -1,33 +1,9 @@
+-16-17
+-16
+-You just have time to hear the Gnome say, 'Three skulls' before a white bolt of energy shoots out from the lock into your chest, knocking you unconscious. Roll one die, add 1 to the number and reduce your STAMINA by the total. If you are still alive, you come to and are told by the Gnome to try again. You chose the wrong gems last time, so you won't try that combination again.
+-A
+-B
+-C
+-Emerald
+-Diamond
+-Sapphire
+-Turn to 16
+-Diamond
+-Sapphire
+-Emerald
+-Turn to 392
+-Sapphire
+-Emerald
+-Diamond
+-Turn to 177
+-Emerald
+-Sapphire
+-Diamond
+-Turn to 287
+-Diamond
+-Emerald
+-Sapphire
+-Turn to 132
+-Sapphire
+-Diamond
+-Emerald
+-Turn to 249
+-[image: Illustration of a small rodent lying on its side]
+-17
+-You are not strong enough to force open the heavy door. The water is now waist-high and you are exhausted from your efforts. The water level rises quickly and you find yourself floating ever upwards until your face is pressed against the ceiling. You are soon completely immersed and unable to hold your breath any longer. Your adventure ends here.
++18-21
++18
++Luckily for you, the cobra's fangs sink into your leather wristband. The snake recoils quickly, ready to strike again, as the Dwarf tells you to have another try. Roll two dice. If the total is the same as or less than your SKILL, turn to 55. If the total is greater than your SKILL, turn to 202.
++19
++You cannot resist the Medusa's beguiling gaze as she looks into your eyes. You feel your limbs begin to stiffen and you panic helplessly as you turn to stone. Your adventure ends here.
++20
++Only your incredible strength could withstand the poisonous spider's bite. However, you are weakened and you notice your hand trembling as you pocket the Gold Piece. Reduce your SKILL by 1 point. You curse the person who dropped the backpack and set off north again. Turn to 279.
++21
++The wound has had no effect on the Bloodbeast, and it continues to attack you as furiously as before. Continue your combat and as soon as you win your next Attack Round, Test your Luck. If you are Lucky, turn to 97. If you are Unlucky, turn to 116.

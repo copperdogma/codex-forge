@@ -1,0 +1,176 @@
+--- gold/page-011.html
++++ model/page-011.html
+@@ -1,130 +1,60 @@
+ <h1>
+-ADVENTURE SHEET
++HOW TO FIGHT THE CREATURES OF DEATHTRAP DUNGEON
+ </h1>
+ <p>
++Before embarking on your adventure, you must first determine your own strengths and weaknesses. You have in your possession a sword and a backpack containing provisions (food and drink) for the trip. You have been preparing for your quest by training yourself in swordplay and exercising vigorously to build up your stamina.
++</p>
++<p>
++To see how effective your preparations have been you must use the dice to determine your initial
+ <strong>
+ SKILL
+ </strong>
+-</p>
+-<p>
+-Initial Skill =
+-</p>
+-<p>
++and
+ <strong>
+ STAMINA
+ </strong>
++scores. On pages 18–19 there is an
++<em>
++Adventure Sheet
++</em>
++which you may use to record the details of an adventure. On it you will find boxes for recording your
++<strong>
++SKILL
++</strong>
++and
++<strong>
++STAMINA
++</strong>
++scores.
+ </p>
+ <p>
+-Initial Stamina =
++You are advised to either record your scores on the
++<em>
++Adventure Sheet
++</em>
++in pencil, or make photocopies of the page to use in future adventures.
++</p>
++<h2>
++Skill, Stamina and Luck
++</h2>
++<p>
++Roll one die. Add 6 to this number and enter this total in the
++<strong>
++SKILL
++</strong>
++box on the
++<em>
++Adventure Sheet
++</em>
++.
+ </p>
+ <p>
++Roll both dice. Add 12 to the number rolled and enter this total in the
+ <strong>
+-LUCK
++STAMINA
+ </strong>
++box.
+ </p>
+-<p>
+-Initial Luck =
+-</p>
+-<p>
+-<strong>
+-ITEMS OF EQUIPMENT CARRIED
+-</strong>
+-</p>
+-<p>
+-<strong>
+-GOLD
+-</strong>
+-</p>
+-<p>
+-<strong>
+-JEWELS
+-</strong>
+-</p>
+-<p>
+-<strong>
+-POTIONS
+-</strong>
+-</p>
+-<p>
+-<strong>
+-PROVISIONS REMAINING
+-</strong>
+-</p>
+-<h2>
+-MONSTER ENCOUNTER BOXES
+-</h2>
+-<img alt="Small sword illustration above the section header">
+-<ul>
+-<li>
+-<p>
+-Skill =
+-</p>
+-<p>
+-Stamina =
+-</p>
+-</li>
+-<li>
+-<p>
+-Skill =
+-</p>
+-<p>
+-Stamina =
+-</p>
+-</li>
+-<li>
+-<p>
+-Skill =
+-</p>
+-<p>
+-Stamina =
+-</p>
+-</li>
+-<li>
+-<p>
+-Skill =
+-</p>
+-<p>
+-Stamina =
+-</p>
+-</li>
+-<li>
+-<p>
+-Skill =
+-</p>
+-<p>
+-Stamina =
+-</p>
+-</li>
+-<li>
+-<p>
+-Skill =
+-</p>
+-<p>
+-Stamina =
+-</p>
+-</li>
+-<li>
+-<p>
+-Skill =
+-</p>
+-<p>
+-Stamina =
+-</p>
+-</li>
+-<li>
+-<p>
+-Skill =
+-</p>
+-<p>
+-Stamina =
+-</p>
+-</li>
+-<li>
+-<p>
+-Skill =
+-</p>
+-<p>
+-Stamina =
+-</p>
+-</li>
+-</ul>+<p class="page-number">
++9
++</p>

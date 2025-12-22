@@ -1,0 +1,30 @@
+--- gold/page-026L.txt
++++ model/page-026L.txt
+@@ -1,17 +1,10 @@
+-40-42
+-40
+-You call out to the Dwarf that you are ready to fight the MINOTAUR. The wooden door rises slowly and you see the fearsome beast, half man, half bull, step into the arena. Steam blows from its nostrils as it works itself up into a rage, ready to attack. Suddenly it rushes forward, swinging its double-headed axe.
+-MINOTAUR
+-SKILL 9
+-STAMINA 9
+-If you win, turn to 163.
+-41
+-You walk slowly over to the alcove, carefully checking the floor for any more hidden traps. You see that the goblet contains a sparkling red liquid. Will you:
+-Drink the red liquid?
+-Turn to 98
+-Leave the goblet and walk back to search the Barbarian (if you have not done so already)?
+-Turn to 126
+-Leave the chamber to continue west?
+-Turn to 83
+-42
+-The cobra's fangs sink deep into your wrist and you feel its poison starting to creep through your body. Lose 5 STAMINA points. If you are still alive, the Dwarf has no mercy but tells you to try again. Roll two dice. If the total is the same as or less than your SKILL, turn to 55. If the total is greater than your SKILL, turn to 202.
++43-46
++43
++The tunnel turns sharply to the right and continues north for as far as you can see. There is a door in the left-hand wall which is ajar. You hear someone cry for help from the other side of the door. If you wish to open it, turn to 200. If you would rather continue north, turn to 316.
++44
++You are only a few metres from the doorway when you hear the old man behind you utter some strange words. Instantly your muscles harden and you feel your skin becoming taut. You start to panic, but there is nothing you can do to stop the petrification of your body. Your adventure ends here.
++[image: Illustration of a prone figure lying on the ground]
++45
++The razor-sharp disc thuds into your back with terrible effect. Lose 1 skill point and 4 stamina points. If you are still alive, you struggle to pull the disc from your back as the Ninja throws yet another one at you. Turn to 312.
++46
++You lower yourself carefully down the idol and, wasting no more time in the cavern, run forward to the tunnel in the northern wall. Turn to 239.

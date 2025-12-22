@@ -1,0 +1,43 @@
+--- gold/page-011.txt
++++ model/page-011.txt
+@@ -1,32 +1,8 @@
+-ADVENTURE SHEET
+-SKILL
+-Initial Skill =
+-STAMINA
+-Initial Stamina =
+-LUCK
+-Initial Luck =
+-ITEMS OF EQUIPMENT CARRIED
+-GOLD
+-JEWELS
+-POTIONS
+-PROVISIONS REMAINING
+-MONSTER ENCOUNTER BOXES
+-[image: Small sword illustration above the section header]
+-Skill =
+-Stamina =
+-Skill =
+-Stamina =
+-Skill =
+-Stamina =
+-Skill =
+-Stamina =
+-Skill =
+-Stamina =
+-Skill =
+-Stamina =
+-Skill =
+-Stamina =
+-Skill =
+-Stamina =
+-Skill =
+-Stamina =
++HOW TO FIGHT THE CREATURES OF DEATHTRAP DUNGEON
++Before embarking on your adventure, you must first determine your own strengths and weaknesses. You have in your possession a sword and a backpack containing provisions (food and drink) for the trip. You have been preparing for your quest by training yourself in swordplay and exercising vigorously to build up your stamina.
++To see how effective your preparations have been you must use the dice to determine your initial SKILL and STAMINA scores. On pages 18–19 there is an Adventure Sheet which you may use to record the details of an adventure. On it you will find boxes for recording your SKILL and STAMINA scores.
++You are advised to either record your scores on the Adventure Sheet in pencil, or make photocopies of the page to use in future adventures.
++Skill, Stamina and Luck
++Roll one die. Add 6 to this number and enter this total in the SKILL box on the Adventure Sheet.
++Roll both dice. Add 12 to the number rolled and enter this total in the STAMINA box.
++9

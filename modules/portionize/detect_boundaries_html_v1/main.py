@@ -73,7 +73,7 @@ def filter_pages_to_gameplay(pages: List[Dict[str, Any]], coarse: Optional[Dict[
 
 
 def build_candidates(pages: List[Dict[str, Any]], min_section: int, max_section: int,
-                     require_text_between: bool) -> List[Dict[str, Any]]:
+                     require_text_between: bool, include_background: bool) -> List[Dict[str, Any]]:
     candidates: List[Dict[str, Any]] = []
 
     for page in pages:
@@ -83,7 +83,44 @@ def build_candidates(pages: List[Dict[str, Any]], min_section: int, max_section:
         spread_side = page.get("spread_side")
         blocks = page.get("blocks") or []
 
-        # Build local list of header indices for this page
+        # Optional: detect BACKGROUND as a special, unnumbered gameplay header
+        if include_background:
+            for idx, block in enumerate(blocks):
+                if block.get("block_type") != "h1":
+                    continue
+                text = (block.get("text") or "").strip()
+                if text.lower() != "background":
+                    continue
+                # score body text until next header
+                span_blocks = blocks[idx + 1:]
+                follow_text_score = 0
+                has_body_text = False
+                for b in span_blocks:
+                    if b.get("block_type") in {"h1", "h2"}:
+                        break
+                    if _block_is_body_text(b):
+                        has_body_text = True
+                        follow_text_score += min(200, len((b.get("text") or "")))
+                if require_text_between and not has_body_text:
+                    continue
+                element_id = f"p{page_number:03d}-b{blocks[idx].get('order')}"
+                candidates.append({
+                    "section_id": "background",
+                    "start_element_id": element_id,
+                    "start_page": page_number,
+                    "start_line_idx": blocks[idx].get("order"),
+                    "start_element_metadata": {
+                        "spread_side": spread_side,
+                        "block_type": "h1",
+                    },
+                    "confidence": 0.9,
+                    "method": "code_filter",
+                    "source": "html_h1_background",
+                    "follow_text_score": follow_text_score,
+                })
+                break
+
+        # Build local list of numeric header indices for this page
         header_indices = []
         for idx, block in enumerate(blocks):
             if block.get("block_type") != "h2":
@@ -159,8 +196,16 @@ def apply_macro_section(boundaries: List[Dict[str, Any]], coarse: Optional[Dict[
         b["macro_section"] = macro_section_for_page(page, coarse)
 
 
+def _section_sort_key(section_id: str) -> Tuple[int, Any]:
+    if section_id.lower() == "background":
+        return (0, 0)
+    if section_id.isdigit():
+        return (1, int(section_id))
+    return (2, section_id)
+
+
 def build_boundaries(candidates: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
-    candidates.sort(key=lambda b: int(b["section_id"]))
+    candidates.sort(key=lambda b: _section_sort_key(str(b["section_id"])))
     for idx, b in enumerate(candidates):
         nxt = candidates[idx + 1] if idx + 1 < len(candidates) else None
         if nxt:
@@ -179,6 +224,11 @@ def main() -> None:
     parser.add_argument("--min_section", dest="min_section", type=int, default=1)
     parser.add_argument("--max-section", dest="max_section", type=int, default=400)
     parser.add_argument("--max_section", dest="max_section", type=int, default=400)
+    parser.add_argument("--include-background", dest="include_background", action="store_true")
+    parser.add_argument("--include_background", dest="include_background", action="store_true")
+    parser.add_argument("--skip-background", dest="include_background", action="store_false")
+    parser.add_argument("--skip_background", dest="include_background", action="store_false")
+    parser.set_defaults(include_background=True)
     parser.add_argument("--require-text-between", dest="require_text_between", action="store_true")
     parser.add_argument("--require_text_between", dest="require_text_between", action="store_true")
     parser.add_argument("--allow-empty-between", dest="require_text_between", action="store_false")
@@ -213,7 +263,7 @@ def main() -> None:
     )
 
     pages = filter_pages_to_gameplay(pages, coarse)
-    candidates = build_candidates(pages, args.min_section, args.max_section, args.require_text_between)
+    candidates = build_candidates(pages, args.min_section, args.max_section, args.require_text_between, args.include_background)
     deduped = dedupe_candidates(candidates)
     boundaries = build_boundaries(deduped)
     apply_macro_section(boundaries, coarse)

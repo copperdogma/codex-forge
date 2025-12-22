@@ -1,0 +1,32 @@
+ADVENTURE SHEET
+SKILL
+Initial Skill =
+STAMINA
+Initial Stamina =
+LUCK
+Initial Luck =
+ITEMS OF EQUIPMENT CARRIED
+GOLD
+JEWELS
+POTIONS
+PROVISIONS REMAINING
+MONSTER ENCOUNTER BOXES
+[image: Small sword illustration above the section header]
+Skill =
+Stamina =
+Skill =
+Stamina =
+Skill =
+Stamina =
+Skill =
+Stamina =
+Skill =
+Stamina =
+Skill =
+Stamina =
+Skill =
+Stamina =
+Skill =
+Stamina =
+Skill =
+Stamina =

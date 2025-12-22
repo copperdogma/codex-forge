@@ -26,6 +26,14 @@ params:
     desc: Gamebook format version string
     required: false
     default: "1.0.0"
+  - name: emit_text
+    desc: Include plain text in section outputs
+    required: false
+    default: true
+  - name: emit_provenance_text
+    desc: Include raw/clean text in provenance
+    required: false
+    default: true
 notes: >
   Emits Fighting Fantasy Engine schema-compatible JSON with extra provenance
   retained under each section. Safe to run on resolved_portion or enriched_portion outputs.

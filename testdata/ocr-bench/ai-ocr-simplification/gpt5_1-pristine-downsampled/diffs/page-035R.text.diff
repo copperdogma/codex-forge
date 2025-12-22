@@ -1,0 +1,27 @@
+--- gold/page-035R.txt
++++ model/page-035R.txt
+@@ -1,16 +1,8 @@
+-79-82
+-79
+-You grip the arms of the chair tightly, half expecting a surge of energy or pain to rush through your body. Test your Luck. If you are Lucky, turn to 106. If you are Unlucky, turn to 383.
+-80
+-You take your time and manage to step over the last pole without having touched any of them. You hurry on east, still following the two pairs of footprints. Turn to 313.
+-[image: illustration of a rat lying on the ground]
+-81
+-The only furniture in the Goblin's room is a table, two chairs and a cupboard on the wall. There are two closed doors, one in the west wall and the other in the north wall. Will you:
+-Open the cupboard?
+-Turn to 307
+-Open the west door?
+-Turn to 263
+-Open the north door?
+-Turn to 136
+-82
+-As the Pit Fiend slams its body against the wall, you let go of the rope and drop safely to the floor. You run towards the double doors and are relieved to feel them swing open as you push on them. You let them swing shut behind you and head north along the tunnel. Turn to 214.
++83-85
++83
++The passage soon leads to a junction. You notice more footprints on the floor, possibly as many as three pairs, heading north from the south passage. You decide to follow them. Turn to 37.
++84
++Roll two dice. If the total is more than eight, turn to 152. If the total is eight or less, turn to 121.
++[image: Illustration of monstrous faces and creatures within a circular frame]
++85
++Before you are able to do anything else, the old man mumbles a few strange words into the air. You feel your muscles harden and your skin go taut. You start to panic, but there is nothing you can do to stop the petrification of your body. Your adventure ends here.

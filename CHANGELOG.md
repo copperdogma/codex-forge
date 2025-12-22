@@ -17,6 +17,18 @@
 ### Tested
 - `pytest -q tests/test_boundary_ordering_guard.py`
 
+## [2025-12-22] - HTML-first pipeline hardening and OCR bench artifacts
+
+### Added
+- GPT-5.1 HTML-first pipeline enhancements: background section support and HTML-only sections in final gamebook.
+- OCR benchmark tooling for pristine downsampled comparisons and HTML/text diff artifacts.
+- Stories 082–087 to track cost optimization, validation, and legacy recipe retirement.
+
+### Changed
+- Gamebook smoke validation now requires `metadata.startSection` and allows background sections.
+- Build/export modules support dropping text and provenance text (HTML is source of truth).
+- Choice repair and extraction now derive text from HTML where appropriate.
+
 ## [2025-12-12] - GPU “pit of success” for EasyOCR on Apple Silicon
 
 ### Added

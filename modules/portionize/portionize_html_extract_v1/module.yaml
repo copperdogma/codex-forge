@@ -18,6 +18,10 @@ param_schema:
       type: integer
     max_section:
       type: integer
+    emit_raw_text:
+      type: boolean
+    drop_raw_text:
+      type: boolean
     boundaries:
       type: string
   required: []

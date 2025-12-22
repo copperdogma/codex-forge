@@ -3,6 +3,7 @@ import json
 from typing import List, Dict, Optional
 
 from modules.common.utils import read_jsonl, save_jsonl, ProgressLogger, log_llm_usage
+from modules.common.html_utils import html_to_text
 
 try:
     from openai import OpenAI
@@ -170,7 +171,7 @@ def main():
         if not r:
             continue
         html = r.get("raw_html") or ""
-        text = r.get("raw_text") or ""
+        text = html_to_text(html)
         suspected_targets = []
         for orphan in orphans:
             sources = relaxed_index.get(orphan) or []

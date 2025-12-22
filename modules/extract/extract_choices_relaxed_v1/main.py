@@ -17,7 +17,6 @@ Critical for 100% game engine accuracy - uses strong deterministic signals.
 """
 
 import argparse
-import html as html_lib
 import json
 import os
 import re
@@ -25,6 +24,7 @@ from typing import List, Dict, Tuple, Optional, Set
 from dataclasses import dataclass
 
 from modules.common.utils import read_jsonl, save_jsonl, ProgressLogger
+from modules.common.html_utils import html_to_text
 
 
 @dataclass
@@ -142,34 +142,6 @@ def extract_choice_patterns(text: str, min_section: int = 1, max_section: int = 
                 ))
     
     return candidates
-
-
-def _html_to_text(html: str) -> str:
-    if not html:
-        return ""
-    text = html
-
-    def _img_alt(match: re.Match) -> str:
-        alt = match.group(1) or ""
-        return f" {alt} " if alt else " "
-
-    text = re.sub(r'<img[^>]*alt="([^"]*)"[^>]*>', _img_alt, text, flags=re.IGNORECASE)
-    text = re.sub(r'<br\s*/?>', '\n', text, flags=re.IGNORECASE)
-
-    block_tags = [
-        "p", "h1", "h2", "h3", "h4", "h5", "h6",
-        "li", "ul", "ol", "dl", "dt", "dd",
-        "table", "thead", "tbody", "tr", "td", "th",
-        "div", "section", "header", "footer",
-    ]
-    for tag in block_tags:
-        text = re.sub(rf'</?{tag}[^>]*>', '\n', text, flags=re.IGNORECASE)
-
-    text = re.sub(r'<[^>]+>', ' ', text)
-    text = html_lib.unescape(text)
-    text = re.sub(r'[ \t\r\f\v]+', ' ', text)
-    text = re.sub(r'\n\s*\n+', '\n', text)
-    return text.strip()
 
 
 def extract_choice_patterns_relaxed(text: str, min_section: int, max_section: int) -> List[ChoiceCandidate]:
@@ -351,10 +323,9 @@ def main():
     
     for i, portion in enumerate(portions):
         section_id = portion.get('section_id', '')
-        raw_text = portion.get('raw_text') or ''
         raw_html = portion.get('raw_html') or ''
-        html_text = _html_to_text(raw_html)
-        text = raw_text or html_text
+        html_text = html_to_text(raw_html)
+        text = html_text
         
         # Extract candidates using pattern matching
         candidates = extract_choice_patterns(text, min_section, max_section)
