@@ -1,0 +1,11 @@
+module_id: split_pages_from_manifest_v1
+stage: extract
+entrypoint: modules/extract/split_pages_from_manifest_v1/main.py
+input_schema: page_image_v1
+output_schema: page_image_v1
+description: "Split page images from a manifest into L/R pages when spreads are detected."
+params:
+  - name: out
+    type: str
+    default: pages_split_manifest.jsonl
+notes: "Consumes page_image_v1 manifest of full pages and emits page_image_v1 manifest of split pages." 

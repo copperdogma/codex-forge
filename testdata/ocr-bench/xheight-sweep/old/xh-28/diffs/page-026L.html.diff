@@ -1,0 +1,38 @@
+--- gold/page-026L.html
++++ model/page-026L.html
+@@ -27,26 +27,15 @@
+ <p>
+ You walk slowly over to the alcove, carefully checking the floor for any more hidden traps. You see that the goblet contains a sparkling red liquid. Will you:
+ </p>
+-<dl>
+-<dt>
+-Drink the red liquid?
+-</dt>
+-<dd>
+-Turn to 98
+-</dd>
+-<dt>
+-Leave the goblet and walk back to search the Barbarian (if you have not done so already)?
+-</dt>
+-<dd>
+-Turn to 126
+-</dd>
+-<dt>
+-Leave the chamber to continue west?
+-</dt>
+-<dd>
+-Turn to 83
+-</dd>
+-</dl>
++<p>
++Drink the red liquid? Turn to 98
++</p>
++<p>
++Leave the goblet and walk back to search the Barbarian (if you have not done so already)? Turn to 126
++</p>
++<p>
++Leave the chamber to continue west? Turn to 83
++</p>
+ <h2>
+ 42
+ </h2>

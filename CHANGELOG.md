@@ -1,3 +1,21 @@
+## [2025-12-23] - Large-image OCR cost tuning + pristine parity scaffolding
+
+### Added
+- Line-height driven PDF render stage (`extract_pdf_images_capped_v1`) and manifest-based split stage (`split_pages_from_manifest_v1`).
+- OCR x-height sweep utility (`scripts/ocr_bench_xheight_sweep.py`) and pristine DPI benchmark artifacts.
+- New stories for pristine-book parity and run-summary UX (089, 090).
+
+### Changed
+- GPT‑5.1 recipe now renders via capped extractor + manifest split with `target_line_height: 24`.
+- Table-rescue smoke settings updated to run through the new extractor stage.
+- Story 082 marked Done; story index updated to include new parity/summary stories.
+
+### Fixed
+- `table_rescue_html_v1` now resolves output paths correctly when `--out` contains a path.
+
+### Tested
+- Deep smoke run through `html_repair_loop` on a single page.
+
 ## [2025-12-18] - Boundary ordering guard + targeted escalation
 
 ### Added

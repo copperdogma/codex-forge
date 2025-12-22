@@ -1,0 +1,50 @@
+--- gold/page-019R.html
++++ model/page-019R.html
+@@ -1,35 +1,21 @@
+ <p class="page-number">
+-12-13
++12
+ </p>
+-<h2>
+-12
+-</h2>
+ <p>
+ The door opens into a large, candle-lit room filled with the most extraordinarily lifelike statues of knights and warriors. A white-haired old man dressed in tattered rags suddenly jumps out from behind one of the statues and starts to giggle. Though he looks like a fool, the sparkle in his eyes makes you think there is more to him than is apparent. In a high-pitched voice he says, 'Oh good, another stone for my garden. I'm glad you have come to join your friends. Now, I'm a fair man and so I'll ask you a question. If you answer correctly, I'll let you go free - but if your answer is wrong, I'll turn you to stone!' He starts to chuckle again, obviously pleased with your arrival. Will you:
+ </p>
+-<dl>
+-<dt>
+-Wait for his question?
+-</dt>
+-<dd>
+-Turn to 382
+-</dd>
+-<dt>
+-Attack him with your sword?
+-</dt>
+-<dd>
+-Turn to 195
+-</dd>
+-<dt>
+-Make a run for the door?
+-</dt>
+-<dd>
+-Turn to 250
+-</dd>
+-</dl>
+-<h2>
++<p>
++Wait for his question? Turn to 382
++</p>
++<p>
++Attack him with your sword? Turn to 195
++</p>
++<p>
++Make a run for the door? Turn to 250
++</p>
++<p class="page-number">
+ 13
+-</h2>
++</p>
+ <p>
+ The tunnel makes a sudden turn to the left and heads north for as far as you can see. The footprints you are following start to peter out as the tunnel becomes gradually drier. Soon you are beyond the dripping roof and the pools on the floor. You notice the air becoming hotter and you find yourself panting even though you are walking quite slowly. In a small recess on the left-hand wall you see a section of bamboo standing on its end. Lifting it down, you see it is filled with a clear liquid. Your throat is
+ </p>

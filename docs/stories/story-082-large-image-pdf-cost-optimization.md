@@ -1,6 +1,6 @@
 # Story: Large-Image PDF Cost Optimization
 
-**Status**: To Do  
+**Status**: Done  
 **Created**: 2025-12-22  
 **Priority**: High  
 **Parent Story**: story-081 (GPT-5.1 AI-First OCR Pipeline)
@@ -51,25 +51,35 @@ Control OCR cost for high-resolution PDFs by validating image sizes and defining
 
 ## Success Criteria
 
-- [ ] **Image size audit**: Baseline old vs pristine PDFs with exact page dimensions (px) and file sizes.
-- [ ] **Cost sensitivity**: Estimate cost impact at multiple resolutions (e.g., 100%, 75%, 50%, 35%).
-- [ ] **Downscale policy**: Define target max dimension and/or max megapixels per page for OCR input.
-- [ ] **Quality check**: Verify OCR quality on a representative sample at chosen downscale (no loss in section headers and choice text).
-- [ ] **Configurable**: Policy is configurable via recipe/settings (not hard-coded).
+- [x] **Image size audit**: Baseline old vs pristine PDFs with exact page dimensions (px) and file sizes.
+- [x] **Cost sensitivity**: Estimate cost impact at multiple resolutions (e.g., 100%, 75%, 50%, 35%).
+- [x] **Optimal DPI target**: Determine minimum DPI (or max MP) that preserves section headers + choice tables with GPT‑5.1.
+- [x] **Downscale policy**: Define target max dimension and/or max megapixels per page for OCR input.
+- [x] **Quality check**: Verify OCR quality on a representative sample at chosen downscale (no loss in section headers and choice text).
+- [x] **Configurable**: Policy is configurable via recipe/settings (not hard-coded).
+- [x] **Auto DPI chooser**: Estimate target render DPI from sampled pages using pixel line-height (x-height proxy). DPI is a derived knob, not the target.
+- [x] **Optional caps**: Allow optional caps (max DPI, max megapixels) but keep them **off by default**.
+- [x] **X-height quality sweep**: Run OCR across multiple target line-heights for both old and pristine PDFs to find the lowest acceptable x-height.
+- [x] **Max-available extraction**: Early pipeline stage extracts page images at the highest available DPI subject to the chosen x-height target and optional caps; proceed to split detection on those images.
 
 ---
 
 ## Tasks
 
-- [ ] Inventory page image sizes for **old** and **pristine** PDFs (min/median/max; include example page IDs).
-- [ ] Ensure large-image rendering works safely (Pillow decompression-bomb guard) for pristine PDFs.
-- [ ] Define a resolution sweep plan and estimate cost per page at each resolution.
-- [ ] Build a **downsampled benchmark set**: resize pristine pages to match old benchmark dimensions and run OCR bench diff.
-- [ ] Establish **page mapping** between old benchmark pages and pristine pages (manual or OCR-based), then re-run downsampled benchmark.
-- [ ] Run OCR on a small, representative page set at multiple resolutions; compare against gold outputs.
-- [ ] Choose a default downscale policy with justification (quality vs cost) and document it.
-- [ ] Add settings/recipe knobs to control downscale behavior.
-- [ ] Document findings and decision in the story work log with evidence.
+- [x] Inventory page image sizes for **old** and **pristine** PDFs (min/median/max; include example page IDs).
+- [x] Ensure large-image rendering works safely (Pillow decompression-bomb guard) for pristine PDFs.
+- [x] Define a resolution sweep plan and estimate cost per page at each resolution.
+- [x] Build a **downsampled benchmark set**: resize pristine pages to match old benchmark dimensions and run OCR bench diff.
+- [x] Establish **page mapping** between old benchmark pages and pristine pages (manual or OCR-based), then re-run downsampled benchmark.
+- [x] Run OCR on a small, representative page set at multiple resolutions; compare against gold outputs.
+- [x] Determine **minimum viable DPI** for GPT‑5.1 that preserves headers + tables (document evidence).
+- [x] Choose a default downscale policy with justification (quality vs cost) and document it.
+- [x] Add settings/recipe knobs to control downscale behavior.
+- [x] Document findings and decision in the story work log with evidence.
+- [x] Add a **line-height based DPI chooser** that samples pages across the PDF, computes a target DPI, and feeds the capped extractor.
+- [x] Add a pre-split **max-available extraction module**: extract page images at max available DPI guided by x-height target, then feed split detection.
+- [x] Add **optional caps** (max DPI / max megapixels) with defaults off.
+- [x] Run OCR bench at multiple target x-heights for both PDFs and record quality deltas.
 
 ---
 
@@ -180,3 +190,73 @@ Plan: run OCR on a representative sample at 200/150/120/100 DPI and compare sect
 - **Result:** Failure (table still collapsed).
 - **Notes:** Added a hint to split multiple “Turn to X” options into list/table rows. Page‑061 output remains a single-row concatenated table. Prompt tweaks alone are not enough for this layout.
 - **Next:** Explore post‑processing or a targeted table extractor for this specific pattern.
+
+### 20251222-1930 — Reviewed recent commits and added DPI requirement
+- **Result:** Success.
+- **Notes:** Recent commits (`28dde09` → `99510c1`) focused on GPT‑5.1 HTML pipeline + table rescue; no explicit optimal DPI decision landed yet. Added an explicit success criteria + task to determine minimum viable DPI/max MP for GPT‑5.1 (headers + tables preserved).
+- **Next:** Run DPI sweep with table‑rescue enabled and record the minimal acceptable DPI/MP target.
+
+### 20251222-1945 — Pulled completed story evidence (table rescue) into DPI decision
+- **Result:** Success.
+- **Notes:** Story‑085 confirmed table collapse is **not** DPI‑dependent for pristine page‑061 (fails at 300/150), and the new `table_rescue_html_v1` reliably repairs it. Validation across all pristine table pages (14 pages) shows only page‑061 requires rescue; others preserve structure. Artifacts: `/tmp/cf-pristine-table-check/pages_html_rescued_all.jsonl` and `/tmp/cf-table-rescue-smoke/pages_html_rescued_216b.jsonl`. This means the DPI decision can focus on text/heading fidelity without blocking on table collapse (rescue is now the mitigation).
+- **Next:** Run DPI sweep with rescue enabled to pick the minimum viable DPI/max MP policy.
+
+### 20251222-2030 — DPI sweep on pristine benchmarks + policy decision
+- **Result:** Success.
+- **Notes:** Rendered the 9 mapped pristine benchmark pages at 200/150/120/100 DPI and ran GPT‑5.1 OCR + diffs. Outputs:  
+  - `testdata/ocr-bench/ai-ocr-simplification/gpt5_1-pristine-dpi-200/diffs/diff_summary.json` → avg_html 0.867418, avg_text 0.989851  
+  - `.../gpt5_1-pristine-dpi-150/diffs/diff_summary.json` → avg_html 0.819466, avg_text 0.986478  
+  - `.../gpt5_1-pristine-dpi-120/diffs/diff_summary.json` → avg_html 0.908099, avg_text 0.986947  
+  - `.../gpt5_1-pristine-dpi-100/diffs/diff_summary.json` → avg_html 0.874036, avg_text 0.986266  
+  Text ratios are effectively flat; 120 DPI produced the strongest HTML ratio with no meaningful text loss on the sample set.
+- **Decision:** Default **120 DPI** for pristine PDFs (≈29 MP/page at 300‑DPI baseline → ~6× reduction vs 300 DPI) with table rescue enabled for rare collapses (page‑061).  
+- **Config:** New settings file `configs/settings.ff-ai-ocr-gpt51-pristine-120dpi.yaml` sets `split_pages.dpi: 120`.
+- **Next:** If needed, run a larger validation slice at 120 DPI on pristine pages before full‑book runs.
+
+### 20251222-2105 — Added max-DPI extraction requirement
+- **Result:** Success.
+- **Notes:** Added requirement to cap extraction at 120 DPI in an early pipeline module before split detection.
+- **Next:** Implement the max-DPI extraction module and wire it ahead of split detection.
+
+### 20251222-2215 — Implemented capped PDF extraction + manifest-based splitting
+- **Result:** Success.
+- **Notes:** Added `extract_pdf_images_capped_v1` (per-page max DPI capped at 120) and `split_pages_from_manifest_v1` to split pre-rendered images. Updated GPT‑5.1 recipe and pristine settings to use the new stages.
+- **Next:** Test extraction + split on both PDFs and inspect manifests/DPI reports.
+
+### 20251222-2235 — Tested capped extraction on both PDFs
+- **Result:** Success.
+- **Notes:** Old PDF pages 1–2 render at 120 DPI (max_source_dpi ~150). Pristine PDF pages 1–2 report max_source_dpi 72, so render at 72 DPI (cap honored). Artifacts: `/tmp/cf-cap-old/render_dpi_report.jsonl`, `/tmp/cf-cap-pristine/render_dpi_report.jsonl`, split outputs under `/tmp/cf-cap-old-split/` and `/tmp/cf-cap-pristine-split/`.
+- **Next:** Decide if 72 DPI is acceptable for pristine OCR or whether to override for quality; otherwise proceed with full‑book runs.
+
+### 20251222-2310 — Added line-height based DPI chooser (in extractor)
+- **Result:** Updated.
+- **Notes:** Reworked `extract_pdf_images_capped_v1` to treat x-height as primary and DPI as a derived knob. Added optional sweep (`--sweep-line-heights`) plus optional caps (`max_mp`, `dpi_cap`), all off by default. Updated success criteria to reflect optional caps.
+- **Next:** Run sweep on both PDFs to validate target selection and confirm caps remain off by default.
+
+### 20251222-2340 — Ran x-height sweep (caps off)
+- **Result:** Success.
+- **Notes:** Swept line heights (20–36 px) on both PDFs. Old PDF: max_source_dpi ~150 caps effective line height (~15.9 px) even when target 20–36; best candidate picked 20 px (target_dpi 180, applied ~150). Pristine PDF: max_source_dpi 72 caps effective line height (~14 px); best candidate 20 px (target_dpi ~103, applied 72). Reports: `/tmp/cf-cap-old/line_height_sweep.json`, `/tmp/cf-cap-pristine/line_height_sweep.json`, summaries in `/tmp/cf-cap-old/render_dpi_summary.json` and `/tmp/cf-cap-pristine/render_dpi_summary.json`.
+- **Next:** Decide whether to override low embedded DPI later by re-rendering select pages at higher DPI (separate story).
+
+### 20251223-0025 — OCR quality sweep across x-height targets (old vs pristine)
+- **Result:** Success.
+- **Notes:** Ran GPT‑5.1 OCR bench across x-height targets 16/20/24/28 px for both PDFs (9-page mapped set).  
+  Old PDF avg ratios: xh-16 (HTML 0.9134 / text 0.9895), xh-20 (0.9143 / 0.9921), xh-24 (0.9140 / 0.9923), xh-28 (0.9139 / 0.9888).  
+  Pristine PDF avg ratios: xh-16 (0.8664 / 0.9806), xh-20 (0.9124 / 0.9806), xh-24 (0.9159 / 0.9878), xh-28 (0.8738 / 0.9858).  
+  Artifacts under `testdata/ocr-bench/xheight-sweep/{old,pristine}/xh-*/diffs/diff_summary.json`.
+- **Next:** Choose the lowest x-height that meets quality targets; consider 24 px as a stable default for both PDFs.
+
+### 20251223-0105 — Set default x-height target + cost estimate
+- **Result:** Success.
+- **Notes:** Set `target_line_height: 24` in the GPT‑5.1 recipe. Estimated OCR cost at xh‑24 from bench usage: avg prompt 1304, completion ~378 (old) / ~372 (pristine). At GPT‑5.1 pricing ($1.25/M in, $10/M out), cost ≈ $0.00541 per split page (old) / $0.00535 (pristine) → ≈ $1.22–$1.21 for 226 split pages.
+- **Next:** If desired, update settings to override target line height for specific runs.
+
+### 20251223-0135 — Smoke run for x-height extraction + split
+- **Result:** Success.
+- **Notes:** Ran smoke with `--end-at split_pages` using `configs/settings.ff-ai-ocr-gpt51-table-rescue-smoke.yaml` (page 108). Extractor target_dpi=216 (xh‑24), render_dpi capped by max_source_dpi ~137.5 for page 108. Artifacts: `/tmp/cf-ff-ai-ocr-gpt51-xh24-smoke/01_extract_pdf_images_capped_v1/render_dpi_summary.json` and `render_dpi_report.jsonl`, plus split manifest under `/tmp/cf-ff-ai-ocr-gpt51-xh24-smoke/02_split_pages_from_manifest_v1/pages_split_manifest.jsonl`.
+- **Next:** Proceed with full OCR runs only if/when x-height target and cap behavior are finalized.
+
+### 20251223-0215 — Cost estimate at 120 DPI (GPT‑5.1)
+- **Result:** Success.
+- **Notes:** From `testdata/ocr-bench/ai-ocr-simplification/gpt5_1-pristine-dpi-120/openai_usage.jsonl` (9 pages), avg tokens/page: prompt 1240, completion 369.89. Using GPT‑5.1 pricing ($1.25/M input, $10/M output), cost ≈ $0.00525 per split page (~$0.52 cents) → ≈ $1.19 for 226 split pages. Pricing source: OpenAI API pricing page.
+- **Next:** If needed, recompute with cached input or Batch pricing.

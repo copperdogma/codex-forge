@@ -1,0 +1,15 @@
+--- gold/page-054R.html
++++ model/page-054R.html
+@@ -17,7 +17,11 @@
+ 166
+ </h2>
+ <p>
+-As you touch the emerald eye of the idol, you hear a creaking sound below you. Looking down, you are shocked to see the two stuffed birds taking flight. Their wings flap in jerky movements, but they are soon above you and look set to attack. Fight the FLYING GUARDIANS one at a time, but reduce your SKILL by 3 during this combat because of your restricted position.
++As you touch the emerald eye of the idol, you hear a creaking sound below you. Looking down, you are shocked to see the two stuffed birds taking flight. Their wings flap in jerky movements, but they are soon above you and look set to attack. Fight the FLYING GUARDIANS one at a time, but reduce your
++<em>
++SKILL
++</em>
++by 3 during this combat because of your restricted position.
+ </p>
+ <table>
+ <thead>

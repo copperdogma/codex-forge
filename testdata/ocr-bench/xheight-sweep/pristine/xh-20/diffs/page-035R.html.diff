@@ -1,0 +1,46 @@
+--- gold/page-035R.html
++++ model/page-035R.html
+@@ -17,33 +17,22 @@
+ <p>
+ You take your time and manage to step over the last pole without having touched any of them. You hurry on east, still following the two pairs of footprints. Turn to 313.
+ </p>
+-<img alt="illustration of a rat lying on the ground">
++<img alt="Sleeping rat-like creature illustration">
+ <h2>
+ 81
+ </h2>
+ <p>
+ The only furniture in the Goblin's room is a table, two chairs and a cupboard on the wall. There are two closed doors, one in the west wall and the other in the north wall. Will you:
+ </p>
+-<dl>
+-<dt>
+-Open the cupboard?
+-</dt>
+-<dd>
+-Turn to 307
+-</dd>
+-<dt>
+-Open the west door?
+-</dt>
+-<dd>
+-Turn to 263
+-</dd>
+-<dt>
+-Open the north door?
+-</dt>
+-<dd>
+-Turn to 136
+-</dd>
+-</dl>
++<p>
++Open the cupboard? Turn to 307
++</p>
++<p>
++Open the west door? Turn to 263
++</p>
++<p>
++Open the north door? Turn to 136
++</p>
+ <h2>
+ 82
+ </h2>

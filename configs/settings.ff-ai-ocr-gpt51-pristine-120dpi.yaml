@@ -1,0 +1,3 @@
+stage_params:
+  extract_pdf_images_capped:
+    dpi_cap: 120

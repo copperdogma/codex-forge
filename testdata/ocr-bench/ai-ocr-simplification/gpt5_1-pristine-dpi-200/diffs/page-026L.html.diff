@@ -1,0 +1,64 @@
+--- gold/page-026L.html
++++ model/page-026L.html
+@@ -1,9 +1,9 @@
+ <p class="running-head">
+ 40-42
+ </p>
+-<h2>
++<p class="page-number">
+ 40
+-</h2>
++</p>
+ <p>
+ You call out to the Dwarf that you are ready to fight the MINOTAUR. The wooden door rises slowly and you see the fearsome beast, half man, half bull, step into the arena. Steam blows from its nostrils as it works itself up into a rage, ready to attack. Suddenly it rushes forward, swinging its double-headed axe.
+ </p>
+@@ -21,35 +21,24 @@
+ <p>
+ If you win, turn to 163.
+ </p>
+-<h2>
++<p class="page-number">
+ 41
+-</h2>
++</p>
+ <p>
+ You walk slowly over to the alcove, carefully checking the floor for any more hidden traps. You see that the goblet contains a sparkling red liquid. Will you:
+ </p>
+-<dl>
+-<dt>
+-Drink the red liquid?
+-</dt>
+-<dd>
+-Turn to 98
+-</dd>
+-<dt>
+-Leave the goblet and walk back to search the Barbarian (if you have not done so already)?
+-</dt>
+-<dd>
+-Turn to 126
+-</dd>
+-<dt>
+-Leave the chamber to continue west?
+-</dt>
+-<dd>
+-Turn to 83
+-</dd>
+-</dl>
+-<h2>
++<p>
++Drink the red liquid? Turn to 98
++</p>
++<p>
++Leave the goblet and walk back to search the Barbarian (if you have not done so already)? Turn to 126
++</p>
++<p>
++Leave the chamber to continue west? Turn to 83
++</p>
++<p class="page-number">
+ 42
+-</h2>
++</p>
+ <p>
+-The cobra's fangs sink deep into your wrist and you feel its poison starting to creep through your body. Lose 5 STAMINA points. If you are still alive, the Dwarf has no mercy but tells you to try again. Roll two dice. If the total is the same as or less than your SKILL, turn to 55. If the total is greater than your SKILL, turn to 202.
++The cobra’s fangs sink deep into your wrist and you feel its poison starting to creep through your body. Lose 5 STAMINA points. If you are still alive, the Dwarf has no mercy but tells you to try again. Roll two dice. If the total is the same as or less than your SKILL, turn to 55. If the total is greater than your SKILL, turn to 202.
+ </p>

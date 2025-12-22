@@ -32,17 +32,21 @@ Guiding priorities: **perfect OCR first**, then move downstream stage‑by‑sta
     Only after 035 is Done; profile + cost guardrails for GPT‑5.1 pipeline.
 13. **082 — Large-Image PDF Cost Optimization**
     Validate image sizes and downscale policy to balance OCR quality vs cost.
-14. **083 — Game-Ready Validation Checklist**
+14. **089 — Pristine Book Parity (Missing Sections + Robustness)**
+    Bring the pristine PDF to 100% coverage with the same pipeline; reduce missing sections/orphans.
+15. **090 — Run Summary UX (Missing Sections + Stage Metrics)**
+    Make missing sections + per-stage metrics prominent in run summaries.
+16. **083 — Game-Ready Validation Checklist**
     Define strict criteria and validation steps for “game-ready” artifacts.
-15. **084 — Fast PDF Image Extraction (Embedded Streams)**
+17. **084 — Fast PDF Image Extraction (Embedded Streams)**
     Investigate ripping embedded page images vs full rasterization.
-16. **085 — Table Rescue OCR Pass**
+18. **085 — Table Rescue OCR Pass**
     Add a targeted table-rescue step for collapsed grids/choice tables.
-17. **086 — Preserve HTML Through Final Gamebook**
+19. **086 — Preserve HTML Through Final Gamebook**
     Ensure HTML survives to final artifacts (no lossy plain-text-only outputs).
-18. **087 — Retire Legacy OCR-Only Recipe**
+20. **087 — Retire Legacy OCR-Only Recipe**
     Deprecate/remove legacy OCR-only recipes now superseded by GPT‑5.1 pipeline.
-19. **088 — Choice Parsing Enhancements**
+21. **088 — Choice Parsing Enhancements**
     Improve choice parsing and add semantic choice markup in HTML.
 
 20. **009 — Layout‑Preserving Extractor**  
@@ -131,13 +135,15 @@ This index tracks stories in `/docs/stories/` for the codex-forge pipeline.
 || 079 | Sequential Page Numbering Refactor — Dual-Field Provenance | High | Done | /docs/stories/story-079-page-numbering-refactor.md |
 || 080 | Central Escalation Cache (Premium OCR Overlay) | High | To Do | /docs/stories/story-080-central-escalation-cache.md |
 || 081 | GPT‑5.1 AI‑First OCR Pipeline (HTML‑First) | High | Done | /docs/stories/story-081-ai-ocr-gpt51-pipeline.md |
-|| 082 | Large-Image PDF Cost Optimization | High | To Do | /docs/stories/story-082-large-image-pdf-cost-optimization.md |
+|| 082 | Large-Image PDF Cost Optimization | High | Done | /docs/stories/story-082-large-image-pdf-cost-optimization.md |
 || 083 | Game-Ready Validation Checklist | High | To Do | /docs/stories/story-083-game-ready-validation-checklist.md |
 || 084 | Fast PDF Image Extraction (Embedded Streams) | Medium | To Do | /docs/stories/story-084-fast-pdf-image-extraction.md |
 || 085 | Table Rescue OCR Pass | High | Done | /docs/stories/story-085-table-rescue-ocr.md |
 || 086 | Preserve HTML Through Final Gamebook | High | Done | /docs/stories/story-086-preserve-html-final-output.md |
 || 087 | Retire Legacy OCR-Only Recipe | Medium | To Do | /docs/stories/story-087-retire-legacy-ocr-recipe.md |
 || 088 | Choice Parsing Enhancements | High | To Do | /docs/stories/story-088-choice-parsing-enhancements.md |
+|| 089 | Pristine Book Parity (Missing Sections + Robustness) | High | To Do | /docs/stories/story-089-pristine-book-parity.md |
+|| 090 | Run Summary UX (Missing Sections + Stage Metrics) | Medium | To Do | /docs/stories/story-090-run-summary-and-missing-section-signal.md |
 || 099 | Remove dev-only backcompat disclaimer | Low | To Do | /docs/stories/story-099-remove-dev-backcompat-note.md |
 
 ## Notes

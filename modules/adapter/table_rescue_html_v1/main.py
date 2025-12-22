@@ -206,6 +206,20 @@ def call_rescue(model: str, prompt: str, image_data: str, temperature: float, ma
     return raw, usage, request_id
 
 
+def _resolve_default_outdir(input_path: Path, module_id: str) -> Path:
+    # Prefer the module folder in the run dir (e.g., 04_table_rescue_html_v1) if discoverable.
+    cur = input_path.parent
+    for parent in [cur] + list(cur.parents):
+        if (parent / "pipeline_state.json").exists():
+            run_dir = parent
+            candidates = [p for p in run_dir.iterdir() if p.is_dir() and p.name.endswith(module_id)]
+            if candidates:
+                # Prefer the lowest ordinal if multiple exist.
+                return sorted(candidates, key=lambda p: p.name)[0]
+            return run_dir / module_id
+    return input_path.parent
+
+
 def main() -> None:
     parser = argparse.ArgumentParser(description="Rescue collapsed tables via targeted OCR")
     parser.add_argument("--pages", help="Input pages_html.jsonl")
@@ -251,9 +265,17 @@ def main() -> None:
         raise SystemExit(f"Input not found: {input_path}")
 
     if not args.outdir:
-        args.outdir = str(input_path.parent)
-    ensure_dir(args.outdir)
-    out_path = Path(args.outdir) / args.out if not os.path.isabs(args.out) else Path(args.out)
+        args.outdir = str(_resolve_default_outdir(input_path, "table_rescue_html_v1"))
+    outdir_path = Path(args.outdir).expanduser()
+    if not outdir_path.is_absolute():
+        outdir_path = (Path.cwd() / outdir_path).resolve()
+    ensure_dir(str(outdir_path))
+    if os.path.isabs(args.out) or os.path.sep in args.out:
+        out_path = Path(args.out)
+        if not out_path.is_absolute():
+            out_path = (Path.cwd() / out_path).resolve()
+    else:
+        out_path = outdir_path / args.out
     if out_path.exists():
         out_path.unlink()
 

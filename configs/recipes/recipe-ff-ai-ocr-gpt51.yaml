@@ -7,14 +7,22 @@ input:
 output_dir: output/runs/ff-ai-ocr-gpt51
 
 stages:
-  - id: split_pages
+  - id: extract_pdf_images_capped
     stage: extract
-    module: split_pages_v1
-    out: pages_split_manifest.jsonl
+    module: extract_pdf_images_capped_v1
+    out: pages_rendered_manifest.jsonl
     params:
-      dpi: 300
+      target_line_height: 24
       start: 1
       end: 113  # full book; override via settings for smoke runs
+
+  - id: split_pages
+    stage: extract
+    module: split_pages_from_manifest_v1
+    needs: [extract_pdf_images_capped]
+    inputs:
+      pages: extract_pdf_images_capped
+    out: pages_split_manifest.jsonl
 
   - id: ocr_ai
     stage: extract

@@ -1,0 +1,70 @@
+{
+  "pages": 9,
+  "avg_html_ratio": 0.873816,
+  "avg_text_ratio": 0.985834,
+  "results": [
+    {
+      "page": "page-007R",
+      "html_ratio": 0.904839,
+      "text_ratio": 0.999221,
+      "html_diff_lines": 93,
+      "text_diff_lines": 9
+    },
+    {
+      "page": "page-009L",
+      "html_ratio": 0.542762,
+      "text_ratio": 1.0,
+      "html_diff_lines": 52,
+      "text_diff_lines": 0
+    },
+    {
+      "page": "page-017L",
+      "html_ratio": 0.952335,
+      "text_ratio": 0.941742,
+      "html_diff_lines": 11,
+      "text_diff_lines": 10
+    },
+    {
+      "page": "page-017R",
+      "html_ratio": 1.0,
+      "text_ratio": 1.0,
+      "html_diff_lines": 0,
+      "text_diff_lines": 0
+    },
+    {
+      "page": "page-019R",
+      "html_ratio": 0.601452,
+      "text_ratio": 0.996255,
+      "html_diff_lines": 38,
+      "text_diff_lines": 15
+    },
+    {
+      "page": "page-020R",
+      "html_ratio": 0.949934,
+      "text_ratio": 0.965449,
+      "html_diff_lines": 51,
+      "text_diff_lines": 10
+    },
+    {
+      "page": "page-026L",
+      "html_ratio": 0.968051,
+      "text_ratio": 0.997164,
+      "html_diff_lines": 38,
+      "text_diff_lines": 17
+    },
+    {
+      "page": "page-035R",
+      "html_ratio": 0.94497,
+      "text_ratio": 0.972672,
+      "html_diff_lines": 46,
+      "text_diff_lines": 21
+    },
+    {
+      "page": "page-054R",
+      "html_ratio": 1.0,
+      "text_ratio": 1.0,
+      "html_diff_lines": 0,
+      "text_diff_lines": 0
+    }
+  ]
+}

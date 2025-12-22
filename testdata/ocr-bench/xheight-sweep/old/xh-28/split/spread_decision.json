@@ -1,0 +1,69 @@
+{
+  "is_spread": true,
+  "gutter_position": 0.518,
+  "confidence": 0.82,
+  "landscape_ratio": "5/5",
+  "confident_samples": 4,
+  "samples": [
+    {
+      "index": 0,
+      "path": "/Users/cam/Documents/Projects/codex-forge/testdata/ocr-bench/xheight-sweep/old/xh-28/rendered/page-007.jpg",
+      "width": 1275,
+      "height": 1078,
+      "ratio": 1.183,
+      "is_landscape": true,
+      "gutter_position": 0.53,
+      "gutter_brightness": 255.0,
+      "gutter_contrast": 0.109,
+      "is_confident": true
+    },
+    {
+      "index": 1,
+      "path": "/Users/cam/Documents/Projects/codex-forge/testdata/ocr-bench/xheight-sweep/old/xh-28/rendered/page-009.jpg",
+      "width": 1280,
+      "height": 1077,
+      "ratio": 1.188,
+      "is_landscape": true,
+      "gutter_position": 0.523,
+      "gutter_brightness": 253.1,
+      "gutter_contrast": 0.091,
+      "is_confident": true
+    },
+    {
+      "index": 3,
+      "path": "/Users/cam/Documents/Projects/codex-forge/testdata/ocr-bench/xheight-sweep/old/xh-28/rendered/page-019.jpg",
+      "width": 1275,
+      "height": 1067,
+      "ratio": 1.195,
+      "is_landscape": true,
+      "gutter_position": 0.487,
+      "gutter_brightness": 254.6,
+      "gutter_contrast": 0.237,
+      "is_confident": true
+    },
+    {
+      "index": 5,
+      "path": "/Users/cam/Documents/Projects/codex-forge/testdata/ocr-bench/xheight-sweep/old/xh-28/rendered/page-026.jpg",
+      "width": 1284,
+      "height": 1081,
+      "ratio": 1.188,
+      "is_landscape": true,
+      "gutter_position": 0.512,
+      "gutter_brightness": 162.2,
+      "gutter_contrast": 0.205,
+      "is_confident": true
+    },
+    {
+      "index": 7,
+      "path": "/Users/cam/Documents/Projects/codex-forge/testdata/ocr-bench/xheight-sweep/old/xh-28/rendered/page-054.jpg",
+      "width": 1290,
+      "height": 1086,
+      "ratio": 1.188,
+      "is_landscape": true,
+      "gutter_position": 0.557,
+      "gutter_brightness": 229.1,
+      "gutter_contrast": 0.021,
+      "is_confident": false
+    }
+  ]
+}

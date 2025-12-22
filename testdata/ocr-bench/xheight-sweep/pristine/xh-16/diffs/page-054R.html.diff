@@ -1,0 +1,52 @@
+--- gold/page-054R.html
++++ model/page-054R.html
+@@ -5,19 +5,35 @@
+ 164
+ </h2>
+ <p>
+-As you walk along, droplets of water again start falling from the tunnel ceiling. You see wet footprints, made by the same boots that you followed earlier, heading west. The footprints lead to a closed iron door in the right-hand wall of the tunnel, but do not seem to go any further. If you wish to open the door, turn to 299. If you would rather keep going west, turn to 83.
++As you walk along, droplets of water again start falling from the tunnel ceiling. You see wet footprints, made by the same boots that you followed earlier, heading west. The footprints lead to a closed iron door in the right-hand wall of the tunnel, but do not seem to go any further. If you wish to open the door, turn to
++<strong>
++299
++</strong>
++. If you would rather keep going west, turn to
++<strong>
++83
++</strong>
++.
+ </p>
+ <h2>
+ 165
+ </h2>
+ <p>
+-There is a slot in the padlock into which you place the coin. Immediately the lock clicks apart, and you are able to unchain the stilts. You place them on your shoulder and once again set off north. Turn to 234.
++There is a slot in the padlock into which you place the coin. Immediately the lock clicks apart, and you are able to unchain the stilts. You place them on your shoulder and once again set off north. Turn to
++<strong>
++234
++</strong>
++.
+ </p>
+ <h2>
+ 166
+ </h2>
+ <p>
+-As you touch the emerald eye of the idol, you hear a creaking sound below you. Looking down, you are shocked to see the two stuffed birds taking flight. Their wings flap in jerky movements, but they are soon above you and look set to attack. Fight the FLYING GUARDIANS one at a time, but reduce your SKILL by 3 during this combat because of your restricted position.
++As you touch the emerald eye of the idol, you hear a creaking sound below you. Looking down, you are shocked to see the two stuffed birds taking flight. Their wings flap in jerky movements, but they are soon above you and look set to attack. Fight the FLYING GUARDIANS one at a time, but reduce your
++<strong>
++SKILL
++</strong>
++by 3 during this combat because of your restricted position.
+ </p>
+ <table>
+ <thead>
+@@ -58,5 +74,9 @@
+ </tbody>
+ </table>
+ <p>
+-If you win, turn to 11.
++If you win, turn to
++<strong>
++11
++</strong>
++.
+ </p>

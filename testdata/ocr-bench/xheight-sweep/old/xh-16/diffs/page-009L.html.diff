@@ -1,0 +1,49 @@
+--- gold/page-009L.html
++++ model/page-009L.html
+@@ -1,37 +1,21 @@
+ <p>
+-If the creature has just wounded you, you may
+-<em>
+-Test your Luck
+-</em>
+-to try to minimize the wound. If you are lucky, you have managed to avoid the full damage of the blow. Restore 1 point of STAMINA (i.e. instead of doing 2 points of damage it has done only 1). If you are unlucky, you have taken a more serious blow. Subtract 1 extra STAMINA point.
++If the creature has just wounded you, you may Test your Luck to try to minimize the wound. If you are lucky, you have managed to avoid the full damage of the blow. Restore 1 point of STAMINA (i.e. instead of doing 2 points of damage it has done only 1). If you are unlucky, you have taken a more serious blow. Subtract 1 extra STAMINA point.
+ </p>
+ <p>
+-Remember that you must subtract 1 point from your own LUCK score each time you
+-<em>
+-Test your Luck
+-</em>
+-.
++Remember that you must subtract 1 point from your own LUCK score each time you Test your Luck.
+ </p>
+-<h2>
++<p>
+ Restoring Skill, Stamina and Luck
+-</h2>
+-<h3>
++</p>
++<p>
+ Skill
+-</h3>
++</p>
+ <p>
+-Your SKILL score will not change much during your adventure. Occasionally, a page may give instructions to increase or decrease your SKILL score. A Magic Weapon may increase your SKILL, but remember that only one weapon can be used at a time! You cannot claim 2 SKILL bonuses for carrying two Magic Swords. Your SKILL score can never exceed its
+-<em>
+-Initial
+-</em>
+-value unless specifically instructed. Drinking the Potion of Skill (see later) will restore your SKILL to its
+-<em>
+-Initial
+-</em>
+-level at any time.
++Your SKILL score will not change much during your adventure. Occasionally, a page may give instructions to increase or decrease your SKILL score. A Magic Weapon may increase your SKILL, but remember that only one weapon can be used at a time! You cannot claim 2 SKILL bonuses for carrying two Magic Swords. Your SKILL score can never exceed its Initial value unless specifically instructed. Drinking the Potion of Skill (see later) will restore your SKILL to its Initial level at any time.
+ </p>
+-<h3>
++<p>
+ Stamina and Provisions
+-</h3>
++</p>
+ <p>
+ Your STAMINA score will change a lot during your adventure as you fight monsters and undertake arduous tasks. As you near your goal, your STAMINA level may be dangerously low and battles may be particularly risky, so be careful!
+ </p>

@@ -1,0 +1,44 @@
+module_id: extract_pdf_images_capped_v1
+stage: extract
+entrypoint: modules/extract/extract_pdf_images_capped_v1/main.py
+input_schema: null
+output_schema: page_image_v1
+description: "Render PDF pages at the maximum available DPI capped at a configurable limit, emitting a page_image_v1 manifest of full pages."
+params:
+  - name: dpi_cap
+    type: int
+    default: null
+  - name: baseline_dpi
+    type: int
+    default: 72
+  - name: target_line_height
+    type: int
+    default: 28
+  - name: min_dpi
+    type: int
+    default: 72
+  - name: sample_count
+    type: int
+    default: 5
+  - name: sweep_line_heights
+    type: str
+    default: null
+  - name: sweep_report
+    type: str
+    default: line_height_sweep.json
+  - name: max_mp
+    type: float
+    default: null
+  - name: start
+    type: int
+    default: 1
+  - name: end
+    type: int
+    default: null
+  - name: out
+    type: str
+    default: pages_rendered_manifest.jsonl
+  - name: report
+    type: str
+    default: render_dpi_report.jsonl
+notes: "Attempts to detect embedded image DPI via pypdf/PyPDF2; falls back to dpi_cap if not available."
