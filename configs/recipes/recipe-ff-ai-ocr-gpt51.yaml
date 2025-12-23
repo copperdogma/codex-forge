@@ -180,8 +180,13 @@ stages:
 
   - id: validate_gamebook
     stage: validate
-    module: validate_gamebook_smoke_v1
-    needs: [build_gamebook]
+    module: validate_ff_engine_v2
+    needs: [build_gamebook, report_pipeline_issues, detect_endings, detect_boundaries_html, html_blocks_repaired]
     inputs:
       gamebook: build_gamebook
+      portions: detect_endings
+      boundaries: detect_boundaries_html
+      elements_core: html_blocks_repaired
     out: validation_report.json
+    params:
+      forensics: true
