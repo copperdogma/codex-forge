@@ -22,7 +22,7 @@ Guiding priorities: **perfect OCR first**, then move downstream stage‑by‑sta
    Achieved 100% section-id coverage (400/400), with missing-from-source explicitly recorded.
 8. DONE: **078 — Boundary Ordering Guard + Targeted Escalation**
    Prevent empty sections by enforcing span feasibility and escalating out‑of‑order headers. (Resume 035 after 078.)
-9.  **035 — Fighting Fantasy Pipeline Optimization** *(Paused)*
+9. DONE: **035 — Fighting Fantasy Pipeline Optimization** *(Paused)*
    Drive missing/no‑text/no‑choice to targets using the new OCR + boundary stack. (Resume after 078/080.)
 10. DONE: **050 — FF Ending Detection Verification**  
    Verify ending/dead‑end classification quality on FF outputs (no book‑specific tuning).
@@ -109,7 +109,7 @@ This index tracks stories in `/docs/stories/` for the codex-forge pipeline.
 || 052 | Evaluate Apple Vision OCR Integration | Medium | Done | /docs/stories/story-052-apple-ocr-integration.md |
 || 053 | Pipeline Smoke Test (Static Sample, No External Calls) | High | To Do | /docs/stories/story-053-smoke-test-pipeline.md |
 || 054 | Canonical FF Recipe Consolidation | High | Done | /docs/stories/story-054-canonical-ff-recipe.md |
-|| 056 | Validation Forensics Automation | High | To Do | /docs/stories/story-056-validation-forensics.md |
+|| 056 | Validation Forensics Automation | High | Done | /docs/stories/story-056-validation-forensics.md |
 || 057 | OCR Quality & Column Detection Improvements | High | Done | /docs/stories/story-057-ocr-quality-column-detection.md |
 || 058 | Post-OCR Text Quality & Error Correction | High | Done | /docs/stories/story-058-post-ocr-text-quality.md |
 || 059 | Section Detection & Boundary Improvements | High | Done | /docs/stories/story-059-section-detection-boundaries.md |

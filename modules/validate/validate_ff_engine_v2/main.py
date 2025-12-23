@@ -256,28 +256,19 @@ def main():
     logger.log("validate", "running", current=0, total=1,
                message="Validating gamebook", artifact=args.out, module_id="validate_ff_engine_v2")
 
-    upstream = None
-    if args.forensics:
-        upstream = {
-            "elements": load_optional_jsonl(args.elements),
-            "elements_core": load_optional_jsonl(args.elements_core),
-            "boundaries": load_optional_jsonl(args.boundaries),
-            "portions": load_optional_jsonl(args.portions),
-            "boundaries_path": args.boundaries,
-            "elements_path": args.elements,
-            "elements_core_path": args.elements_core,
-            "portions_path": args.portions,
-        }
-    report = validate_gamebook(gamebook, args.expected_range_start, args.expected_range_end, upstream=upstream)
+    report = validate_gamebook(gamebook, args.expected_range_start, args.expected_range_end)
 
     if args.forensics:
         base_dir = os.path.dirname(os.path.abspath(args.gamebook))
-        boundaries_path = os.path.join(base_dir, "section_boundaries_merged.jsonl")
-        elements_path = os.path.join(base_dir, "elements.jsonl")
-        elements_core_path = os.path.join(base_dir, "elements_core.jsonl")
-        portions_path = os.path.join(base_dir, "portions_enriched_choices.jsonl")
+        
+        # Use provided paths if available, otherwise fall back to defaults
+        boundaries_path = args.boundaries or os.path.join(base_dir, "section_boundaries_merged.jsonl")
+        elements_path = args.elements or os.path.join(base_dir, "elements.jsonl")
+        elements_core_path = args.elements_core or os.path.join(base_dir, "elements_core.jsonl")
+        portions_path = args.portions or os.path.join(base_dir, "portions_enriched_choices.jsonl")
         pages_clean_path = os.path.join(base_dir, "pages_clean.jsonl")
         pages_raw_path = os.path.join(base_dir, "pages_raw.jsonl")
+        
         unresolved_path = args.unresolved_missing or os.path.join(base_dir, "unresolved_missing.json")
         boundaries = load_optional_jsonl(boundaries_path)
         elements = load_optional_jsonl(elements_path)
@@ -314,9 +305,27 @@ def main():
                 page_number_trace = {"artifact": pages_clean_path, "missing": missing}
 
         # Prefer elements_core (cleaner, seq/page aligned); fall back to full elements if missing
-        elem_by_id = {e.get("id"): e for e in (elements_core or elements)}
+        # Support both flattened IR (list of elements) and block-based IR (page rows with blocks)
+        flattened_elements = []
+        for row in (elements_core or elements):
+            if "blocks" in row and isinstance(row["blocks"], list):
+                # Flatten block-based IR
+                page_num = row.get("page_number") or row.get("page")
+                for block in row["blocks"]:
+                    order = block.get("order") or 0
+                    flattened_elements.append({
+                        "id": f"p{page_num:03d}-b{order}",
+                        "text": block.get("text"),
+                        "page_number": page_num,
+                        "metadata": row.get("metadata"),
+                        "seq": order, # approximate
+                    })
+            else:
+                flattened_elements.append(row)
+
+        elem_by_id = {e.get("id"): e for e in flattened_elements}
         bound_by_sid = {b.get("section_id"): b for b in boundaries}
-        portion_by_sid = {p.get("section_id") or p.get("portion_id"): p for p in portions}
+        portion_by_sid = {str(p.get("section_id") or p.get("portion_id")): p for p in portions}
 
         def short_text(txt: str, limit: int = 160):
             if not txt:
@@ -359,6 +368,19 @@ def main():
             txt = (p.get("raw_text") or p.get("text") or "").strip()
             return len(txt) if txt else 0
 
+        def get_ending_info(sid: str):
+            p = portion_by_sid.get(sid)
+            if not p:
+                return None
+            repair = p.get("repair") or {}
+            eg = repair.get("ending_guard")
+            if eg:
+                return eg
+            # fallback if not in repair
+            if p.get("ending"):
+                return {"ending_type": p.get("ending"), "reason": "Marked in portion metadata"}
+            return None
+
         def page_for_boundary(b):
             if not b:
                 return None
@@ -392,6 +414,12 @@ def main():
             if kind == "no_text":
                 return "Re-read portion (repair_portions) or widen boundary span; inspect start/end elements."
             if kind == "no_choices":
+                eg = get_ending_info(sid)
+                if eg:
+                    etype = eg.get("ending_type")
+                    if etype in ("death", "victory"):
+                        return f"Confirmed {etype}. No action needed."
+                    return f"Ending classified as '{etype}'; check if choices are missing in OCR/extraction."
                 return "Escalate choices_loop or run ending_guard to classify true endings."
             return None
 
@@ -448,6 +476,7 @@ def main():
                 "span": span_meta(b),
                 "portion_snippet": portion_snippet(sid),
                 "portion_length": portion_length(sid),
+                "ending_info": get_ending_info(sid),
                 "evidence": b.get("evidence") if b else None,
                 "artifact_paths": {
                     "boundaries": file_meta(boundaries_path),
@@ -481,12 +510,20 @@ def main():
                 traces.setdefault("missing_sections", {})[sid] = traces.get("missing_sections", {}).get(sid, make_trace(sid))
                 traces["missing_sections"][sid]["outcome"] = "resolved_bad_source_missing"
                 traces["missing_sections"][sid]["suggested_action"] = "Source page missing/fused after OCR+vision escalation"
-        report = report.model_copy(update={"forensics": traces})
+        
         report = report.model_copy(update={"forensics": traces})
 
     # Save report
     ensure_dir(os.path.dirname(args.out) or ".")
     save_json(args.out, report.model_dump(by_alias=True))
+
+    if args.forensics:
+        try:
+            import subprocess
+            html_out = args.out.replace(".json", ".html")
+            subprocess.run(["python3", "tools/generate_forensic_html.py", args.out, "--out", html_out], check=False)
+        except Exception as e:
+            print(f"Warning: Failed to generate HTML forensic report: {e}")
 
     # Log completion
     status = "done" if report.is_valid else "failed"
