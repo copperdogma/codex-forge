@@ -1,0 +1,7 @@
+input:
+  pdf: input/deathtrapdungeon00ian_jn9_1 - from internet archive.pdf
+
+stage_params:
+  extract_pdf_images_capped:
+    start: 1
+    end: 228  # pristine PDF has 228 pages (1-up layout, no splitting needed)
