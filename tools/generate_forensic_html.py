@@ -143,15 +143,11 @@ def generate_html(report_path: str, out_path: str):
                 parts.append(f"<li><span class='meta-label'>Text Length:</span> {trace.get('portion_length')} chars</li>")
             parts.append("</ul>")
             
-            if trace.get("portion_snippet"):
-                parts.append("<div class='collapsible'>Portion Snippet</div>")
-                parts.append(f"<div class='content'><div class='snippet'>{trace['portion_snippet']}</div></div>")
-            
             if trace.get("portion_html"):
                 import html
                 escaped_html = html.escape(trace["portion_html"])
-                parts.append("<div class='collapsible'>Portion HTML Source</div>")
-                parts.append(f"<div class='content'><div class='snippet'>{escaped_html}</div></div>")
+                parts.append("<div style='margin-top:12px;'><strong>Portion HTML Source:</strong></div>")
+                parts.append(f"<div class='snippet' style='max-height: 400px; overflow-y: auto;'>{escaped_html}</div>")
             
             parts.append("</td>")
             
