@@ -147,6 +147,12 @@ def generate_html(report_path: str, out_path: str):
                 parts.append("<div class='collapsible'>Portion Snippet</div>")
                 parts.append(f"<div class='content'><div class='snippet'>{trace['portion_snippet']}</div></div>")
             
+            if trace.get("portion_html"):
+                import html
+                escaped_html = html.escape(trace["portion_html"])
+                parts.append("<div class='collapsible'>Portion HTML Source</div>")
+                parts.append(f"<div class='content'><div class='snippet'>{escaped_html}</div></div>")
+            
             parts.append("</td>")
             
             # Column 3: Evidence & Hits

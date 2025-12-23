@@ -361,6 +361,12 @@ def main():
                 return None
             return short_text(p.get("raw_text") or p.get("text"))
 
+        def portion_html(sid: str):
+            p = portion_by_sid.get(sid)
+            if not p:
+                return None
+            return p.get("raw_html")
+
         def portion_length(sid: str):
             p = portion_by_sid.get(sid)
             if not p:
@@ -475,6 +481,7 @@ def main():
                 or (start_elem.get("page") if start_elem else None),
                 "span": span_meta(b),
                 "portion_snippet": portion_snippet(sid),
+                "portion_html": portion_html(sid),
                 "portion_length": portion_length(sid),
                 "ending_info": get_ending_info(sid),
                 "evidence": b.get("evidence") if b else None,
