@@ -26,7 +26,7 @@ Guiding priorities: **perfect OCR first**, then move downstream stage‑by‑sta
    Drive missing/no‑text/no‑choice to targets using the new OCR + boundary stack. (Resume after 078/080.)
 10. DONE: **050 — FF Ending Detection Verification**  
    Verify ending/dead‑end classification quality on FF outputs (no book‑specific tuning).
-11. **056 — Validation Forensics Automation (remaining items)**  
+11. DONE:**056 — Validation Forensics Automation (remaining items)**  
    Finish ending‑aware traces, boundary‑source reasoning, toggles/docs, optional HTML/CSV view.
 12. **066 — FF Pipeline Accel + Accuracy Guardrails**  
     Only after 035 is Done; profile + cost guardrails for GPT‑5.1 pipeline.
@@ -145,6 +145,8 @@ This index tracks stories in `/docs/stories/` for the codex-forge pipeline.
 || 089 | Pristine Book Parity (Missing Sections + Robustness) | High | Done | /docs/stories/story-089-pristine-book-parity.md |
 || 090 | Run Summary UX (Missing Sections + Stage Metrics) | Medium | Done | /docs/stories/story-090-run-summary-and-missing-section-signal.md |
 || 091 | Orphaned Section Mitigation | High | Done | /docs/stories/story-091-orphaned-section-mitigation.md |
+|| 092 | HTML Presentation Cleanup | High | To Do | /docs/stories/story-092-html-presentation-cleanup.md |
+|| 093 | Coarse Portionizer Endmatter Filter | High | To Do | /docs/stories/story-093-coarse-portionizer-endmatter-filter.md |
 || 099 | Remove dev-only backcompat disclaimer | Low | To Do | /docs/stories/story-099-remove-dev-backcompat-note.md |
 
 ## Notes
