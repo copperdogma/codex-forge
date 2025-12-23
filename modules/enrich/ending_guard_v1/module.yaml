@@ -4,6 +4,8 @@ description: >
   For gameplay sections with no choices, ask an LLM if the text is a death/victory ending or open.
   Marks ending_type in repair.ending_guard and sets ending=victory/death when applicable.
 entrypoint: modules/enrich/ending_guard_v1/main.py
+input_schema: enriched_portion_v1
+output_schema: enriched_portion_v1
 params:
   portions: Input portions (json/jsonl).
   out: Output path (same format as input).

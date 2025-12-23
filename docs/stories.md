@@ -24,7 +24,7 @@ Guiding priorities: **perfect OCR first**, then move downstream stage‑by‑sta
    Prevent empty sections by enforcing span feasibility and escalating out‑of‑order headers. (Resume 035 after 078.)
 9.  **035 — Fighting Fantasy Pipeline Optimization** *(Paused)*
    Drive missing/no‑text/no‑choice to targets using the new OCR + boundary stack. (Resume after 078/080.)
-10. **050 — FF Ending Detection Verification**  
+10. DONE: **050 — FF Ending Detection Verification**  
    Verify ending/dead‑end classification quality on FF outputs (no book‑specific tuning).
 11. **056 — Validation Forensics Automation (remaining items)**  
    Finish ending‑aware traces, boundary‑source reasoning, toggles/docs, optional HTML/CSV view.
@@ -104,7 +104,7 @@ This index tracks stories in `/docs/stories/` for the codex-forge pipeline.
 || 036 | FF OCR Recovery & Text Repair | High | Done | /docs/stories/story-036-ff-ocr-recovery-and-text-repair.md |
 || 037 | FF OCR Ensemble with BetterOCR | High | Done | /docs/stories/story-037-ocr-ensemble-with-betterocr.md |
 || 038 | Agentic Pipeline Coordinator | Medium | To Do | /docs/stories/story-038-agentic-pipeline-coordinator.md |
-|| 050 | FF Ending Detection Verification | Medium | To Do | /docs/stories/story-050-ff-ending-detection.md |
+|| 050 | FF Ending Detection Verification | Medium | Done | /docs/stories/story-050-ff-ending-detection.md |
 || 051 | Text Quality Evaluation & Repair | High | Done | /docs/stories/story-051-text-quality-eval.md |
 || 052 | Evaluate Apple Vision OCR Integration | Medium | Done | /docs/stories/story-052-apple-ocr-integration.md |
 || 053 | Pipeline Smoke Test (Static Sample, No External Calls) | High | To Do | /docs/stories/story-053-smoke-test-pipeline.md |

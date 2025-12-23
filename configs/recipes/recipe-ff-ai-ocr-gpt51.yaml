@@ -133,18 +133,30 @@ stages:
       max_sources: 50
       max_calls: 50
 
+  - id: detect_endings
+    stage: enrich
+    module: ending_guard_v1
+    needs: [repair_choices]
+    inputs:
+      pages: html_blocks_repaired
+      inputs: repair_choices
+    out: portions_with_endings.jsonl
+    params:
+      model: gpt-5.1
+      # Auto-detects sections with is_gameplay=true and no choices
+
   - id: report_pipeline_issues
     stage: adapter
     module: report_pipeline_issues_v1
-    needs: [repair_choices]
+    needs: [detect_endings]
     out: issues_report.jsonl
 
   - id: build_gamebook
     stage: build
     module: build_ff_engine_with_issues_v1
-    needs: [report_pipeline_issues, repair_choices]
+    needs: [report_pipeline_issues, detect_endings]
     inputs:
-      portions: repair_choices
+      portions: detect_endings
       issues_report: report_pipeline_issues
     out: gamebook.json
     params:

@@ -5,7 +5,7 @@ This repo processes scanned (or text) books into structured JSON, using modular 
 ## Prime Directives
 - **Do NOT run `git commit`, `git push`, or modify remotes unless the user explicitly requests it.**
 - System is in active development (not production); do not preserve backward compatibility or keep legacy shims unless explicitly requested.
-- AI-first: the AI owns implementation and self-verification; humans provide requirements and oversight. Do not report work "done" without testing/validation against requirements and story acceptance criteria.
+- **AI-first:** the AI owns implementation and self-verification; humans provide requirements and oversight. **Work is NOT complete until it runs successfully through driver.py with artifacts in output/runs/.** Standalone module testing is encouraged for development but does NOT count as completion. Do not report work "done" without full pipeline integration testing.
 - **100% Accuracy Requirement:** The final artifacts (gamebook.json) are used directly in a game engine. **If even ONE section number or choice is wrong, the game is broken.** Partial success on section coverage or choice extraction is a complete failure. Pipeline must either achieve 100% accuracy or fail explicitly with clear diagnostics. There is no "good enough" - it's perfect or broken.
 - Keep artifacts append-only; never rewrite user data or outputs in `output/` or `input/`.
 - Artifacts are write-only: never silently patch; any manual or auto patch must be emitted as a new artifact with traceable intent.
@@ -44,53 +44,93 @@ Before writing any significant code or starting implementation:
 
 **When adding new behaviors**, prefer shipping them as a separate module first, run a baseline, and only merge into an existing module after comparing baselines to prove no regressions.
 
-### After Building: Verify Actual Results
-**DO NOT declare success just because code runs without errors.**
+## Module Development & Testing Workflow
 
-This is a **data pipeline** project. Every stage produces **artifacts** (JSONL files, JSON files). After implementing any change:
+This is a **data pipeline** project. Success means correct data in `output/runs/`, not just code that runs without errors.
 
-1. **MANDATORY: Inspect actual output artifacts**
-   - Open the files: `output/runs/<run_id>/{ordinal:02d}_{module_id}/<artifact>.jsonl` for intermediate artifacts (e.g., `01_extract_ocr_ensemble_v1/pages_raw.jsonl`)
-   - Final outputs (e.g., `gamebook.json`) are in root: `output/runs/<run_id>/gamebook.json`
-   - Read sample entries (5-10 minimum)
-   - Verify the **data content**, not just that the file exists
+### Development Phase: Standalone Testing (Encouraged)
+**Use standalone testing for rapid iteration during development:**
+- Fast debugging without re-running expensive upstream stages
+- Direct control over inputs for testing edge cases
+- Cost-effective iteration during implementation
 
-2. **Verify against expectations**
-   - Does the text look correct?
-   - Are the extracted values accurate?
-   - Do counts/statistics match what you expect?
-   - Compare before/after if fixing a bug
+```bash
+# Good for development - iterate quickly
+PYTHONPATH=. python modules/enrich/ending_guard_v1/main.py \
+  --portions /path/to/test_input.jsonl \
+  --out /tmp/test_output.jsonl
+```
 
-3. **Complete the loop: Implement → Verify → Iterate**
-   - If artifacts reveal issues, **fix and verify again**
-   - Don't stop at "code runs" - stop at "output is correct"
-   - Document what you observed in artifacts (include samples in work log)
+**Standalone testing is a tool for development, NOT a completion criterion.**
 
-**Examples of what NOT to do:**
-- ❌ "I've implemented the text extraction. The module runs successfully." (Did you read the extracted text?)
-- ❌ "Fixed the duplicate detection. No errors." (Are there still duplicates in the output?)
-- ❌ "Added section classification. Tests pass." (What does the actual classification data look like?)
+### Completion Phase: Integration Testing (Mandatory)
+**Work is NOT complete until tested through driver.py in the real pipeline:**
 
-**Examples of what TO do:**
-- ✅ "Implemented text extraction. Inspected `03_portionize_llm_v1/window_hypotheses.jsonl` - all 293 portions now have populated `raw_text` (e.g., portion 9 has 1295 chars: 'There is also a LUCK box...'). Text quality looks good."
-- ✅ "Fixed duplicate detection. Checked `06_enrich_v1/portions_enriched.jsonl` - previously had 3 portions claiming section_id='1', now only 1 (page 16, correct text). Issue resolved."
-- ✅ "Added classification. Sampled 10 sections from `gamebook.json` - 8 correctly classified as 'gameplay', 2 as 'rules'. Spot-checked section 42: classified as 'gameplay', text contains combat ('SKILL 7 STAMINA 9'), correct."
+**Completion checklist:**
+1. **Clear Python cache:** `find modules/<module> -name "*.pyc" -delete` (stale cache causes silent failures)
+2. **Run through driver:** Use `--start-from <stage>` or full recipe
+3. **Verify artifacts exist:** Check `output/runs/<run_id>/{ordinal:02d}_{module_id}/` has expected files
+4. **Inspect artifact data:** Open JSONL/JSON, read 5-10 samples, verify content correctness
+5. **Check downstream stages:** Ensure next stages can consume the artifacts
+6. **Document findings:** Include artifact paths + sample data in work log
 
-**The pattern:**
-1. Build/fix code
-2. Run pipeline
-3. **Open and read the actual artifact files**
-4. Verify data quality with specific examples
-5. If issues found → return to step 1
-6. Only declare success when **data is correct**, not when **code runs**
+```bash
+# Completion testing - must succeed for work to be "done"
+find modules/enrich/ending_guard_v1 -name "*.pyc" -delete
+python driver.py --recipe configs/recipes/recipe-ff-ai-ocr-gpt51.yaml \
+  --run-id test-ending-detection --start-from detect_endings --force
+ls -lh output/runs/test-ending-detection/13_ending_guard_v1/portions_with_endings.jsonl
+python3 -c "import json; [print(json.loads(line).get('ending')) for line in open('...')[:5]]"
+```
 
-**Validation must be diagnostic:** For every missing/no-text/no-choice warning or error, emit a per-item provenance trace that walks upstream artifacts (OCR → elements/elements_core → boundaries → portions) and shows where content disappeared or was absent. The trace should make it obvious which stage caused loss (e.g., text present in elements but missing after portions ⇒ extraction issue; text absent from OCR ⇒ source/OCR issue; text truly absent ⇒ likely real empty section). Traces must include artifact paths, page/element IDs, and short text snippets where available. No manual artifact edits—fix code/logic and regenerate.
+**Completion criteria:**
+- ❌ "Module works standalone to /tmp" → NOT DONE
+- ❌ "Code runs without errors" → NOT DONE
+- ❌ "Artifacts copied from /tmp to output/" → NOT DONE (breaks provenance)
+- ✅ "Driver.py executed stage successfully, artifacts in output/runs/, data verified" → DONE
 
-**Stage resolution discipline:** A stage must resolve before the next runs. Resolution means either (a) it meets its coverage/quality goal (e.g., all sections found, ordering valid) or (b) it finishes a defined escalate→validate loop and records the unresolved items prominently in artifacts/metadata. Do not silently push partial “best-effort” outputs downstream. Examples:
-- Section splitting must complete its own escalation (retries, stronger models, focused re-reads) until coverage is acceptable or the cap is hit; only then assemble boundaries.
-- Boundary verification must pass or emit explicit failure markers before extraction starts.
-- Extraction must retry/repair flagged portions; unresolved portions must carry explicit error records (not empty text) so validators/builders surface them.
-- Stub-fatal policy: stub backfills are for forensics only. Default is **fatal on stubs**—pipelines must fail unless `allow_stubs` is explicitly set, and the allowance must be recorded in provenance/validation so missing content cannot be hidden.
+### Why Both Matter
+- **Standalone testing** saves time and money during development
+- **Driver integration** proves it works in the real system with real dependencies
+- **Neither replaces the other** - use standalone for iteration, driver for verification
+
+**Common failure pattern to avoid:**
+1. ❌ Develop module with standalone testing → works great
+2. ❌ Inspect `/tmp/output.jsonl` → data looks perfect
+3. ❌ Declare story complete → **WRONG**
+4. ❌ Later discover it fails when run through driver.py
+
+**Correct pattern:**
+1. ✅ Develop module with standalone testing (iterate rapidly)
+2. ✅ Once logic works, test through driver.py
+3. ✅ Fix any integration issues (missing args, schema mismatches, dependency problems)
+4. ✅ Verify artifacts in `output/runs/` have correct data
+5. ✅ Only then declare complete
+
+### Artifact Inspection Examples
+**What NOT to do:**
+- ❌ "Implemented extraction. Module runs successfully."
+- ❌ "Fixed duplicates. No errors reported."
+- ❌ "Added classification. Tests pass."
+
+**What TO do:**
+- ✅ "Implemented extraction. Inspected `output/runs/.../03_portionize/portions.jsonl` - 293 portions with populated text (e.g., portion 9: 1295 chars 'There is also a LUCK box...'). Quality verified."
+- ✅ "Fixed duplicates. Checked `output/runs/.../06_enrich/portions_enriched.jsonl` - was 3 sections claiming id='1', now 1 (page 16, correct). Resolved."
+- ✅ "Added classification. Sampled 10 from `output/runs/.../gamebook.json` - 8 'gameplay', 2 'rules'. Section 42: 'gameplay', has combat 'SKILL 7 STAMINA 9'. Correct."
+
+## Validation & Stage Resolution
+
+### Stage resolution discipline
+A stage must resolve before the next runs. Resolution means either (a) it meets its coverage/quality goal or (b) it finishes a defined escalate→validate loop and records unresolved items prominently. Do not silently push partial outputs downstream.
+
+Examples:
+- Section splitting must complete escalation (retries, stronger models) until coverage is acceptable or retry cap is hit
+- Boundary verification must pass or emit explicit failure markers before extraction starts
+- Extraction must retry/repair flagged portions; unresolved portions carry explicit error records (not empty text)
+- **Stub-fatal policy:** Default is fatal on stubs—pipelines must fail unless `allow_stubs` is explicitly set
+
+### Diagnostic validation
+For every missing/no-text/no-choice warning, emit a per-item provenance trace walking upstream artifacts (OCR → elements → boundaries → portions) showing where content disappeared. Traces must include artifact paths, page/element IDs, and text snippets. No manual artifact edits—fix code/logic and regenerate.
 
 ### Escalate-to-success loop (applies to every stage)
 - Default pattern: **detect/code → validate → targeted escalate → validate**, repeat until 100% success or a retry/budget cap is hit.
@@ -125,20 +165,11 @@ This is a **data pipeline** project. Every stage produces **artifacts** (JSONL f
 
 ### Prompt Design: Trust AI Intelligence, Don't Over-Engineer
 
-- Write prompts at the document/recipe level (keep them generic; see “Generality & Non-Overfitting”).
+- Write prompts at the document/recipe level (keep them generic; see "Generality & Non-Overfitting").
 - Prefer simple, structural instructions over brittle heuristics:
-  - ✅ “This is a Fighting Fantasy gamebook with front matter, rules, then numbered sections 1–400. Find section headers.”
+  - ✅ "This is a Fighting Fantasy gamebook with front matter, rules, then numbered sections 1–400. Find section headers."
   - ❌ Complex regex/keyword rule stacks and confidence micro-tuning.
 - Use code for deterministic transforms; use AI for semantic structure (classification, boundary detection, context).
-
-### Why This Matters
-- This project processes books into structured data. **Wrong data is worse than no data.**
-- A module that runs without errors but produces garbage output is a **silent failure**.
-- Users trust the output. If the AI doesn't verify it, **bad data propagates downstream**.
-- The deep dive we did on story 031 revealed issues at every stage - **issues that only became obvious when we manually inspected artifacts**.
-- Validation must surface evidence automatically. On any validation failure or warning (missing text/choices/sections), emit traces that show where data was lost (e.g., boundary source, start element text/page, upstream artifact paths) so an AI or human can see the root cause without manual spelunking.
-
-**You own the quality of your output, not just the quality of your code.**
 
 ## Escalation Strategy (known-good pattern)
 When a first-pass run leaves quality gaps, escalate in a controlled, data-driven loop:
@@ -165,7 +196,10 @@ Before portionization, automatically flag pages for high-fidelity re-OCR if eith
 - Inputs: `input/` (PDF, images, text); Outputs: `output/` (git-ignored)
 
 ## Current Pipeline (modules + driver)
-- Use `driver.py` with recipes in `configs/recipes/`. Examples: `recipe-ff-canonical.yaml`, `recipe-ocr.yaml`, `recipe-text.yaml`.
+- Use `driver.py` with recipes in `configs/recipes/`.
+- **Primary recipe for Fighting Fantasy**: `recipe-ff-ai-ocr-gpt51.yaml` (GPT-5.1 AI-first OCR, HTML output)
+- Legacy OCR ensemble recipe (`recipe-ff-canonical.yaml`) is deprecated; do not use.
+- Other recipes: `recipe-ocr.yaml`, `recipe-text.yaml` (for reference/testing only)
 - Legacy linear scripts were removed; use modules only.
 
 ## Modular Plan (story 015)
@@ -192,9 +226,13 @@ Before portionization, automatically flag pages for high-fidelity re-OCR if eith
   - **Reference**: [OpenAI Models Documentation](https://platform.openai.com/docs/models) - Check this for latest models, capabilities, and pricing
 - Defaults: `gpt-4.1-mini` with optional boost `gpt-5`; see scripts/recipes.
 
-## Running & Monitoring (canonical)
+## Running & Monitoring (canonical recipe: recipe-ff-ai-ocr-gpt51.yaml)
 
 **Always run on ARM64 + MPS by default. If that is not available, stop and fix the env before running the pipeline.**
+
+**Current canonical recipe**: `configs/recipes/recipe-ff-ai-ocr-gpt51.yaml` (GPT-5.1 AI-first OCR)
+- HTML-native output, faster than legacy OCR ensemble
+- Legacy `recipe-ff-canonical.yaml` is deprecated and disabled
 
 ### Environment (required)
 - Create/refresh env (Metal pins in `requirements.txt` + `constraints/metal.txt`):
@@ -209,7 +247,7 @@ Before portionization, automatically flag pages for high-fidelity re-OCR if eith
 
 ### Full pipeline run (preferred)
 - Use the monitored wrapper (creates pidfile + crash markers):
-  - `scripts/run_driver_monitored.sh --recipe configs/recipes/recipe-ff-canonical.yaml --run-id <run_id> --output-dir output/runs -- --instrument --force`
+  - `scripts/run_driver_monitored.sh --recipe configs/recipes/recipe-ff-ai-ocr-gpt51.yaml --run-id <run_id> --output-dir output/runs -- --instrument --force`
 - **Important**:
   - `--output-dir` must be the **parent** (`output/runs`), not a run-specific path.
   - `run_driver_monitored.sh` pre-deletes the run dir on `--force`, strips `--force`, and adds `--allow-run-id-reuse`.
@@ -225,7 +263,8 @@ Before portionization, automatically flag pages for high-fidelity re-OCR if eith
   - `run_driver_monitored.sh` calls `scripts/postmortem_run.sh` on exit to append a `run_postmortem` failure event.
 
 ### Smoke runs
-- 5pp smoke: `python driver.py --recipe configs/recipes/recipe-ff-canonical.yaml --settings configs/settings.ff-canonical-smoke-5.yaml --run-id ff-canonical-smoke-5 --output-dir /tmp/cf-ff-canonical-smoke-5 --force`
+- 5pp smoke: `python driver.py --recipe configs/recipes/recipe-ff-ai-ocr-gpt51.yaml --settings configs/settings.ff-ai-ocr-smoke-5.yaml --run-id ff-ai-ocr-smoke-5 --output-dir /tmp/cf-ff-ai-ocr-smoke-5 --force`
+- Note: If smoke settings don't exist, create them based on the main recipe with reduced page ranges
 
 ### Troubleshooting (must-read)
 - **OMP SHM crash** (`Can't open SHM2`):
@@ -240,7 +279,7 @@ Before portionization, automatically flag pages for high-fidelity re-OCR if eith
 - List files: `ls`, `rg --files`
 - View docs: `sed -n '1,120p' docs/stories/story-015-modular-pipeline.md`
 - Run validator: `python validate_artifact.py --schema portion_hyp_v1 --file output/...jsonl`
-- Dry-run the canonical recipe: `python driver.py --recipe configs/recipes/recipe-ff-canonical.yaml --dry-run`
+- Dry-run the canonical recipe: `python driver.py --recipe configs/recipes/recipe-ff-ai-ocr-gpt51.yaml --dry-run`
 - Section coverage check: `python modules/adapter/section_target_guard_v1/main.py --inputs output/runs/ocr-enrich-sections-noconsensus/portions_enriched.jsonl --out /tmp/portions_enriched_guard.jsonl --report /tmp/section_target_report.json`
 - Dashboard: `python -m http.server 8000` then open `http://localhost:8000/docs/pipeline-visibility.html`
 ## Open Questions / WIP

@@ -1,14 +1,41 @@
-# Canonical Fighting Fantasy Pipeline (2025-12)
+# ⚠️ DEPRECATED — DO NOT USE THIS RECIPE ⚠️
 #
-# Design:
-# - Starts from Unstructured intake (elements IR) — current best-supported path for FF modules.
-# - Runs the redesigned header/structure/boundary stack, then AI extract, optional text clean, build, validate.
-# - Supports smoke runs via settings overrides (e.g., settings.smoke.yaml: input.pdf, models.default)
-#   and portionize_ai_extract_v1's skip_ai/stub parameters for offline stubs.
+# This recipe has been superseded by recipe-ff-ai-ocr-gpt51.yaml (GPT-5.1 AI-first OCR pipeline).
+# The AI OCR pipeline is faster, more accurate, and uses HTML as the canonical output format.
 #
-# Notes:
-# - All modules referenced exist in-repo as of 2025-12-06.
-# - Deprecated/legacy FF recipes remain for historical reference but should not be used.
+# ██╗   ██╗███████╗███████╗    ██████╗ ███████╗ ██████╗██╗██████╗ ███████╗
+# ██║   ██║██╔════╝██╔════╝    ██╔══██╗██╔════╝██╔════╝██║██╔══██╗██╔════╝
+# ██║   ██║███████╗█████╗█████╗██████╔╝█████╗  ██║     ██║██████╔╝█████╗
+# ██║   ██║╚════██║██╔══╝╚════╝██╔══██╗██╔══╝  ██║     ██║██╔═══╝ ██╔══╝
+# ╚██████╔╝███████║███████╗    ██║  ██║███████╗╚██████╗██║██║     ███████╗
+#  ╚═════╝ ╚══════╝╚══════╝    ╚═╝  ╚═╝╚══════╝ ╚═════╝╚═╝╚═╝     ╚══════╝
+#
+#  █████╗ ██╗       ███████╗ ██████╗██████╗        ██████╗ ██████╗ ████████╗
+# ██╔══██╗██║       ██╔════╝██╔════╝██╔══██╗      ██╔════╝ ██╔══██╗╚══██╔══╝
+# ███████║██║ █████╗██║     ██║     ██████╔╝█████╗██║  ███╗██████╔╝   ██║
+# ██╔══██║██║ ╚════╝██║     ██║     ██╔══██╗╚════╝██║   ██║██╔═══╝    ██║
+# ██║  ██║██║       ╚███████╗╚██████╗██║  ██║      ╚██████╔╝██║        ██║
+# ╚═╝  ╚═╝╚═╝        ╚══════╝ ╚═════╝╚═╝  ╚═╝       ╚═════╝ ╚═╝        ╚═╝
+#
+# USE THIS INSTEAD: configs/recipes/recipe-ff-ai-ocr-gpt51.yaml
+#
+# This file is intentionally broken to prevent accidental use.
+# It will be removed once recipe-ff-ai-ocr-gpt51.yaml is confirmed stable.
+#
+# Historical context:
+# - This was the "canonical" OCR ensemble pipeline (tesseract+easyocr+apple+pdftext)
+# - Replaced by pure AI OCR approach in December 2025
+# - Last known working state: December 18, 2025
+
+# Invalid YAML - missing value causes parse error
+DEPRECATED_DO_NOT_USE:
+ERROR_USE_RECIPE_FF_AI_OCR_GPT51_INSTEAD:
+
+# If you're seeing this in a dry-run or error, you're using the wrong recipe!
+# Switch to: configs/recipes/recipe-ff-ai-ocr-gpt51.yaml
+
+---
+# Original recipe preserved below for reference (WILL NOT PARSE - intentionally broken above)
 
 run_id: ff-canonical
 input:
