@@ -1,0 +1,34 @@
+schema_version: 1.0.0
+module_id: validate_choice_links_v1
+stage: enrich
+entrypoint: modules/validate/validate_choice_links_v1/main.py
+input_schema: enriched_portion_v1
+output_schema: enriched_portion_v1
+description: Verify choice links using AI, specifically targeting suspected OCR misreads that cause orphaned sections.
+inputs:
+  input:
+    type: file
+    format: jsonl
+    description: Portions with extracted choices (enriched_portion)
+params:
+  confidence_threshold:
+    type: number
+    default: 0.6
+    description: AI confidence threshold (0-1.0) below which a link is considered invalid.
+  max_ai_calls:
+    type: integer
+    default: 50
+    description: Maximum number of AI verification calls to make.
+  model:
+    type: string
+    default: "gpt-4.1-mini"
+    description: Model to use for verification.
+  check_multi_links:
+    type: boolean
+    default: true
+    description: Check sections with multiple incoming links for narrative flow.
+outputs:
+  validated_portions:
+    type: file
+    format: jsonl
+    description: Portions with validated/repaired choices.

@@ -144,6 +144,7 @@ This index tracks stories in `/docs/stories/` for the codex-forge pipeline.
 || 088 | Choice Parsing Enhancements | High | To Do | /docs/stories/story-088-choice-parsing-enhancements.md |
 || 089 | Pristine Book Parity (Missing Sections + Robustness) | High | Done | /docs/stories/story-089-pristine-book-parity.md |
 || 090 | Run Summary UX (Missing Sections + Stage Metrics) | Medium | Done | /docs/stories/story-090-run-summary-and-missing-section-signal.md |
+|| 091 | Orphaned Section Mitigation | High | Done | /docs/stories/story-091-orphaned-section-mitigation.md |
 || 099 | Remove dev-only backcompat disclaimer | Low | To Do | /docs/stories/story-099-remove-dev-backcompat-note.md |
 
 ## Notes

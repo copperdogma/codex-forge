@@ -133,13 +133,26 @@ stages:
       max_sources: 50
       max_calls: 50
 
-  - id: detect_endings
+  - id: validate_choice_links
     stage: enrich
-    module: ending_guard_v1
+    module: validate_choice_links_v1
     needs: [repair_choices]
     inputs:
       pages: html_blocks_repaired
-      inputs: repair_choices
+      input: repair_choices
+    out: portions_with_choices_validated.jsonl
+    params:
+      model: gpt-4.1-mini
+      max_ai_calls: 50
+      check_multi_links: true
+
+  - id: detect_endings
+    stage: enrich
+    module: ending_guard_v1
+    needs: [validate_choice_links]
+    inputs:
+      pages: html_blocks_repaired
+      inputs: validate_choice_links
     out: portions_with_endings.jsonl
     params:
       model: gpt-5.1
