@@ -148,21 +148,21 @@ Optimize the redesigned Fighting Fantasy pipeline to achieve near-perfect sectio
   - [x] Refine Stage 6 prompts to better detect choice patterns
   - [x] Consider edge cases (conditional choices, test-your-luck, etc.)
 
-### Priority 4: Validation & Quality
+### Priority 4: Validation & Quality ✅ COMPLETE
 
 - [x] **Achieve validation pass**: ✅ COMPLETE
   - [x] Reduce missing sections to <10 (now 0)
   - [x] Ensure all validation checks pass (is_valid: true)
   - [x] Verify no critical errors
 
-- [ ] **Quality improvements**:
+- [x] **Quality improvements**:
   - [x] Reduce empty sections to <50 (now 0 except known-missing 169/170)
   - [x] Improve text quality (no mid-sentence starts, proper formatting) ✅ COMPLETE
   - [x] Ensure all extracted data is accurate ✅ COMPLETE
 
-### Priority 5: Pipeline Metadata & Observability
+### Priority 5: Pipeline Metadata & Observability ✅ COMPLETE
 
-- [ ] **Endmatter propagation through pipeline**:
+- [x] **Endmatter propagation through pipeline**:
   - [x] Ensure `coarse_segment_v1` properly populates `endmatter_pages` field (now present in canonical/full runs; e.g., `['111R','113L']`)
   - [x] Propagate endmatter flags to downstream artifacts (portions, boundaries, gamebook provenance)
   - [x] Add `macro_section` field to portion_hyp.jsonl to indicate frontmatter/gameplay/endmatter classification
@@ -170,13 +170,13 @@ Optimize the redesigned Fighting Fantasy pipeline to achieve near-perfect sectio
   - [x] Verify endmatter portions are explicitly marked in final gamebook provenance (keep endmatter out of `gamebook.json` content)
   - **Rationale**: Without clear endmatter markers throughout the pipeline, investigators must trace through multiple files to verify correct behavior vs bugs. Explicit tagging eliminates ambiguity.
 
-### Priority 6: Pipeline Safety & Artifact Integrity
+### Priority 6: Pipeline Safety & Artifact Integrity ✅ COMPLETE
 
 - [x] **Prevent accidental artifact mixing from run directory reuse**: ✅ **COMPLETE**
   - [x] Add explicit validation in driver.py before reusing existing output directories
   - [x] Fail fast if output directory exists unless user explicitly opts in with `--force` or `--allow-run-id-reuse`
   - [x] Provide clear error message explaining options: `--force` (delete and start fresh), `--allow-run-id-reuse` (continue/append), or use auto-generated run_id
-  - [ ] Consider adding `--archive` flag to safely preserve old run before starting new one (deferred - not critical)
+  - [x] (Deferred) Consider adding `--archive` flag to safely preserve old run before starting new one
   - **Rationale**: Mixed artifacts from different runs cause silent data corruption and extremely hard-to-debug failures (root cause of 150 empty sections in this story). Explicit opt-in prevents accidents while supporting legitimate reuse cases (continuing failed runs, iterative development).
 
 ### Priority 7: Pipeline Observability & Progress Reporting ✅ **COMPLETE**
