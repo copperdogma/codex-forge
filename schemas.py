@@ -58,6 +58,24 @@ class InventoryEnrichment(BaseModel):
     inventory_checks: List[InventoryCheck] = Field(default_factory=list)
 
 
+class StatCheck(BaseModel):
+    stat: Optional[str] = None  # SKILL, LUCK, STAMINA, or null for plain dice roll
+    dice_roll: str = "2d6"
+    dice_count: int = 2
+    dice_sides: int = 6
+    pass_condition: str  # e.g., "total <= stat" or "1-3"
+    pass_section: str
+    fail_condition: Optional[str] = None
+    fail_section: Optional[str] = None
+    confidence: float = 1.0
+
+
+class TestLuck(BaseModel):
+    lucky_section: str
+    unlucky_section: str
+    confidence: float = 1.0
+
+
 class Paragraph(BaseModel):
     id: str
     page: int = 0
@@ -65,7 +83,8 @@ class Paragraph(BaseModel):
     choices: List[Choice] = Field(default_factory=list)
     images: List[str] = Field(default_factory=list)
     combat: List[Combat] = Field(default_factory=list)
-    test_luck: Optional[bool] = None
+    test_luck: List[TestLuck] = Field(default_factory=list)
+    stat_checks: List[StatCheck] = Field(default_factory=list)
     item_effects: List[ItemEffect] = Field(default_factory=list)
     inventory: Optional[InventoryEnrichment] = None
 
@@ -330,7 +349,8 @@ class EnrichedPortion(BaseModel):
     continuation_confidence: Optional[float] = None
     choices: List[Choice] = Field(default_factory=list)
     combat: List[Combat] = Field(default_factory=list)
-    test_luck: Optional[bool] = None
+    test_luck: List[TestLuck] = Field(default_factory=list)
+    stat_checks: List[StatCheck] = Field(default_factory=list)
     item_effects: List[ItemEffect] = Field(default_factory=list)
     inventory: Optional[InventoryEnrichment] = None
     targets: List[str] = Field(default_factory=list)

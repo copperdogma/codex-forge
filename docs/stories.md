@@ -109,7 +109,7 @@ This index tracks stories in `/docs/stories/` for the codex-forge pipeline.
 || 093 | Coarse Portionizer Endmatter Filter | High | Done | /docs/stories/story-093-coarse-portionizer-endmatter-filter.md |
 || 094 | Inventory Parsing and Extraction | High | Done | /docs/stories/story-094-inventory-parsing.md |
 || 095 | Combat and Enemy Extraction | High | Done | /docs/stories/story-095-combat-enemy-extraction.md |
-|| 096 | Stat Check Extraction (Skill, Luck, and Dice Rolls) | High | To Do | /docs/stories/story-096-stat-check-extraction.md |
+|| 096 | Stat Check Extraction (Skill, Luck, and Dice Rolls) | High | Done | /docs/stories/story-096-stat-check-extraction.md |
 || 097 | Stat Modification Extraction (Skill, Stamina, Luck Changes) | High | To Do | /docs/stories/story-097-stat-modification-extraction.md |
 || 099 | Remove dev-only backcompat disclaimer | Low | To Do | /docs/stories/story-099-remove-dev-backcompat-note.md |
 

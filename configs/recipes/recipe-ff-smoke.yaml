@@ -91,13 +91,26 @@ stages:
       use_ai: false # skip AI in smoke
       max_ai_calls: 0
 
+  - id: extract_stat_checks
+    stage: enrich
+    module: extract_stat_checks_v1
+    needs: [extract_inventory, convert_to_blocks]
+    inputs:
+      portions: extract_inventory
+      pages: convert_to_blocks
+    out: portions_with_stats.jsonl
+    params:
+      model: gpt-4.1-mini
+      use_ai: false # skip AI in smoke
+      max_ai_calls: 0
+
   - id: detect_endings
     stage: enrich
     module: ending_guard_v1
-    needs: [extract_inventory, convert_to_blocks]
+    needs: [extract_stat_checks, convert_to_blocks]
     inputs:
       pages: convert_to_blocks
-      inputs: extract_inventory
+      inputs: extract_stat_checks
     out: portions_with_endings.jsonl
     params:
       model: gpt-5.1

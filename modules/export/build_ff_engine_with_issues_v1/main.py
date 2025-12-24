@@ -126,10 +126,39 @@ def build_section(portion: Dict[str, Any], emit_text: bool, emit_provenance_text
         section["items"] = portion["items"]
     if portion.get("stat_modifications"):
         section["statModifications"] = portion["stat_modifications"]
-    if portion.get("testYourLuck"):
-        section["testYourLuck"] = portion["testYourLuck"]
     if portion.get("deathConditions"):
         section["deathConditions"] = portion["deathConditions"]
+    
+    # Test Your Luck
+    portion_luck = portion.get("test_luck") or []
+    if not isinstance(portion_luck, list):
+        portion_luck = [portion_luck]
+    
+    test_your_luck = []
+    for l in portion_luck:
+        if isinstance(l, dict) and l.get("lucky_section") and l.get("unlucky_section"):
+            test_your_luck.append({
+                "luckySection": str(l["lucky_section"]),
+                "unluckySection": str(l["unlucky_section"])
+            })
+    if test_your_luck:
+        section["testYourLuck"] = test_your_luck
+
+    # Stat Checks (Dice Checks)
+    portion_checks = portion.get("stat_checks") or []
+    dice_checks = []
+    for c in portion_checks:
+        if isinstance(c, dict) and c.get("pass_section"):
+            dice_checks.append({
+                "stat": c.get("stat"),
+                "diceRoll": c.get("dice_roll", "2d6"),
+                "passSection": str(c["pass_section"]),
+                "failSection": str(c["fail_section"]) if c.get("fail_section") else None,
+                "passCondition": c.get("pass_condition")
+            })
+    if dice_checks:
+        section["diceChecks"] = dice_checks
+
     # Combat extraction (multiple enemies supported)
     portion_combat = portion.get("combat") or []
     if not isinstance(portion_combat, list):

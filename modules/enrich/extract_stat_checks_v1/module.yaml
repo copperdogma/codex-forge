@@ -1,0 +1,23 @@
+module_id: extract_stat_checks_v1
+stage: enrich
+description: "Extract stat check mechanics (SKILL, LUCK, STAMINA tests and dice rolls) from section text."
+entrypoint: modules/enrich/extract_stat_checks_v1/main.py
+input_schema: enriched_portion_v1
+output_schema: enriched_portion_v1
+default_params:
+  model: "gpt-4.1-mini"
+  use_ai: true
+  max_ai_calls: 50
+param_schema:
+  properties:
+    model:
+      type: string
+      description: "LLM model for complex extraction (default: gpt-4.1-mini)"
+    use_ai:
+      type: boolean
+      description: "Use LLM for complex extraction cases (default: true)"
+    max_ai_calls:
+      type: integer
+      description: "Maximum LLM calls for this run (default: 50)"
+  required: []
+notes: "Hybrid extraction using regex for standard stat check phrases and LLM for complex/ambiguous cases, followed by a global AI audit pass."
