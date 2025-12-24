@@ -17,7 +17,8 @@ HTML_TEMPLATE = """<!DOCTYPE html>
         .status-valid {{ color: #28a745; font-weight: bold; }}
         .status-invalid {{ color: #dc3545; font-weight: bold; }}
         .stats {{ display: flex; gap: 20px; margin-bottom: 20px; }}
-        .stat-item {{ flex: 1; text-align: center; padding: 15px; background: #f0f0f5; border-radius: 8px; }}
+        .stat-item {{ flex: 1; text-align: center; padding: 15px; background: #f0f0f5; border-radius: 8px; text-decoration: none; color: inherit; transition: background 0.2s; }}
+        .stat-item:hover {{ background: #e0e0eb; }}
         .stat-value {{ display: block; font-size: 24px; font-weight: bold; }}
         .stat-label {{ font-size: 12px; color: #666; text-transform: uppercase; }}
         table {{ width: 100%; border-collapse: collapse; margin-top: 10px; }}
@@ -51,18 +52,26 @@ HTML_TEMPLATE = """<!DOCTYPE html>
                 <span class="stat-label">Total Sections</span>
                 <span class="stat-value">{total_sections}</span>
             </div>
-            <div class="stat-item">
+            <a href="#missing_sections" class="stat-item">
                 <span class="stat-label">Missing</span>
                 <span class="stat-value">{missing_count}</span>
-            </div>
-            <div class="stat-item">
+            </a>
+            <a href="#no_text" class="stat-item">
                 <span class="stat-label">No Text</span>
                 <span class="stat-value">{no_text_count}</span>
-            </div>
-            <div class="stat-item">
+            </a>
+            <a href="#no_choices" class="stat-item">
                 <span class="stat-label">No Choices</span>
                 <span class="stat-value">{no_choices_count}</span>
-            </div>
+            </a>
+            <a href="#broken_links" class="stat-item">
+                <span class="stat-label">Broken Links</span>
+                <span class="stat-value">{broken_links_count}</span>
+            </a>
+            <a href="#orphans" class="stat-item">
+                <span class="stat-label">Orphans</span>
+                <span class="stat-value">{orphans_count}</span>
+            </a>
         </div>
         <div>
             <strong>Run ID:</strong> {run_id}<br>
@@ -100,6 +109,9 @@ def generate_html(report_path: str, out_path: str):
     no_text = report.get("sections_with_no_text", [])
     no_choices = report.get("sections_with_no_choices", [])
     forensics = report.get("forensics", {})
+    
+    broken_links = forensics.get("broken_links", {}).keys()
+    orphans = forensics.get("orphans", {}).keys()
 
     content_parts = []
 
@@ -107,12 +119,15 @@ def generate_html(report_path: str, out_path: str):
         if not section_ids:
             return ""
         
-        parts = [f"<h2>{title} ({len(section_ids)})</h2>", "<div class='card'><table>"]
+        parts = [f"<h2 id='{forensic_category}'>{title} ({len(section_ids)})</h2>", "<div class='card'><table>"]
         parts.append("<thead><tr><th>Section</th><th>Diagnostic Trace</th><th>Evidence & Hits</th></tr></thead><tbody>")
         
         category_traces = forensics.get(forensic_category, {})
         
-        for sid in section_ids:
+        # Sort section IDs numerically if possible
+        sorted_sids = sorted(section_ids, key=lambda x: int(x) if x.isdigit() else 999)
+        
+        for sid in sorted_sids:
             trace = category_traces.get(sid, {})
             
             # Column 1: Section ID + Basic Info
@@ -137,16 +152,18 @@ def generate_html(report_path: str, out_path: str):
                 parts.append(f"<li><span class='meta-label'>Boundary Source:</span> {trace['boundary_source']} (conf: {trace.get('boundary_confidence', 'N/A')})</li>")
             if meta.get("start_page"):
                 parts.append(f"<li><span class='meta-label'>Pages:</span> {meta.get('start_page')} to {meta.get('end_page')}</li>")
-            if meta.get("span_length") is not None:
-                parts.append(f"<li><span class='meta-label'>Element Span:</span> {meta.get('span_length')} units</li>")
+            if meta.get("element_count") is not None:
+                parts.append(f"<li><span class='meta-label'>Elements:</span> {meta.get('element_count')} blocks</li>")
             if trace.get("portion_length") is not None:
                 parts.append(f"<li><span class='meta-label'>Text Length:</span> {trace.get('portion_length')} chars</li>")
             parts.append("</ul>")
             
-            if trace.get("portion_html"):
+            html_to_show = trace.get("presentation_html") or trace.get("portion_html")
+            if html_to_show:
                 import html
-                escaped_html = html.escape(trace["portion_html"])
-                parts.append("<div style='margin-top:12px;'><strong>Portion HTML Source:</strong></div>")
+                escaped_html = html.escape(html_to_show)
+                label = "Presentation HTML" if trace.get("presentation_html") else "Portion HTML Source"
+                parts.append(f"<div style='margin-top:12px;'><strong>{label}:</strong></div>")
                 parts.append(f"<div class='snippet' style='max-height: 400px; overflow-y: auto;'>{escaped_html}</div>")
             
             parts.append("</td>")
@@ -174,6 +191,8 @@ def generate_html(report_path: str, out_path: str):
     content_parts.append(render_trace_table("Missing Sections", missing_sections, "missing_sections"))
     content_parts.append(render_trace_table("Sections with No Text", no_text, "no_text"))
     content_parts.append(render_trace_table("Gameplay Sections with No Choices", no_choices, "no_choices"))
+    content_parts.append(render_trace_table("Broken Links (Missing Targets)", broken_links, "broken_links"))
+    content_parts.append(render_trace_table("Orphaned Sections (Unreachable)", orphans, "orphans"))
 
     # Errors and Warnings
     if report.get("errors") or report.get("warnings"):
@@ -192,6 +211,8 @@ def generate_html(report_path: str, out_path: str):
         missing_count=len(missing_sections),
         no_text_count=len(no_text),
         no_choices_count=len(no_choices),
+        broken_links_count=len(broken_links),
+        orphans_count=len(orphans),
         run_id=report.get("run_id", "N/A"),
         timestamp=datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
         content_html="".join(content_parts)

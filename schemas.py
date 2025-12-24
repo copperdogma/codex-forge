@@ -59,11 +59,11 @@ class InventoryEnrichment(BaseModel):
 
 
 class StatCheck(BaseModel):
-    stat: Optional[str] = None  # SKILL, LUCK, STAMINA, or null for plain dice roll
+    stat: Optional[Union[str, List[str]]] = None  # SKILL, LUCK, STAMINA, or list
     dice_roll: str = "2d6"
     dice_count: int = 2
     dice_sides: int = 6
-    pass_condition: str  # e.g., "total <= stat" or "1-3"
+    pass_condition: str = "success"  # e.g., "total <= stat" or "1-3"
     pass_section: str
     fail_condition: Optional[str] = None
     fail_section: Optional[str] = None
