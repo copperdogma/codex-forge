@@ -171,19 +171,33 @@ stages:
     inputs:
       portions: detect_endings
       issues_report: report_pipeline_issues
-    out: gamebook.json
+    out: gamebook_raw.json
     params:
       title: Deathtrap Dungeon
       author: Ian Livingstone
       emit_text: false
       emit_provenance_text: false
 
+  - id: clean_presentation
+    stage: export
+    module: clean_html_presentation_v1
+    needs: [build_gamebook]
+    inputs:
+      input: build_gamebook
+    out: gamebook.json
+    params:
+      preserve_original_html: true
+      remove_section_headers: true
+      remove_running_heads: true
+      remove_page_numbers: true
+      remove_images: true
+
   - id: validate_gamebook
     stage: validate
     module: validate_ff_engine_v2
-    needs: [build_gamebook, report_pipeline_issues, detect_endings, detect_boundaries_html, html_blocks_repaired]
+    needs: [clean_presentation, report_pipeline_issues, detect_endings, detect_boundaries_html, html_blocks_repaired]
     inputs:
-      gamebook: build_gamebook
+      gamebook: clean_presentation
       portions: detect_endings
       boundaries: detect_boundaries_html
       elements_core: html_blocks_repaired

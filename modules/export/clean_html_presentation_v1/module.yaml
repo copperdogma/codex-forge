@@ -1,0 +1,31 @@
+module_id: clean_html_presentation_v1
+stage: export
+description: Cleans HTML in gamebook.json for final presentation (removes running heads, section headers, etc.).
+entrypoint: modules/export/clean_html_presentation_v1/main.py
+params:
+  - name: input
+    desc: Path to input gamebook.json
+    required: true
+  - name: out
+    desc: Path to output gamebook.json
+    required: true
+  - name: preserve_original_html
+    desc: "Whether to keep the original 'html' field (default: true)"
+    type: boolean
+    default: true
+  - name: remove_section_headers
+    desc: "Whether to remove <h2>{section_id}</h2> headers (default: true)"
+    type: boolean
+    default: true
+  - name: remove_running_heads
+    desc: "Whether to remove <p class=\"running-head\"> elements (default: true)"
+    type: boolean
+    default: true
+  - name: remove_page_numbers
+    desc: "Whether to remove page number elements (default: true)"
+    type: boolean
+    default: true
+  - name: remove_images
+    desc: "Whether to remove <img> elements (default: true)"
+    type: boolean
+    default: true

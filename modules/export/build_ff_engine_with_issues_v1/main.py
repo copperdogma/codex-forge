@@ -213,7 +213,7 @@ def main():
     parser.add_argument("--author", help="Gamebook author")
     parser.add_argument("--start-section", "--start_section", default="1", dest="start_section", help="Starting section id")
     parser.add_argument("--format-version", "--format_version", default="1.0.0", dest="format_version", help="Format version string")
-    parser.add_argument("--allow-stubs", action="store_true", dest="allow_stubs",
+    parser.add_argument("--allow-stubs", "--allow_stubs", action="store_true", dest="allow_stubs",
                         help="Permit stub backfill for missing targets (default: fail if stubs needed)")
     parser.add_argument("--expected-range", "--expected_range", default="1-400", dest="expected_range",
                         help="Expected section id range (e.g., 1-400). Targets outside are ignored.")

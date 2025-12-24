@@ -95,7 +95,7 @@ def build_elements(pages: List[Dict[str, Any]]) -> Tuple[List[Dict[str, Any]], D
     page_to_image: Dict[int, str] = {}
 
     for page in pages:
-        page_number = _coerce_int(page.get("page_number"))
+        page_number = _coerce_int(page.get("page_number") or page.get("page"))
         if page_number is None:
             continue
         image = page.get("image")
@@ -281,7 +281,14 @@ def main() -> None:
     parser.add_argument("--run-id")
     args = parser.parse_args()
 
-    pages_path = args.pages or (args.inputs[0] if args.inputs else None)
+    pages_path = args.pages
+    boundaries_path = args.boundaries
+
+    if not pages_path and args.inputs:
+        pages_path = args.inputs[0]
+    if not boundaries_path and args.inputs and len(args.inputs) > 1:
+        boundaries_path = args.inputs[1]
+
     if not pages_path:
         parser.error("Missing --pages (or --inputs) input")
     if not os.path.isabs(pages_path):
@@ -289,7 +296,6 @@ def main() -> None:
     if not os.path.exists(pages_path):
         raise SystemExit(f"Blocks file not found: {pages_path}")
 
-    boundaries_path = args.boundaries
     if not boundaries_path:
         raise SystemExit("Missing --boundaries")
     if not os.path.isabs(boundaries_path):

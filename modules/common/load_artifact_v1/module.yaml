@@ -1,0 +1,14 @@
+module_id: load_artifact_v1
+stage: extract
+description: "Loads an existing artifact from a path without re-running."
+entrypoint: modules/common/load_artifact_v1/main.py
+params:
+  - name: path
+    desc: "Path to existing artifact"
+    required: true
+  - name: out
+    desc: "Output path (where driver expects artifact to be)"
+    required: true
+  - name: schema_version
+    desc: "Schema version to stamp artifact with"
+    required: false

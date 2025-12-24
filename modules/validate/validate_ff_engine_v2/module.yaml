@@ -18,5 +18,5 @@ param_schema:
       type: integer
     forensics:
       type: boolean
-  required: [gamebook, out]
+  required: []
 notes: "Validates Fighting Fantasy Engine gamebook.json output. Checks for missing sections, duplicates, empty sections, and structural issues. Generates detailed validation report."

@@ -44,8 +44,44 @@ def cleanup_artifact(artifact_path: str, force: bool):
         os.remove(artifact_path)
         print(f"[force-clean] removed existing {artifact_path}")
 
-def _artifact_name_for_stage(stage_id: str, stage_type: str, outputs_map: Dict[str, str]) -> str:
-    return outputs_map.get(stage_id) or DEFAULT_OUTPUTS.get(stage_type, f"{stage_id}.jsonl")
+def _artifact_name_for_stage(stage_id: str, stage_type: str, outputs_map: Dict[str, str], stage_conf: Dict[str, Any] = None) -> str:
+    # 1. Use stage-level out from recipe if provided
+    if stage_conf and stage_conf.get("out"):
+        return stage_conf["out"]
+
+    # 2. Use recipe-level outputs mapping if provided
+    if stage_id in outputs_map:
+        return outputs_map[stage_id]
+
+    # 3. Standard defaults by stage type
+    if stage_type == "intake":
+        return "pages_raw.jsonl"
+    if stage_type == "extract":
+        return "pages_raw.jsonl"
+    if stage_type == "clean":
+        return "pages_clean.jsonl"
+    if stage_type == "portionize":
+        return "portion_hypotheses.jsonl"
+    if stage_type == "consensus":
+        return "portions_locked.jsonl"
+    if stage_type == "normalize":
+        return "portions_normalized.jsonl"
+    if stage_type == "resolve":
+        return "portions_resolved.jsonl"
+    if stage_type == "enrich":
+        return "portions_enriched.jsonl"
+    if stage_type == "build":
+        return "gamebook.json"
+    if stage_type == "validate":
+        return "validation_report.json"
+    if stage_type == "adapter":
+        return "adapter_out.jsonl"
+    if stage_type == "app":
+        return "app_data.json"
+    if stage_type == "export":
+        return "gamebook.json"
+
+    return f"{stage_id}_out.jsonl"
 
 
 def _load_pricing(path: str) -> Dict[str, Any]:
@@ -340,7 +376,7 @@ def build_plan(recipe: Dict[str, Any], registry: Dict[str, Any]) -> Dict[str, An
         merged_params.update(stage_overrides)
         params = _merge_params(entry.get("default_params", {}), merged_params, entry.get("param_schema"))
         _validate_params(params, entry.get("param_schema"), stage_id, module_id)
-        artifact_name = conf.get("out") or _artifact_name_for_stage(stage_id, stage_type, outputs_map)
+        artifact_name = _artifact_name_for_stage(stage_id, stage_type, outputs_map, conf)
         description = conf.get("description") or entry.get("notes") or entry.get("description")
         output_schema = entry.get("output_schema") or params.get("schema_version")
         nodes[stage_id] = {
@@ -489,10 +525,13 @@ def build_command(entrypoint: str, params: Dict[str, Any], stage_conf: Dict[str,
     if script.endswith(".py") and script.startswith("modules/"):
         module_name = script[:-3].replace("/", ".")
 
-    artifact_name = stage_conf["artifact_name"]
     stage_id = stage_conf.get("id")
     module_id = stage_conf.get("module")
     stage_type = stage_conf.get("stage")
+
+    artifact_name = stage_conf.get("artifact_name")
+    if not artifact_name:
+         artifact_name = _artifact_name_for_stage(stage_id, stage_type, {}, stage_conf)
     
     # Determine if this is a final output (gamebook.json stays in root)
     is_final_output = (stage_type == "build" and artifact_name == "gamebook.json")
