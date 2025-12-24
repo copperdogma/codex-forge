@@ -107,7 +107,7 @@ This index tracks stories in `/docs/stories/` for the codex-forge pipeline.
 || 091 | Orphaned Section Mitigation | High | Done | /docs/stories/story-091-orphaned-section-mitigation.md |
 || 092 | HTML Presentation Cleanup | High | Done | /docs/stories/story-092-html-presentation-cleanup.md |
 || 093 | Coarse Portionizer Endmatter Filter | High | Done | /docs/stories/story-093-coarse-portionizer-endmatter-filter.md |
-|| 094 | Inventory Parsing and Extraction | High | To Do | /docs/stories/story-094-inventory-parsing.md |
+|| 094 | Inventory Parsing and Extraction | High | Done | /docs/stories/story-094-inventory-parsing.md |
 || 095 | Combat and Enemy Extraction | High | Done | /docs/stories/story-095-combat-enemy-extraction.md |
 || 096 | Stat Check Extraction (Skill, Luck, and Dice Rolls) | High | To Do | /docs/stories/story-096-stat-check-extraction.md |
 || 097 | Stat Modification Extraction (Skill, Stamina, Luck Changes) | High | To Do | /docs/stories/story-097-stat-modification-extraction.md |

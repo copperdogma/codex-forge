@@ -38,6 +38,26 @@ class ItemEffect(BaseModel):
         return self
 
 
+class InventoryItem(BaseModel):
+    item: str
+    quantity: int = 1
+    confidence: float = 1.0
+
+
+class InventoryCheck(BaseModel):
+    item: str
+    condition: str  # "if you have", "if you possess", etc.
+    target_section: Optional[str] = None
+    confidence: float = 1.0
+
+
+class InventoryEnrichment(BaseModel):
+    items_gained: List[InventoryItem] = Field(default_factory=list)
+    items_lost: List[InventoryItem] = Field(default_factory=list)
+    items_used: List[InventoryItem] = Field(default_factory=list)
+    inventory_checks: List[InventoryCheck] = Field(default_factory=list)
+
+
 class Paragraph(BaseModel):
     id: str
     page: int = 0
@@ -47,6 +67,7 @@ class Paragraph(BaseModel):
     combat: List[Combat] = Field(default_factory=list)
     test_luck: Optional[bool] = None
     item_effects: List[ItemEffect] = Field(default_factory=list)
+    inventory: Optional[InventoryEnrichment] = None
 
     @field_validator("id")
     def id_is_numeric(cls, v):
@@ -311,6 +332,7 @@ class EnrichedPortion(BaseModel):
     combat: List[Combat] = Field(default_factory=list)
     test_luck: Optional[bool] = None
     item_effects: List[ItemEffect] = Field(default_factory=list)
+    inventory: Optional[InventoryEnrichment] = None
     targets: List[str] = Field(default_factory=list)
     element_ids: Optional[List[str]] = None  # Source element IDs for provenance
     repair: Optional[Dict[str, Any]] = None

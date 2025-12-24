@@ -161,6 +161,37 @@ def build_section(portion: Dict[str, Any], emit_text: bool, emit_provenance_text
     if section_combat:
         section["combat"] = section_combat
 
+    # Inventory extraction
+    inv = portion.get("inventory")
+    if inv and isinstance(inv, dict):
+        engine_items = []
+        for item in inv.get("items_gained", []):
+            engine_items.append({
+                "name": f"{item.get('quantity', 1)} {item.get('item')}" if item.get("quantity", 1) > 1 else item.get("item"),
+                "action": "add"
+            })
+        for item in inv.get("items_lost", []):
+            engine_items.append({
+                "name": item.get("item"),
+                "action": "remove"
+            })
+        for item in inv.get("items_used", []):
+            engine_items.append({
+                "name": item.get("item"),
+                "action": "remove"
+            })
+        for check in inv.get("inventory_checks", []):
+            engine_items.append({
+                "name": check.get("item"),
+                "action": "check",
+                "checkSuccessSection": str(check.get("target_section")) if check.get("target_section") else None
+            })
+        
+        if engine_items:
+            # Merge with existing items if any
+            existing_items = section.get("items", [])
+            section["items"] = existing_items + engine_items
+
     provenance = {
         "portion_id": portion.get("portion_id"),
         "orig_portion_id": portion.get("orig_portion_id"),

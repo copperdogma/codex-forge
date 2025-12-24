@@ -146,6 +146,16 @@ For every missing/no-text/no-choice warning, emit a per-item provenance trace wa
 - **AI role:** Validation only, not primary extraction (saves costs, more reliable)
 - **Module:** `extract_choices_v1` - dedicated, single-purpose choice extractor
 
+### Scanning for Section Features
+
+When implementing modules that scan sections for specific features (combat, inventory, stat changes, etc.), strictly follow the **try-validate-escalate** pattern:
+
+1.  **Try (Code-first)**: Use deterministic patterns (regex, keyword matching) to identify and extract features. This is fast and free.
+2.  **Validate**: Apply custom validation rules specific to the feature (e.g., "SKILL must be between 1-15", "Item gain must include an item name").
+3.  **Escalate (AI)**: If validation fails or the code-first pass detects ambiguity (e.g., "SKILL mentioned but no block found"), escalate to a targeted AI call with a stronger model.
+
+Always think about **HOW** to validate the data for the specific feature you are extracting. Each feature likely needs its own set of integrity checks.
+
 **Two-layer validation:**
 
 1. **Per-section validation:** Text patterns vs. extracted choices
