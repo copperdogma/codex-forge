@@ -1,6 +1,6 @@
 # Story: Pipeline Smoke Test (Static Sample, No External Calls)
 
-**Status**: Open  
+**Status**: Done
 **Created**: 2025-12-02  
 
 ## Goal

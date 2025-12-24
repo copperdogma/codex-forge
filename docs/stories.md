@@ -1,66 +1,26 @@
 # Project Stories — codex-forge
 
 ## Recommended Order (next up)
-Guiding priorities: **perfect OCR first**, then move downstream stage‑by‑stage. **Finish Fighting Fantasy to ~100% quality/coverage before starting Onward to the Unknown.**
+Guiding priorities: **development stability first**, then **quality definitions**, followed by **core gameplay enrichment**. Finish Fighting Fantasy to 100% "game-ready" status before scaling optimizations or starting the genealogy pilot.
 
-1. DONE: **065 — Stabilize EasyOCR as a Third OCR Engine**  
-   Finish full‑book EasyOCR coverage and performance on Deathtrap Dungeon. (Blocks true 3‑engine voting.)
-2. DONE: **063 — OCR Ensemble Three‑Engine Voting**  *(Done)*
-   Implement real 3‑way fusion + Tesseract confidences + inline escalation tuning once 065 is stable.
-3. DONE: **062 — OCR Content Type Detection Module**  
-   Tag OCR lines/elements with DocLayNet‑style content types to guide downstream routing and preserve layout intent.
-4. DONE: **058 — Post‑OCR Text Quality & Error Correction**
-   Add generic spell/garble detection + repair loop so OCR output is readable even when engines agree on bad text.
-5. DONE: **059 — Section Detection & Boundary Improvements**
-   Use improved OCR + content‑types to harden boundary/header detection for FF.
+1. **053 — Pipeline Smoke Test (Static Sample, No External Calls)**: Essential for developer productivity and CI stability; catches integration breakages without incurring API costs.
+3. **095 — Combat and Enemy Extraction**: High-value enrichment; parses enemy stat blocks and outcomes critical for the game engine's primary mechanic.
+4. **094 — Inventory Parsing and Extraction**: Core enrichment for tracking item gains, losses, and conditional possession logic in the engine.
+5. **088 — Choice Parsing Enhancements (HTML + Linking)**: Improves structural HTML quality and link recall before scaling to the full library.
+6. **066 — FF Pipeline Accel + Accuracy Guardrails**: Optimizes the now-stable GPT-5.1 pipeline for speed and cost efficiency without risking regressions.
+7. **084 — Fast PDF Image Extraction (Embedded Streams)**: Technical optimization to significantly reduce slow and expensive PDF rasterization time.
+8. **087 — Retire Legacy OCR-Only Recipe**: Housekeeping to reduce maintenance overhead and prevent accidental use of superseded OCR-ensemble paths.
+9. **075 — Booktype Text Cleanup Adapter (Downstream Normalization)**: Refines final text fidelity via deterministic tools and lexicon-guided normalization.
+10. **080 — Central Escalation Cache (Premium OCR Overlay)**: Architectural cleanup to eliminate redundant vision calls and unify page-level provenance.
+13. **024 — Image cropper follow-up**: Improves quality of extracted illustrations and diagrams via more advanced detector backends.
+14. **011 — AI planner to assemble pipelines**: Facilitates easier configuration for diverse book types via agentic goal-to-recipe matching.
+15. **038 — Agentic Pipeline Coordinator**: Fundamental shift toward autonomous quality monitoring, sanity checking, and self-healing artifacts.
+2. **083 — Game-Ready Validation Checklist**: Establishes the formal quality bar for "authoritative" artifacts before declaring the FF phase complete.
+11. **009 — Layout-preserving extractor**: Prerequisite capability for handling non-narrative (tabular/complex) book layouts in the next phase.
+12. **026 — Onward to the Unknown — Arthur L'Heureux pilot**: First end-to-end testbed for genealogy/complex layouts; depends on 009.
+16. **099 — Remove dev-only backcompat disclaimer**: Final milestone marking the entire pipeline as stable and production-ready.
 
-6. DONE: **068 — Fighting Fantasy Boundary Detection Improvements**  
-   Improved boundary detection from 87% to 100% coverage (398/398 sections). Perfect accuracy achieved.
-7. DONE: **073 — 100% Section Detection — Segmentation Architecture**
-   Implemented multi-stage segmentation architecture. Page 12 correctly identified as gameplay start.
-8. DONE: **074 — Missing Sections Investigation — Complete 100% Coverage**
-   Achieved 100% section-id coverage (400/400), with missing-from-source explicitly recorded.
-8. DONE: **078 — Boundary Ordering Guard + Targeted Escalation**
-   Prevent empty sections by enforcing span feasibility and escalating out‑of‑order headers. (Resume 035 after 078.)
-9. DONE: **035 — Fighting Fantasy Pipeline Optimization** *(Paused)*
-   Drive missing/no‑text/no‑choice to targets using the new OCR + boundary stack. (Resume after 078/080.)
-10. DONE: **050 — FF Ending Detection Verification**  
-   Verify ending/dead‑end classification quality on FF outputs (no book‑specific tuning).
-11. DONE:**056 — Validation Forensics Automation (remaining items)**  
-   Finish ending‑aware traces, boundary‑source reasoning, toggles/docs, optional HTML/CSV view.
-12. **066 — FF Pipeline Accel + Accuracy Guardrails**  
-    Only after 035 is Done; profile + cost guardrails for GPT‑5.1 pipeline.
-13. **082 — Large-Image PDF Cost Optimization**
-    Validate image sizes and downscale policy to balance OCR quality vs cost.
-14. **089 — Pristine Book Parity (Missing Sections + Robustness)**
-    Bring the pristine PDF to 100% coverage with the same pipeline; reduce missing sections/orphans.
-15. **090 — Run Summary UX (Missing Sections + Stage Metrics)**
-    Make missing sections + per-stage metrics prominent in run summaries.
-16. **083 — Game-Ready Validation Checklist**
-    Define strict criteria and validation steps for “game-ready” artifacts.
-17. **084 — Fast PDF Image Extraction (Embedded Streams)**
-    Investigate ripping embedded page images vs full rasterization.
-18. **085 — Table Rescue OCR Pass**
-    Add a targeted table-rescue step for collapsed grids/choice tables.
-19. **086 — Preserve HTML Through Final Gamebook**
-    Ensure HTML survives to final artifacts (no lossy plain-text-only outputs).
-20. **087 — Retire Legacy OCR-Only Recipe**
-    Deprecate/remove legacy OCR-only recipes now superseded by GPT‑5.1 pipeline.
-21. **088 — Choice Parsing Enhancements**
-    Improve choice parsing and add semantic choice markup in HTML.
 
-20. **009 — Layout‑Preserving Extractor**  
-    Build layout/table preservation needed for non‑FF books.
-21. **026 — Onward to the Unknown pilot (Arthur L'Heureux)**  
-    Run end‑to‑end with layout‑aware table handling once 009 lands.
-
-Later / non‑blocking:
-- 024 Image cropper follow‑up (image extraction quality)
-- 053 Pipeline smoke test (static, no external calls)  
-- 021 Dashboard UI polish
-- 038 Agentic pipeline coordinator
-- 011 AI planner to assemble pipelines
-- 028 Market discovery, 029 Model audit (obsolete), 099 Remove dev backcompat note
 
 This index tracks stories in `/docs/stories/` for the codex-forge pipeline.
 
@@ -107,7 +67,7 @@ This index tracks stories in `/docs/stories/` for the codex-forge pipeline.
 || 050 | FF Ending Detection Verification | Medium | Done | /docs/stories/story-050-ff-ending-detection.md |
 || 051 | Text Quality Evaluation & Repair | High | Done | /docs/stories/story-051-text-quality-eval.md |
 || 052 | Evaluate Apple Vision OCR Integration | Medium | Done | /docs/stories/story-052-apple-ocr-integration.md |
-|| 053 | Pipeline Smoke Test (Static Sample, No External Calls) | High | To Do | /docs/stories/story-053-smoke-test-pipeline.md |
+|| 053 | Pipeline Smoke Test (Static Sample, No External Calls) | High | Done | /docs/stories/story-053-smoke-test-pipeline.md |
 || 054 | Canonical FF Recipe Consolidation | High | Done | /docs/stories/story-054-canonical-ff-recipe.md |
 || 056 | Validation Forensics Automation | High | Done | /docs/stories/story-056-validation-forensics.md |
 || 057 | OCR Quality & Column Detection Improvements | High | Done | /docs/stories/story-057-ocr-quality-column-detection.md |
@@ -147,6 +107,8 @@ This index tracks stories in `/docs/stories/` for the codex-forge pipeline.
 || 091 | Orphaned Section Mitigation | High | Done | /docs/stories/story-091-orphaned-section-mitigation.md |
 || 092 | HTML Presentation Cleanup | High | Done | /docs/stories/story-092-html-presentation-cleanup.md |
 || 093 | Coarse Portionizer Endmatter Filter | High | Done | /docs/stories/story-093-coarse-portionizer-endmatter-filter.md |
+|| 094 | Inventory Parsing and Extraction | High | To Do | /docs/stories/story-094-inventory-parsing.md |
+|| 095 | Combat and Enemy Extraction | High | To Do | /docs/stories/story-095-combat-enemy-extraction.md |
 || 099 | Remove dev-only backcompat disclaimer | Low | To Do | /docs/stories/story-099-remove-dev-backcompat-note.md |
 
 ## Notes
