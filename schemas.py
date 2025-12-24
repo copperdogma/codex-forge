@@ -76,6 +76,13 @@ class TestLuck(BaseModel):
     confidence: float = 1.0
 
 
+class StatModification(BaseModel):
+    stat: str  # skill, stamina, luck (lowercase normalized)
+    amount: Union[int, str]
+    permanent: bool = False
+    confidence: float = 1.0
+
+
 class Paragraph(BaseModel):
     id: str
     page: int = 0
@@ -85,6 +92,7 @@ class Paragraph(BaseModel):
     combat: List[Combat] = Field(default_factory=list)
     test_luck: List[TestLuck] = Field(default_factory=list)
     stat_checks: List[StatCheck] = Field(default_factory=list)
+    stat_modifications: List[StatModification] = Field(default_factory=list)
     item_effects: List[ItemEffect] = Field(default_factory=list)
     inventory: Optional[InventoryEnrichment] = None
 
@@ -351,6 +359,7 @@ class EnrichedPortion(BaseModel):
     combat: List[Combat] = Field(default_factory=list)
     test_luck: List[TestLuck] = Field(default_factory=list)
     stat_checks: List[StatCheck] = Field(default_factory=list)
+    stat_modifications: List[StatModification] = Field(default_factory=list)
     item_effects: List[ItemEffect] = Field(default_factory=list)
     inventory: Optional[InventoryEnrichment] = None
     targets: List[str] = Field(default_factory=list)

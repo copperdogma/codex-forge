@@ -15,6 +15,7 @@ Guiding priorities: **development stability first**, then **quality definitions*
 13. **024 — Image cropper follow-up**: Improves quality of extracted illustrations and diagrams via more advanced detector backends.
 14. **011 — AI planner to assemble pipelines**: Facilitates easier configuration for diverse book types via agentic goal-to-recipe matching.
 15. **038 — Agentic Pipeline Coordinator**: Fundamental shift toward autonomous quality monitoring, sanity checking, and self-healing artifacts.
+16. **098 — Late-Stage Section Validation and Reachability Analysis**: Final integrity pass to ensure 100% graph connectivity across all extracted gameplay mechanics.
 2. **083 — Game-Ready Validation Checklist**: Establishes the formal quality bar for "authoritative" artifacts before declaring the FF phase complete.
 11. **009 — Layout-preserving extractor**: Prerequisite capability for handling non-narrative (tabular/complex) book layouts in the next phase.
 12. **026 — Onward to the Unknown — Arthur L'Heureux pilot**: First end-to-end testbed for genealogy/complex layouts; depends on 009.
@@ -110,7 +111,8 @@ This index tracks stories in `/docs/stories/` for the codex-forge pipeline.
 || 094 | Inventory Parsing and Extraction | High | Done | /docs/stories/story-094-inventory-parsing.md |
 || 095 | Combat and Enemy Extraction | High | Done | /docs/stories/story-095-combat-enemy-extraction.md |
 || 096 | Stat Check Extraction (Skill, Luck, and Dice Rolls) | High | Done | /docs/stories/story-096-stat-check-extraction.md |
-|| 097 | Stat Modification Extraction (Skill, Stamina, Luck Changes) | High | To Do | /docs/stories/story-097-stat-modification-extraction.md |
+|| 097 | Stat Modification Extraction (Skill, Stamina, Luck Changes) | High | Done | /docs/stories/story-097-stat-modification-extraction.md |
+|| 098 | Late-Stage Section Validation and Reachability Analysis | High | To Do | /docs/stories/story-098-late-stage-section-validation.md |
 || 099 | Remove dev-only backcompat disclaimer | Low | To Do | /docs/stories/story-099-remove-dev-backcompat-note.md |
 
 ## Notes

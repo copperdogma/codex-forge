@@ -159,6 +159,19 @@ def build_section(portion: Dict[str, Any], emit_text: bool, emit_provenance_text
     if dice_checks:
         section["diceChecks"] = dice_checks
 
+    # Stat Modifications
+    portion_mods = portion.get("stat_modifications") or []
+    stat_changes = []
+    for m in portion_mods:
+        if isinstance(m, dict) and m.get("stat") and m.get("amount") is not None:
+            stat_changes.append({
+                "stat": m["stat"],
+                "amount": m["amount"],
+                "permanent": m.get("permanent", False)
+            })
+    if stat_changes:
+        section["statChanges"] = stat_changes
+
     # Combat extraction (multiple enemies supported)
     portion_combat = portion.get("combat") or []
     if not isinstance(portion_combat, list):
