@@ -46,7 +46,7 @@ class InventoryItem(BaseModel):
 
 class InventoryCheck(BaseModel):
     item: str
-    condition: str  # "if you have", "if you possess", etc.
+    condition: str = "if you have"  # "if you have", "if you possess", etc.
     target_section: Optional[str] = None
     confidence: float = 1.0
 

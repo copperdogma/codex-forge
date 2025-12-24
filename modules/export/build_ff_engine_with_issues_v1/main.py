@@ -124,8 +124,6 @@ def build_section(portion: Dict[str, Any], emit_text: bool, emit_provenance_text
     # Optional fields if present
     if portion.get("items"):
         section["items"] = portion["items"]
-    if portion.get("stat_modifications"):
-        section["statModifications"] = portion["stat_modifications"]
     if portion.get("deathConditions"):
         section["deathConditions"] = portion["deathConditions"]
     

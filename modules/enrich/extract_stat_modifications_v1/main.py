@@ -24,42 +24,47 @@ SYSTEM_PROMPT = """You are an expert at parsing Fighting Fantasy gamebook sectio
 Extract stat modifications (SKILL, STAMINA, LUCK) from the provided text into a JSON object.
 
 Detect:
-- stat: "skill", "stamina", or "luck" (normalized to lowercase).
+- stat: \"skill\", \"stamina\", or \"luck\" (normalized to lowercase).
 - amount: The integer amount of change (positive for gains/restoration, negative for losses).
-- permanent: Whether the change affects the INITIAL value (e.g., "reduce your initial Skill"). Default false.
+- permanent: Whether the change affects the INITIAL value (e.g., \"reduce your initial Skill\"). Default false.
 
 Rules:
-- Ignore narrative mentions that aren't modifications (e.g., "Your Skill is 12").
-- "Restore" or "Gain" are positive. "Lose" or "Reduce" are negative.
-- Handle implicit amounts (e.g., "Lose a Luck point" -> amount: -1).
+- Ignore narrative mentions that aren't modifications (e.g., \"Your Skill is 12\").
+- \"Restore\" or \"Gain\" are positive. \"Lose\" or \"Reduce\" are negative.
+- Handle implicit amounts (e.g., \"Lose a Luck point\" -> amount: -1).
 
 Example output:
 {
-  "stat_modifications": [
-    { "stat": "skill", "amount": -1, "permanent": false },
-    { "stat": "stamina", "amount": 4, "permanent": false }
+  \"stat_modifications\": [
+    { \"stat\": \"skill\", \"amount\": -1, \"permanent\": false },
+    { \"stat\": \"stamina\", \"amount\": 4, \"permanent\": false }
   ]
 }
 
-If no modifications are found, return {"stat_modifications": []}."""
+If no modifications are found, return {\"stat_modifications\": []}."""
 
 AUDIT_SYSTEM_PROMPT = """You are a quality assurance auditor for a Fighting Fantasy gamebook extraction pipeline.
-Review the list of extracted stat modifications.
-Identify FALSE POSITIVES—entries that are NOT valid stat changes.
+I will provide a list of extracted stat modifications along with the source text for each section.
+Your job is to:
+1. Identify FALSE POSITIVES (narrative text that isn't a stat change).
+2. Identify INCORRECT VALUES (e.g., text says \"reduce by 1d6 + 1\" but extraction says \"-1\").
+3. Identify MISSING modifications that were in the text but not the list.
 
-Common False Positives:
-- Current state mentions: "Your Stamina is now 4".
-- Conditional checks: "If your Stamina is 4 or less".
-- Combat damage (already handled elsewhere): "The creature hits you for 2 Stamina".
-- Abstract concepts: "Lose your nerve".
+Common Issues:
+- Text says \"Roll one die, add 1... reduce STAMINA by total\" -> amount should be \"-(1d6+1)\".
+- Narrative mentions like \"Your Stamina is now 4\" are NOT modifications.
 
-Return a JSON object with a "removals" key:
+Return a JSON object with \"removals\" (to delete), \"corrections\" (to update), and \"additions\" (to add).
 {
-  "removals": [
-    { "section_id": "1", "item_index": 0, "reason": "narrative mention" }
-  ]
+  \"removals\": [
+    { \"section_id\": \"1\", \"item_index\": 0, \"reason\": \"narrative mention\" }
+  ],
+  \"corrections\": [
+    { \"section_id\": \"16\", \"item_index\": 0, \"data\": { \"stat\": \"stamina\", \"amount\": \"-(1d6+1)\", \"permanent\": false } }
+  ],
+  \"additions\": []
 }
-If everything is correct, return {"removals": []}."""
+If everything is correct, return {\"removals\": [], \"corrections\": [], \"additions\": []}."""
 
 # --- Logic ---
 
@@ -110,9 +115,10 @@ def extract_stat_modifications_llm(text: str, model: str, client: OpenAI) -> Tup
         print(f"LLM stat modification extraction error: {e}")
         return [], {}
 
-def audit_stat_modifications_batch(audit_list: List[Dict[str, Any]], model: str, client: OpenAI, run_id: str) -> List[Dict[str, Any]]:
+def audit_stat_modifications_batch(audit_list: List[Dict[str, Any]], model: str, client: OpenAI, run_id: str) -> Dict[str, List[Dict[str, Any]]]:
+    """Performs a global audit over all extracted stat modifications to prune debris."""
     if not audit_list:
-        return []
+        return {"removals": [], "corrections": [], "additions": []}
     
     try:
         response = client.chat.completions.create(
@@ -131,11 +137,10 @@ def audit_stat_modifications_batch(audit_list: List[Dict[str, Any]], model: str,
         }
         log_llm_usage(run_id, "stat_mod_audit", usage)
         
-        data = json.loads(response.choices[0].message.content)
-        return data.get("removals", [])
+        return json.loads(response.choices[0].message.content)
     except Exception as e:
         print(f"Global stat modification audit error: {e}")
-        return []
+        return {"removals": [], "corrections": [], "additions": []}
 
 def main():
     parser = argparse.ArgumentParser(description="Extract stat modifications from enriched portions.")
@@ -186,8 +191,12 @@ def main():
         portion.stat_modifications = mods
         
         sid = portion.section_id or portion.portion_id
-        for i, m in enumerate(mods):
-            audit_data.append({"section_id": sid, "item_index": i, "data": m.model_dump()})
+        # Include text in audit data for context!
+        audit_data.append({
+            "section_id": sid, 
+            "text": text[:500], # Provide snippet for context
+            "mods": [m.model_dump() for m in mods]
+        })
 
         out_portions.append(portion)
         
@@ -197,17 +206,47 @@ def main():
 
     # 3. BATCH AUDIT (Global)
     if args.use_ai and audit_data:
-        logger.log("extract_stat_modifications", "running", message=f"Performing global audit on {len(audit_data)} modifications...")
-        removals = audit_stat_modifications_batch(audit_data, args.model, client, args.run_id)
-        if removals:
-            print(f"Global audit identified {len(removals)} false positives to remove.")
-            removals_set = set()
-            for r in removals:
-                removals_set.add((str(r.get("section_id")), int(r.get("item_index"))))
+        logger.log("extract_stat_modifications", "running", message=f"Performing global audit on {len(audit_data)} sections...")
+        audit_results = audit_stat_modifications_batch(audit_data, args.model, client, args.run_id)
+        
+        removals = audit_results.get("removals", [])
+        corrections = audit_results.get("corrections", [])
+        additions = audit_results.get("additions", [])
+
+        if removals or corrections or additions:
+            print(f"Global audit identified {len(removals)} removals, {len(corrections)} corrections, and {len(additions)} additions.")
             
+            # Map by section ID for easy access
+            removals_map = {}
+            for r in removals:
+                removals_map.setdefault(str(r.get("section_id")), set()).add(int(r.get("item_index")))
+            
+            corrections_map = {}
+            for c in corrections:
+                corrections_map.setdefault(str(c.get("section_id")), {})[int(c.get("item_index"))] = c.get("data")
+            
+            additions_map = {}
+            for a in additions:
+                additions_map.setdefault(str(a.get("section_id")), []).append(a.get("data"))
+
             for p in out_portions:
                 sid = str(p.section_id or p.portion_id)
-                p.stat_modifications = [m for i, m in enumerate(p.stat_modifications) if (sid, i) not in removals_set]
+                # Apply corrections
+                if sid in corrections_map:
+                    for idx, new_data in corrections_map[sid].items():
+                        if idx < len(p.stat_modifications):
+                            p.stat_modifications[idx] = StatModification(**new_data)
+                
+                # Apply removals
+                if sid in removals_map:
+                    p.stat_modifications = [m for i, m in enumerate(p.stat_modifications) if i not in removals_map[sid]]
+                
+                # Apply additions
+                if sid in additions_map:
+                    if not p.stat_modifications:
+                        p.stat_modifications = []
+                    for a_data in additions_map[sid]:
+                        p.stat_modifications.append(StatModification(**a_data))
 
     final_rows = [p.model_dump(exclude_none=True) for p in out_portions]
     save_jsonl(args.out, final_rows)

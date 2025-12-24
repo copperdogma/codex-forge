@@ -68,25 +68,33 @@ If no physical inventory actions are found, return {"inventory": {}}.
 """
 
 AUDIT_SYSTEM_PROMPT = """You are a quality assurance auditor for a Fighting Fantasy gamebook extraction pipeline.
-I will provide a list of inventory items extracted from various sections of the book.
-Your job is to identify FALSE POSITIVES—entries that are NOT physical items or valid game actions.
+I will provide a list of inventory items extracted from various sections of the book along with the source text for each section.
+Your job is to identify:
+1. FALSE POSITIVES: Entries that are NOT physical items or valid game actions.
+2. INCORRECT VALUES: Incorrect quantities or item names.
+3. MISSING ITEMS: Items described in the text that were not in the extracted list.
 
 Common False Positives to flag:
 - Sentence fragments: "not done so already", "any left", "it is ours"
 - Character states: "yourself", "dripping with sweat", "helplessly"
 - Abstract concepts: "time", "luck", "aim", "balance"
-- Non-item nouns: "officials", "Dwarf", "most extraordinarily lifelike statues"
+- Non-item nouns: "officials", "Dwarf"
 - Locations: "end of a tunnel", "large cavern"
 
-For each section, review the items and tell me which ones to REMOVE.
-Return a JSON object with a "removals" key:
+For each section, review the items and tell me which ones to REMOVE, CORRECT, or ADD.
+Return a JSON object with "removals", "corrections", and "additions".
 {
   "removals": [
-    { "section_id": "1", "item": "officials", "action": "remove" },
-    { "section_id": "18", "item": "not done so already", "action": "check" }
+    { "section_id": "1", "type": "add", "item_index": 0, "reason": "not an item" }
+  ],
+  "corrections": [
+    { "section_id": "42", "type": "add", "item_index": 0, "data": { "item": "Gold Pieces", "quantity": 10 } }
+  ],
+  "additions": [
+    { "section_id": "100", "data": { "item": "Brass Key", "quantity": 1, "action": "add" } }
   ]
 }
-If everything is correct, return {"removals": []}."""
+If everything is correct, return {"removals": [], "corrections": [], "additions": []}."""
 
 # --- Logic ---
 
@@ -264,10 +272,10 @@ def extract_inventory_llm(text: str, model: str, client: OpenAI) -> Tuple[Invent
         print(f"LLM inventory extraction error: {e}")
         return InventoryEnrichment(), {}
 
-def audit_inventory_batch(audit_list: List[Dict[str, Any]], model: str, client: OpenAI) -> List[Dict[str, Any]]:
+def audit_inventory_batch(audit_list: List[Dict[str, Any]], model: str, client: OpenAI, run_id: str) -> Dict[str, List[Dict[str, Any]]]:
     """Performs a global audit over all extracted inventory items to prune debris."""
     if not audit_list:
-        return []
+        return {"removals": [], "corrections": [], "additions": []}
     
     try:
         response = client.chat.completions.create(
@@ -284,13 +292,12 @@ def audit_inventory_batch(audit_list: List[Dict[str, Any]], model: str, client: 
             "prompt_tokens": response.usage.prompt_tokens,
             "completion_tokens": response.usage.completion_tokens,
         }
-        log_llm_usage("global_audit", "inventory_audit", usage)
+        log_llm_usage(run_id, "inventory_audit", usage)
         
-        data = json.loads(response.choices[0].message.content)
-        return data.get("removals", [])
+        return json.loads(response.choices[0].message.content)
     except Exception as e:
         print(f"Global inventory audit error: {e}")
-        return []
+        return {"removals": [], "corrections": [], "additions": []}
 
 def main():
     parser = argparse.ArgumentParser(description="Extract inventory actions from enriched portions.")
@@ -321,11 +328,7 @@ def main():
 
     for idx, row in enumerate(portions):
         portion = EnrichedPortion(**row)
-        text = portion.raw_text
-        if not text and portion.raw_html:
-            text = html_to_text(portion.raw_html)
-        if not text:
-            text = ""
+        text = portion.raw_text or html_to_text(portion.raw_html or "")
         
         inv = extract_inventory_regex(text)
         is_valid = validate_inventory(inv)
@@ -351,10 +354,17 @@ def main():
         portion.inventory = inv
         
         sid = portion.section_id or portion.portion_id
-        for item in inv.items_gained: audit_data.append({"section_id": sid, "item": item.item, "action": "add"})
-        for item in inv.items_lost: audit_data.append({"section_id": sid, "item": item.item, "action": "remove"})
-        for item in inv.items_used: audit_data.append({"section_id": sid, "item": item.item, "action": "use"})
-        for item in inv.inventory_checks: audit_data.append({"section_id": sid, "item": item.item, "action": "check"})
+        section_items = []
+        for i, item in enumerate(inv.items_gained): section_items.append({"item_index": i, "type": "add", "data": item.model_dump()})
+        for i, item in enumerate(inv.items_lost): section_items.append({"item_index": i, "type": "remove", "data": item.model_dump()})
+        for i, item in enumerate(inv.items_used): section_items.append({"item_index": i, "type": "use", "data": item.model_dump()})
+        for i, item in enumerate(inv.inventory_checks): section_items.append({"item_index": i, "type": "check", "data": item.model_dump()})
+
+        audit_data.append({
+            "section_id": sid,
+            "text": text[:500],
+            "items": section_items
+        })
 
         out_portions.append(portion)
         
@@ -363,22 +373,77 @@ def main():
                        message=f"Processed {idx+1}/{total_portions} portions (AI calls: {ai_calls})")
 
     if args.use_ai and audit_data:
-        logger.log("extract_inventory", "running", message=f"Performing global audit on {len(audit_data)} items...")
-        removals = audit_inventory_batch(audit_data, args.model, client)
-        if removals:
-            print(f"Global audit identified {len(removals)} false positives to remove.")
-            removals_map = {} 
-            for r in removals:
-                key = (str(r.get("section_id")), str(r.get("item")), str(r.get("action")))
-                removals_map[key] = True
+        logger.log("extract_inventory", "running", message=f"Performing global audit on {len(audit_data)} sections...")
+        audit_results = audit_inventory_batch(audit_data, args.model, client, args.run_id)
+        
+        removals = audit_results.get("removals", [])
+        corrections = audit_results.get("corrections", [])
+        additions = audit_results.get("additions", [])
+
+        if removals or corrections or additions:
+            print(f"Global audit identified {len(removals)} removals, {len(corrections)} corrections, and {len(additions)} additions.")
             
+            removals_set = set()
+            for r in removals:
+                sid_r = r.get("section_id")
+                idx_r = r.get("item_index")
+                if sid_r is not None and idx_r is not None:
+                    removals_set.add((str(sid_r), str(r.get("type")), int(idx_r)))
+            
+            corrections_map = {}
+            for c in corrections:
+                sid_c = c.get("section_id")
+                idx_c = c.get("item_index")
+                if sid_c is not None and idx_c is not None:
+                    corrections_map[(str(sid_c), str(c.get("type")), int(idx_c))] = c.get("data")
+            
+            additions_map = {}
+            for a in additions:
+                sid_a = a.get("section_id")
+                if sid_a is not None:
+                    additions_map.setdefault(str(sid_a), []).append(a.get("data"))
+
             for p in out_portions:
-                if p.inventory:
-                    sid = p.section_id or p.portion_id
-                    p.inventory.items_gained = [i for i in p.inventory.items_gained if (str(sid), str(i.item), "add") not in removals_map]
-                    p.inventory.items_lost = [i for i in p.inventory.items_lost if (str(sid), str(i.item), "remove") not in removals_map]
-                    p.inventory.items_used = [i for i in p.inventory.items_used if (str(sid), str(i.item), "use") not in removals_map]
-                    p.inventory.inventory_checks = [i for i in p.inventory.inventory_checks if (str(sid), str(i.item), "check") not in removals_map]
+                if not p.inventory:
+                    p.inventory = InventoryEnrichment()
+                
+                sid = str(p.section_id or p.portion_id)
+                
+                new_gained = []
+                for i, item in enumerate(p.inventory.items_gained):
+                    key = (sid, "add", i)
+                    if key in corrections_map: new_gained.append(InventoryItem(**corrections_map[key]))
+                    elif key not in removals_set: new_gained.append(item)
+                p.inventory.items_gained = new_gained
+
+                new_lost = []
+                for i, item in enumerate(p.inventory.items_lost):
+                    key = (sid, "remove", i)
+                    if key in corrections_map: new_lost.append(InventoryItem(**corrections_map[key]))
+                    elif key not in removals_set: new_lost.append(item)
+                p.inventory.items_lost = new_lost
+
+                new_used = []
+                for i, item in enumerate(p.inventory.items_used):
+                    key = (sid, "use", i)
+                    if key in corrections_map: new_used.append(InventoryItem(**corrections_map[key]))
+                    elif key not in removals_set: new_used.append(item)
+                p.inventory.items_used = new_used
+
+                new_checks = []
+                for i, item in enumerate(p.inventory.inventory_checks):
+                    key = (sid, "check", i)
+                    if key in corrections_map: new_checks.append(InventoryCheck(**corrections_map[key]))
+                    elif key not in removals_set: new_checks.append(item)
+                p.inventory.inventory_checks = new_checks
+
+                if sid in additions_map:
+                    for a_data in additions_map[sid]:
+                        action = a_data.pop("action", "add")
+                        if action == "add": p.inventory.items_gained.append(InventoryItem(**a_data))
+                        elif action == "remove": p.inventory.items_lost.append(InventoryItem(**a_data))
+                        elif action == "use": p.inventory.items_used.append(InventoryItem(**a_data))
+                        elif action == "check": p.inventory.inventory_checks.append(InventoryCheck(**a_data))
 
     final_rows = [p.model_dump(exclude_none=True) for p in out_portions]
     save_jsonl(args.out, final_rows)

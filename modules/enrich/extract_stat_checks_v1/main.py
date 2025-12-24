@@ -55,21 +55,29 @@ Example output:
 If no mechanics are found, return {"stat_checks": [], "test_your_luck": []}."""
 
 AUDIT_SYSTEM_PROMPT = """You are a quality assurance auditor for a Fighting Fantasy gamebook extraction pipeline.
-Review the list of extracted stat checks and "Test Your Luck" mechanics.
-Identify FALSE POSITIVES or logical errors (e.g., pass/fail sections reversed, non-mechanic text).
+I will provide a list of extracted stat checks and "Test Your Luck" mechanics along with the source text for each section.
+Your job is to identify:
+1. FALSE POSITIVES: Entries that are NOT valid stat checks or mechanics.
+2. INCORRECT VALUES: Incorrect pass/fail sections, stats, or conditions.
+3. MISSING MECHANICS: Mechanics described in the text that were not extracted.
 
-Common False Positives to flag:
-- Narrative text about stats that isn't a check: "Your SKILL is 12", "Restore 2 STAMINA".
+Common Issues to flag:
+- Narrative text about stats that isn't a check: "Your SKILL is 12".
 - Ambiguous dice rolls that aren't checks: "The Dwarf rolls two dice and laughs."
 - Character states: "You feel lucky."
 
-Return a JSON object with a "removals" key:
+For each section, review the items and tell me which ones to REMOVE, CORRECT, or ADD.
+Return a JSON object with "removals", "corrections", and "additions".
 {
   "removals": [
-    { "section_id": "1", "item_index": 0, "type": "stat_check", "reason": "not a check" }
-  ]
+    { "section_id": "1", "type": "stat_check", "item_index": 0, "reason": "not a check" }
+  ],
+  "corrections": [
+    { "section_id": "18", "type": "stat_check", "item_index": 0, "data": { "stat": "SKILL", "pass_section": "55" } }
+  ],
+  "additions": []
 }
-If everything is correct, return {"removals": []}."""
+If everything is correct, return {"removals": [], "corrections": [], "additions": []}."""
 
 # --- Logic ---
 
@@ -117,10 +125,10 @@ def extract_stat_checks_llm(text: str, model: str, client: OpenAI) -> Tuple[List
         print(f"LLM stat check extraction error: {e}")
         return [], [], {}
 
-def audit_stat_checks_batch(audit_list: List[Dict[str, Any]], model: str, client: OpenAI) -> List[Dict[str, Any]]:
+def audit_stat_checks_batch(audit_list: List[Dict[str, Any]], model: str, client: OpenAI, run_id: str) -> Dict[str, List[Dict[str, Any]]]:
     """Performs a global audit over all extracted stat checks to prune debris."""
     if not audit_list:
-        return []
+        return {"removals": [], "corrections": [], "additions": []}
     
     try:
         response = client.chat.completions.create(
@@ -137,13 +145,12 @@ def audit_stat_checks_batch(audit_list: List[Dict[str, Any]], model: str, client
             "prompt_tokens": response.usage.prompt_tokens,
             "completion_tokens": response.usage.completion_tokens,
         }
-        log_llm_usage("global_audit", "stat_check_audit", usage)
+        log_llm_usage(run_id, "stat_check_audit", usage)
         
-        data = json.loads(response.choices[0].message.content)
-        return data.get("removals", [])
+        return json.loads(response.choices[0].message.content)
     except Exception as e:
         print(f"Global stat check audit error: {e}")
-        return []
+        return {"removals": [], "corrections": [], "additions": []}
 
 def main():
     parser = argparse.ArgumentParser(description="Extract stat checks from enriched portions.")
@@ -195,10 +202,15 @@ def main():
         portion.test_luck = luck_tests
         
         sid = portion.section_id or portion.portion_id
-        for i, c in enumerate(checks):
-            audit_data.append({"section_id": sid, "item_index": i, "type": "stat_check", "data": c.model_dump()})
-        for i, l in enumerate(luck_tests):
-            audit_data.append({"section_id": sid, "item_index": i, "type": "test_luck", "data": l.model_dump()})
+        section_mechanics = []
+        for i, c in enumerate(checks): section_mechanics.append({"item_index": i, "type": "stat_check", "data": c.model_dump()})
+        for i, l in enumerate(luck_tests): section_mechanics.append({"item_index": i, "type": "test_luck", "data": l.model_dump()})
+
+        audit_data.append({
+            "section_id": sid,
+            "text": text[:500],
+            "mechanics": section_mechanics
+        })
 
         out_portions.append(portion)
         
@@ -207,22 +219,54 @@ def main():
                        message=f"Processed {idx+1}/{total_portions} portions (AI calls: {ai_calls})")
 
     if args.use_ai and audit_data:
-        logger.log("extract_stat_checks", "running", message=f"Performing global audit on {len(audit_data)} mechanics...")
-        removals = audit_stat_checks_batch(audit_data, args.model, client)
-        if removals:
-            print(f"Global audit identified {len(removals)} false positives to remove.")
-            removals_set = set() 
+        logger.log("extract_stat_checks", "running", message=f"Performing global audit on {len(audit_data)} sections...")
+        audit_results = audit_stat_checks_batch(audit_data, args.model, client, args.run_id)
+        
+        removals = audit_results.get("removals", [])
+        corrections = audit_results.get("corrections", [])
+        additions = audit_results.get("additions", [])
+
+        if removals or corrections or additions:
+            print(f"Global audit identified {len(removals)} removals, {len(corrections)} corrections, and {len(additions)} additions.")
+            
+            removals_set = set()
             for r in removals:
                 removals_set.add((str(r.get("section_id")), str(r.get("type")), int(r.get("item_index"))))
             
+            corrections_map = {}
+            for c in corrections:
+                corrections_map[(str(c.get("section_id")), str(c.get("type")), int(c.get("item_index")))] = c.get("data")
+            
+            additions_map = {}
+            for a in additions:
+                additions_map.setdefault(str(a.get("section_id")), []).append(a.get("data"))
+
             for p in out_portions:
                 sid = str(p.section_id or p.portion_id)
-                p.stat_checks = [c for i, c in enumerate(p.stat_checks) if (sid, "stat_check", i) not in removals_set]
-                p.test_luck = [l for i, l in enumerate(p.test_luck) if (sid, "test_luck", i) not in removals_set]
+                
+                new_checks = []
+                for i, item in enumerate(p.stat_checks):
+                    key = (sid, "stat_check", i)
+                    if key in corrections_map: new_checks.append(StatCheck(**corrections_map[key]))
+                    elif key not in removals_set: new_checks.append(item)
+                p.stat_checks = new_checks
+
+                new_luck = []
+                for i, item in enumerate(p.test_luck):
+                    key = (sid, "test_luck", i)
+                    if key in corrections_map: new_luck.append(TestLuck(**corrections_map[key]))
+                    elif key not in removals_set: new_luck.append(item)
+                p.test_luck = new_luck
+
+                if sid in additions_map:
+                    for a_data in additions_map[sid]:
+                        m_type = a_data.pop("type", "stat_check")
+                        if m_type == "stat_check": p.stat_checks.append(StatCheck(**a_data))
+                        elif m_type == "test_luck": p.test_luck.append(TestLuck(**a_data))
 
     final_rows = [p.model_dump(exclude_none=True) for p in out_portions]
     save_jsonl(args.out, final_rows)
-    logger.log("extract_stat_checks", "done", message=f"Extracted stat checks for {total_portions} portions. Total AI calls: {ai_calls} + 1 audit.", artifact=args.out)
+    logger.log("extract_stat_checks", "done", message=f"Extracted stat checks for {total_portions} portions. AI calls: {ai_calls} + 1 audit.", artifact=args.out)
 
 if __name__ == "__main__":
     main()
