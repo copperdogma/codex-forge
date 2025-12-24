@@ -1,0 +1,21 @@
+# Fast extraction smoke test configuration
+# Tests the new extract_pdf_images_fast_v1 module
+
+# Extraction: Use fast extraction with rendering fallback
+extract_pdf_images_fast_v1:
+  fallback_to_render: true
+  fallback_dpi: 300
+
+# Split pages from manifest (fast extraction produces manifest)
+split_pages_from_manifest_v1: {}
+
+# OCR: GPT-5.1 with table rescue
+extract_ocr_ai_v1:
+  model: gpt-5.2
+  ocr_hints: |
+    This is a Fighting Fantasy gamebook page.
+    Preserve section numbers as <h2> tags.
+    Multi-row choice tables should be represented as proper HTML tables with multiple <tr> rows.
+
+table_rescue_html_v1:
+  model: gpt-5.2

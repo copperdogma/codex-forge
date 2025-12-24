@@ -292,7 +292,14 @@ def audit_inventory_batch(audit_list: List[Dict[str, Any]], model: str, client: 
             "prompt_tokens": response.usage.prompt_tokens,
             "completion_tokens": response.usage.completion_tokens,
         }
-        log_llm_usage(run_id, "inventory_audit", usage)
+        if usage:
+            log_llm_usage(
+                model=usage.get("model", "gpt-4.1-mini"),
+                prompt_tokens=usage.get("prompt_tokens", 0),
+                completion_tokens=usage.get("completion_tokens", 0),
+                stage_id="inventory_audit",
+                run_id=run_id
+            )
         
         return json.loads(response.choices[0].message.content)
     except Exception as e:
@@ -347,7 +354,14 @@ def main():
             
             inv_llm, usage = extract_inventory_llm(llm_input, args.model, client)
             ai_calls += 1
-            log_llm_usage(args.run_id, "extract_inventory", usage)
+            if usage:
+                log_llm_usage(
+                    model=usage.get("model", args.model),
+                    prompt_tokens=usage.get("prompt_tokens", 0),
+                    completion_tokens=usage.get("completion_tokens", 0),
+                    stage_id="extract_inventory",
+                    run_id=args.run_id
+                )
             if inv_llm:
                 inv = inv_llm
         

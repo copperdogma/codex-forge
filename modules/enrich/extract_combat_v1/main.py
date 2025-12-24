@@ -222,7 +222,14 @@ def main():
             
             combats_llm, usage = extract_combat_llm(llm_input, args.model, client)
             ai_calls += 1
-            log_llm_usage(args.run_id, "extract_combat", usage)
+            if usage:
+                log_llm_usage(
+                    model=usage.get("model", args.model),
+                    prompt_tokens=usage.get("prompt_tokens", 0),
+                    completion_tokens=usage.get("completion_tokens", 0),
+                    stage_id="extract_combat",
+                    run_id=args.run_id
+                )
             if combats_llm:
                 combats = combats_llm
         

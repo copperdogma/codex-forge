@@ -1,0 +1,22 @@
+# Minimal test recipe for fast extraction (20 pages)
+# Tests extract_pdf_images_fast_v1 with x-height normalization
+
+run_id: test-fast-extract-20
+input:
+  pdf: input/06 deathtrap dungeon.pdf
+output_dir: output/runs/test-fast-extract-20
+
+stages:
+  - id: extract_pdf_images
+    stage: extract
+    module: extract_pdf_images_fast_v1
+    out: pages_rendered_manifest.jsonl
+    params:
+      start: 1
+      end: 20
+      target_line_height: 24
+      baseline_dpi: 72
+      sample_count: 5
+      fallback_to_render: true
+      fallback_dpi: 300
+

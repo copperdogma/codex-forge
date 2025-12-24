@@ -1,0 +1,38 @@
+module_id: extract_pdf_images_fast_v1
+stage: extract
+entrypoint: modules/extract/extract_pdf_images_fast_v1/main.py
+input_schema: null
+output_schema: page_image_v1
+description: "Fast extraction of embedded PDF images (bypasses rendering when possible). Extracts full-page embedded JPEG images directly from PDF streams for 28-974× speedup vs rendering."
+params:
+  - name: start
+    type: int
+    default: 1
+  - name: end
+    type: int
+    default: null
+  - name: fallback_to_render
+    type: bool
+    default: true
+  - name: fallback_dpi
+    type: int
+    default: 300
+  - name: target_line_height
+    type: int
+    default: 24
+  - name: baseline_dpi
+    type: int
+    default: 72
+  - name: sample_count
+    type: int
+    default: 5
+  - name: normalize
+    type: bool
+    default: true
+  - name: out
+    type: str
+    default: pages_rendered_manifest.jsonl
+  - name: report
+    type: str
+    default: extraction_report.jsonl
+notes: "Attempts to extract embedded full-page images directly from PDF XObject streams. Falls back to pdf2image rendering if embedded images are not available or extraction fails. Validated for Fighting Fantasy gamebooks (old PDF: 150 DPI native, pristine PDF: 72 DPI native)."

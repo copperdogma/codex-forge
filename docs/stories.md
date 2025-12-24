@@ -4,22 +4,23 @@
 Guiding priorities: **development stability first**, then **quality definitions**, followed by **core gameplay enrichment**. Finish Fighting Fantasy to 100% "game-ready" status before scaling optimizations or starting the genealogy pilot.
 
 1. DONE: **053 — Pipeline Smoke Test (Static Sample, No External Calls)**: Essential for developer productivity and CI stability; catches integration breakages without incurring API costs.
-3. **095 — Combat and Enemy Extraction**: High-value enrichment; parses enemy stat blocks and outcomes critical for the game engine's primary mechanic.
-4. **094 — Inventory Parsing and Extraction**: Core enrichment for tracking item gains, losses, and conditional possession logic in the engine.
-5. **088 — Choice Parsing Enhancements (HTML + Linking)**: Improves structural HTML quality and link recall before scaling to the full library.
-6. **066 — FF Pipeline Accel + Accuracy Guardrails**: Optimizes the now-stable GPT-5.1 pipeline for speed and cost efficiency without risking regressions.
-7. **084 — Fast PDF Image Extraction (Embedded Streams)**: Technical optimization to significantly reduce slow and expensive PDF rasterization time.
+3. DONE: **095 — Combat and Enemy Extraction**: High-value enrichment; parses enemy stat blocks and outcomes critical for the game engine's primary mechanic.
+4. DONE: **094 — Inventory Parsing and Extraction**: Core enrichment for tracking item gains, losses, and conditional possession logic in the engine.
+5. DONE: **088 — Choice Parsing Enhancements (HTML + Linking)**: Improves structural HTML quality and link recall before scaling to the full library.
+6. **084 — Fast PDF Image Extraction (Embedded Streams)**: Technical optimization to significantly reduce slow and expensive PDF rasterization time.
+7. **102 — X-Height Measurement and Target Investigation**: Critical investigation into x-height measurement accuracy and optimal target selection. System measurements don't match manual measurements, and 24px target may be unnecessarily large if native 14px works well.
 8. **087 — Retire Legacy OCR-Only Recipe**: Housekeeping to reduce maintenance overhead and prevent accidental use of superseded OCR-ensemble paths.
+8. **101 — ARM64 Environment Cleanup Investigation**: Investigate and clean up obsolete ARM64/MPS environment requirements now that canonical pipeline uses AI-first OCR instead of EasyOCR.
 9. **075 — Booktype Text Cleanup Adapter (Downstream Normalization)**: Refines final text fidelity via deterministic tools and lexicon-guided normalization.
-10. **080 — Central Escalation Cache (Premium OCR Overlay)**: Architectural cleanup to eliminate redundant vision calls and unify page-level provenance.
-13. **024 — Image cropper follow-up**: Improves quality of extracted illustrations and diagrams via more advanced detector backends.
-14. **011 — AI planner to assemble pipelines**: Facilitates easier configuration for diverse book types via agentic goal-to-recipe matching.
-15. **038 — Agentic Pipeline Coordinator**: Fundamental shift toward autonomous quality monitoring, sanity checking, and self-healing artifacts.
-16. **098 — Late-Stage Section Validation and Reachability Analysis**: Final integrity pass to ensure 100% graph connectivity across all extracted gameplay mechanics.
-2. **083 — Game-Ready Validation Checklist**: Establishes the formal quality bar for "authoritative" artifacts before declaring the FF phase complete.
-11. **009 — Layout-preserving extractor**: Prerequisite capability for handling non-narrative (tabular/complex) book layouts in the next phase.
-12. **026 — Onward to the Unknown — Arthur L'Heureux pilot**: First end-to-end testbed for genealogy/complex layouts; depends on 009.
-16. **099 — Remove dev-only backcompat disclaimer**: Final milestone marking the entire pipeline as stable and production-ready.
+10.  **080 — Central Escalation Cache (Premium OCR Overlay)**: Architectural cleanup to eliminate redundant vision calls and unify page-level provenance.
+11. **024 — Image cropper follow-up**: Improves quality of extracted illustrations and diagrams via more advanced detector backends.
+12. **011 — AI planner to assemble pipelines**: Facilitates easier configuration for diverse book types via agentic goal-to-recipe matching.
+13. **038 — Agentic Pipeline Coordinator**: Fundamental shift toward autonomous quality monitoring, sanity checking, and self-healing artifacts.
+14. **098 — Late-Stage Section Validation and Reachability Analysis**: Final integrity pass to ensure 100% graph connectivity across all extracted gameplay mechanics.
+15. **083 — Game-Ready Validation Checklist**: Establishes the formal quality bar for "authoritative" artifacts before declaring the FF phase complete.
+16. **009 — Layout-preserving extractor**: Prerequisite capability for handling non-narrative (tabular/complex) book layouts in the next phase.
+17. **026 — Onward to the Unknown — Arthur L'Heureux pilot**: First end-to-end testbed for genealogy/complex layouts; depends on 009.
+18. **099 — Remove dev-only backcompat disclaimer**: Final milestone marking the entire pipeline as stable and production-ready.
 
 
 
@@ -98,7 +99,7 @@ This index tracks stories in `/docs/stories/` for the codex-forge pipeline.
 || 081 | GPT‑5.1 AI‑First OCR Pipeline (HTML‑First) | High | Done | /docs/stories/story-081-ai-ocr-gpt51-pipeline.md |
 || 082 | Large-Image PDF Cost Optimization | High | Done | /docs/stories/story-082-large-image-pdf-cost-optimization.md |
 || 083 | Game-Ready Validation Checklist | High | To Do | /docs/stories/story-083-game-ready-validation-checklist.md |
-|| 084 | Fast PDF Image Extraction (Embedded Streams) | Medium | To Do | /docs/stories/story-084-fast-pdf-image-extraction.md |
+|| 084 | Fast PDF Image Extraction (Embedded Streams) | High | Done | /docs/stories/story-084-fast-pdf-image-extraction.md |
 || 085 | Table Rescue OCR Pass | High | Done | /docs/stories/story-085-table-rescue-ocr.md |
 || 086 | Preserve HTML Through Final Gamebook | High | Done | /docs/stories/story-086-preserve-html-final-output.md |
 || 087 | Retire Legacy OCR-Only Recipe | Medium | To Do | /docs/stories/story-087-retire-legacy-ocr-recipe.md |
@@ -114,6 +115,9 @@ This index tracks stories in `/docs/stories/` for the codex-forge pipeline.
 || 097 | Stat Modification Extraction (Skill, Stamina, Luck Changes) | High | Done | /docs/stories/story-097-stat-modification-extraction.md |
 || 098 | Late-Stage Section Validation and Reachability Analysis | High | Done | /docs/stories/story-098-late-stage-section-validation.md |
 || 099 | Remove dev-only backcompat disclaimer | Low | To Do | /docs/stories/story-099-remove-dev-backcompat-note.md |
+||| 100 | Pipeline Visibility Cost Display Enhancement | Medium | To Do | /docs/stories/story-100-pipeline-visibility-cost-display.md |
+||| 101 | ARM64 Environment Cleanup Investigation | Medium | To Do | /docs/stories/story-101-arm64-environment-cleanup.md |
+||| 102 | X-Height Measurement and Target Investigation | High | To Do | /docs/stories/story-102-x-height-measurement-and-target-investigation.md |
 
 ## Notes
 - Status "Done" reflects current working state in codex-forge. "To Do" items are planned next steps aligned with `docs/requirements.md` and `snapshot.md`.

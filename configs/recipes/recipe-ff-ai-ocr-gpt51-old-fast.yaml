@@ -1,0 +1,272 @@
+# GPT‑5.1 AI‑first OCR pipeline with FAST extraction (old PDF)
+# Story 084: Uses extract_pdf_images_fast_v1 for 28× speedup
+# Old PDF has 150 DPI embedded images - fast extraction proven identical to rendering
+
+run_id: ff-ai-ocr-gpt51-old-fast
+input:
+  pdf: input/06 deathtrap dungeon.pdf
+output_dir: output/runs/ff-ai-ocr-gpt51-old-fast
+
+stages:
+  - id: extract_pdf_images_capped
+    stage: extract
+    module: extract_pdf_images_fast_v1
+    out: pages_rendered_manifest.jsonl
+    params:
+      start: 1
+      end: 113  # full book; override via settings for smoke runs
+      fallback_to_render: true
+      fallback_dpi: 300
+      target_line_height: 24  # Normalize to 24px x-height for optimal OCR quality/cost
+
+  - id: split_pages
+    stage: extract
+    module: split_pages_from_manifest_v1
+    needs: [extract_pdf_images_capped]
+    inputs:
+      pages: extract_pdf_images_capped
+    out: pages_split_manifest.jsonl
+
+  - id: ocr_ai
+    stage: extract
+    module: ocr_ai_gpt51_v1
+    needs: [split_pages]
+    inputs:
+      pages: split_pages
+    out: pages_html.jsonl
+    params:
+      model: gpt-5.1
+      ocr_hints: |
+        - This book uses either running heads OR page numbers, not both on the same page.
+        - In gameplay pages, section numbers are centered standalone digits (1–3 digits) and should be <h2>.
+        - Do not treat running heads (e.g., "16-17") as section headers.
+
+  - id: table_rescue
+    stage: adapter
+    module: table_rescue_html_v1
+    needs: [ocr_ai]
+    inputs:
+      pages: ocr_ai
+    out: pages_html_rescued.jsonl
+    params:
+      model: gpt-5.1
+      max_pages: 10
+      crop_bottom: 0.42
+      rescue_hints: |
+        - When options are presented in columns or rows, preserve the grid as a <table>.
+        - Preserve row/column separation for repeated option lists and references.
+
+  - id: html_blocks_raw
+    stage: adapter
+    module: html_to_blocks_v1
+    needs: [table_rescue]
+    inputs:
+      pages: table_rescue
+    out: page_blocks.jsonl
+
+  - id: coarse_segment_html
+    stage: portionize
+    module: coarse_segment_html_v1
+    needs: [html_blocks_raw]
+    inputs:
+      pages: html_blocks_raw
+    out: coarse_segments.json
+
+  - id: html_repair_loop
+    stage: portionize
+    module: detect_boundaries_html_loop_v1
+    needs: [table_rescue, coarse_segment_html]
+    inputs:
+      pages: table_rescue
+      coarse_segments: coarse_segment_html
+    out: pages_html_repaired.jsonl
+    params:
+      min_section: 1
+      max_section: 400
+      allow_missing: true
+
+  - id: html_blocks_repaired
+    stage: adapter
+    module: html_to_blocks_v1
+    needs: [html_repair_loop]
+    inputs:
+      pages: html_repair_loop
+    out: page_blocks_repaired.jsonl
+
+  - id: detect_boundaries_html
+    stage: portionize
+    module: detect_boundaries_html_v1
+    needs: [html_blocks_repaired, coarse_segment_html]
+    inputs:
+      pages: html_blocks_repaired
+      coarse_segments: coarse_segment_html
+    out: section_boundaries.jsonl
+    params:
+      include_background: true
+
+  - id: portionize_html
+    stage: portionize
+    module: portionize_html_extract_v1
+    needs: [html_blocks_repaired, detect_boundaries_html]
+    inputs:
+      pages: html_blocks_repaired
+      boundaries: detect_boundaries_html
+    out: portions_enriched.jsonl
+    params:
+      drop_raw_text: true
+
+  - id: extract_choices
+    stage: extract
+    module: extract_choices_relaxed_v1
+    needs: [portionize_html]
+    inputs:
+      pages: portionize_html
+    out: portions_with_choices.jsonl
+
+  - id: repair_choices
+    stage: enrich
+    module: choices_repair_relaxed_v1
+    needs: [extract_choices]
+    inputs:
+      pages: html_blocks_repaired
+      inputs: extract_choices
+    out: portions_with_choices_repaired.jsonl
+    params:
+      model: gpt-5.1
+      max_sources: 50
+      max_calls: 50
+
+  - id: validate_choice_links
+    stage: enrich
+    module: validate_choice_links_v1
+    needs: [repair_choices]
+    inputs:
+      pages: html_blocks_repaired
+      input: repair_choices
+    out: portions_with_choices_validated.jsonl
+    params:
+      model: gpt-4.1-mini
+      max_ai_calls: 50
+      check_multi_links: true
+
+  - id: extract_combat
+    stage: enrich
+    module: extract_combat_v1
+    needs: [validate_choice_links, html_blocks_repaired]
+    inputs:
+      portions: validate_choice_links
+      pages: html_blocks_repaired
+    out: portions_with_combat.jsonl
+    params:
+      model: gpt-4.1-mini
+      use_ai: true
+      max_ai_calls: 50
+
+  - id: extract_inventory
+    stage: enrich
+    module: extract_inventory_v1
+    needs: [extract_combat, html_blocks_repaired]
+    inputs:
+      portions: extract_combat
+      pages: html_blocks_repaired
+    out: portions_with_inventory.jsonl
+    params:
+      model: gpt-4.1-mini
+      use_ai: true
+      max_ai_calls: 50
+
+  - id: extract_stat_checks
+    stage: enrich
+    module: extract_stat_checks_v1
+    needs: [extract_inventory, html_blocks_repaired]
+    inputs:
+      portions: extract_inventory
+      pages: html_blocks_repaired
+    out: portions_with_stats.jsonl
+    params:
+      model: gpt-4.1-mini
+      use_ai: true
+      max_ai_calls: 50
+
+  - id: extract_stat_modifications
+    stage: enrich
+    module: extract_stat_modifications_v1
+    needs: [extract_stat_checks, html_blocks_repaired]
+    inputs:
+      portions: extract_stat_checks
+      pages: html_blocks_repaired
+    out: portions_with_mods.jsonl
+    params:
+      model: gpt-4.1-mini
+      use_ai: true
+      max_ai_calls: 50
+
+  - id: validate_reachability
+    stage: validate
+    module: validate_holistic_reachability_v1
+    needs: [extract_stat_modifications]
+    inputs:
+      portions: extract_stat_modifications
+    out: reachability_report.json
+
+  - id: detect_endings
+    stage: enrich
+    module: ending_guard_v1
+    needs: [extract_stat_modifications]
+    inputs:
+      pages: html_blocks_repaired
+      inputs: extract_stat_modifications
+    out: portions_with_endings.jsonl
+    params:
+      model: gpt-5.1
+      skip_ai: false
+      # Auto-detects sections with is_gameplay=true and no choices
+
+  - id: report_pipeline_issues
+    stage: adapter
+    module: report_pipeline_issues_v1
+    needs: [detect_endings]
+    out: issues_report.jsonl
+
+  - id: build_gamebook
+    stage: build
+    module: build_ff_engine_with_issues_v1
+    needs: [report_pipeline_issues, detect_endings]
+    inputs:
+      portions: detect_endings
+      issues_report: report_pipeline_issues
+    out: gamebook_raw.json
+    params:
+      title: Deathtrap Dungeon
+      author: Ian Livingstone
+      emit_text: false
+      emit_provenance_text: false
+      allow_stubs: true
+
+  - id: clean_presentation
+    stage: export
+    module: clean_html_presentation_v1
+    needs: [build_gamebook]
+    inputs:
+      input: build_gamebook
+    out: gamebook.json
+    params:
+      preserve_original_html: true
+      remove_section_headers: true
+      remove_running_heads: true
+      remove_page_numbers: true
+      remove_images: true
+
+  - id: validate_gamebook
+    stage: validate
+    module: validate_ff_engine_v2
+    needs: [clean_presentation, report_pipeline_issues, detect_endings, detect_boundaries_html, html_blocks_repaired, validate_reachability]
+    inputs:
+      gamebook: clean_presentation
+      portions: detect_endings
+      boundaries: detect_boundaries_html
+      elements_core: html_blocks_repaired
+      reachability_report: validate_reachability
+    out: validation_report.json
+    params:
+      forensics: true

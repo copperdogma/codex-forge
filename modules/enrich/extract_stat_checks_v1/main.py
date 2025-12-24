@@ -145,7 +145,14 @@ def audit_stat_checks_batch(audit_list: List[Dict[str, Any]], model: str, client
             "prompt_tokens": response.usage.prompt_tokens,
             "completion_tokens": response.usage.completion_tokens,
         }
-        log_llm_usage(run_id, "stat_check_audit", usage)
+        if usage:
+            log_llm_usage(
+                model=usage.get("model", "gpt-4.1-mini"),
+                prompt_tokens=usage.get("prompt_tokens", 0),
+                completion_tokens=usage.get("completion_tokens", 0),
+                stage_id="stat_check_audit",
+                run_id=run_id
+            )
         
         return json.loads(response.choices[0].message.content)
     except Exception as e:
@@ -194,7 +201,14 @@ def main():
             
             c_ai, l_ai, usage = extract_stat_checks_llm(llm_input, args.model, client)
             ai_calls += 1
-            log_llm_usage(args.run_id, "extract_stat_checks", usage)
+            if usage:
+                log_llm_usage(
+                    model=usage.get("model", args.model),
+                    prompt_tokens=usage.get("prompt_tokens", 0),
+                    completion_tokens=usage.get("completion_tokens", 0),
+                    stage_id="extract_stat_checks",
+                    run_id=args.run_id
+                )
             if c_ai or l_ai:
                 checks, luck_tests = c_ai, l_ai
         
@@ -232,13 +246,17 @@ def main():
             removals_set = set()
             removals_map = {}
             for r in removals:
-                sid_r = str(r.get("section_id"))
-                removals_set.add((sid_r, str(r.get("type")), int(r.get("item_index"))))
-                removals_map.setdefault(sid_r, set()).add(int(r.get("item_index")))
+                item_index = r.get("item_index")
+                if item_index is not None:
+                    sid_r = str(r.get("section_id"))
+                    removals_set.add((sid_r, str(r.get("type")), int(item_index)))
+                    removals_map.setdefault(sid_r, set()).add(int(item_index))
             
             corrections_map = {}
             for c in corrections:
-                corrections_map.setdefault(str(c.get("section_id")), {})[int(c.get("item_index"))] = c.get("data")
+                item_index = c.get("item_index")
+                if item_index is not None:
+                    corrections_map.setdefault(str(c.get("section_id")), {})[int(item_index)] = c.get("data")
             
             additions_map = {}
             for a in additions:
@@ -253,7 +271,14 @@ def main():
                         if idx < len(p.stat_checks):
                             merged = p.stat_checks[idx].model_dump()
                             merged.update(new_data)
-                            p.stat_checks[idx] = StatCheck(**merged)
+                            # Filter out None values for required fields before validation
+                            merged = {k: v for k, v in merged.items() if v is not None or k in ["fail_section"]}
+                            try:
+                                p.stat_checks[idx] = StatCheck(**merged)
+                            except Exception as e:
+                                # Skip invalid corrections
+                                print(f"Warning: Skipping invalid correction for section {sid}, index {idx}: {e}")
+                                continue
                         elif idx < (len(p.stat_checks) + len(p.test_luck)):
                             l_idx = idx - len(p.stat_checks)
                             merged = p.test_luck[l_idx].model_dump()

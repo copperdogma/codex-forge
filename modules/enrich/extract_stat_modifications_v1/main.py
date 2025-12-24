@@ -135,7 +135,14 @@ def audit_stat_modifications_batch(audit_list: List[Dict[str, Any]], model: str,
             "prompt_tokens": response.usage.prompt_tokens,
             "completion_tokens": response.usage.completion_tokens,
         }
-        log_llm_usage(run_id, "stat_mod_audit", usage)
+        if usage:
+            log_llm_usage(
+                model=usage.get("model", "gpt-4.1-mini"),
+                prompt_tokens=usage.get("prompt_tokens", 0),
+                completion_tokens=usage.get("completion_tokens", 0),
+                stage_id="stat_mod_audit",
+                run_id=run_id
+            )
         
         return json.loads(response.choices[0].message.content)
     except Exception as e:
@@ -184,7 +191,14 @@ def main():
             
             m_ai, usage = extract_stat_modifications_llm(llm_input, args.model, client)
             ai_calls += 1
-            log_llm_usage(args.run_id, "extract_stat_modifications", usage)
+            if usage:
+                log_llm_usage(
+                    model=usage.get("model", args.model),
+                    prompt_tokens=usage.get("prompt_tokens", 0),
+                    completion_tokens=usage.get("completion_tokens", 0),
+                    stage_id="extract_stat_modifications",
+                    run_id=args.run_id
+                )
             if m_ai:
                 mods = m_ai
         

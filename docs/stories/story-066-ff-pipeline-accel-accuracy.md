@@ -15,6 +15,8 @@ Speed up the **GPT‑5.1 HTML‑first** Fighting Fantasy pipeline with profiling
 
 ## Tasks
 - [ ] Profile GPT‑5.1 pipeline stages (timing + cost per module) and record baselines.
+- [ ] Test calling gpt51 calls in parallel to speed up the pipeline.
+- [ ] Can we use prompt caching to save costs?
 - [ ] Add rate‑limit/backoff and concurrency controls for OCR AI calls (API stability).
 - [ ] Add caching/hash reuse for unchanged page images to skip re‑OCR.
 - [ ] Benchmark and capture baseline vs optimized runtimes and costs on a reference FF book.
