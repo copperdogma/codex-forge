@@ -146,7 +146,7 @@ This index tracks stories in `/docs/stories/` for the codex-forge pipeline.
 || 090 | Run Summary UX (Missing Sections + Stage Metrics) | Medium | Done | /docs/stories/story-090-run-summary-and-missing-section-signal.md |
 || 091 | Orphaned Section Mitigation | High | Done | /docs/stories/story-091-orphaned-section-mitigation.md |
 || 092 | HTML Presentation Cleanup | High | To Do | /docs/stories/story-092-html-presentation-cleanup.md |
-|| 093 | Coarse Portionizer Endmatter Filter | High | To Do | /docs/stories/story-093-coarse-portionizer-endmatter-filter.md |
+|| 093 | Coarse Portionizer Endmatter Filter | High | Done | /docs/stories/story-093-coarse-portionizer-endmatter-filter.md |
 || 099 | Remove dev-only backcompat disclaimer | Low | To Do | /docs/stories/story-099-remove-dev-backcompat-note.md |
 
 ## Notes

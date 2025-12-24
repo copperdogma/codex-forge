@@ -15,6 +15,55 @@ from modules.common.utils import read_jsonl, save_jsonl, ProgressLogger
 TEXT_BLOCKS = {"p", "li", "dd", "dt", "td", "th"}
 STRUCTURAL_TAGS = {"table", "thead", "tbody", "tr", "ol", "ul", "dl"}
 
+# Generic endmatter patterns (not book-specific)
+ENDMATTER_RUNNING_HEAD_PATTERNS = [
+    r"more\s+fighting\s+fantasy",
+    r"also\s+(?:available|in)",  # Matches "also available" or "also in"
+    r"coming\s+soon",
+    r"further\s+adventures?",
+]
+
+def _is_endmatter_running_head(block: Dict[str, Any]) -> bool:
+    """Detect running heads that indicate endmatter (series ads, book lists)."""
+    if block.get("block_type") != "p":
+        return False
+    cls = (block.get("attrs") or {}).get("class")
+    if cls != "running-head":
+        return False
+    text = (block.get("text") or "").strip().lower()
+    for pattern in ENDMATTER_RUNNING_HEAD_PATTERNS:
+        if re.search(pattern, text, re.IGNORECASE):
+            return True
+    return False
+
+
+def _is_book_title_header(block: Dict[str, Any]) -> bool:
+    """Detect headers that look like book titles (numbered list format)."""
+    block_type = block.get("block_type")
+    if block_type not in {"h1", "h2"}:
+        return False
+    text = (block.get("text") or "").strip()
+    # Pattern: "N. BOOK TITLE" where N is a number (typically 1-50 for book lists)
+    # Must be all caps or title case to distinguish from gameplay sections
+    if re.match(r"^\d{1,2}\.\s+[A-Z][A-Z\s\-:]+$", text):
+        return True
+    return False
+
+
+def _is_author_name_line(block: Dict[str, Any]) -> bool:
+    """Detect author name patterns (typically follow book titles)."""
+    if block.get("block_type") != "p":
+        return False
+    text = (block.get("text") or "").strip()
+    # Pattern: "Firstname Lastname" or "Name and Name" or "By Name"
+    # Typically short lines with proper case (not all caps, not lowercase)
+    if not text or len(text) > 60:  # Author names are typically short
+        return False
+    # Check for author-like patterns
+    if re.match(r"^(?:By\s+)?[A-Z][a-z]+(?:\s+(?:and\s+)?[A-Z][a-z]+)+$", text):
+        return True
+    return False
+
 
 def _coerce_int(val: Any) -> Optional[int]:
     if isinstance(val, int):
@@ -74,12 +123,22 @@ def build_elements(pages: List[Dict[str, Any]]) -> Tuple[List[Dict[str, Any]], D
     return elements, id_to_index, page_to_image
 
 
-def _skip_block(block: Dict[str, Any], skip_running_heads: bool, skip_page_numbers: bool) -> bool:
+def _skip_block(block: Dict[str, Any], skip_running_heads: bool, skip_page_numbers: bool, skip_endmatter: bool = False) -> bool:
     block_type = block.get("block_type")
     if not block_type:
         return True
     if block_type.startswith("/"):
         return False
+
+    # Generic endmatter filtering (applies to all FF books)
+    if skip_endmatter:
+        if _is_endmatter_running_head(block):
+            return True
+        if _is_book_title_header(block):
+            return True
+        if _is_author_name_line(block):
+            return True
+
     if block_type in {"h1", "h2"}:
         return True
     if block_type == "img":
@@ -97,10 +156,10 @@ def _skip_block(block: Dict[str, Any], skip_running_heads: bool, skip_page_numbe
     return False
 
 
-def _assemble_text(span: List[Dict[str, Any]], skip_running_heads: bool, skip_page_numbers: bool) -> str:
+def _assemble_text(span: List[Dict[str, Any]], skip_running_heads: bool, skip_page_numbers: bool, skip_endmatter: bool = False) -> str:
     parts: List[str] = []
     for b in span:
-        if _skip_block(b, skip_running_heads, skip_page_numbers):
+        if _skip_block(b, skip_running_heads, skip_page_numbers, skip_endmatter):
             continue
         if b.get("block_type") not in TEXT_BLOCKS:
             continue
@@ -122,13 +181,24 @@ def _format_attrs(block: Dict[str, Any]) -> str:
     return ""
 
 
-def _assemble_html(span: List[Dict[str, Any]], skip_running_heads: bool, skip_page_numbers: bool) -> str:
+def _assemble_html(span: List[Dict[str, Any]], skip_running_heads: bool, skip_page_numbers: bool, skip_endmatter: bool = False) -> str:
     parts: List[str] = []
     for b in span:
         block_type = b.get("block_type")
         if not block_type:
             continue
         text = (b.get("text") or "").strip()
+
+        # Apply endmatter filtering first (most specific)
+        if skip_endmatter:
+            if _is_endmatter_running_head(b):
+                continue
+            if _is_book_title_header(b):
+                continue
+            if _is_author_name_line(b):
+                continue
+
+        # Apply legacy running head/page number filtering
         if (skip_running_heads or skip_page_numbers) and block_type == "p":
             cls = (b.get("attrs") or {}).get("class")
             if skip_running_heads and cls == "running-head":
@@ -138,6 +208,7 @@ def _assemble_html(span: List[Dict[str, Any]], skip_running_heads: bool, skip_pa
             order_val = _coerce_int(b.get("order"))
             if skip_running_heads and order_val == 1 and re.match(r"^\d{1,3}[-–]\d{1,3}$", text):
                 continue
+
         if block_type.startswith("/"):
             parts.append(f"</{block_type[1:]}>")
             continue
@@ -190,11 +261,16 @@ def main() -> None:
     parser.add_argument("--skip_page_numbers", dest="skip_page_numbers", action="store_true")
     parser.add_argument("--keep-page-numbers", dest="skip_page_numbers", action="store_false")
     parser.add_argument("--keep_page_numbers", dest="skip_page_numbers", action="store_false")
+    parser.set_defaults(skip_page_numbers=True)
+    parser.add_argument("--skip-endmatter", dest="skip_endmatter", action="store_true", help="Filter out endmatter patterns (book ads, titles, author names)")
+    parser.add_argument("--skip_endmatter", dest="skip_endmatter", action="store_true")
+    parser.add_argument("--keep-endmatter", dest="skip_endmatter", action="store_false")
+    parser.add_argument("--keep_endmatter", dest="skip_endmatter", action="store_false")
+    parser.set_defaults(skip_endmatter=True)
     parser.add_argument("--min-section", dest="min_section", type=int, default=None)
     parser.add_argument("--min_section", dest="min_section", type=int, default=None)
     parser.add_argument("--max-section", dest="max_section", type=int, default=None)
     parser.add_argument("--max_section", dest="max_section", type=int, default=None)
-    parser.set_defaults(skip_page_numbers=True)
     parser.add_argument("--emit-raw-text", dest="emit_raw_text", action="store_true")
     parser.add_argument("--emit_raw_text", dest="emit_raw_text", action="store_true")
     parser.add_argument("--drop-raw-text", dest="emit_raw_text", action="store_false")
@@ -255,7 +331,7 @@ def main() -> None:
         end_idx = id_to_index.get(end_id, len(elements)) if end_id else len(elements)
 
         span = elements[start_idx:end_idx]
-        raw_text = _assemble_text(span, args.skip_running_heads, args.skip_page_numbers) if args.emit_raw_text else ""
+        raw_text = _assemble_text(span, args.skip_running_heads, args.skip_page_numbers, args.skip_endmatter) if args.emit_raw_text else ""
 
         page_numbers = [e["page_number"] for e in span if e.get("page_number") is not None]
         if page_numbers:
@@ -278,7 +354,7 @@ def main() -> None:
             if img and img not in source_images:
                 source_images.append(img)
 
-        raw_html = _assemble_html(span, False, False)
+        raw_html = _assemble_html(span, False, False, args.skip_endmatter)
         out_rows.append({
             "schema_version": "enriched_portion_v1",
             "module_id": "portionize_html_extract_v1",
