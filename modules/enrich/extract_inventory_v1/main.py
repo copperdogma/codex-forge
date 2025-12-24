@@ -17,25 +17,21 @@ GAIN_PATTERNS = [
     re.compile(r"\b(.*?)\s+is\s+yours\b", re.IGNORECASE),
 ]
 
-# Losing: "you lose", "you drop", "is taken", "remove"
 LOSE_PATTERNS = [
-    re.compile(r"\byou\s+(?:lose|drop|discard|remove)\s+(?:a\b|the\b|an\b)?\s*(.*?)(?:\.|$|\band\b|\bturn\b)", re.IGNORECASE),
+    re.compile(r"\byou\s+(?:lose|drop|discard|remove)\s+(?:the\s+|a\s+|an\s+)?(.*?)(?:\.|$|\band\b|\bturn\b)", re.IGNORECASE),
     re.compile(r"\b(?:is|are)\s+taken\s+from\s+you\b", re.IGNORECASE),
 ]
 
-# Using: "you use", "you drink", "you eat", "using the"
 USE_PATTERNS = [
-    re.compile(r"\byou\s+(?:use|drink|eat|read)\s+(?:the\b|a\b|an\b)?\s*(.*?)(?:\.|$|\band\b|\bturn\b)", re.IGNORECASE),
+    re.compile(r"\byou\s+(?:use|drink|eat|read)\s+(?:the\s+|a\s+|an\s+)?(.*?)(?:\.|$|\band\b|\bturn\b)", re.IGNORECASE),
     re.compile(r"\bwith\s+the\b\s+(.*?)(?:\.|$|\band\b|\bturn\b)", re.IGNORECASE),
 ]
 
-# Checks: "if you have", "if you possess", "is in your backpack"
 CHECK_PATTERNS = [
-    re.compile(r"\bif\s+you\s+(?:have|possess|are\s+carrying)\s+(?:the\b|a\b|an\b)?\s*(.*?)(?:,|$|\bturn\b)", re.IGNORECASE),
-    re.compile(r"\bif\s+(?:the\b|a\b|an\b)?\s*(.*?)\s+is\s+in\s+your\s+backpack\b", re.IGNORECASE),
+    re.compile(r"\bif\s+you\s+(?:have|possess|are\s+carrying)\s+(?:the\s+|a\s+|an\s+)?(.*?)(?:,|$|\bturn\b)", re.IGNORECASE),
+    re.compile(r"\bif\s+(?:the\s+|a\s+|an\s+)?(.*?)\s+is\s+in\s+your\s+backpack\b", re.IGNORECASE),
 ]
 
-# Quantity: try to extract a leading number
 QUANTITY_PATTERN = re.compile(r"^(\d+|one|two|three|four|five|six|seven|eight|nine|ten)\s+(.*)", re.IGNORECASE)
 
 NUM_MAP = {
@@ -51,11 +47,12 @@ Detect:
 - items_used: Items the player uses or consumes (potions, keys).
 - inventory_checks: Conditional checks on item possession.
 
-For each item, include:
-- item: The clean name of the item.
-- quantity: Number of items (default 1).
-- condition: (For checks only) The condition phrase like "if you have".
-- target_section: (For checks only) The section to turn to if the check passes.
+IMPORTANT RULES:
+- Only extract PHYSICAL objects (keys, potions, gold, weapons, etc.).
+- DO NOT extract abstract concepts like "time", "aim", "balance", "luck", "yourself", "not done so already".
+- DO NOT extract sentences or fragments like "not done so already", "any left", "if you have not".
+- Item names should be clean and concise (e.g., "Silver Key", not "the rusty silver key you found").
+- quantity should be an integer or the string "all".
 
 Example output:
 {
@@ -67,8 +64,29 @@ Example output:
   }
 }
 
-If no inventory actions are found, return {"inventory": {}}.
+If no physical inventory actions are found, return {"inventory": {}}.
 """
+
+AUDIT_SYSTEM_PROMPT = """You are a quality assurance auditor for a Fighting Fantasy gamebook extraction pipeline.
+I will provide a list of inventory items extracted from various sections of the book.
+Your job is to identify FALSE POSITIVES—entries that are NOT physical items or valid game actions.
+
+Common False Positives to flag:
+- Sentence fragments: "not done so already", "any left", "it is ours"
+- Character states: "yourself", "dripping with sweat", "helplessly"
+- Abstract concepts: "time", "luck", "aim", "balance"
+- Non-item nouns: "officials", "Dwarf", "most extraordinarily lifelike statues"
+- Locations: "end of a tunnel", "large cavern"
+
+For each section, review the items and tell me which ones to REMOVE.
+Return a JSON object with a "removals" key:
+{
+  "removals": [
+    { "section_id": "1", "item": "officials", "action": "remove" },
+    { "section_id": "18", "item": "not done so already", "action": "check" }
+  ]
+}
+If everything is correct, return {"removals": []}."""
 
 # --- Logic ---
 
@@ -77,13 +95,14 @@ def _parse_item_text(text: str) -> Tuple[Optional[str], int]:
     if not text:
         return None, 1
     
-    # Filter out common pronouns and articles that might be captured by loose regex
     text_lower = text.lower()
-    if text_lower in {"it", "them", "him", "her", "some", "none", "your", "his", "their", "my"}:
+    if text_lower in {
+        "it", "them", "him", "her", "some", "none", "your", "his", "their", "my", 
+        "yourself", "himself", "herself", "not", "not done so already", "already"
+    }:
         return None, 1
     
-    # Strip leading "your " etc
-    for p in ["your ", "his ", "her ", "their ", "my ", "its "]:
+    for p in ["your ", "his ", "her ", "their ", "my ", "its ", "the ", "a ", "an "]:
         if text_lower.startswith(p):
             text = text[len(p):].strip()
             text_lower = text.lower()
@@ -104,20 +123,18 @@ def extract_inventory_regex(text: str) -> InventoryEnrichment:
     used = []
     checks = []
 
-    # This is a very naive regex implementation.
-    # It will likely have many false positives and misses.
-    # In a real scenario, we'd refine these patterns or rely more on LLM.
-    
-    # We only apply regex if we see strong keywords to minimize false positives
-    if not any(k in text.lower() for k in ["backpack", "gold pieces", "potion", "item", "possess", "carrying", "find", "take", "lose", "drop", "have"]):
-        return InventoryEnrichment()
+    STRICT_ITEMS = ["gold pieces", "provisions", "potion", "key", "rope", "spike", "mallet", "shield", "sword"]
+    lower_text = text.lower()
+    if not any(k in lower_text for k in ["backpack", "gold pieces", "potion", "item", "possess", "carrying"]):
+        if not any(k in lower_text for k in STRICT_ITEMS):
+            return InventoryEnrichment()
 
     for pattern in GAIN_PATTERNS:
         for match in pattern.finditer(text):
             item_text = match.group(1)
             if item_text:
                 name, qty = _parse_item_text(item_text)
-                if name and len(name) < 50:
+                if name and len(name) < 40:
                     gained.append(InventoryItem(item=name, quantity=qty, confidence=0.7))
 
     for pattern in LOSE_PATTERNS:
@@ -125,7 +142,7 @@ def extract_inventory_regex(text: str) -> InventoryEnrichment:
             item_text = match.group(1)
             if item_text:
                 name, qty = _parse_item_text(item_text)
-                if name and len(name) < 50:
+                if name and len(name) < 40:
                     lost.append(InventoryItem(item=name, quantity=qty, confidence=0.7))
 
     for pattern in USE_PATTERNS:
@@ -133,14 +150,13 @@ def extract_inventory_regex(text: str) -> InventoryEnrichment:
             item_text = match.group(1)
             if item_text:
                 name, qty = _parse_item_text(item_text)
-                if name and len(name) < 50:
+                if name and len(name) < 40:
                     used.append(InventoryItem(item=name, quantity=qty, confidence=0.7))
 
     for pattern in CHECK_PATTERNS:
         for match in pattern.finditer(text):
             item_text = match.group(1)
             if item_text:
-                # Capture the specific condition keyword(s)
                 raw_match = match.group(0).lower()
                 if "if you have" in raw_match: condition = "if you have"
                 elif "if you possess" in raw_match: condition = "if you possess"
@@ -149,28 +165,38 @@ def extract_inventory_regex(text: str) -> InventoryEnrichment:
                 else: condition = "item check"
                 
                 name, _ = _parse_item_text(item_text)
-                if name and len(name) < 50:
+                if name and len(name) < 40:
                     checks.append(InventoryCheck(item=name, condition=condition, confidence=0.7))
     
     return InventoryEnrichment(items_gained=gained, items_lost=lost, items_used=used, inventory_checks=checks)
 
 def validate_inventory(inv: InventoryEnrichment) -> bool:
     """Returns True if the inventory data looks sane."""
-    # Basic sanity: no empty item names, reasonable quantities
+    BLACK_LIST = {
+        "time", "aim", "balance", "luck", "yourself", "not", "already", 
+        "not done so already", "done so already", "any left", "one", 
+        "some", "none", "not done so already)?", "it"
+    }
+    
     all_items = inv.items_gained + inv.items_lost + inv.items_used
     for item in all_items:
-        if not item.item or len(item.item) < 2:
+        name_lower = item.item.lower().strip(" .,?!()")
+        if not name_lower or len(name_lower) < 3:
             return False
-        if item.quantity <= 0 or item.quantity > 1000:
+        if name_lower in BLACK_LIST:
             return False
-        # Check for obvious garbage
-        if "turn to" in item.item.lower() or "turn over" in item.item.lower():
+        if "turn to" in name_lower or "?" in name_lower:
+            return False
+        if len(name_lower) > 50:
             return False
             
     for check in inv.inventory_checks:
-        if not check.item or len(check.item) < 2:
+        name_lower = check.item.lower().strip(" .,?!()")
+        if not name_lower or len(name_lower) < 3:
             return False
-        if "turn to" in check.item.lower():
+        if name_lower in BLACK_LIST:
+            return False
+        if "turn to" in name_lower or "?" in name_lower:
             return False
             
     return True
@@ -196,10 +222,37 @@ def extract_inventory_llm(text: str, model: str, client: OpenAI) -> Tuple[Invent
         data = json.loads(content)
         inv_data = data.get("inventory", {})
         
-        gained = [InventoryItem(**item, confidence=0.95) for item in inv_data.get("items_gained", [])]
-        lost = [InventoryItem(**item, confidence=0.95) for item in inv_data.get("items_lost", [])]
-        used = [InventoryItem(**item, confidence=0.95) for item in inv_data.get("items_used", [])]
-        checks = [InventoryCheck(**item, confidence=0.95) for item in inv_data.get("inventory_checks", [])]
+        def parse_qty(q):
+            if isinstance(q, int): return q
+            if str(q).isdigit(): return int(q)
+            if str(q).lower() == "all": return "all"
+            return 1
+
+        gained = [
+            InventoryItem(item=item.get("item"), quantity=parse_qty(item.get("quantity")), confidence=0.95) 
+            for item in inv_data.get("items_gained", [])
+            if item.get("item")
+        ]
+        lost = [
+            InventoryItem(item=item.get("item"), quantity=parse_qty(item.get("quantity")), confidence=0.95) 
+            for item in inv_data.get("items_lost", [])
+            if item.get("item")
+        ]
+        used = [
+            InventoryItem(item=item.get("item"), quantity=parse_qty(item.get("quantity")), confidence=0.95) 
+            for item in inv_data.get("items_used", [])
+            if item.get("item")
+        ]
+        checks = [
+            InventoryCheck(
+                item=item.get("item"), 
+                condition=item.get("condition") or "if you have", 
+                target_section=str(item.get("target_section")) if item.get("target_section") else None,
+                confidence=0.95
+            ) 
+            for item in inv_data.get("inventory_checks", [])
+            if item.get("item")
+        ]
         
         return InventoryEnrichment(
             items_gained=gained,
@@ -210,6 +263,34 @@ def extract_inventory_llm(text: str, model: str, client: OpenAI) -> Tuple[Invent
     except Exception as e:
         print(f"LLM inventory extraction error: {e}")
         return InventoryEnrichment(), {}
+
+def audit_inventory_batch(audit_list: List[Dict[str, Any]], model: str, client: OpenAI) -> List[Dict[str, Any]]:
+    """Performs a global audit over all extracted inventory items to prune debris."""
+    if not audit_list:
+        return []
+    
+    try:
+        response = client.chat.completions.create(
+            model=model,
+            messages=[
+                {"role": "system", "content": AUDIT_SYSTEM_PROMPT},
+                {"role": "user", "content": f"AUDIT LIST:\n{json.dumps(audit_list, indent=2)}"}
+            ],
+            response_format={"type": "json_object"}
+        )
+        
+        usage = {
+            "model": model,
+            "prompt_tokens": response.usage.prompt_tokens,
+            "completion_tokens": response.usage.completion_tokens,
+        }
+        log_llm_usage("global_audit", "inventory_audit", usage)
+        
+        data = json.loads(response.choices[0].message.content)
+        return data.get("removals", [])
+    except Exception as e:
+        print(f"Global inventory audit error: {e}")
+        return []
 
 def main():
     parser = argparse.ArgumentParser(description="Extract inventory actions from enriched portions.")
@@ -234,8 +315,8 @@ def main():
     ai_calls = 0
     
     out_portions = []
+    audit_data = [] 
     
-    # High-signal keywords that strongly suggest inventory actions
     INV_KEYWORDS = ["backpack", "gold pieces", "potion", "possess", "carrying", "you find", "you take", "you lose", "you drop", "if you have"]
 
     for idx, row in enumerate(portions):
@@ -246,23 +327,17 @@ def main():
         if not text:
             text = ""
         
-        # 1. TRY: Regex attempt (only for gains for now as a spike)
         inv = extract_inventory_regex(text)
-        
-        # 2. VALIDATE
         is_valid = validate_inventory(inv)
         
-        # 3. ESCALATE
         needs_ai = False
         if not is_valid:
             needs_ai = True
         elif not inv.items_gained and not inv.items_lost and not inv.items_used and not inv.inventory_checks:
-            # If regex found nothing, check if we should escalate based on keywords
             if any(k in text.lower() for k in INV_KEYWORDS):
                 needs_ai = True
         
         if needs_ai and args.use_ai and ai_calls < args.max_ai_calls:
-            # print(f"DEBUG: Triggering AI inventory extraction for section {portion.section_id}")
             llm_input = text
             if len(text) < 100 and portion.raw_html:
                 llm_input = f"HTML SOURCE:\n{portion.raw_html}\n\nPLAIN TEXT:\n{text}"
@@ -274,14 +349,40 @@ def main():
                 inv = inv_llm
         
         portion.inventory = inv
-        out_portions.append(portion.model_dump(exclude_none=True))
+        
+        sid = portion.section_id or portion.portion_id
+        for item in inv.items_gained: audit_data.append({"section_id": sid, "item": item.item, "action": "add"})
+        for item in inv.items_lost: audit_data.append({"section_id": sid, "item": item.item, "action": "remove"})
+        for item in inv.items_used: audit_data.append({"section_id": sid, "item": item.item, "action": "use"})
+        for item in inv.inventory_checks: audit_data.append({"section_id": sid, "item": item.item, "action": "check"})
+
+        out_portions.append(portion)
         
         if (idx + 1) % 50 == 0:
             logger.log("extract_inventory", "running", current=idx+1, total=total_portions, 
                        message=f"Processed {idx+1}/{total_portions} portions (AI calls: {ai_calls})")
 
-    save_jsonl(args.out, out_portions)
-    logger.log("extract_inventory", "done", message=f"Extracted inventory for {total_portions} portions. Total AI calls: {ai_calls}", artifact=args.out)
+    if args.use_ai and audit_data:
+        logger.log("extract_inventory", "running", message=f"Performing global audit on {len(audit_data)} items...")
+        removals = audit_inventory_batch(audit_data, args.model, client)
+        if removals:
+            print(f"Global audit identified {len(removals)} false positives to remove.")
+            removals_map = {} 
+            for r in removals:
+                key = (str(r.get("section_id")), str(r.get("item")), str(r.get("action")))
+                removals_map[key] = True
+            
+            for p in out_portions:
+                if p.inventory:
+                    sid = p.section_id or p.portion_id
+                    p.inventory.items_gained = [i for i in p.inventory.items_gained if (str(sid), str(i.item), "add") not in removals_map]
+                    p.inventory.items_lost = [i for i in p.inventory.items_lost if (str(sid), str(i.item), "remove") not in removals_map]
+                    p.inventory.items_used = [i for i in p.inventory.items_used if (str(sid), str(i.item), "use") not in removals_map]
+                    p.inventory.inventory_checks = [i for i in p.inventory.inventory_checks if (str(sid), str(i.item), "check") not in removals_map]
+
+    final_rows = [p.model_dump(exclude_none=True) for p in out_portions]
+    save_jsonl(args.out, final_rows)
+    logger.log("extract_inventory", "done", message=f"Extracted inventory for {total_portions} portions. Total AI calls: {ai_calls} + 1 audit.", artifact=args.out)
 
 if __name__ == "__main__":
     main()

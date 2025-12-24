@@ -40,7 +40,7 @@ class ItemEffect(BaseModel):
 
 class InventoryItem(BaseModel):
     item: str
-    quantity: int = 1
+    quantity: Union[int, str] = 1
     confidence: float = 1.0
 
 

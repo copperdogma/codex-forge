@@ -82,6 +82,8 @@ Currently, this information is only present in plain text. Extracting it into st
    - Use pattern matching for fast, deterministic detection
    - Use LLM for validation and complex cases (multiple modifications, special rules)
    - Combine results with confidence scoring
+4. **Global AI Audit** (post-process):
+   - Perform a final batch audit over all extracted stat modifications to prune false positives and normalize phrasing, referencing the pattern established in Story 094 (Inventory Parsing).
 
 **Output Schema:**
 ```json
