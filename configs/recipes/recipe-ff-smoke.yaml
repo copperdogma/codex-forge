@@ -117,6 +117,14 @@ stages:
       use_ai: false # skip AI in smoke
       max_ai_calls: 0
 
+  - id: validate_reachability
+    stage: validate
+    module: validate_holistic_reachability_v1
+    needs: [extract_stat_modifications]
+    inputs:
+      portions: extract_stat_modifications
+    out: reachability_report.json
+
   - id: detect_endings
     stage: enrich
     module: ending_guard_v1

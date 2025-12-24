@@ -903,21 +903,21 @@ def build_command(entrypoint: str, params: Dict[str, Any], stage_conf: Dict[str,
         gamebook_path = artifact_inputs.get("gamebook") or artifact_inputs.get("input")
         if gamebook_path:
             cmd += ["--gamebook", gamebook_path]; flags_added.add("--gamebook")
-        boundaries_path = artifact_inputs.get("boundaries")
-        if boundaries_path:
-            cmd += ["--boundaries", boundaries_path]; flags_added.add("--boundaries")
-        elements_path = artifact_inputs.get("elements")
-        if elements_path:
-            cmd += ["--elements", elements_path]; flags_added.add("--elements")
-        # Only validate_ff_engine_v2 supports forensics + extra inputs
-        if stage_conf["module"] == "validate_ff_engine_v2":
-            elements_core_path = artifact_inputs.get("elements_core")
-            if elements_core_path:
-                cmd += ["--elements-core", elements_core_path]; flags_added.add("--elements-core")
-            portions_path = artifact_inputs.get("portions")
-            if portions_path:
-                cmd += ["--portions", portions_path]; flags_added.add("--portions")
+        
+        # Pass all other artifact_inputs as flags (e.g. --portions, --boundaries)
+        for extra_key, extra_val in artifact_inputs.items():
+            if extra_key == "gamebook":
+                continue
+            flag = "--" + extra_key.replace("_", "-")
+            if flag in flags_added:
+                continue
+            cmd += [flag, str(extra_val)]
+            flags_added.add(flag)
+
+        # Legacy special-case for forensics in ff_engine_v2
+        if stage_conf["module"] == "validate_ff_engine_v2" and "--forensics" not in flags_added:
             cmd += ["--forensics"]; flags_added.add("--forensics")
+            
         cmd += ["--out", artifact_path]
         flags_added.add("--out")
 

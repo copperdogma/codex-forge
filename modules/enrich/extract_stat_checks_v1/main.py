@@ -260,9 +260,12 @@ def main():
 
                 if sid in additions_map:
                     for a_data in additions_map[sid]:
-                        m_type = a_data.pop("type", "stat_check")
-                        if m_type == "stat_check": p.stat_checks.append(StatCheck(**a_data))
-                        elif m_type == "test_luck": p.test_luck.append(TestLuck(**a_data))
+                        # Robustly detect type based on keys
+                        is_luck = "lucky_section" in a_data and "unlucky_section" in a_data
+                        if is_luck:
+                            p.test_luck.append(TestLuck(**a_data))
+                        else:
+                            p.stat_checks.append(StatCheck(**a_data))
 
     final_rows = [p.model_dump(exclude_none=True) for p in out_portions]
     save_jsonl(args.out, final_rows)

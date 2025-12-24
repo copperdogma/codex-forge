@@ -1,6 +1,6 @@
 # Story: Late-Stage Section Validation and Reachability Analysis
 
-**Status**: To Do  
+**Status**: Done
 **Created**: 2025-12-23  
 **Priority**: High  
 **Parent Story**: story-083 (Game-Ready Validation Checklist)
@@ -27,16 +27,16 @@ A final, late-stage validation pass ensures:
 
 ## Success Criteria
 
-- [ ] **Aggregate all references**: Collect referenced section IDs from:
+- [x] **Aggregate all references**: Collect referenced section IDs from:
     - `choices.target`
     - `combat.win_section`, `combat.loss_section`, `combat.escape_section`
     - `stat_checks.pass_section`, `stat_checks.fail_section`
     - `inventory_checks.target_section`
-- [ ] **Verify reachability**: Compare the aggregated list against the authoritative list of `section_id`s in the run.
-- [ ] **Broken Link Detection**: Flag any reference to a section ID that does not exist in the final artifact.
-- [ ] **Island Section Detection**: Flag any section (except Section 1 and Frontmatter) that has zero incoming references from any mechanic.
-- [ ] **Unified Validation Report**: Emit a detailed JSON/HTML report summarizing the "connectivity health" of the book.
-- [ ] **Recipe Integration**: Insert this as a final safety gate in `recipe-ff-ai-ocr-gpt51.yaml` before export.
+- [x] **Verify reachability**: Compare the aggregated list against the authoritative list of `section_id`s in the run.
+- [x] **Broken Link Detection**: Flag any reference to a section ID that does not exist in the final artifact.
+- [x] **Island Section Detection**: Flag any section (except Section 1 and Frontmatter) that has zero incoming references from any mechanic.
+- [x] **Unified Validation Report**: Emit a detailed JSON/HTML report summarizing the "connectivity health" of the book.
+- [x] **Recipe Integration**: Insert this as a final safety gate in `recipe-ff-ai-ocr-gpt51.yaml` before export.
 
 ---
 
@@ -57,12 +57,12 @@ A final, late-stage validation pass ensures:
 
 ## Tasks
 
-- [ ] Design the holistic reachability validator module.
-- [ ] Implement reference aggregation for all enrichment types (Choices, Combat, Stats, Inventory).
-- [ ] Implement broken link and orphan section logic.
-- [ ] Generate a visual or structured connectivity report.
-- [ ] Integrate into the canonical Fighting Fantasy recipe.
-- [ ] Verify on a full book run (e.g., Deathtrap Dungeon) and document findings.
+- [x] Design the holistic reachability validator module.
+- [x] Implement reference aggregation for all enrichment types (Choices, Combat, Stats, Inventory).
+- [x] Implement broken link and orphan section logic.
+- [x] Generate a visual or structured connectivity report.
+- [x] Integrate into the canonical Fighting Fantasy recipe.
+- [x] Verify on a full book run (e.g., Deathtrap Dungeon) and document findings.
 
 ---
 
@@ -71,3 +71,8 @@ A final, late-stage validation pass ensures:
 ### 20251223-XXXX — Story created
 - **Result:** Story defined.
 - **Notes:** Shifting validation to the end of the pipeline allows us to catch broken links that regex-only or single-mechanic validators miss.
+
+### 20251223-XXXX — Implementation and Integration
+- **Result:** Success. Implemented `validate_holistic_reachability_v1` and integrated it as a final safety gate.
+- **Notes:** Updated `driver.py` to support flexible flag passing for the `validate` stage. Verified on *Deathtrap Dungeon*, successfully identifying the known orphan section (281) and confirming overall graph integrity.
+- **Outcome:** Holistic connectivity analysis is now part of the canonical enrichment pipeline.

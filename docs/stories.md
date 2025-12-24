@@ -112,7 +112,7 @@ This index tracks stories in `/docs/stories/` for the codex-forge pipeline.
 || 095 | Combat and Enemy Extraction | High | Done | /docs/stories/story-095-combat-enemy-extraction.md |
 || 096 | Stat Check Extraction (Skill, Luck, and Dice Rolls) | High | Done | /docs/stories/story-096-stat-check-extraction.md |
 || 097 | Stat Modification Extraction (Skill, Stamina, Luck Changes) | High | Done | /docs/stories/story-097-stat-modification-extraction.md |
-|| 098 | Late-Stage Section Validation and Reachability Analysis | High | To Do | /docs/stories/story-098-late-stage-section-validation.md |
+|| 098 | Late-Stage Section Validation and Reachability Analysis | High | Done | /docs/stories/story-098-late-stage-section-validation.md |
 || 099 | Remove dev-only backcompat disclaimer | Low | To Do | /docs/stories/story-099-remove-dev-backcompat-note.md |
 
 ## Notes
