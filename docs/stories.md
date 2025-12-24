@@ -102,7 +102,7 @@ This index tracks stories in `/docs/stories/` for the codex-forge pipeline.
 || 085 | Table Rescue OCR Pass | High | Done | /docs/stories/story-085-table-rescue-ocr.md |
 || 086 | Preserve HTML Through Final Gamebook | High | Done | /docs/stories/story-086-preserve-html-final-output.md |
 || 087 | Retire Legacy OCR-Only Recipe | Medium | To Do | /docs/stories/story-087-retire-legacy-ocr-recipe.md |
-|| 088 | Choice Parsing Enhancements | High | To Do | /docs/stories/story-088-choice-parsing-enhancements.md |
+|| 088 | Choice Parsing Enhancements | High | Done | /docs/stories/story-088-choice-parsing-enhancements.md |
 || 089 | Pristine Book Parity (Missing Sections + Robustness) | High | Done | /docs/stories/story-089-pristine-book-parity.md |
 || 090 | Run Summary UX (Missing Sections + Stage Metrics) | Medium | Done | /docs/stories/story-090-run-summary-and-missing-section-signal.md |
 || 091 | Orphaned Section Mitigation | High | Done | /docs/stories/story-091-orphaned-section-mitigation.md |

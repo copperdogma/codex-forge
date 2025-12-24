@@ -37,6 +37,42 @@ class ChoiceCandidate:
     position: int  # Character position in text
 
 
+def extract_choices_html(html: str) -> List[ChoiceCandidate]:
+    """
+    Extract choices from HTML structural tags (e.g., <a href="#123">).
+    """
+    if not html:
+        return []
+    
+    candidates = []
+    # Pattern for <a href="#123">...</a>
+    # Robust to newlines and whitespace:
+    # 1. <a ... href="#123" ...>
+    # 2. text content (possibly with tags or newlines)
+    # 3. </a>
+    link_pattern = re.compile(r'<a\s+[^>]*href=["\']#(\d+)["\'][^>]*>(.*?)</a>', re.IGNORECASE | re.DOTALL)
+    
+    for match in link_pattern.finditer(html):
+        target_str = match.group(1)
+        # Clean up text content: remove HTML tags and normalize whitespace
+        text_content = re.sub(r'<[^>]+>', '', match.group(2))
+        text_content = re.sub(r'\s+', ' ', text_content).strip()
+        
+        try:
+            target = int(target_str)
+            candidates.append(ChoiceCandidate(
+                target=target,
+                text_snippet=text_content or f"Turn to {target}",
+                confidence=1.0, # Structural tags are high confidence
+                pattern="html_link",
+                position=match.start()
+            ))
+        except ValueError:
+            continue
+            
+    return candidates
+
+
 def _normalize_section_ref_token(token: str) -> Optional[int]:
     """
     Normalize common OCR confusions in a numeric section reference token.
@@ -351,15 +387,21 @@ def main():
     
     for i, portion in enumerate(portions):
         section_id = portion.get('section_id', '')
-        raw_html = portion.get('raw_html') or ''
+        raw_html = portion.get('raw_html') or portion.get('html') or ''
         html_text = html_to_text(raw_html)
         text = html_text
         
-        # Extract candidates using pattern matching
+        # 1. PRIMARY: Structural HTML links
+        html_candidates = extract_choices_html(raw_html)
+        
+        # 2. SECONDARY: Regex pattern matching on text
         candidates = extract_choice_patterns(text, min_section, max_section)
         
+        # Combine all candidates
+        all_candidates = html_candidates + candidates
+        
         # Deduplicate
-        choices = deduplicate_choices(candidates, "pattern_match")
+        choices = deduplicate_choices(all_candidates, "pattern_match_hybrid")
 
         relaxed_candidates = extract_choice_patterns_relaxed(html_text, min_section, max_section)
         relaxed_choices = deduplicate_choices(relaxed_candidates, "pattern_match_relaxed")

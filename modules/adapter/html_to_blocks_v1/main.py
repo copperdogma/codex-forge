@@ -9,7 +9,7 @@ from typing import Any, Dict, List, Optional
 from modules.common.utils import read_jsonl, save_jsonl, ensure_dir, ProgressLogger
 
 
-BLOCK_TAGS = {"h1", "h2", "p", "dt", "dd", "li", "caption", "th", "td", "img"}
+BLOCK_TAGS = {"h1", "h2", "p", "dt", "dd", "li", "caption", "th", "td", "img", "a"}
 CONTAINER_TAGS = {"table", "thead", "tbody", "tr", "ol", "ul", "dl"}
 
 
@@ -68,6 +68,11 @@ class HtmlBlockParser(HTMLParser):
                 for k, v in attrs:
                     if k.lower() == "class" and v:
                         attrs_dict["class"] = v
+                        break
+            elif tag == "a":
+                for k, v in attrs:
+                    if k.lower() == "href" and v:
+                        attrs_dict["href"] = v
                         break
             self._current = {
                 "block_type": tag,

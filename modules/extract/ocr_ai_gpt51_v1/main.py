@@ -19,7 +19,7 @@ except Exception as exc:  # pragma: no cover - environment dependency
 ALLOWED_TAGS = {
     "h1", "h2", "h3", "p", "strong", "em", "ol", "ul", "li",
     "table", "thead", "tbody", "tr", "th", "td", "caption",
-    "img", "dl", "dt", "dd",
+    "img", "dl", "dt", "dd", "a",
 }
 
 RUNNING_HEAD_CLASS = "running-head"
@@ -34,12 +34,14 @@ Allowed tags (only):
 - Emphasis: <strong>, <em>
 - Lists: <ol>, <ul>, <li>
 - Tables: <table>, <thead>, <tbody>, <tr>, <th>, <td>, <caption>
+- Navigation: <a href="#123"> (use for explicit navigation choices like 'turn to 123')
 - Running head / page number: <p class="running-head">, <p class="page-number">
 - Images: <img alt="..."> (placeholder only, no src)
 
 Rules:
 - Preserve exact wording, punctuation, and numbers.
 - Reflow paragraphs (no hard line breaks within a paragraph).
+- Navigation Links: Wrap the target number or the whole instruction in <a href="#N"> where N is the target section number (e.g., <a href="#55">turn to 55</a>).
 - Keep running heads and page numbers if present (use the classed <p> tags above).
 - Use <h2> for section numbers when they are clearly section headers.
 - Use <h1> only for true page titles/headings.
@@ -87,6 +89,18 @@ class TagSanitizer(HTMLParser):
                     alt = v or ""
                     break
             self.out.append(f"<img alt=\"{alt}\">")
+            return
+        if tag == "a":
+            href = ""
+            for k, v in attrs:
+                if k.lower() == "href":
+                    href = v or ""
+                    break
+            # Only keep internal fragments (like #123)
+            if href.startswith("#"):
+                self.out.append(f"<a href=\"{href}\">")
+            else:
+                self.out.append("<a>")
             return
         if tag == "p":
             cls = None
@@ -146,7 +160,7 @@ def main() -> None:
     parser.add_argument("--allow-empty", dest="allow_empty", action="store_true")
     parser.add_argument("--ocr-hints", dest="ocr_hints", help="Recipe-level OCR hints text")
     parser.add_argument("--ocr_hints", dest="ocr_hints", help="Recipe-level OCR hints text")
-    parser.add_argument("--save-raw", dest="save_raw", action="store_true")
+    parser.add_argument("--save-raw", "--save_raw", dest="save_raw", action="store_true")
     parser.add_argument("--force", action="store_true", help="Overwrite existing output")
     parser.add_argument("--resume", action="store_true", help="Skip pages already written (default)")
     parser.set_defaults(resume=True)

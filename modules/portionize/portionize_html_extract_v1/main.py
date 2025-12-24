@@ -12,7 +12,7 @@ from typing import Any, Dict, List, Optional, Tuple
 from modules.common.utils import read_jsonl, save_jsonl, ProgressLogger
 
 
-TEXT_BLOCKS = {"p", "li", "dd", "dt", "td", "th"}
+TEXT_BLOCKS = {"p", "li", "dd", "dt", "td", "th", "a"}
 STRUCTURAL_TAGS = {"table", "thead", "tbody", "tr", "ol", "ul", "dl"}
 
 # Generic endmatter patterns (not book-specific)
@@ -128,7 +128,7 @@ def _skip_block(block: Dict[str, Any], skip_running_heads: bool, skip_page_numbe
     block_type = block.get("block_type")
     if not block_type:
         return True
-    if block_type.startswith("/"):
+    if block_type.startswith("/") or block_type == "a":
         return False
 
     # Generic endmatter filtering (applies to all FF books)
@@ -177,9 +177,12 @@ def _format_attrs(block: Dict[str, Any]) -> str:
     attrs = block.get("attrs") or {}
     if not attrs:
         return ""
+    parts = []
     if "class" in attrs and attrs["class"]:
-        return f' class="{attrs["class"]}"'
-    return ""
+        parts.append(f' class="{attrs["class"]}"')
+    if "href" in attrs and attrs["href"]:
+        parts.append(f' href="{attrs["href"]}"')
+    return "".join(parts)
 
 
 def _assemble_html(span: List[Dict[str, Any]], skip_running_heads: bool, skip_page_numbers: bool, skip_endmatter: bool = False) -> str:
@@ -233,7 +236,7 @@ def _assemble_html(span: List[Dict[str, Any]], skip_running_heads: bool, skip_pa
             parts.append(f"<img alt=\"{alt}\">")
             continue
 
-        if block_type in {"p", "li", "dd", "dt", "h1", "h2"}:
+        if block_type in {"p", "li", "dd", "dt", "h1", "h2", "a"}:
             attrs = _format_attrs(b)
             parts.append(f"<{block_type}{attrs}>")
             if text:
