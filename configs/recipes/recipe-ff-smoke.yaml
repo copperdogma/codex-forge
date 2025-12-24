@@ -1,50 +1,129 @@
-run_id: ff-smoke
+# Smoke test recipe for Fighting Fantasy AI pipeline
+# Uses pre-generated stubs to bypass expensive API calls.
+
+run_id: smoke-ff
 input:
   pdf: testdata/tbotb-mini.pdf
-output_dir: /tmp/cf-smoke-ff
+output_dir: output/runs/smoke-ff
 
 stages:
-  - id: clean_pages
-    stage: adapter
-    module: load_stub_v1
+  - id: load_blocks
+    stage: extract
+    module: load_artifact_v1
+    out: pages_clean.jsonl
     params:
-      stub: testdata/smoke/ff/pages_clean.jsonl
+      path: testdata/smoke/ff/pages_clean.jsonl
       out: pages_clean.jsonl
       schema_version: clean_page_v1
-  - id: regions
-    stage: portionize
-    module: portionize_regions_v1
-    needs: [clean_pages]
-    params:
-      skip_ai: true
-      stub: testdata/smoke/ff/regions.json
-      window: 6
-      stride: 4
-      pages: testdata/smoke/ff/pages_clean.jsonl
-      out: regions.json
-  - id: headers
-    stage: portionize
-    module: portionize_headers_v1
-    needs: [clean_pages, regions]
-    params:
-      skip_ai: true
-      stub: testdata/smoke/ff/portion_hyp.jsonl
-      window: 3
-      stride: 1
-      pages: testdata/smoke/ff/pages_clean.jsonl
-      regions: testdata/smoke/ff/regions.json
-      out: portion_hyp.jsonl
-  - id: resolve_main
+
+  - id: convert_to_blocks
     stage: adapter
-    module: portion_hyp_to_resolved_v1
-    needs: [headers]
-    params: {}
-  - id: build_raw
-    stage: build
-    module: build_portions_v1
-    needs: [clean_pages, resolve_main]
+    module: text_to_html_blocks_v1
+    needs: [load_blocks]
     inputs:
-      pages: clean_pages
-      portions: resolve_main
-    out: portions_final_raw.json
-    params: {}
+      pages: load_blocks
+    out: page_blocks.jsonl
+
+  - id: load_boundaries
+    stage: extract
+    module: load_artifact_v1
+    out: section_boundaries.jsonl
+    params:
+      path: testdata/smoke/ff/section_boundaries_stub.jsonl
+      out: section_boundaries.jsonl
+      schema_version: section_boundary_v1
+
+  - id: portionize_html
+    stage: portionize
+    module: portionize_html_extract_v1
+    needs: [convert_to_blocks, load_boundaries]
+    inputs:
+      pages: convert_to_blocks
+      boundaries: load_boundaries
+    out: portions_enriched.jsonl
+    params:
+      drop_raw_text: true
+
+  - id: extract_choices
+    stage: extract
+    module: extract_choices_relaxed_v1
+    needs: [portionize_html]
+    inputs:
+      pages: portionize_html
+    out: portions_with_choices.jsonl
+
+  - id: validate_choice_links
+    stage: enrich
+    module: validate_choice_links_v1
+    needs: [extract_choices, convert_to_blocks]
+    inputs:
+      pages: convert_to_blocks
+      input: extract_choices
+    out: portions_with_choices_validated.jsonl
+    params:
+      model: gpt-4.1-mini
+      max_ai_calls: 0 # skip AI in smoke
+      check_multi_links: true
+
+  - id: detect_endings
+    stage: enrich
+    module: ending_guard_v1
+    needs: [validate_choice_links, convert_to_blocks]
+    inputs:
+      pages: convert_to_blocks
+      inputs: validate_choice_links
+    out: portions_with_endings.jsonl
+    params:
+      model: gpt-5.1
+      skip_ai: true # support skip_ai in ending_guard
+
+  - id: report_pipeline_issues
+    stage: adapter
+    module: report_pipeline_issues_v1
+    needs: [detect_endings]
+    out: issues_report.jsonl
+
+  - id: build_gamebook
+    stage: build
+    module: build_ff_engine_with_issues_v1
+    needs: [report_pipeline_issues, detect_endings]
+    inputs:
+      portions: detect_endings
+      issues_report: report_pipeline_issues
+    out: gamebook_raw.json
+    params:
+      title: Smoke Test Book
+      author: Ryan North
+      emit_text: false
+      emit_provenance_text: false
+      allow_stubs: true
+      expected_range: 3-8
+
+  - id: clean_presentation
+    stage: export
+    module: clean_html_presentation_v1
+    needs: [build_gamebook]
+    inputs:
+      input: build_gamebook
+    out: gamebook.json
+    params:
+      preserve_original_html: true
+      remove_section_headers: true
+      remove_running_heads: true
+      remove_page_numbers: true
+      remove_images: true
+
+  - id: validate_gamebook
+    stage: validate
+    module: validate_ff_engine_v2
+    needs: [clean_presentation, report_pipeline_issues, detect_endings, load_boundaries, convert_to_blocks]
+    inputs:
+      gamebook: clean_presentation
+      portions: detect_endings
+      boundaries: load_boundaries
+      elements_core: convert_to_blocks
+    out: validation_report.json
+    params:
+      forensics: true
+      expected_range_start: 3
+      expected_range_end: 8

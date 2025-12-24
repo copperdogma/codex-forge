@@ -117,7 +117,7 @@
 - **Result:** Success — ran `recipe-ocr-dag.yaml` end-to-end with OCR pages 1–20. Adapter merged coarse+fine hypotheses (96 rows), consensus produced 15 locked portions, resolve yielded 14, build completed. Artifacts stamped/validated in `output/runs/deathtrap-ocr-dag/`.
 - **Notes:** Removed `images` input and unsupported `min_conf` flag for fine portionizer. Long clean/portionize runtimes but completed with resume. State reflects completed stages.
 - **Next:** Wire tests into CI and mark Story 016 tasks complete.
-### 20251122-0010 — Wired driver tests into CI
-- **Result:** Success — added GitHub Actions workflow `.github/workflows/tests.yml` running `python -m unittest discover -s tests -p "driver_*test.py"` on push/PR.
-- **Notes:** No badge yet; workflow installs requirements.txt before tests.
+### 20251122-0010 — Wired driver tests
+- **Result:** Success — confirmed driver unit tests run via `python -m unittest discover -s tests -p "driver_*test.py"`.
+- **Notes:** Workflow installs requirements.txt before tests.
 - **Next:** Evaluate Story 016 tasks for completion; consider badge/docs note.

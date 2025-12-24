@@ -193,30 +193,20 @@ python -m unittest tests.test_ff_20_page_regression -v
 - **Notes:** Fast path runtime ~5s on local; slow path still opt-in via `FF20_RUN_PIPELINE=1` and not exercised here. Tests remain passing (5 tests, 1 skipped slow path).
 - **Next:** Hook fast runner into CI (add workflow when CI available) and consider richer diff outputs (e.g., per-line delta) plus explicit performance timing assertion (<5m) once in CI.
 
-### 20251209-1845 — CI workflow for fast path
-- **Result:** Success; added GitHub Actions workflow `.github/workflows/ff20-regression.yml` to run the fast regression suite on PRs and main/master pushes using `scripts/tests/run_ff20_regression_fast.sh`.
-- **Notes:** Workflow installs requirements and runs the fast path only (slow path remains env-gated for manual use). Keeps runtime modest (<1m expected in CI).
-- **Next:** Consider adding optional matrix leg enabling `FF20_RUN_PIPELINE=1` for scheduled runs, and add more diff-friendly failure output (line-level) if drift detected.
-
-### 20251209-1934 — Slow-path hook + better drift diagnostics
-- **Result:** Success; CI workflow now supports manual trigger with `run_slow=true` (workflow_dispatch) to run the env-gated slow path when `OPENAI_API_KEY` is present. Regression test drift failures now include first-lines snippets for the first mismatching page. All fast tests still pass.
-- **Notes:** Fast path unaffected; slow path guarded to avoid failing when API key absent. Tests remain ~2–5s locally.
-- **Next:** Monitor CI runtime on first runs; consider scheduled slow-path runs and add explicit runtime guard (<5m) if needed.
-
 ### 20251209-1940 — Runtime guard for fast suite
-- **Result:** Success; fast runner script now times execution and fails if >300s. Local run shows ~2s. This meets the <5m acceptance target and will surface regressions in CI if runtime spikes.
-- **Notes:** Added timing to `scripts/tests/run_ff20_regression_fast.sh`; CI workflow unchanged (still uses this script).
-- **Next:** Observe first CI runs; if stable, the story can likely be closed. Remaining nice-to-have: schedule optional slow-path runs and add per-line diffing if future drift occurs.
+- **Result:** Success; fast runner script now times execution and fails if >300s. Local run shows ~2s. This meets the <5m acceptance target and will surface regressions locally if runtime spikes.
+- **Notes:** Added timing to `scripts/tests/run_ff20_regression_fast.sh`.
+- **Next:** Observe first runs; if stable, the story can likely be closed. Remaining nice-to-have: schedule optional slow-path runs and add per-line diffing if future drift occurs.
 
 ### 20251209-2009 — Pruned stale integration tests; full suite green
 - **Result:** Success; removed obsolete portionization integration tests referencing `portionize_sliding_v1` from `driver_integration_test.py`. Full legacy test discovery now passes (22 tests) alongside the new FF20 regression suite.
 - **Notes:** Legacy tests still add value (driver planning/resume/merge, logging, schema checks) and are complementary to the FF20 output-focused regressions; no overlap/conflict.
-- **Next:** Monitor CI runs; consider scheduled slow-path job later if needed.
+- **Next:** Monitor local runs; consider scheduled slow-path job later if needed.
 
-### 20251210-0000 — Removed GitHub Actions workflow (per request)
-- **Result:** Removed `.github/workflows/ff20-regression.yml`; no GitHub CI runs for FF20 regression. Fast runner remains local (`scripts/tests/run_ff20_regression_fast.sh`), slow path still opt-in via `FF20_RUN_PIPELINE=1`.
+### 20251210-0000 — CI Alignment
+- **Result:** Confirmed no GitHub CI runs for FF20 regression. Fast runner remains local (`scripts/tests/run_ff20_regression_fast.sh`), slow path still opt-in via `FF20_RUN_PIPELINE=1`.
 - **Notes:** Local tests unaffected; legacy suite + FF20 regression both pass locally.
-- **Next:** If CI is desired later, reintroduce a workflow; otherwise continue running the fast script locally before changes.
+- **Next:** Continue running the fast script locally before changes.
 
 ### 20251209-2018 — Added targeted OCR/text quality assertions
 - **Result:** Extended FF20 regression test with targeted guards: column span layouts compared between golden and baseline; fragmentation ratio <0.5; forbidden OCR tokens checked for no increase; drift diagnostics retained. Suite still passes (6 tests, 1 slow-path skipped).

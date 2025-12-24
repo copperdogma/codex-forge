@@ -1,0 +1,12 @@
+module_id: text_to_html_blocks_v1
+stage: adapter
+description: "Converts clean_page_v1 text to simple page_html_blocks_v1."
+entrypoint: modules/common/text_to_html_blocks_v1/main.py
+params:
+  - name: pages
+    desc: "Path to clean_page_v1 JSONL"
+    required: true
+  - name: out
+    desc: "Output path for page_html_blocks_v1"
+    required: true
+output_schema: page_html_blocks_v1

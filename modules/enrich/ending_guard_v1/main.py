@@ -70,12 +70,15 @@ def main():
     parser.add_argument("--state-file", help="Pipeline state file (for driver compatibility).")
     parser.add_argument("--progress-file", help="Pipeline events file (for driver compatibility).")
     parser.add_argument("--run-id", help="Run ID (for driver compatibility).")
+    parser.add_argument("--skip-ai", "--skip_ai", action="store_true", help="Skip AI calls; assume open for all.")
     args = parser.parse_args()
 
     rows, fmt = load_portions(args.portions)
     by_id = {str(r.get("section_id") or r.get("portion_id")): r for r in rows}
 
-    if args.targets:
+    if args.skip_ai:
+        target_ids = set()
+    elif args.targets:
         target_ids = set(args.targets)
     else:
         # Auto-detect no-choice sections

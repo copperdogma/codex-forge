@@ -104,7 +104,8 @@ def build_elements(pages: List[Dict[str, Any]]) -> Tuple[List[Dict[str, Any]], D
         blocks = page.get("blocks") or []
         for block in blocks:
             order = block.get("order") or 0
-            element_id = f"p{page_number:03d}-b{order}"
+            # Prefer existing element_id if provided by upstream (e.g. stubs)
+            element_id = block.get("element_id") or f"p{page_number:03d}-b{order}"
             elem = {
                 "element_id": element_id,
                 "page_number": page_number,

@@ -108,6 +108,7 @@ class HtmlBlock(BaseModel):
     text: str
     order: int
     attrs: Optional[Dict[str, Any]] = None
+    element_id: Optional[str] = None
 
 
 class PageHtmlBlocks(BaseModel):
