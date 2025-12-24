@@ -1,0 +1,83 @@
+# Verification Recipe for Choice Parsers + Tagging
+run_id: ff-tagging-verification
+input:
+  pdf: input/06 deathtrap dungeon.pdf
+output_dir: output/runs/ff-tagging-verification
+
+stages:
+  - id: split_pages
+    stage: extract
+    module: split_pages_v1
+    out: pages_split_manifest.jsonl
+    params:
+      start: 1
+      end: 50
+      dpi: 300
+
+  - id: ocr_html
+    stage: extract
+    module: ocr_ai_gpt51_v1
+    needs: [split_pages]
+    inputs:
+      pages: split_pages
+    out: pages_html.jsonl
+    params:
+      model: gpt-4.1-mini
+      save_raw: true
+
+  - id: convert_to_blocks
+    stage: adapter
+    module: html_to_blocks_v1
+    needs: [ocr_html]
+    inputs:
+      pages: ocr_html
+    out: page_blocks.jsonl
+
+  - id: detect_boundaries
+    stage: portionize
+    module: detect_boundaries_html_v1
+    needs: [convert_to_blocks]
+    inputs:
+      pages: convert_to_blocks
+    out: section_boundaries.jsonl
+    params:
+      min_section: 1
+      max_section: 400
+
+  - id: portionize
+    stage: portionize
+    module: portionize_html_extract_v1
+    needs: [convert_to_blocks, detect_boundaries]
+    inputs:
+      pages: convert_to_blocks
+      boundaries: detect_boundaries
+    params:
+      emit_raw_text: true
+
+  - id: extract_choices
+    stage: extract
+    module: extract_choices_relaxed_v1
+    needs: [portionize]
+    inputs:
+      pages: portionize
+    out: portions_with_choices.jsonl
+
+  - id: build_gamebook
+    stage: build
+    module: build_ff_engine_with_issues_v1
+    needs: [extract_choices]
+    inputs:
+      portions: extract_choices
+    out: gamebook_raw.json
+    params:
+      title: "Tagging Test"
+      author: "Ian Livingstone"
+      allow_stubs: true
+
+  - id: clean_presentation
+    stage: export
+    module: clean_html_presentation_v1
+    needs: [build_gamebook]
+    inputs:
+      input: build_gamebook
+    out: gamebook.json

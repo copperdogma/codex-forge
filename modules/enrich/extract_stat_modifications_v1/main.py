@@ -219,15 +219,18 @@ def main():
             # Map by section ID for easy access
             removals_map = {}
             for r in removals:
-                removals_map.setdefault(str(r.get("section_id")), set()).add(int(r.get("item_index")))
+                sid_r = str(r.get("section_id"))
+                removals_map.setdefault(sid_r, set()).add(int(r.get("item_index")))
             
             corrections_map = {}
             for c in corrections:
-                corrections_map.setdefault(str(c.get("section_id")), {})[int(c.get("item_index"))] = c.get("data")
+                sid_c = str(c.get("section_id"))
+                corrections_map.setdefault(sid_c, {})[int(c.get("item_index"))] = c.get("data")
             
             additions_map = {}
             for a in additions:
-                additions_map.setdefault(str(a.get("section_id")), []).append(a.get("data"))
+                sid_a = str(a.get("section_id"))
+                additions_map.setdefault(sid_a, []).append(a.get("data"))
 
             for p in out_portions:
                 sid = str(p.section_id or p.portion_id)

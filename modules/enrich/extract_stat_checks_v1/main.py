@@ -230,12 +230,15 @@ def main():
             print(f"Global audit identified {len(removals)} removals, {len(corrections)} corrections, and {len(additions)} additions.")
             
             removals_set = set()
+            removals_map = {}
             for r in removals:
-                removals_set.add((str(r.get("section_id")), str(r.get("type")), int(r.get("item_index"))))
+                sid_r = str(r.get("section_id"))
+                removals_set.add((sid_r, str(r.get("type")), int(r.get("item_index"))))
+                removals_map.setdefault(sid_r, set()).add(int(r.get("item_index")))
             
             corrections_map = {}
             for c in corrections:
-                corrections_map[(str(c.get("section_id")), str(c.get("type")), int(c.get("item_index")))] = c.get("data")
+                corrections_map.setdefault(str(c.get("section_id")), {})[int(c.get("item_index"))] = c.get("data")
             
             additions_map = {}
             for a in additions:
@@ -244,27 +247,31 @@ def main():
             for p in out_portions:
                 sid = str(p.section_id or p.portion_id)
                 
-                new_checks = []
-                for i, item in enumerate(p.stat_checks):
-                    key = (sid, "stat_check", i)
-                    if key in corrections_map: new_checks.append(StatCheck(**corrections_map[key]))
-                    elif key not in removals_set: new_checks.append(item)
-                p.stat_checks = new_checks
-
-                new_luck = []
-                for i, item in enumerate(p.test_luck):
-                    key = (sid, "test_luck", i)
-                    if key in corrections_map: new_luck.append(TestLuck(**corrections_map[key]))
-                    elif key not in removals_set: new_luck.append(item)
-                p.test_luck = new_luck
-
+                # Apply corrections
+                if sid in corrections_map:
+                    for idx, new_data in corrections_map[sid].items():
+                        if idx < len(p.stat_checks):
+                            merged = p.stat_checks[idx].model_dump()
+                            merged.update(new_data)
+                            p.stat_checks[idx] = StatCheck(**merged)
+                        elif idx < (len(p.stat_checks) + len(p.test_luck)):
+                            l_idx = idx - len(p.stat_checks)
+                            merged = p.test_luck[l_idx].model_dump()
+                            merged.update(new_data)
+                            p.test_luck[l_idx] = TestLuck(**merged)
+                
+                # Apply removals
+                if sid in removals_map:
+                    p.stat_checks = [m for i, m in enumerate(p.stat_checks) if (sid, "stat_check", i) not in removals_set]
+                    p.test_luck = [l for i, l in enumerate(p.test_luck) if (sid, "test_luck", i) not in removals_set]
+                
+                # Apply additions
                 if sid in additions_map:
                     for a_data in additions_map[sid]:
-                        # Robustly detect type based on keys
                         is_luck = "lucky_section" in a_data and "unlucky_section" in a_data
                         if is_luck:
                             p.test_luck.append(TestLuck(**a_data))
-                        else:
+                        elif "pass_section" in a_data:
                             p.stat_checks.append(StatCheck(**a_data))
 
     final_rows = [p.model_dump(exclude_none=True) for p in out_portions]

@@ -1,0 +1,175 @@
+# Comprehensive Full Book Verification Recipe
+# Run ID: ff-full-verification-final
+run_id: ff-full-verification-final
+input:
+  pdf: input/06 deathtrap dungeon.pdf
+output_dir: output/runs/ff-full-verification-final
+
+stages:
+  - id: load_blocks
+    stage: extract
+    module: load_artifact_v1
+    out: page_blocks.jsonl
+    params:
+      path: /Users/cam/Documents/Projects/codex-forge/output/runs/ff-ai-ocr-gpt51-full-20251222/03_html_to_blocks_v1/page_blocks.jsonl
+      schema_version: page_html_blocks_v1
+
+  - id: load_boundaries
+    stage: extract
+    module: load_artifact_v1
+    out: section_boundaries.jsonl
+    params:
+      path: /Users/cam/Documents/Projects/codex-forge/output/runs/ff-ai-ocr-gpt51-full-20251222/05_detect_boundaries_html_loop_v1/section_boundaries.jsonl
+      schema_version: section_boundary_v1
+
+  - id: portionize
+    stage: portionize
+    module: portionize_html_extract_v1
+    needs: [load_blocks, load_boundaries]
+    inputs:
+      pages: load_blocks
+      boundaries: load_boundaries
+    params:
+      emit_raw_text: true
+
+  - id: extract_choices
+    stage: extract
+    module: extract_choices_relaxed_v1
+    needs: [portionize]
+    inputs:
+      pages: portionize
+    out: portions_with_choices.jsonl
+
+  - id: validate_choice_links
+    stage: enrich
+    module: validate_choice_links_v1
+    needs: [extract_choices, load_blocks]
+    inputs:
+      pages: load_blocks
+      input: extract_choices
+    out: portions_with_choices_validated.jsonl
+    params:
+      model: gpt-4.1-mini
+      max_ai_calls: 0
+      check_multi_links: true
+
+  - id: extract_combat
+    stage: enrich
+    module: extract_combat_v1
+    needs: [validate_choice_links, load_blocks]
+    inputs:
+      portions: validate_choice_links
+      pages: load_blocks
+    out: portions_with_combat.jsonl
+    params:
+      model: gpt-4.1-mini
+      use_ai: true
+      max_ai_calls: 50
+
+  - id: extract_inventory
+    stage: enrich
+    module: extract_inventory_v1
+    needs: [extract_combat, load_blocks]
+    inputs:
+      portions: extract_combat
+      pages: load_blocks
+    out: portions_with_inventory.jsonl
+    params:
+      model: gpt-4.1-mini
+      use_ai: true
+      max_ai_calls: 50
+
+  - id: extract_stat_checks
+    stage: enrich
+    module: extract_stat_checks_v1
+    needs: [extract_inventory, load_blocks]
+    inputs:
+      portions: extract_inventory
+      pages: load_blocks
+    out: portions_with_stats.jsonl
+    params:
+      model: gpt-4.1-mini
+      use_ai: true
+      max_ai_calls: 50
+
+  - id: extract_stat_modifications
+    stage: enrich
+    module: extract_stat_modifications_v1
+    needs: [extract_stat_checks, load_blocks]
+    inputs:
+      portions: extract_stat_checks
+      pages: load_blocks
+    out: portions_with_mods.jsonl
+    params:
+      model: gpt-4.1-mini
+      use_ai: true
+      max_ai_calls: 50
+
+  - id: validate_reachability
+    stage: validate
+    module: validate_holistic_reachability_v1
+    needs: [extract_stat_modifications]
+    inputs:
+      portions: extract_stat_modifications
+    out: reachability_report.json
+
+  - id: detect_endings
+    stage: enrich
+    module: ending_guard_v1
+    needs: [extract_stat_modifications, load_blocks]
+    inputs:
+      pages: load_blocks
+      portions: extract_stat_modifications
+    out: portions_with_endings.jsonl
+    params:
+      model: gpt-4.1-mini
+      skip_ai: false
+
+  - id: report_pipeline_issues
+    stage: adapter
+    module: report_pipeline_issues_v1
+    needs: [detect_endings]
+    out: issues_report.jsonl
+
+  - id: build_gamebook
+    stage: build
+    module: build_ff_engine_with_issues_v1
+    needs: [report_pipeline_issues, detect_endings]
+    inputs:
+      portions: detect_endings
+      issues_report: report_pipeline_issues
+    out: gamebook_raw.json
+    params:
+      title: "Deathtrap Dungeon (Final Verification)"
+      author: "Ian Livingstone"
+      emit_text: false
+      emit_provenance_text: false
+      allow_stubs: true
+
+  - id: clean_presentation
+    stage: export
+    module: clean_html_presentation_v1
+    needs: [build_gamebook]
+    inputs:
+      input: build_gamebook
+    out: gamebook.json
+    params:
+      preserve_original_html: true
+      remove_section_headers: true
+      remove_running_heads: true
+      remove_page_numbers: true
+      remove_images: true
+
+  - id: validate_gamebook
+    stage: validate
+    module: validate_ff_engine_v2
+    needs: [clean_presentation, report_pipeline_issues, detect_endings, load_boundaries, load_blocks, validate_reachability]
+    inputs:
+      gamebook: clean_presentation
+      portions: detect_endings
+      boundaries: load_boundaries
+      elements_core: load_blocks
+      reachability_report: validate_reachability
+    out: validation_report.json
+    params:
+      forensics: true
