@@ -533,8 +533,8 @@ def build_command(entrypoint: str, params: Dict[str, Any], stage_conf: Dict[str,
     if not artifact_name:
          artifact_name = _artifact_name_for_stage(stage_id, stage_type, {}, stage_conf)
     
-    # Determine if this is a final output (gamebook.json stays in root)
-    is_final_output = (stage_type == "build" and artifact_name == "gamebook.json")
+    # Determine if this is a final output (stays in root)
+    is_final_output = (artifact_name in ("gamebook.json", "validation_report.json"))
     
     if is_final_output:
         # Final outputs stay in root

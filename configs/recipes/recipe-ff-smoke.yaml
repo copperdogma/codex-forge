@@ -42,7 +42,7 @@ stages:
       boundaries: load_boundaries
     out: portions_enriched.jsonl
     params:
-      drop_raw_text: true
+      emit_raw_text: true
 
   - id: extract_choices
     stage: extract
@@ -65,13 +65,26 @@ stages:
       max_ai_calls: 0 # skip AI in smoke
       check_multi_links: true
 
+  - id: extract_combat
+    stage: enrich
+    module: extract_combat_v1
+    needs: [validate_choice_links, convert_to_blocks]
+    inputs:
+      portions: validate_choice_links
+      pages: convert_to_blocks
+    out: portions_with_combat.jsonl
+    params:
+      model: gpt-4.1-mini
+      use_ai: false # skip AI in smoke
+      max_ai_calls: 0
+
   - id: detect_endings
     stage: enrich
     module: ending_guard_v1
-    needs: [validate_choice_links, convert_to_blocks]
+    needs: [extract_combat, convert_to_blocks]
     inputs:
       pages: convert_to_blocks
-      inputs: validate_choice_links
+      inputs: extract_combat
     out: portions_with_endings.jsonl
     params:
       model: gpt-5.1

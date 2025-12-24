@@ -3,7 +3,7 @@
 ## Recommended Order (next up)
 Guiding priorities: **development stability first**, then **quality definitions**, followed by **core gameplay enrichment**. Finish Fighting Fantasy to 100% "game-ready" status before scaling optimizations or starting the genealogy pilot.
 
-1. **053 — Pipeline Smoke Test (Static Sample, No External Calls)**: Essential for developer productivity and CI stability; catches integration breakages without incurring API costs.
+1. DONE: **053 — Pipeline Smoke Test (Static Sample, No External Calls)**: Essential for developer productivity and CI stability; catches integration breakages without incurring API costs.
 3. **095 — Combat and Enemy Extraction**: High-value enrichment; parses enemy stat blocks and outcomes critical for the game engine's primary mechanic.
 4. **094 — Inventory Parsing and Extraction**: Core enrichment for tracking item gains, losses, and conditional possession logic in the engine.
 5. **088 — Choice Parsing Enhancements (HTML + Linking)**: Improves structural HTML quality and link recall before scaling to the full library.
@@ -108,7 +108,9 @@ This index tracks stories in `/docs/stories/` for the codex-forge pipeline.
 || 092 | HTML Presentation Cleanup | High | Done | /docs/stories/story-092-html-presentation-cleanup.md |
 || 093 | Coarse Portionizer Endmatter Filter | High | Done | /docs/stories/story-093-coarse-portionizer-endmatter-filter.md |
 || 094 | Inventory Parsing and Extraction | High | To Do | /docs/stories/story-094-inventory-parsing.md |
-|| 095 | Combat and Enemy Extraction | High | To Do | /docs/stories/story-095-combat-enemy-extraction.md |
+|| 095 | Combat and Enemy Extraction | High | Done | /docs/stories/story-095-combat-enemy-extraction.md |
+|| 096 | Stat Check Extraction (Skill, Luck, and Dice Rolls) | High | To Do | /docs/stories/story-096-stat-check-extraction.md |
+|| 097 | Stat Modification Extraction (Skill, Stamina, Luck Changes) | High | To Do | /docs/stories/story-097-stat-modification-extraction.md |
 || 099 | Remove dev-only backcompat disclaimer | Low | To Do | /docs/stories/story-099-remove-dev-backcompat-note.md |
 
 ## Notes

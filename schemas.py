@@ -10,7 +10,12 @@ class Choice(BaseModel):
 class Combat(BaseModel):
     skill: int
     stamina: int
-    name: Optional[str] = None
+    enemy: Optional[str] = None
+    win_section: Optional[str] = None
+    loss_section: Optional[str] = None
+    escape_section: Optional[str] = None
+    special_rules: Optional[str] = None
+    confidence: float = 1.0
 
 
 class ItemEffect(BaseModel):
@@ -39,7 +44,7 @@ class Paragraph(BaseModel):
     text: str
     choices: List[Choice] = Field(default_factory=list)
     images: List[str] = Field(default_factory=list)
-    combat: Optional[Combat] = None
+    combat: List[Combat] = Field(default_factory=list)
     test_luck: Optional[bool] = None
     item_effects: List[ItemEffect] = Field(default_factory=list)
 
@@ -47,6 +52,14 @@ class Paragraph(BaseModel):
     def id_is_numeric(cls, v):
         if not v.isdigit():
             raise ValueError("id must be numeric string")
+        return v
+
+    @field_validator("combat", mode="before")
+    def combat_default(cls, v):
+        if v is None:
+            return []
+        if isinstance(v, dict):
+            return [v]
         return v
 
     @field_validator("item_effects", mode="before")
@@ -295,7 +308,7 @@ class EnrichedPortion(BaseModel):
     continuation_of: Optional[str] = None
     continuation_confidence: Optional[float] = None
     choices: List[Choice] = Field(default_factory=list)
-    combat: Optional[Combat] = None
+    combat: List[Combat] = Field(default_factory=list)
     test_luck: Optional[bool] = None
     item_effects: List[ItemEffect] = Field(default_factory=list)
     targets: List[str] = Field(default_factory=list)
@@ -304,6 +317,14 @@ class EnrichedPortion(BaseModel):
     repair_hints: Optional[Dict[str, Any]] = None
     context_correction: Optional[Dict[str, Any]] = None
     macro_section: Optional[str] = None  # frontmatter | gameplay | endmatter
+
+    @field_validator("combat", mode="before")
+    def combat_default(cls, v):
+        if v is None:
+            return []
+        if isinstance(v, dict):
+            return [v]
+        return v
 
 
 class LLMCallUsage(BaseModel):

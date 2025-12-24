@@ -130,27 +130,36 @@ def build_section(portion: Dict[str, Any], emit_text: bool, emit_provenance_text
         section["testYourLuck"] = portion["testYourLuck"]
     if portion.get("deathConditions"):
         section["deathConditions"] = portion["deathConditions"]
-    combat = portion.get("combat")
-    if combat and isinstance(combat, dict) and combat.get("skill") is not None and combat.get("stamina") is not None:
-        creature = {
-            "name": combat.get("name") or "Creature",
-            "skill": combat.get("skill"),
-            "stamina": combat.get("stamina"),
-        }
-        if combat.get("specialRules"):
-            creature["specialRules"] = combat["specialRules"]
-        if combat.get("allowEscape") is not None:
-            creature["allowEscape"] = combat["allowEscape"]
-        if combat.get("escapeSection"):
-            creature["escapeSection"] = str(combat["escapeSection"])
-        # Only include combat if we have a winSection to satisfy schema; otherwise keep in provenance
-        if combat.get("winSection"):
-            section["combat"] = {
-                "creature": creature,
-                "winSection": str(combat["winSection"]),
+    # Combat extraction (multiple enemies supported)
+    portion_combat = portion.get("combat") or []
+    if not isinstance(portion_combat, list):
+        portion_combat = [portion_combat]
+        
+    section_combat = []
+    for c in portion_combat:
+        if not isinstance(c, dict):
+            continue
+        if c.get("skill") is not None and c.get("stamina") is not None:
+            enemy = {
+                "enemy": c.get("enemy") or c.get("name") or "Creature",
+                "skill": c.get("skill"),
+                "stamina": c.get("stamina"),
             }
-            if combat.get("loseSection"):
-                section["combat"]["loseSection"] = str(combat["loseSection"])
+            if c.get("win_section") or c.get("winSection"):
+                enemy["win_section"] = str(c.get("win_section") or c.get("winSection"))
+            if c.get("loss_section") or c.get("loseSection"):
+                enemy["loss_section"] = str(c.get("loss_section") or c.get("loseSection"))
+            if c.get("escape_section") or c.get("escapeSection"):
+                enemy["escape_section"] = str(c.get("escape_section") or c.get("escapeSection"))
+            if c.get("special_rules") or c.get("specialRules"):
+                enemy["special_rules"] = c.get("special_rules") or c.get("specialRules")
+            
+            # According to schema, win_section is required for CombatEncounter
+            if "win_section" in enemy:
+                section_combat.append(enemy)
+
+    if section_combat:
+        section["combat"] = section_combat
 
     provenance = {
         "portion_id": portion.get("portion_id"),
@@ -183,11 +192,16 @@ def collect_targets(section: Dict[str, Any]) -> List[str]:
             tgt = link.get("targetSection")
             if tgt:
                 targets.append(str(tgt))
-    combat = section.get("combat") or {}
-    for key in ("winSection", "loseSection"):
-        tgt = combat.get(key)
-        if tgt:
-            targets.append(str(tgt))
+    combat_list = section.get("combat") or []
+    if not isinstance(combat_list, list):
+        combat_list = [combat_list]
+    for combat in combat_list:
+        if not isinstance(combat, dict):
+            continue
+        for key in ("win_section", "loss_section", "winSection", "loseSection"):
+            tgt = combat.get(key)
+            if tgt:
+                targets.append(str(tgt))
     for ty in section.get("testYourLuck") or []:
         for key in ("luckySection", "unluckySection"):
             tgt = ty.get(key)

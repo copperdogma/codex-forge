@@ -100,8 +100,11 @@
           }
         },
         "combat": {
-          "$ref": "#/definitions/CombatEncounter",
-          "description": "Combat encounter data (only for gameplay sections)"
+          "type": "array",
+          "description": "Combat encounter data (only for gameplay sections)",
+          "items": {
+            "$ref": "#/definitions/CombatEncounter"
+          }
         },
         "items": {
           "type": "array",
@@ -188,18 +191,35 @@
     },
     "CombatEncounter": {
       "type": "object",
-      "required": ["creature", "winSection"],
+      "required": ["enemy", "skill", "stamina", "win_section"],
       "properties": {
-        "creature": {
-          "$ref": "#/definitions/CreatureStats"
+        "enemy": {
+          "type": "string",
+          "description": "Creature name"
         },
-        "winSection": {
+        "skill": {
+          "type": "number",
+          "description": "Combat Skill value"
+        },
+        "stamina": {
+          "type": "number",
+          "description": "Stamina (hit points)"
+        },
+        "win_section": {
           "$ref": "#/definitions/SectionId",
           "description": "Section to navigate to if player wins"
         },
-        "loseSection": {
+        "loss_section": {
           "$ref": "#/definitions/SectionId",
-          "description": "Section to navigate to if player loses (optional, death may be implicit)"
+          "description": "Section to navigate to if player loses"
+        },
+        "escape_section": {
+          "$ref": "#/definitions/SectionId",
+          "description": "Section to navigate to if player escapes"
+        },
+        "special_rules": {
+          "type": "string",
+          "description": "Optional special combat rules"
         }
       }
     },

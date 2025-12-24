@@ -146,13 +146,26 @@ stages:
       max_ai_calls: 50
       check_multi_links: true
 
+  - id: extract_combat
+    stage: enrich
+    module: extract_combat_v1
+    needs: [validate_choice_links, html_blocks_repaired]
+    inputs:
+      portions: validate_choice_links
+      pages: html_blocks_repaired
+    out: portions_with_combat.jsonl
+    params:
+      model: gpt-4.1-mini
+      use_ai: true
+      max_ai_calls: 50
+
   - id: detect_endings
     stage: enrich
     module: ending_guard_v1
-    needs: [validate_choice_links]
+    needs: [extract_combat]
     inputs:
       pages: html_blocks_repaired
-      inputs: validate_choice_links
+      inputs: extract_combat
     out: portions_with_endings.jsonl
     params:
       model: gpt-5.1
