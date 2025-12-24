@@ -5,16 +5,15 @@ This repo processes scanned (or text) books into structured JSON, using modular 
 ## Prime Directives
 - **Do NOT run `git commit`, `git push`, or modify remotes unless the user explicitly requests it.**
 - System is in active development (not production); do not preserve backward compatibility or keep legacy shims unless explicitly requested.
-- **AI-first:** the AI owns implementation and self-verification; humans provide requirements and oversight. **Work is NOT complete until it runs successfully through driver.py with artifacts in output/runs/.** Standalone module testing is encouraged for development but does NOT count as completion. Do not report work "done" without full pipeline integration testing.
-- **100% Accuracy Requirement:** The final artifacts (gamebook.json) are used directly in a game engine. **If even ONE section number or choice is wrong, the game is broken.** Partial success on section coverage or choice extraction is a complete failure. Pipeline must either achieve 100% accuracy or fail explicitly with clear diagnostics. There is no "good enough" - it's perfect or broken.
+- **AI-first:** the AI owns implementation and self-verification; humans provide requirements and oversight.
+- **The Definition of Done:** A story or task is **NOT complete** until:
+    1. It runs successfully through `driver.py` in a real (or partial resume) pipeline.
+    2. Produced artifacts exist in `output/runs/`.
+    3. **Manual Data Inspection**: You have opened the artifacts (JSON/JSONL) and manually verified that the specific data being added/fixed is accurate and high-quality.
+    4. You have reported the specific artifact paths and sample data verified to the user.
+- **100% Accuracy Requirement:** The final artifacts (gamebook.json) are used directly in a game engine. **If even ONE section number or choice is wrong, the game is broken.** Partial success on section coverage or choice extraction is a complete failure. Pipeline must achieve 100% accuracy or fail explicitly.
+- **Inspect outputs, not just logs:** A green or non-crashing run is not evidence of correctness. Always manually open produced artifacts and check for logical errors (e.g., concatenated sections, missing data, incorrect values).
 - Keep artifacts append-only; never rewrite user data or outputs in `output/` or `input/`.
-- Artifacts are write-only: never silently patch; any manual or auto patch must be emitted as a new artifact with traceable intent.
-- Default to `workspace-write` safe commands; avoid destructive ops (`rm -rf`, `git reset --hard`).
-- Preserve non-ASCII only if the file already contains it.
-- Do not patch artifacts by hand to hide upstream issues; fix the root cause and regenerate. Any temporary manual edit must be explicit, traceable, and leave original inputs untouched.
-- Never "fix" run artifacts by hand: all data corrections must be structural/code changes and reproducible; regenerate outputs instead of manual edits.
-- Every stage must resolve before the next runs: either reach its coverage/quality target or finish a defined escalate→validate loop and clearly mark unresolved items. Do not pass partially-resolved outputs downstream without explicit failure markers.
-- **Always inspect outputs, not just logs:** After every meaningful run, manually open the produced artifacts (JSON/JSONL) and check they match expectations (counts, sample content). A green or non-crashing run is not evidence of correctness; if outputs are empty/suspicious, stop and fix before proceeding.
 
 ## Generality & Non-Overfitting (Read First)
 - Optimize for an input *category* (e.g., Fighting Fantasy scans), not a single PDF/run.
@@ -64,15 +63,17 @@ PYTHONPATH=. python modules/enrich/ending_guard_v1/main.py \
 **Standalone testing is a tool for development, NOT a completion criterion.**
 
 ### Completion Phase: Integration Testing (Mandatory)
-**Work is NOT complete until tested through driver.py in the real pipeline:**
+**Work is NOT complete until tested through driver.py in the real pipeline and manually verified for quality.**
 
 **Completion checklist:**
 1. **Clear Python cache:** `find modules/<module> -name "*.pyc" -delete` (stale cache causes silent failures)
-2. **Run through driver:** Use `--start-from <stage>` or full recipe
-3. **Verify artifacts exist:** Check `output/runs/<run_id>/{ordinal:02d}_{module_id}/` has expected files
-4. **Inspect artifact data:** Open JSONL/JSON, read 5-10 samples, verify content correctness
-5. **Check downstream stages:** Ensure next stages can consume the artifacts
-6. **Document findings:** Include artifact paths + sample data in work log
+2. **Run through driver:** Use `--start-from <stage>` or a resume recipe.
+3. **Verify artifacts exist:** Check `output/runs/<run_id>/{ordinal:02d}_{module_id}/` has expected files.
+4. **Manual Data Verification (Mandatory)**: Open JSONL/JSON, read 5-10 samples, and verify content correctness. **Check for logical failures** (e.g., mismatched page ranges, corrupted HTML, missing features).
+5. **Check downstream stages:** Ensure next stages can consume the artifacts.
+6. **Document findings:** Include artifact paths + sample data in work log.
+
+**Artifact reuse policy**: You MAY reuse artifacts from a previous run (e.g., expensive OCR results) to save time/cost using a resume recipe or `load_artifact_v1`. However, you MUST ensure that the reused IDs and schemas are consistent with the current run to prevent "megasection" or "mismatch" failures.
 
 ```bash
 # Completion testing - must succeed for work to be "done"
