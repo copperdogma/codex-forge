@@ -14,7 +14,7 @@ stages:
     params:
       start: 1
       end: 20
-      target_line_height: 24
+      target_line_height: 20
       baseline_dpi: 72
       sample_count: 5
       fallback_to_render: true

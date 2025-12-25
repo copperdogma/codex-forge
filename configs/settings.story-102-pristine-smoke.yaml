@@ -1,0 +1,7 @@
+input:
+  pdf: input/deathtrapdungeon00ian_jn9_1 - from internet archive.pdf
+
+stage_params:
+  extract_pdf_images_capped:
+    start: 13
+    end: 32

@@ -17,7 +17,7 @@ stages:
       end: 228  # pristine PDF has 228 pages (1-up layout, no splitting needed)
       fallback_to_render: true
       fallback_dpi: 300
-      target_line_height: 24  # Normalize to 24px x-height for optimal OCR quality/cost
+      target_line_height: 20  # Normalize to 20px x-height for optimal OCR quality/cost (story-102)
 
   - id: split_pages
     stage: extract

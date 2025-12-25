@@ -375,5 +375,9 @@ def main():
         module_id="validate_choice_links_v1",
     )
 
+    # Explicitly exit with success code
+    import sys
+    sys.exit(0)
+
 if __name__ == '__main__':
     main()

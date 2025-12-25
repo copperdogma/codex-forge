@@ -7,8 +7,8 @@ Guiding priorities: **development stability first**, then **quality definitions*
 3. DONE: **095 — Combat and Enemy Extraction**: High-value enrichment; parses enemy stat blocks and outcomes critical for the game engine's primary mechanic.
 4. DONE: **094 — Inventory Parsing and Extraction**: Core enrichment for tracking item gains, losses, and conditional possession logic in the engine.
 5. DONE: **088 — Choice Parsing Enhancements (HTML + Linking)**: Improves structural HTML quality and link recall before scaling to the full library.
-6. **084 — Fast PDF Image Extraction (Embedded Streams)**: Technical optimization to significantly reduce slow and expensive PDF rasterization time.
-7. **102 — X-Height Measurement and Target Investigation**: Critical investigation into x-height measurement accuracy and optimal target selection. System measurements don't match manual measurements, and 24px target may be unnecessarily large if native 14px works well.
+6. DONE: **084 — Fast PDF Image Extraction (Embedded Streams)**: Technical optimization to significantly reduce slow and expensive PDF rasterization time.
+7. DONE: **102 — X-Height Measurement and Target Investigation**: Critical investigation into x-height measurement accuracy and optimal target selection. System measurements don't match manual measurements, and 24px target may be unnecessarily large if native 14px works well.
 8. **087 — Retire Legacy OCR-Only Recipe**: Housekeeping to reduce maintenance overhead and prevent accidental use of superseded OCR-ensemble paths.
 8. **101 — ARM64 Environment Cleanup Investigation**: Investigate and clean up obsolete ARM64/MPS environment requirements now that canonical pipeline uses AI-first OCR instead of EasyOCR.
 9. **075 — Booktype Text Cleanup Adapter (Downstream Normalization)**: Refines final text fidelity via deterministic tools and lexicon-guided normalization.
@@ -117,7 +117,7 @@ This index tracks stories in `/docs/stories/` for the codex-forge pipeline.
 || 099 | Remove dev-only backcompat disclaimer | Low | To Do | /docs/stories/story-099-remove-dev-backcompat-note.md |
 ||| 100 | Pipeline Visibility Cost Display Enhancement | Medium | To Do | /docs/stories/story-100-pipeline-visibility-cost-display.md |
 ||| 101 | ARM64 Environment Cleanup Investigation | Medium | To Do | /docs/stories/story-101-arm64-environment-cleanup.md |
-||| 102 | X-Height Measurement and Target Investigation | High | To Do | /docs/stories/story-102-x-height-measurement-and-target-investigation.md |
+||| 102 | X-Height Measurement and Target Investigation | High | Done | /docs/stories/story-102-x-height-measurement-and-target-investigation.md |
 
 ## Notes
 - Status "Done" reflects current working state in codex-forge. "To Do" items are planned next steps aligned with `docs/requirements.md` and `snapshot.md`.

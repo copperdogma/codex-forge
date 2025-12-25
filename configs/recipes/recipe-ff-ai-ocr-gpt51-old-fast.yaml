@@ -17,7 +17,7 @@ stages:
       end: 113  # full book; override via settings for smoke runs
       fallback_to_render: true
       fallback_dpi: 300
-      target_line_height: 24  # Normalize to 24px x-height for optimal OCR quality/cost
+      target_line_height: 20  # Normalize to 20px x-height for optimal OCR quality/cost (story-102)
 
   - id: split_pages
     stage: extract

@@ -12,7 +12,7 @@ stages:
     module: extract_pdf_images_capped_v1
     out: pages_rendered_manifest.jsonl
     params:
-      target_line_height: 24
+      target_line_height: 20
       start: 1
       end: 113  # full book; override via settings for smoke runs
 
