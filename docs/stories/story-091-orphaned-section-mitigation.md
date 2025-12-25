@@ -126,3 +126,4 @@ Mitigate orphaned sections caused by OCR misreading section numbers in choice te
 - Requires AI calls (cost consideration)
 - May not catch misreads that create valid-looking links (e.g., 303 → 308 if both are valid)
 
+

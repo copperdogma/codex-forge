@@ -15,6 +15,7 @@ Enhance the pipeline visibility dashboard to prominently display API costs at th
 
 ## Success Criteria
 
+- [ ] Add API cost tracking into every module that uses API calls. Perhaps centralize all API calls so they're tracked in a single place?
 - [ ] **Total cost** is displayed prominently at the top of the dashboard (in the summary grid).
 - [ ] **Per-module cost breakdown** is shown in a clear, scannable format (table or card list).
 - [ ] Cost display updates automatically when instrumentation data refreshes.

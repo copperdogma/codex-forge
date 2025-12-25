@@ -88,3 +88,4 @@ The current canonical recipe (`recipe-ff-ai-ocr-gpt51.yaml`) uses GPT-5.1 for AI
   - Need to verify if these requirements are still needed
 - **Next:** Search codebase for torch/MPS usage and verify canonical recipe dependencies.
 
+
