@@ -239,22 +239,23 @@ Before portionization, automatically flag pages for high-fidelity re-OCR if eith
 
 ## Running & Monitoring (canonical recipe: recipe-ff-ai-ocr-gpt51.yaml)
 
-**Always run on ARM64 + MPS by default. If that is not available, stop and fix the env before running the pipeline.**
+**ARM64 + MPS is required only for legacy EasyOCR/ensemble runs.** The canonical GPT-5.1 OCR pipeline runs on any arch; use MPS only when running legacy OCR recipes or EasyOCR GPU smoke tests.
 
 **Current canonical recipe**: `configs/recipes/recipe-ff-ai-ocr-gpt51.yaml` (GPT-5.1 AI-first OCR)
 - HTML-native output, faster than legacy OCR ensemble
 - Legacy `configs/recipes/legacy/recipe-ff-canonical.yaml` is deprecated and disabled
 
 ### Environment (required)
-- Create/refresh env (Metal pins in `requirements.txt` + `constraints/metal.txt`):
+- **Canonical GPT-5.1 OCR**:
+  - `pip install --no-cache-dir -r requirements.txt`
+- **Legacy EasyOCR / OCR ensemble (optional)**:
   - `conda config --add envs_dirs /Users/cam/.conda_envs`
   - `conda create -n codex-arm-mps python=3.11 -y`
   - `conda activate codex-arm-mps`
-  - `pip install --no-cache-dir -r requirements.txt -c constraints/metal.txt`
-- Activate env: `source ~/miniforge3/bin/activate codex-arm-mps`
-- Guard: `python scripts/check_arm_mps.py` (must pass)
-- SHM-safe env (required for EasyOCR/libomp stability):
-  - `KMP_USE_SHMEM=0 KMP_CREATE_SHMEM=FALSE OMP_NUM_THREADS=1 KMP_AFFINITY=disabled KMP_INIT_AT_FORK=FALSE`
+  - `pip install --no-cache-dir -r requirements-legacy-easyocr.txt -c constraints/metal.txt`
+  - Guard (legacy only): `python scripts/check_arm_mps.py` (must pass)
+  - SHM-safe env (EasyOCR/libomp stability):
+    - `KMP_USE_SHMEM=0 KMP_CREATE_SHMEM=FALSE OMP_NUM_THREADS=1 KMP_AFFINITY=disabled KMP_INIT_AT_FORK=FALSE`
 
 ### Full pipeline run (preferred)
 - Use the monitored wrapper (creates pidfile + crash markers):
@@ -283,10 +284,10 @@ Before portionization, automatically flag pages for high-fidelity re-OCR if eith
 - Legacy/archived smoke: `configs/recipes/legacy/recipe-ocr-coarse-fine-smoke.yaml` and `configs/settings.ff-canonical-smoke*.yaml`
 
 ### Troubleshooting (must-read)
-- **OMP SHM crash** (`Can't open SHM2`):
+- **OMP SHM crash** (`Can't open SHM2`) — legacy EasyOCR only:
   - Ensure `codex-arm-mps` env + SHM-safe vars are set.
   - If it still fails, run outside any restricted/sandboxed shell or disable EasyOCR/torch paths.
-- **MPS unavailable**: rerun env setup; `python scripts/check_arm_mps.py` must pass.
+- **MPS unavailable** (legacy EasyOCR): rerun env setup; `python scripts/check_arm_mps.py` must pass.
 - **Apple Vision OCR sandbox failure** (`sysctlbyname for kern.hv_vmm_present failed`): run outside sandbox/full host permissions or disable `apple` engine.
 - **Monitoring looks idle but process died**: check `driver.log` in the run dir and confirm `run_monitor` / `run_postmortem` events exist in `pipeline_events.jsonl`.
 

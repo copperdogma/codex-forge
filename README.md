@@ -231,8 +231,7 @@ The legacy OCR-ensemble recipe is archived at `configs/recipes/legacy/recipe-ff-
 - **Manifest**: Automatically registered in `output/run_manifest.jsonl` for tracking
 - **Example**:
   ```bash
-  # Full canonical FF recipe run (GPU default: arm64 env)
-  source ~/miniforge3/bin/activate codex-arm-mps
+  # Full canonical FF recipe run (GPT-5.1 OCR; no ARM64/MPS requirement)
   python driver.py --recipe configs/recipes/recipe-ff-ai-ocr-gpt51.yaml --run-id deathtrap-dungeon-20251225
   
   # With instrumentation
@@ -256,8 +255,7 @@ The legacy OCR-ensemble recipe is archived at `configs/recipes/legacy/recipe-ff-
     --output-dir /private/tmp/cf-ff-ai-ocr-gpt51-test \
     --force
   
-  # Smoke test with subset (GPU default: arm64 env)
-  source ~/miniforge3/bin/activate codex-arm-mps
+  # Smoke test with subset (GPT-5.1 OCR; no ARM64/MPS requirement)
   python driver.py --recipe configs/recipes/recipe-ff-ai-ocr-gpt51.yaml \
     --settings configs/settings.ff-ai-ocr-gpt51-smoke-20.yaml \
     --run-id ff-ai-ocr-gpt51-smoke-20 \
@@ -301,16 +299,17 @@ Runtime note: full non-mock OCR on the 113-page sample typically takes ~35–40 
 
 Each run emits a lightweight `timing_summary.json` in the run directory with wall seconds per stage (and pages/min for intake/extract when available).
 
-### Apple Silicon vs x86_64 (intake quality + GPU)
-- Prefer the ARM64 Python env on Apple Silicon: `~/miniforge3/envs/codex-arm/bin/python` (reports `platform.machine() == "arm64"`). Unstructured `hi_res` runs successfully here and yields far better header/section recall.
-- On x86_64 (Rosetta) the TensorFlow build expects AVX and forces us to fall back to `strategy: fast`, which markedly reduces header detection and downstream section coverage.
+### Apple Silicon vs x86_64 (legacy OCR + hi_res notes)
+- **Canonical GPT-5.1 OCR** runs on any arch; no MPS requirement.
+- Prefer the ARM64 Python env on Apple Silicon for **legacy** Unstructured `hi_res` intake: `~/miniforge3/envs/codex-arm/bin/python` (reports `platform.machine() == "arm64"`). Unstructured `hi_res` runs successfully here and yields far better header/section recall.
+- On x86_64 (Rosetta) the TensorFlow build expects AVX and forces legacy `hi_res` to fall back to `strategy: fast`, which markedly reduces header detection and downstream section coverage.
 - Legacy OCR ensemble recipes (archived under `configs/recipes/legacy/`) defaulted to `strategy: hi_res` and rely on EasyOCR; these notes apply only to legacy recipes.
 - EasyOCR auto-uses GPU when Metal/MPS is available (Apple Silicon) and falls back to CPU otherwise; no flags needed. Use `--allow-run-id-reuse` only if you explicitly want to reuse an existing run directory; defaults now auto-generate a fresh run_id/output_dir per run.
-- Metal-friendly env recipe (pins torch 2.9.1 / torchvision 0.24.1 / Pillow<13):
+- Metal-friendly env recipe (legacy EasyOCR; pins torch 2.9.1 / torchvision 0.24.1 / Pillow<13):
   ```bash
   conda create -n codex-arm-mps python=3.11
   conda activate codex-arm-mps
-  pip install --no-cache-dir -r requirements.txt -c constraints/metal.txt
+  pip install --no-cache-dir -r requirements-legacy-easyocr.txt -c constraints/metal.txt
   python - <<'PY'
   import torch; print(torch.__version__, torch.backends.mps.is_available())
   PY
@@ -419,9 +418,11 @@ Artifacts appear under `output/runs/<run_id>/` as listed in the recipe; use `--s
 - Coarse+fine portionizer; continuation merge
 - AI planner to pick modules/configs based on user goals
 
-## OCR Strategy Choice
+## Legacy OCR Strategy Choice (Unstructured intake)
 
-**Recommended: `hi_res` on ARM64, `ocr_only` on x86_64**
+**Legacy Unstructured intake only.** The canonical GPT-5.1 OCR pipeline does not use `hi_res`/`ocr_only` strategies.
+
+**Legacy recommendation: `hi_res` on ARM64, `ocr_only` on x86_64**
 
 **⚠️ Before choosing a strategy**: Check your Python architecture (`python -c "import platform; print(platform.machine())"`). On Apple Silicon Macs, verify if ARM64 environment exists even if your current shell is using x86_64.
 
@@ -432,9 +433,12 @@ After comprehensive testing comparing old Tesseract-based OCR with Unstructured 
 
 **Note**: OCR text quality is source-limited (scanned PDF quality determines accuracy), so strategy choice primarily affects performance and element granularity, not character recognition accuracy.
 
-## Environment Setup
+## Legacy Environment Setup (Unstructured/EasyOCR)
 
-**⚠️ IMPORTANT: Check Your Environment First**
+**⚠️ IMPORTANT: This section applies to legacy Unstructured/EasyOCR intake only.**
+The canonical GPT-5.1 OCR pipeline runs with `requirements.txt` on any arch and does not require ARM64/MPS or JAX.
+
+**Check Your Environment First**
 
 Before assuming x86_64/Rosetta, check if you have an ARM64 environment available:
 
@@ -454,7 +458,7 @@ python -c "import platform; print(f'Machine: {platform.machine()}')"
 
 **On Apple Silicon (M-series) Macs**: You likely have both environments. Always check for ARM64 first and use it for better performance unless you have a specific reason to use x86_64.
 
-### x86_64/Rosetta (Default, Recommended for Quick Starts)
+### x86_64/Rosetta (Legacy default, recommended for quick starts)
 
 The default setup uses x86_64 Python running under Rosetta 2 on Apple Silicon. This is the most stable and compatible option.
 
@@ -477,7 +481,7 @@ The default setup uses x86_64 Python running under Rosetta 2 on Apple Silicon. T
 - Slower performance (~3-5 minutes/page for OCR)
 - No GPU acceleration
 
-### ARM64 Native (Recommended for Heavy Workloads)
+### ARM64 Native (Legacy recommended for heavy workloads)
 
 For repeated processing or when you need `hi_res` OCR with table structure inference, use native ARM64 with JAX/Metal GPU acceleration.
 

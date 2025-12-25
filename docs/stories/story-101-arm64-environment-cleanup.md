@@ -1,6 +1,6 @@
 # Story: ARM64 Environment Cleanup Investigation
 
-**Status**: To Do  
+**Status**: Done  
 **Created**: 2025-12-23  
 **Priority**: Medium  
 **Parent Story**: story-081 (GPT‑5.1 AI‑First OCR Pipeline), story-087 (Retire Legacy OCR Recipe)
@@ -23,14 +23,14 @@ The current canonical recipe (`recipe-ff-ai-ocr-gpt51.yaml`) uses GPT-5.1 for AI
 
 ## Success Criteria
 
-- [ ] Investigate all references to ARM64/MPS environment requirements
-- [ ] Determine if any current modules depend on MPS/torch (beyond legacy EasyOCR)
-- [ ] Verify that the canonical recipe (`recipe-ff-ai-ocr-gpt51.yaml`) has no MPS/torch dependencies
-- [ ] Check if `requirements.txt` still needs torch/easyocr for any active use cases
-- [ ] Update or remove `scripts/check_arm_mps.py` if obsolete
-- [ ] Update `AGENTS.md` and `README.md` to reflect actual requirements
-- [ ] Remove or update SHM-safe environment variable documentation if only needed for EasyOCR
-- [ ] Document findings and any cleanup actions in work log
+- [x] Investigate all references to ARM64/MPS environment requirements
+- [x] Determine if any current modules depend on MPS/torch (beyond legacy EasyOCR)
+- [x] Verify that the canonical recipe (`recipe-ff-ai-ocr-gpt51.yaml`) has no MPS/torch dependencies
+- [x] Check if `requirements.txt` still needs torch/easyocr for any active use cases
+- [x] Update or remove `scripts/check_arm_mps.py` if obsolete
+- [x] Update `AGENTS.md` and `README.md` to reflect actual requirements
+- [x] Remove or update SHM-safe environment variable documentation if only needed for EasyOCR
+- [x] Document findings and any cleanup actions in work log
 
 ---
 
@@ -64,16 +64,16 @@ The current canonical recipe (`recipe-ff-ai-ocr-gpt51.yaml`) uses GPT-5.1 for AI
 
 ## Tasks
 
-- [ ] Search codebase for all torch/MPS imports and usage
-- [ ] Verify canonical recipe module dependencies (check `ocr_ai_gpt51_v1` and all downstream modules)
-- [ ] Check if any non-legacy modules import or use torch/MPS
-- [ ] Review `requirements.txt` and determine if torch/easyocr can be moved to optional/legacy
-- [ ] Review `AGENTS.md` environment setup section
-- [ ] Review `README.md` ARM64/JAX documentation (check if unstructured `hi_res` is still used)
-- [ ] Review `scripts/check_arm_mps.py` usage and determine if it should be removed/updated
-- [ ] Check for SHM-safe environment variable usage (KMP_USE_SHMEM, etc.)
-- [ ] Update documentation to reflect actual requirements
-- [ ] Document findings and recommendations in work log
+- [x] Search codebase for all torch/MPS imports and usage
+- [x] Verify canonical recipe module dependencies (check `ocr_ai_gpt51_v1` and all downstream modules)
+- [x] Check if any non-legacy modules import or use torch/MPS
+- [x] Review `requirements.txt` and determine if torch/easyocr can be moved to optional/legacy
+- [x] Review `AGENTS.md` environment setup section
+- [x] Review `README.md` ARM64/JAX documentation (check if unstructured `hi_res` is still used)
+- [x] Review `scripts/check_arm_mps.py` usage and determine if it should be removed/updated
+- [x] Check for SHM-safe environment variable usage (KMP_USE_SHMEM, etc.)
+- [x] Update documentation to reflect actual requirements
+- [x] Document findings and recommendations in work log
 
 ---
 
@@ -88,4 +88,40 @@ The current canonical recipe (`recipe-ff-ai-ocr-gpt51.yaml`) uses GPT-5.1 for AI
   - Need to verify if these requirements are still needed
 - **Next:** Search codebase for torch/MPS usage and verify canonical recipe dependencies.
 
+### 20251225-1406 — Scanned codebase for torch/MPS usage and canonical recipe deps
+- **Result:** Success; torch/MPS usage is confined to legacy OCR ensemble paths and helper scripts.
+- **Notes:**
+  - `modules/extract/extract_ocr_ensemble_v1/main.py` imports torch and sets MPS device; no other active modules import torch.
+  - `scripts/check_arm_mps.py` and `scripts/regression/check_easyocr_gpu.py` are the only other torch/MPS touchpoints.
+  - Canonical recipe `configs/recipes/recipe-ff-ai-ocr-gpt51.yaml` uses `ocr_ai_gpt51_v1` and contains no EasyOCR/torch modules.
+  - `requirements.txt` and `constraints/metal.txt` still pin `easyocr`, `torch`, and `torchvision`.
+- **Next:** Review legacy recipes/docs to decide whether to demote ARM64/MPS to legacy-only guidance and move EasyOCR/torch to optional installs.
 
+### 20251225-1410 — Scoped ARM64/MPS to legacy EasyOCR and split legacy requirements
+- **Result:** Success; docs now clarify ARM64/MPS as legacy-only, and EasyOCR/torch pins moved to a dedicated requirements file.
+- **Notes:**
+  - Created `requirements-legacy-easyocr.txt` and removed EasyOCR/torch pins from `requirements.txt`.
+  - Updated `constraints/metal.txt` usage comment for legacy installs.
+  - Adjusted `AGENTS.md` and `README.md` to state GPT-5.1 OCR runs on any arch; ARM64/MPS is only for legacy EasyOCR/ensemble or Unstructured `hi_res`.
+  - Updated `scripts/check_arm_mps.py` messaging to explicitly mark legacy EasyOCR scope.
+- **Next:** Decide whether to deprecate legacy EasyOCR scripts or keep them documented for archived recipes; update `docs/stories.md` if story status changes.
+
+### 20251225-1412 — Tightened legacy-only wording in README
+- **Result:** Success; headings and recommendations now explicitly labeled legacy to avoid confusion with canonical GPT-5.1 OCR.
+- **Notes:**
+  - Renamed OCR strategy/environment headings to “Legacy …” and clarified “Legacy recommendation” phrasing.
+  - No historical docs or CHANGELOG edits.
+- **Next:** Confirm if we should add a short legacy EasyOCR install section or mark Story 101 done.
+
+### 20251225-1416 — Ran GPT‑5.1 smoke run to confirm pipeline still executes
+- **Result:** Success; smoke run completed end-to-end with expected missing/ orphan counts for 20pp subset.
+- **Notes:**
+  - Command: `python driver.py --recipe configs/recipes/recipe-ff-ai-ocr-gpt51.yaml --settings configs/settings.ff-ai-ocr-gpt51-smoke-20.yaml --run-id ff-ai-ocr-gpt51-smoke-20 --output-dir /tmp/cf-ff-ai-ocr-gpt51-smoke-20 --force`
+  - Run output: `/tmp/cf-ff-ai-ocr-gpt51-smoke-20/` (validation passed; reachability expected false on partial run).
+  - Key artifacts: `.../03_ocr_ai_gpt51_v1/pages_html.jsonl`, `.../10_portionize_html_extract_v1/portions_enriched.jsonl`, `.../21_build_ff_engine_with_issues_v1/gamebook_raw.json`.
+- **Next:** Decide whether to mark Story 101 done or add a short legacy EasyOCR install section in README.
+
+### 20251225-1419 — Marked Story 101 complete
+- **Result:** Success.
+- **Notes:** Checked all tasks and success criteria; story status set to Done.
+- **Next:** None.

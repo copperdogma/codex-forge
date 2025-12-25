@@ -1,3 +1,18 @@
+## [2025-12-25] - Scope ARM64/MPS to legacy EasyOCR and split deps
+
+### Added
+- `requirements-legacy-easyocr.txt` for legacy EasyOCR/torch installs.
+
+### Changed
+- Default `requirements.txt` no longer includes EasyOCR/torch pins.
+- ARM64/MPS guidance in `README.md` and `AGENTS.md` scoped to legacy OCR/Unstructured paths.
+- `scripts/check_arm_mps.py` messaging now explicitly targets legacy EasyOCR runs.
+- `constraints/metal.txt` updated to reference the legacy requirements file.
+- Story 101 marked Done with work log and validation notes.
+
+### Tested
+- `python driver.py --recipe configs/recipes/recipe-ff-ai-ocr-gpt51.yaml --settings configs/settings.ff-ai-ocr-gpt51-smoke-20.yaml --run-id ff-ai-ocr-gpt51-smoke-20 --output-dir /tmp/cf-ff-ai-ocr-gpt51-smoke-20 --force`
+
 ## [2025-12-25] - Retired legacy OCR recipes and clarified smoke guidance
 
 ### Added

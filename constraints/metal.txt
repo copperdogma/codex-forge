@@ -1,5 +1,5 @@
 # Minimal Metal/MPS-friendly pins to keep EasyOCR + torch stable on Apple Silicon.
-# Use with: pip install --no-cache-dir -r requirements.txt -c constraints/metal.txt
+# Use with: pip install --no-cache-dir -r requirements-legacy-easyocr.txt -c constraints/metal.txt
 torch==2.9.1
 torchvision==0.24.1
 Pillow<13,>=10.4.0

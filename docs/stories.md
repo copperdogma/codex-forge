@@ -9,10 +9,10 @@ Guiding priorities: **development stability first**, then **quality definitions*
 5. DONE: **088 — Choice Parsing Enhancements (HTML + Linking)**: Improves structural HTML quality and link recall before scaling to the full library.
 6. DONE: **084 — Fast PDF Image Extraction (Embedded Streams)**: Technical optimization to significantly reduce slow and expensive PDF rasterization time.
 7. DONE: **102 — X-Height Measurement and Target Investigation**: Critical investigation into x-height measurement accuracy and optimal target selection. System measurements don't match manual measurements, and 24px target may be unnecessarily large if native 14px works well.
-8. **087 — Retire Legacy OCR-Only Recipe**: Housekeeping to reduce maintenance overhead and prevent accidental use of superseded OCR-ensemble paths.
-8. **101 — ARM64 Environment Cleanup Investigation**: Investigate and clean up obsolete ARM64/MPS environment requirements now that canonical pipeline uses AI-first OCR instead of EasyOCR.
+8. DONE: **087 — Retire Legacy OCR-Only Recipe**: Housekeeping to reduce maintenance overhead and prevent accidental use of superseded OCR-ensemble paths.
+8. DONE: **101 — ARM64 Environment Cleanup Investigation**: Investigate and clean up obsolete ARM64/MPS environment requirements now that canonical pipeline uses AI-first OCR instead of EasyOCR.
 9. **075 — Booktype Text Cleanup Adapter (Downstream Normalization)**: Refines final text fidelity via deterministic tools and lexicon-guided normalization.
-10.  **080 — Central Escalation Cache (Premium OCR Overlay)**: Architectural cleanup to eliminate redundant vision calls and unify page-level provenance.
+10. **080 — Central Escalation Cache (Premium OCR Overlay)**: Architectural cleanup to eliminate redundant vision calls and unify page-level provenance.
 11. **024 — Image cropper follow-up**: Improves quality of extracted illustrations and diagrams via more advanced detector backends.
 12. **011 — AI planner to assemble pipelines**: Facilitates easier configuration for diverse book types via agentic goal-to-recipe matching.
 13. **038 — Agentic Pipeline Coordinator**: Fundamental shift toward autonomous quality monitoring, sanity checking, and self-healing artifacts.
@@ -116,7 +116,7 @@ This index tracks stories in `/docs/stories/` for the codex-forge pipeline.
 || 098 | Late-Stage Section Validation and Reachability Analysis | High | Done | /docs/stories/story-098-late-stage-section-validation.md |
 || 099 | Remove dev-only backcompat disclaimer | Low | To Do | /docs/stories/story-099-remove-dev-backcompat-note.md |
 ||| 100 | Pipeline Visibility Cost Display Enhancement | Medium | To Do | /docs/stories/story-100-pipeline-visibility-cost-display.md |
-||| 101 | ARM64 Environment Cleanup Investigation | Medium | To Do | /docs/stories/story-101-arm64-environment-cleanup.md |
+||| 101 | ARM64 Environment Cleanup Investigation | Medium | Done | /docs/stories/story-101-arm64-environment-cleanup.md |
 ||| 102 | X-Height Measurement and Target Investigation | High | Done | /docs/stories/story-102-x-height-measurement-and-target-investigation.md |
 
 ## Notes
