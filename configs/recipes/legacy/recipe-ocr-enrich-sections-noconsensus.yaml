@@ -1,11 +1,13 @@
-run_id: ocr-enrich-sections-81-113-noconsensus
+# DEPRECATED: legacy OCR/ensemble recipe archived on 2025-12-25. Use configs/recipes/recipe-ff-ai-ocr-gpt51.yaml instead.
+run_id: ocr-enrich-sections-noconsensus
 input:
   pdf: input/06 deathtrap dungeon.pdf
-output_dir: output/runs/ocr-enrich-sections-81-113-noconsensus
+output_dir: output/runs/ocr-enrich-sections-noconsensus
 outputs:
   portionize_sections: portions_sections.jsonl
   enrich_main: portions_enriched.jsonl
   guard: portions_enriched_guard.jsonl
+  section_report: section_target_report.json
 
 stages:
   - id: extract_ocr
@@ -16,8 +18,6 @@ stages:
       psm: 4
       oem: 3
       lang: eng
-      start: 81
-      end: 113
 
   - id: clean_pages
     stage: clean
@@ -50,5 +50,5 @@ stages:
     module: section_target_guard_v1
     needs: [enrich_main]
     params:
-      report: output/runs/ocr-enrich-sections-81-113-noconsensus/section_target_report.json
+      report: output/runs/ocr-enrich-sections-noconsensus/section_target_report.json
     out: portions_enriched_guard.jsonl

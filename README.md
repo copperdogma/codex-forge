@@ -57,9 +57,10 @@ The **Intermediate Representation (IR)** stays unchanged throughout; portionizat
 - Running headers at top corners may have high y values (0.9+) if coordinate system is inverted
 - Pattern detection must account for this when identifying top vs bottom positions
 
-### Canonical Recipe Module Reference
+### Legacy OCR Ensemble Recipe Reference (Archived)
 
-The canonical Fighting Fantasy recipe (`configs/recipes/recipe-ff-canonical.yaml`) uses the following modules, organized by stage:
+**Current canonical recipe**: `configs/recipes/recipe-ff-ai-ocr-gpt51.yaml` (GPT-5.1 AI-first OCR, HTML-first output).
+The legacy OCR-ensemble recipe is archived at `configs/recipes/legacy/recipe-ff-canonical.yaml`; the module list below is preserved for historical reference.
 
 #### Intake Stage
 
@@ -232,10 +233,10 @@ The canonical Fighting Fantasy recipe (`configs/recipes/recipe-ff-canonical.yaml
   ```bash
   # Full canonical FF recipe run (GPU default: arm64 env)
   source ~/miniforge3/bin/activate codex-arm-mps
-  python driver.py --recipe configs/recipes/recipe-ff-canonical.yaml --run-id deathtrap-dungeon-20251208
+  python driver.py --recipe configs/recipes/recipe-ff-ai-ocr-gpt51.yaml --run-id deathtrap-dungeon-20251225
   
   # With instrumentation
-  python driver.py --recipe configs/recipes/recipe-ff-canonical.yaml --run-id deathtrap-dungeon-20251208 --instrument
+  python driver.py --recipe configs/recipes/recipe-ff-ai-ocr-gpt51.yaml --run-id deathtrap-dungeon-20251225 --instrument
   ```
 
 **2. Temporary Test Runs** (output in `/tmp` or `/private/tmp`)
@@ -250,17 +251,17 @@ The canonical Fighting Fantasy recipe (`configs/recipes/recipe-ff-canonical.yaml
 - **Example**:
   ```bash
   # Temporary test run (AI agents use this for development/testing)
-  python driver.py --recipe configs/recipes/recipe-ff-canonical.yaml \
-    --run-id cf-ff-canonical-test \
-    --output-dir /private/tmp/cf-ff-canonical-test \
+  python driver.py --recipe configs/recipes/recipe-ff-ai-ocr-gpt51.yaml \
+    --run-id cf-ff-ai-ocr-gpt51-test \
+    --output-dir /private/tmp/cf-ff-ai-ocr-gpt51-test \
     --force
   
   # Smoke test with subset (GPU default: arm64 env)
   source ~/miniforge3/bin/activate codex-arm-mps
-  python driver.py --recipe configs/recipes/recipe-ff-canonical.yaml \
-    --settings configs/settings.ff-canonical-smoke.yaml \
-    --run-id ff-canonical-smoke \
-    --output-dir /tmp/cf-ff-canonical-smoke \
+  python driver.py --recipe configs/recipes/recipe-ff-ai-ocr-gpt51.yaml \
+    --settings configs/settings.ff-ai-ocr-gpt51-smoke-20.yaml \
+    --run-id ff-ai-ocr-gpt51-smoke-20 \
+    --output-dir /tmp/cf-ff-ai-ocr-gpt51-smoke-20 \
     --force
   ```
 
@@ -269,23 +270,28 @@ The canonical Fighting Fantasy recipe (`configs/recipes/recipe-ff-canonical.yaml
 - **Temporary runs**: Use `--output-dir` to override to `/tmp` or `/private/tmp`, NOT registered in manifest
 - **AI Agents**: Should use temporary runs (`--output-dir /private/tmp/...`) for testing/development, and only use regular runs for actual production work
 
+### Smoke Tests (Quick Reference)
+- **Canonical smoke (current pipeline):** `configs/recipes/recipe-ff-ai-ocr-gpt51.yaml` + `configs/settings.ff-ai-ocr-gpt51-smoke-20.yaml`
+- **Offline fixture smoke (no external calls):** `configs/recipes/recipe-ff-smoke.yaml` (uses `testdata/smoke/ff/`)
+- **Legacy/archived smoke:** `configs/recipes/legacy/recipe-ocr-coarse-fine-smoke.yaml` and `configs/settings.ff-canonical-smoke*.yaml` (legacy OCR pipeline)
+
 ### Common Driver Commands
 
 ```bash
-# Dry-run OCR recipe
-python driver.py --recipe configs/recipes/recipe-ocr.yaml --dry-run
+# Dry-run legacy OCR recipe (archived)
+python driver.py --recipe configs/recipes/legacy/recipe-ocr.yaml --dry-run
 
 # Text ingest with mock LLM stages (for tests without API calls)
 python driver.py --recipe configs/recipes/recipe-text.yaml --mock --skip-done
 
 # OCR pages 1–20 real run (auto-generated run_id/output_dir by default)
-python driver.py --recipe configs/recipes/recipe-ff-canonical.yaml --force
+python driver.py --recipe configs/recipes/recipe-ff-ai-ocr-gpt51.yaml --force
 
 # Reuse a specific run_id/output_dir (opt-in)
-python driver.py --recipe configs/recipes/recipe-ff-canonical.yaml --run-id myrun --allow-run-id-reuse
+python driver.py --recipe configs/recipes/recipe-ff-ai-ocr-gpt51.yaml --run-id myrun --allow-run-id-reuse
 
-# Resume long OCR run from portionize onward (reuses cached clean pages)
-python driver.py --recipe configs/recipes/recipe-ocr.yaml --skip-done --start-from portionize_fine
+# Resume legacy OCR run from portionize onward (reuses cached clean pages)
+python driver.py --recipe configs/recipes/legacy/recipe-ocr.yaml --skip-done --start-from portionize_fine
 
 # Swap modules: edit configs/recipes/*.yaml to choose a different module per stage
 # (e.g., set stage: extract -> module: extract_text_v1 instead of extract_ocr_v1)
@@ -298,8 +304,8 @@ Each run emits a lightweight `timing_summary.json` in the run directory with wal
 ### Apple Silicon vs x86_64 (intake quality + GPU)
 - Prefer the ARM64 Python env on Apple Silicon: `~/miniforge3/envs/codex-arm/bin/python` (reports `platform.machine() == "arm64"`). Unstructured `hi_res` runs successfully here and yields far better header/section recall.
 - On x86_64 (Rosetta) the TensorFlow build expects AVX and forces us to fall back to `strategy: fast`, which markedly reduces header detection and downstream section coverage.
-- Canonical FF recipe (`configs/recipes/recipe-ff-canonical.yaml`) defaults to `strategy: hi_res`; if you must stay on x86_64, pass `--settings settings.fast-intake.yaml` to override to `fast` and expect lower quality.
-- EasyOCR now auto-uses GPU when Metal/MPS is available (Apple Silicon) and falls back to CPU otherwise; no flags needed. Use `--allow-run-id-reuse` only if you explicitly want to reuse an existing run directory; defaults now auto-generate a fresh run_id/output_dir per run.
+- Legacy OCR ensemble recipes (archived under `configs/recipes/legacy/`) defaulted to `strategy: hi_res` and rely on EasyOCR; these notes apply only to legacy recipes.
+- EasyOCR auto-uses GPU when Metal/MPS is available (Apple Silicon) and falls back to CPU otherwise; no flags needed. Use `--allow-run-id-reuse` only if you explicitly want to reuse an existing run directory; defaults now auto-generate a fresh run_id/output_dir per run.
 - Metal-friendly env recipe (pins torch 2.9.1 / torchvision 0.24.1 / Pillow<13):
   ```bash
   conda create -n codex-arm-mps python=3.11
@@ -321,20 +327,20 @@ Each run emits a lightweight `timing_summary.json` in the run directory with wal
   MPS troubleshooting: ensure `platform.machine() == "arm64"`, Xcode CLTs installed, and you’re using the arm64 Python from the `codex-arm-mps` env. Reinstall with the Metal constraints if torch shows `mps.is_available() == False`.
 - Keep the "hi_res first, fast fallback" knob: run ARM hi_res by default, and only flip to `settings.fast-intake.yaml` when the environment lacks ARM/AVX. Prior runs showed a large coverage drop when forced to fast, so treat fast as a compatibility fallback, not a peer mode.
 - Recommended full run on ARM:  
-  `~/miniforge3/envs/codex-arm/bin/python driver.py --recipe configs/recipes/recipe-ff-canonical.yaml --run-id <run> --output-dir <dir> --force`
+  `~/miniforge3/envs/codex-arm/bin/python driver.py --recipe configs/recipes/recipe-ff-ai-ocr-gpt51.yaml --run-id <run> --output-dir <dir> --force`
 - macOS-only Vision OCR: a new module `extract_ocr_apple_v1` (and optional `apple` engine in `extract_ocr_ensemble_v1`) uses `VNRecognizeTextRequest`. It compiles a Swift helper at runtime; only available on macOS with Xcode CLTs installed.
   - **Sandbox caveat:** In restricted/sandboxed execution, Apple Vision can fail with errors like `sysctlbyname for kern.hv_vmm_present failed` (and emit empty/no `apple` text). If you hit this, run the OCR stage outside the sandbox / with full host permissions, or disable `apple` for that run.
 
 ### DAG recipes (coarse+fine merge example)
 ```bash
-# Dry-run DAG OCR with adapter merge
-python driver.py --recipe configs/recipes/recipe-ff-canonical.yaml --dry-run
+# Dry-run canonical OCR (GPT-5.1)
+python driver.py --recipe configs/recipes/recipe-ff-ai-ocr-gpt51.yaml --dry-run
 
 # Text ingest DAG with mock LLM stages (fast, no API calls)
 python driver.py --recipe configs/recipes/recipe-text-dag.yaml --mock --skip-done
 
-# Quick smoke: coarse+fine+continuation on first 10 pages (manual)
-python driver.py --recipe configs/recipes/recipe-ocr-coarse-fine-smoke.yaml --force
+# Quick smoke: coarse+fine+continuation on first 10 pages (legacy, archived)
+python driver.py --recipe configs/recipes/legacy/recipe-ocr-coarse-fine-smoke.yaml --force
 
 # Continuation regression check (after a run)
 python scripts/regression/check_continuation_propagation.py \
@@ -377,7 +383,7 @@ Artifacts appear under `output/runs/<run_id>/` as listed in the recipe; use `--s
 
 ## Run monitoring
 - Preferred: `scripts/run_driver_monitored.sh` (spawns driver, writes `driver.pid`, tails `pipeline_events.jsonl`).
-  - Example: `scripts/run_driver_monitored.sh --recipe configs/recipes/recipe-ff-canonical.yaml --run-id <run_id> --output-dir output/runs -- --instrument`
+  - Example: `scripts/run_driver_monitored.sh --recipe configs/recipes/recipe-ff-ai-ocr-gpt51.yaml --run-id <run_id> --output-dir output/runs -- --instrument`
   - **Important**: `run_driver_monitored.sh` expects `--output-dir` to be the parent (e.g., `output/runs`) and passes the full run dir to `driver.py`. Do not pass a run-specific path.
   - If you pass `--force`, the script pre-deletes the run dir, strips `--force`, and adds `--allow-run-id-reuse` so the driver accepts the created run dir without wiping the log/pidfile mid-run.
 - Attach to an existing run: `scripts/monitor_run.sh output/runs/<run_id> output/runs/<run_id>/driver.pid 5`
@@ -396,7 +402,7 @@ Artifacts appear under `output/runs/<run_id>/` as listed in the recipe; use `--s
 - Use with the driver by passing `--settings`, e.g.:
   ```bash
   python driver.py --recipe configs/recipes/recipe-text.yaml --settings configs/presets/speed.text.yaml --instrument
-  python driver.py --recipe configs/recipes/recipe-ocr.yaml  --settings configs/presets/cost.ocr.yaml --instrument
+  python driver.py --recipe configs/recipes/legacy/recipe-ocr.yaml  --settings configs/presets/cost.ocr.yaml --instrument
   ```
 - Bench sessions write metrics to `output/runs/bench-*/bench_metrics.csv` and `metadata.json` (slices, models, price table, runs). Example sessions:
   - `output/runs/bench-cost-perf-ocr-20251124c/bench_metrics.csv`

@@ -87,7 +87,7 @@ def test_intake_chain_with_mocks(tmp_path):
     code, out, err = run([
         "python", "modules/intake/run_dispatch_v1/main.py",
         "--dispatch_hint", str(out_dir / "dispatch_hint.json"),
-        "--default_recipe", "configs/recipes/recipe-ocr.yaml",
+        "--default_recipe", "configs/recipes/legacy/recipe-ocr.yaml",
         "--dry_run",
     ])
     assert code == 0, err

@@ -2,7 +2,9 @@ input:
   pdf: input/06 deathtrap dungeon.pdf
 
 stage_params:
-  split_pages:
-    dpi: 300
+  extract_pdf_images_capped:
+    dpi_cap: 300
     start: 1
     end: 20
+  build_gamebook:
+    allow_stubs: true

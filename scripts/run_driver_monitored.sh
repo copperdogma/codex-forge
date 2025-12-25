@@ -30,7 +30,7 @@ done
 if [[ -z "$RECIPE" || -z "$RUN_ID" || -z "$OUTPUT_DIR" ]]; then
   echo "usage: $0 --recipe <recipe.yaml> --run-id <run_id> --output-dir <output_parent_dir> [--settings <settings.yaml>] [-- <extra driver.py args>]" >&2
   echo "example:" >&2
-  echo "  $0 --recipe configs/recipes/recipe-ff-canonical.yaml --settings configs/settings.ff-canonical-smoke.yaml --run-id story-074-full-20251218-XXXXXX --output-dir output/runs" >&2
+  echo "  $0 --recipe configs/recipes/recipe-ff-ai-ocr-gpt51.yaml --settings configs/settings.ff-ai-ocr-gpt51-smoke-20.yaml --run-id story-074-full-20251218-XXXXXX --output-dir output/runs" >&2
   exit 2
 fi
 

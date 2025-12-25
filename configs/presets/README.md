@@ -4,7 +4,7 @@ These YAML fragments mirror the settings schema (model/temperature/max_tokens/ma
 
 ```bash
 python driver.py --recipe configs/recipes/recipe-text.yaml --settings configs/presets/speed.text.yaml
-python driver.py --recipe configs/recipes/recipe-ocr.yaml  --settings configs/presets/cost.ocr.yaml
+python driver.py --recipe configs/recipes/legacy/recipe-ocr.yaml  --settings configs/presets/cost.ocr.yaml
 ```
 
 Presets correspond to measured benchmarks (window=8) in `output/runs/bench-cost-perf-*/bench_metrics.csv`:

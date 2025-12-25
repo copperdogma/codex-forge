@@ -1,3 +1,20 @@
+## [2025-12-25] - Retired legacy OCR recipes and clarified smoke guidance
+
+### Added
+- Archived legacy OCR recipes under `configs/recipes/legacy/` with deprecation headers.
+- Smoke test quick-reference sections in `README.md` and `AGENTS.md`.
+
+### Changed
+- Canonical recipe references now point to `recipe-ff-ai-ocr-gpt51.yaml` across docs/scripts/tests.
+- GPT-5.1 smoke settings now drive page range via `extract_pdf_images_capped` and allow stubs for 20pp smoke.
+
+### Fixed
+- `recipe-ff-ai-ocr-gpt51.yaml` validation stage now depends on `detect_boundaries_html` (removed stale `load_boundaries`).
+- Removed duplicate `params` block in `detect_endings`.
+
+### Tested
+- `python driver.py --recipe configs/recipes/recipe-ff-ai-ocr-gpt51.yaml --settings configs/settings.ff-ai-ocr-gpt51-smoke-20.yaml --run-id ff-ai-ocr-gpt51-smoke-20 --output-dir /tmp/cf-ff-ai-ocr-gpt51-smoke-20 --force`
+
 ## [2025-12-23] - Large-image OCR cost tuning + pristine parity scaffolding
 
 ### Added

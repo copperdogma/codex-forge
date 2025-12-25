@@ -1,4 +1,4 @@
-# DEPRECATED: superseded by recipe-ff-canonical.yaml (kept for reference)
+# DEPRECATED: superseded by recipe-ff-ai-ocr-gpt51.yaml (kept for reference)
 # Fighting Fantasy AI-First Pipeline
 #
 # This recipe uses a clean AI-first approach to section detection and extraction:

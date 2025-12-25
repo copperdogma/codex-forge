@@ -102,7 +102,7 @@ This index tracks stories in `/docs/stories/` for the codex-forge pipeline.
 || 084 | Fast PDF Image Extraction (Embedded Streams) | High | Done | /docs/stories/story-084-fast-pdf-image-extraction.md |
 || 085 | Table Rescue OCR Pass | High | Done | /docs/stories/story-085-table-rescue-ocr.md |
 || 086 | Preserve HTML Through Final Gamebook | High | Done | /docs/stories/story-086-preserve-html-final-output.md |
-|| 087 | Retire Legacy OCR-Only Recipe | Medium | To Do | /docs/stories/story-087-retire-legacy-ocr-recipe.md |
+|| 087 | Retire Legacy OCR-Only Recipe | Medium | Done | /docs/stories/story-087-retire-legacy-ocr-recipe.md |
 || 088 | Choice Parsing Enhancements | High | Done | /docs/stories/story-088-choice-parsing-enhancements.md |
 || 089 | Pristine Book Parity (Missing Sections + Robustness) | High | Done | /docs/stories/story-089-pristine-book-parity.md |
 || 090 | Run Summary UX (Missing Sections + Stage Metrics) | Medium | Done | /docs/stories/story-090-run-summary-and-missing-section-signal.md |

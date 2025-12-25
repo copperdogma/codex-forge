@@ -9,7 +9,7 @@ set -euo pipefail
 OUTDIR=${1:-/tmp/cf-easyocr-mps-5}
 
 python driver.py \
-  --recipe configs/recipes/recipe-ff-canonical.yaml \
+  --recipe configs/recipes/legacy/recipe-ff-canonical.yaml \
   --settings configs/settings.easyocr-gpu-test.yaml \
   --end-at intake \
   --run-id cf-easyocr-mps-5 \

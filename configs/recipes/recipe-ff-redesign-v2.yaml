@@ -1,4 +1,4 @@
-# Note: superseded by recipe-ff-canonical.yaml; kept for comparison/experiments.
+# Note: superseded by recipe-ff-ai-ocr-gpt51.yaml; kept for comparison/experiments.
 # Fighting Fantasy Pipeline Redesign v2 (5-stage architecture)
 #
 # Stages:

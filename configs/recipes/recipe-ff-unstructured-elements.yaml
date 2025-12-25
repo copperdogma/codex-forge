@@ -1,4 +1,4 @@
-# DEPRECATED: superseded by recipe-ff-canonical.yaml
+# DEPRECATED: superseded by recipe-ff-ai-ocr-gpt51.yaml
 # Fighting Fantasy pipeline using Unstructured intake with element-aware portionization
 #
 # This recipe uses the new element-aware portionizer that works directly with elements

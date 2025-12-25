@@ -1,4 +1,4 @@
-# DEPRECATED: superseded by recipe-ff-canonical.yaml (smoke stubs use recipe-ff-smoke instead)
+# DEPRECATED: superseded by recipe-ff-ai-ocr-gpt51.yaml (smoke stubs use recipe-ff-smoke instead)
 run_id: deathtrap-ff-engine
 input:
   pdf: input/06 deathtrap dungeon.pdf

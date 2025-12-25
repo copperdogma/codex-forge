@@ -202,15 +202,15 @@ Before portionization, automatically flag pages for high-fidelity re-OCR if eith
 - Driver: `driver.py` (executes recipes, stamps/validates artifacts).
 - Schemas: `schemas.py`; validator: `validate_artifact.py`.
 - Settings samples: `settings.example.yaml`, `settings.smoke.yaml`
-- FF smoke (20pp run-only check): `configs/settings.ff-canonical-smoke.yaml` with canonical recipe; use `--settings` instead of a separate recipe.
+- FF smoke (20pp run-only check): `configs/settings.ff-ai-ocr-gpt51-smoke-20.yaml` with canonical recipe; use `--settings` instead of a separate recipe.
 - Docs: `README.md`, `snapshot.md`, `docs/stories/` (story tracker in `docs/stories.md`)
 - Inputs: `input/` (PDF, images, text); Outputs: `output/` (git-ignored)
 
 ## Current Pipeline (modules + driver)
 - Use `driver.py` with recipes in `configs/recipes/`.
 - **Primary recipe for Fighting Fantasy**: `recipe-ff-ai-ocr-gpt51.yaml` (GPT-5.1 AI-first OCR, HTML output)
-- Legacy OCR ensemble recipe (`recipe-ff-canonical.yaml`) is deprecated; do not use.
-- Other recipes: `recipe-ocr.yaml`, `recipe-text.yaml` (for reference/testing only)
+- Legacy OCR ensemble recipe (`configs/recipes/legacy/recipe-ff-canonical.yaml`) is deprecated; do not use.
+- Other recipes: `configs/recipes/legacy/recipe-ocr.yaml`, `configs/recipes/recipe-text.yaml` (for reference/testing only)
 - Legacy linear scripts were removed; use modules only.
 
 ## Modular Plan (story 015)
@@ -243,7 +243,7 @@ Before portionization, automatically flag pages for high-fidelity re-OCR if eith
 
 **Current canonical recipe**: `configs/recipes/recipe-ff-ai-ocr-gpt51.yaml` (GPT-5.1 AI-first OCR)
 - HTML-native output, faster than legacy OCR ensemble
-- Legacy `recipe-ff-canonical.yaml` is deprecated and disabled
+- Legacy `configs/recipes/legacy/recipe-ff-canonical.yaml` is deprecated and disabled
 
 ### Environment (required)
 - Create/refresh env (Metal pins in `requirements.txt` + `constraints/metal.txt`):
@@ -274,8 +274,13 @@ Before portionization, automatically flag pages for high-fidelity re-OCR if eith
   - `run_driver_monitored.sh` calls `scripts/postmortem_run.sh` on exit to append a `run_postmortem` failure event.
 
 ### Smoke runs
-- 5pp smoke: `python driver.py --recipe configs/recipes/recipe-ff-ai-ocr-gpt51.yaml --settings configs/settings.ff-ai-ocr-smoke-5.yaml --run-id ff-ai-ocr-smoke-5 --output-dir /tmp/cf-ff-ai-ocr-smoke-5 --force`
+- 20pp smoke: `python driver.py --recipe configs/recipes/recipe-ff-ai-ocr-gpt51.yaml --settings configs/settings.ff-ai-ocr-gpt51-smoke-20.yaml --run-id ff-ai-ocr-gpt51-smoke-20 --output-dir /tmp/cf-ff-ai-ocr-gpt51-smoke-20 --force`
 - Note: If smoke settings don't exist, create them based on the main recipe with reduced page ranges
+
+### Smoke tests (quick reference)
+- Canonical smoke (current pipeline): `configs/recipes/recipe-ff-ai-ocr-gpt51.yaml` + `configs/settings.ff-ai-ocr-gpt51-smoke-20.yaml`
+- Offline fixture smoke (no external calls): `configs/recipes/recipe-ff-smoke.yaml` (uses `testdata/smoke/ff/`)
+- Legacy/archived smoke: `configs/recipes/legacy/recipe-ocr-coarse-fine-smoke.yaml` and `configs/settings.ff-canonical-smoke*.yaml`
 
 ### Troubleshooting (must-read)
 - **OMP SHM crash** (`Can't open SHM2`):

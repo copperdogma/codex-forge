@@ -1,3 +1,4 @@
+# DEPRECATED: legacy OCR/ensemble recipe archived on 2025-12-25. Use configs/recipes/recipe-ff-ai-ocr-gpt51.yaml instead.
 run_id: ocr-enrich-sections-1-40-noconsensus
 input:
   pdf: input/06 deathtrap dungeon.pdf

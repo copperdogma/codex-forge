@@ -15,15 +15,15 @@ def choose_recipe(plan):
 
     # Simple heuristic mapping
     if book_type == "genealogy" or "tables" in signals:
-        return "configs/recipes/recipe-ocr.yaml"  # placeholder until genealogy recipe exists
+        return "configs/recipes/legacy/recipe-ocr.yaml"  # placeholder until genealogy recipe exists
     if book_type == "cyoa" or "cyoa" in signals:
-        return "configs/recipes/recipe-ocr.yaml"  # placeholder for CYOA pipeline
+        return "configs/recipes/legacy/recipe-ocr.yaml"  # placeholder for CYOA pipeline
     if book_type == "novel":
-        return "configs/recipes/recipe-ocr.yaml"
+        return "configs/recipes/legacy/recipe-ocr.yaml"
     if gaps:
         # keep None to force user decision
         return None
-    return "configs/recipes/recipe-ocr.yaml"
+    return "configs/recipes/legacy/recipe-ocr.yaml"
 
 
 def build_display_to_image(manifest_path: Path) -> dict:

@@ -19,7 +19,7 @@ EXPECTED_GOLDENS = {
 }
 BASELINE_RUN_ID = "ff-canonical-full-20-test"
 BASELINE_RUN_DIR = REPO_ROOT / "output" / "runs" / "ff-canonical"
-RECIPE_PATH = REPO_ROOT / "configs" / "recipes" / "recipe-ff-canonical.yaml"
+RECIPE_PATH = REPO_ROOT / "configs" / "recipes" / "legacy" / "recipe-ff-canonical.yaml"
 
 def _skip_if_baseline_run_dir_not_canonical_20_pages():
     """

@@ -215,10 +215,8 @@ stages:
       inputs: extract_stat_modifications
     out: portions_with_endings.jsonl
     params:
-      model: gpt-4.1-mini
-      skip_ai: false
-    params:
       model: gpt-5.1
+      skip_ai: false
       # Auto-detects sections with is_gameplay=true and no choices
 
   - id: report_pipeline_issues
@@ -258,11 +256,11 @@ stages:
   - id: validate_gamebook
     stage: validate
     module: validate_ff_engine_v2
-    needs: [clean_presentation, report_pipeline_issues, detect_endings, load_boundaries, html_blocks_repaired, validate_reachability]
+    needs: [clean_presentation, report_pipeline_issues, detect_endings, detect_boundaries_html, html_blocks_repaired, validate_reachability]
     inputs:
       gamebook: clean_presentation
       portions: detect_endings
-      boundaries: load_boundaries
+      boundaries: detect_boundaries_html
       elements_core: html_blocks_repaired
       reachability_report: validate_reachability
     out: validation_report.json
