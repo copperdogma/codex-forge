@@ -4,8 +4,7 @@ import os
 import re
 from typing import List, Dict, Any
 
-from openai import OpenAI
-
+from modules.common.openai_client import OpenAI
 from modules.common.utils import ProgressLogger, read_jsonl, ensure_dir, append_jsonl, save_jsonl
 from modules.common.macro_section import macro_section_for_page
 from schemas import PortionHypothesis

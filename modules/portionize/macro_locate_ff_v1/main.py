@@ -8,9 +8,8 @@ import json
 import os
 from collections import defaultdict
 
-from openai import OpenAI
-
-from modules.common.utils import read_jsonl, save_json, ProgressLogger, log_llm_usage
+from modules.common.openai_client import OpenAI
+from modules.common.utils import read_jsonl, save_json, ProgressLogger
 
 PROMPT = open(os.path.join(os.path.dirname(__file__), "prompt.md"), "r", encoding="utf-8").read()
 
@@ -37,13 +36,6 @@ def call_llm(client: OpenAI, model: str, user_payload: str, max_tokens: int):
         response_format={"type": "json_object"},
         max_tokens=max_tokens if not model.startswith("gpt-5") else None,
         **({"max_completion_tokens": max_tokens} if model.startswith("gpt-5") else {}),
-    )
-    usage = getattr(completion, "usage", None)
-    log_llm_usage(
-        model=model,
-        prompt_tokens=getattr(usage, "prompt_tokens", 0) if usage else 0,
-        completion_tokens=getattr(usage, "completion_tokens", 0) if usage else 0,
-        request_ms=None,
     )
     return completion.choices[0].message.content
 

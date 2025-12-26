@@ -450,7 +450,7 @@ def _get_openai_client():
     global _openai_client
     if _openai_client is None:
         try:
-            from openai import OpenAI
+            from modules.common.openai_client import OpenAI
             _openai_client = OpenAI()
         except ImportError:
             raise RuntimeError("openai package required for inline escalation; pip install openai")
@@ -514,19 +514,6 @@ def inline_vision_escalate(image_path: str, model: str = "gpt-4.1",
         usage_obj = getattr(response, "usage", None)
         usage = None
         try:
-            if usage_obj is not None:
-                if hasattr(usage_obj, "model_dump"):
-                    usage = usage_obj.model_dump()
-                elif hasattr(usage_obj, "to_dict"):
-                    usage = usage_obj.to_dict()
-                elif isinstance(usage_obj, dict):
-                    usage = usage_obj
-                else:
-                    usage = {
-                        k: getattr(usage_obj, k)
-                        for k in ("prompt_tokens", "completion_tokens", "total_tokens", "input_tokens", "output_tokens")
-                        if getattr(usage_obj, k, None) is not None
-                    }
         except Exception:
             usage = None
 

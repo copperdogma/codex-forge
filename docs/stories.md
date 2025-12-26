@@ -115,7 +115,7 @@ This index tracks stories in `/docs/stories/` for the codex-forge pipeline.
 || 097 | Stat Modification Extraction (Skill, Stamina, Luck Changes) | High | Done | /docs/stories/story-097-stat-modification-extraction.md |
 || 098 | Late-Stage Section Validation and Reachability Analysis | High | Done | /docs/stories/story-098-late-stage-section-validation.md |
 || 099 | Remove dev-only backcompat disclaimer | Low | To Do | /docs/stories/story-099-remove-dev-backcompat-note.md |
-||| 100 | Pipeline Visibility Cost Display Enhancement | Medium | To Do | /docs/stories/story-100-pipeline-visibility-cost-display.md |
+||| 100 | Pipeline Visibility Cost Display Enhancement | Medium | Done | /docs/stories/story-100-pipeline-visibility-cost-display.md |
 ||| 101 | ARM64 Environment Cleanup Investigation | Medium | Done | /docs/stories/story-101-arm64-environment-cleanup.md |
 ||| 102 | X-Height Measurement and Target Investigation | High | Done | /docs/stories/story-102-x-height-measurement-and-target-investigation.md |
 

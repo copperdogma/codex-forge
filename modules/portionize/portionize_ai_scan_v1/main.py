@@ -3,9 +3,8 @@ import json
 import os
 from typing import List, Dict
 
-from openai import OpenAI
-
-from modules.common.utils import read_jsonl, save_jsonl, ensure_dir, ProgressLogger, log_llm_usage
+from modules.common.openai_client import OpenAI
+from modules.common.utils import read_jsonl, save_jsonl, ensure_dir, ProgressLogger
 from modules.common.macro_section import macro_section_for_page, page_num_from_element_id
 from schemas import SectionBoundary
 
@@ -153,10 +152,6 @@ Please identify ALL Fighting Fantasy gameplay section boundaries."""
 
         completion = client.chat.completions.create(**kwargs)
 
-        usage = getattr(completion, "usage", None)
-        pt = getattr(usage, "prompt_tokens", 0) if usage else 0
-        ct = getattr(usage, "completion_tokens", 0) if usage else 0
-        log_llm_usage(model=selected_model, prompt_tokens=pt, completion_tokens=ct, request_ms=None)
         return completion.choices[0].message.content or ""
 
     response_text = _once(model)

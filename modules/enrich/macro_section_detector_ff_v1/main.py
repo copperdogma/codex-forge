@@ -2,11 +2,8 @@ import argparse
 import json
 from typing import List, Dict
 
-from openai import OpenAI
-
+from modules.common.openai_client import OpenAI
 from modules.common.utils import read_jsonl, save_json
-from modules.common.utils import log_llm_usage
-
 
 PROMPT_HEADER = """You are a book-structure analyzer.
 Your job is to identify the three macro-sections of a book using OCR’d page text:
@@ -161,13 +158,6 @@ def main():
         ],
         response_format={"type": "json_object"},
     )
-    usage = getattr(completion, "usage", None)
-    if usage:
-        log_llm_usage(
-            model=args.model,
-            prompt_tokens=getattr(usage, "prompt_tokens", 0) or 0,
-            completion_tokens=getattr(usage, "completion_tokens", 0) or 0,
-        )
     data = json.loads(completion.choices[0].message.content)
     save_json(args.out, data)
     print(f"Saved macro sections → {args.out}")

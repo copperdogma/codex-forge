@@ -3,8 +3,7 @@ import json
 import logging
 from typing import Any, Dict, List, Optional
 
-from openai import OpenAI
-
+from modules.common.openai_client import OpenAI
 try:
     from transformers import pipeline
     from transformers.pipelines import Pipeline

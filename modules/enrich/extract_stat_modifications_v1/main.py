@@ -4,8 +4,8 @@ import re
 import os
 from typing import Any, Dict, List, Optional, Tuple
 
-from openai import OpenAI
-from modules.common.utils import read_jsonl, save_jsonl, ProgressLogger, log_llm_usage
+from modules.common.openai_client import OpenAI
+from modules.common.utils import read_jsonl, save_jsonl, ProgressLogger
 from modules.common.html_utils import html_to_text
 from schemas import EnrichedPortion, StatModification
 
@@ -135,15 +135,6 @@ def audit_stat_modifications_batch(audit_list: List[Dict[str, Any]], model: str,
             "prompt_tokens": response.usage.prompt_tokens,
             "completion_tokens": response.usage.completion_tokens,
         }
-        if usage:
-            log_llm_usage(
-                model=usage.get("model", "gpt-4.1-mini"),
-                prompt_tokens=usage.get("prompt_tokens", 0),
-                completion_tokens=usage.get("completion_tokens", 0),
-                stage_id="stat_mod_audit",
-                run_id=run_id
-            )
-        
         return json.loads(response.choices[0].message.content)
     except Exception as e:
         print(f"Global stat modification audit error: {e}")
@@ -191,14 +182,6 @@ def main():
             
             m_ai, usage = extract_stat_modifications_llm(llm_input, args.model, client)
             ai_calls += 1
-            if usage:
-                log_llm_usage(
-                    model=usage.get("model", args.model),
-                    prompt_tokens=usage.get("prompt_tokens", 0),
-                    completion_tokens=usage.get("completion_tokens", 0),
-                    stage_id="extract_stat_modifications",
-                    run_id=args.run_id
-                )
             if m_ai:
                 mods = m_ai
         

@@ -3,10 +3,10 @@ import json
 import os
 from base64 import b64encode
 from typing import List, Dict
-from openai import OpenAI
+from modules.common.openai_client import OpenAI
 from tqdm import tqdm
 
-from modules.common.utils import read_jsonl, save_jsonl, ProgressLogger, log_llm_usage
+from modules.common.utils import read_jsonl, save_jsonl, ProgressLogger
 
 
 CLEAN_PROMPT = """You are cleaning OCR text for a scanned book page.
@@ -39,18 +39,6 @@ def clean_page(client: OpenAI, model: str, page: Dict) -> Dict:
             {"role": "user", "content": content}
         ],
         response_format={"type": "json_object"}
-    )
-    usage = getattr(completion, "usage", None)
-    pt = getattr(usage, "prompt_tokens", None)
-    ct = getattr(usage, "completion_tokens", None)
-    if pt is None or ct is None:
-        pt = pt or 0
-        ct = ct or 0
-    log_llm_usage(
-        model=model,
-        prompt_tokens=pt,
-        completion_tokens=ct,
-        request_ms=None,
     )
     data = json.loads(completion.choices[0].message.content)
     return {

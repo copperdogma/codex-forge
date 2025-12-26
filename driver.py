@@ -1841,6 +1841,19 @@ def main():
     except Exception:
         pass
 
+    # Stamp top-level run status for dashboards/monitors.
+    try:
+        state = {}
+        if os.path.exists(state_path):
+            with open(state_path, "r", encoding="utf-8") as f:
+                state = json.load(f)
+        state["status"] = "done"
+        state["ended_at"] = datetime.utcnow().isoformat(timespec="microseconds") + "Z"
+        with open(state_path, "w", encoding="utf-8") as f:
+            json.dump(state, f, indent=2)
+    except Exception:
+        pass
+
     print("Recipe complete.")
 
 

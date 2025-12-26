@@ -52,7 +52,7 @@ def main():
     ap.add_argument("--max-sections", type=int, default=50)
     args = ap.parse_args()
 
-    from openai import OpenAI
+    from modules.common.openai_client import OpenAI
     client = OpenAI()
 
     rows, fmt = load_portions(args.portions)

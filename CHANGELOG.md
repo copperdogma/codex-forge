@@ -562,3 +562,17 @@
 - `PYTHONPATH=. pytest -q tests/test_ocr_ai_gpt51_schema.py`
 - 20-page end-to-end run: `/tmp/cf-ff-ai-ocr-gpt51-smoke-20`
 - Full-book run: `/tmp/cf-ff-ai-ocr-gpt51-full-`
+## [2025-12-26] - Pipeline visibility cost/status and OpenAI usage centralization
+
+### Added
+- Central OpenAI client wrapper to log LLM usage across modules.
+- Run status stamping for crashed/failed/done to persist in `pipeline_state.json`.
+- Styled run selector with filtering, status pills, and external-runs toggle.
+- Cost summary card and per-stage cost breakdown in pipeline visibility dashboard.
+
+### Changed
+- Dashboard run list now filters to existing on-disk runs and dedupes by path.
+- Run status/percent handling prefers top-level `pipeline_state.status` when present.
+
+### Fixed
+- Dashboard now treats stale runs as crashed when status is stamped.

@@ -11,9 +11,8 @@ import os
 from pathlib import Path
 from typing import Dict, List, Optional, Tuple
 
-from openai import OpenAI
-
-from modules.common.utils import read_jsonl, save_json, log_llm_usage, ProgressLogger
+from modules.common.openai_client import OpenAI
+from modules.common.utils import read_jsonl, save_json, ProgressLogger
 
 
 def summarize_page(
@@ -159,14 +158,6 @@ def call_llm_classify(client: OpenAI, model: str, pages: List[Dict], prompt: str
         ],
         response_format={"type": "json_object"},
     )
-
-    usage = getattr(completion, "usage", None)
-    if usage:
-        log_llm_usage(
-            model=model,
-            prompt_tokens=getattr(usage, "prompt_tokens", 0) or 0,
-            completion_tokens=getattr(usage, "completion_tokens", 0) or 0,
-        )
 
     return json.loads(completion.choices[0].message.content)
 

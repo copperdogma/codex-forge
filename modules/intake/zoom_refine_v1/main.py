@@ -5,9 +5,7 @@ from pathlib import Path
 from typing import List
 
 from modules.common.utils import ensure_dir, read_jsonl, save_jsonl
-from openai import OpenAI
-
-
+from modules.common.openai_client import OpenAI
 def choose_recipe(plan):
     book_type = plan.get("book_type") or "other"
     signals = set(plan.get("signals", []))

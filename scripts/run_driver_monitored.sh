@@ -126,6 +126,35 @@ print(json.dumps({
     "extra": {"exit_code": exit_code},
 }))
 PY
+  if [[ -f "$RUN_ID_STATE" ]]; then
+    RUN_DIR="$RUN_DIR" EXIT_CODE="$EXIT_CODE" python - <<'PY'
+import datetime
+import json
+import os
+from pathlib import Path
+
+run_dir = Path(os.environ.get("RUN_DIR", ""))
+exit_code = os.environ.get("EXIT_CODE", "")
+state_path = run_dir / "pipeline_state.json"
+if not state_path.exists():
+    raise SystemExit(0)
+
+try:
+    state = json.loads(state_path.read_text())
+except Exception:
+    state = {}
+
+status = (state.get("status") or "").lower()
+if status in {"done", "failed", "skipped", "crashed"}:
+    raise SystemExit(0)
+
+now = datetime.datetime.utcnow().isoformat(timespec="microseconds") + "Z"
+state["status"] = "failed"
+state["status_reason"] = f"run_driver_monitored: driver.py exited with code {exit_code}"
+state["ended_at"] = now
+state_path.write_text(json.dumps(state, indent=2))
+PY
+  fi
 fi
 
 exit "$EXIT_CODE"

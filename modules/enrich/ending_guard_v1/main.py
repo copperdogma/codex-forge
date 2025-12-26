@@ -3,9 +3,8 @@ import json
 import re
 from typing import Dict, List, Tuple
 
-from openai import OpenAI
-
-from modules.common.utils import read_jsonl, save_jsonl, save_json, log_llm_usage
+from modules.common.openai_client import OpenAI
+from modules.common.utils import read_jsonl, save_jsonl, save_json
 
 SYSTEM_PROMPT = """You are checking if a Fighting Fantasy section is an ending.
 Given section id and text, answer in JSON:
@@ -50,13 +49,6 @@ def classify_ending(client: OpenAI, model: str, section_id: str, text: str) -> D
         ],
         response_format={"type": "json_object"},
     )
-    usage = getattr(completion, "usage", None)
-    if usage:
-        log_llm_usage(
-            model=model,
-            prompt_tokens=getattr(usage, "prompt_tokens", 0) or 0,
-            completion_tokens=getattr(usage, "completion_tokens", 0) or 0,
-        )
     return json.loads(completion.choices[0].message.content)
 
 

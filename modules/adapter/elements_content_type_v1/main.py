@@ -18,8 +18,7 @@ from collections import defaultdict
 from dataclasses import dataclass
 from typing import Any, Dict, List, Optional, Tuple
 
-from openai import OpenAI
-
+from modules.common.openai_client import OpenAI
 from modules.common.utils import read_jsonl, append_jsonl, ensure_dir
 from schemas import ElementCore
 

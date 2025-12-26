@@ -12,9 +12,8 @@ import json
 import os
 from typing import Dict, List, Optional, Any
 
-from openai import OpenAI
-
-from modules.common.utils import read_jsonl, save_json, ensure_dir, ProgressLogger, log_llm_usage
+from modules.common.openai_client import OpenAI
+from modules.common.utils import read_jsonl, save_json, ensure_dir, ProgressLogger
 from schemas import HeaderCandidate, SectionsStructured, MacroSection, GameSectionStructured, ElementCore
 from .fixup import normalize_start_seq
 
@@ -173,16 +172,6 @@ def call_structure_llm(client: OpenAI, model: str, prompt: str, max_tokens: int,
         
         completion = client.chat.completions.create(timeout=timeout, **create_kwargs)
         
-        # Log usage
-        usage = getattr(completion, "usage", None)
-        pt = getattr(usage, "prompt_tokens", 0) if usage else 0
-        ct = getattr(usage, "completion_tokens", 0) if usage else 0
-        log_llm_usage(
-            model=model,
-            prompt_tokens=pt,
-            completion_tokens=ct,
-            request_ms=None,
-        )
         
         # Parse response
         response_text = completion.choices[0].message.content

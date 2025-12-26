@@ -122,6 +122,180 @@
       border: 1px solid rgba(255, 255, 255, 0.08);
     }
 
+    .run-row {
+      display: flex;
+      gap: 10px;
+      align-items: center;
+    }
+
+    .run-row select,
+    .run-row .run-select {
+      flex: 1;
+    }
+
+    .run-select {
+      position: relative;
+      width: 100%;
+    }
+
+    .run-select button {
+      width: 100%;
+      text-align: left;
+      padding: 10px 12px;
+      border-radius: 10px;
+      border: 1px solid rgba(255, 255, 255, 0.07);
+      background: var(--panel-2);
+      color: var(--text);
+      font-family: "Space Grotesk", sans-serif;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+    }
+
+    .run-select button .label {
+      overflow: hidden;
+      white-space: nowrap;
+      text-overflow: ellipsis;
+    }
+
+    .run-select button .chev {
+      opacity: 0.6;
+    }
+
+    .run-popover {
+      position: absolute;
+      top: calc(100% + 8px);
+      left: 0;
+      right: 0;
+      background: var(--panel);
+      border: 1px solid rgba(255, 255, 255, 0.08);
+      border-radius: 12px;
+      box-shadow: 0 18px 40px rgba(0, 0, 0, 0.35);
+      padding: 10px;
+      z-index: 200;
+      display: none;
+    }
+
+    .run-popover.open {
+      display: block;
+    }
+
+    .run-filter {
+      width: 100%;
+      padding: 8px 10px;
+      border-radius: 8px;
+      border: 1px solid rgba(255, 255, 255, 0.08);
+      background: var(--panel-2);
+      color: var(--text);
+      font-family: "IBM Plex Mono", monospace;
+      font-size: 12px;
+      margin-bottom: 8px;
+    }
+
+    .run-options {
+      max-height: 320px;
+      overflow: auto;
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+    }
+
+    .run-option {
+      padding: 8px 10px;
+      border-radius: 10px;
+      border: 1px solid rgba(255, 255, 255, 0.06);
+      background: rgba(255, 255, 255, 0.02);
+      cursor: pointer;
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+    }
+
+    .run-option:hover {
+      border-color: rgba(255, 255, 255, 0.2);
+      background: rgba(255, 255, 255, 0.05);
+    }
+
+    .run-option.active {
+      border-color: rgba(74, 215, 178, 0.6);
+      box-shadow: 0 0 0 1px rgba(74, 215, 178, 0.3) inset;
+    }
+
+    .run-title {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      font-size: 13px;
+      color: var(--text);
+      font-weight: 600;
+    }
+
+    .run-meta {
+      display: flex;
+      gap: 10px;
+      flex-wrap: wrap;
+      font-size: 11px;
+      color: var(--muted);
+    }
+
+    .status-pill {
+      padding: 2px 6px;
+      border-radius: 999px;
+      font-size: 10px;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+    }
+
+    .status-pill.running {
+      background: rgba(74, 215, 178, 0.16);
+      color: #7bf3cc;
+      border: 1px solid rgba(74, 215, 178, 0.4);
+    }
+
+    .status-pill.done {
+      background: rgba(143, 227, 255, 0.16);
+      color: #8fe3ff;
+      border: 1px solid rgba(143, 227, 255, 0.35);
+    }
+
+    .status-pill.failed {
+      background: rgba(255, 107, 107, 0.16);
+      color: #ff9f9f;
+      border: 1px solid rgba(255, 107, 107, 0.35);
+    }
+
+    .status-pill.crashed {
+      background: rgba(255, 107, 107, 0.16);
+      color: #ff9f9f;
+      border: 1px solid rgba(255, 107, 107, 0.35);
+    }
+
+    .status-pill.queued,
+    .status-pill.unknown {
+      background: rgba(255, 255, 255, 0.08);
+      color: var(--muted);
+      border: 1px solid rgba(255, 255, 255, 0.12);
+    }
+
+    .control-toggle {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 10px 12px;
+      border-radius: 10px;
+      border: 1px solid rgba(255, 255, 255, 0.07);
+      background: var(--panel-2);
+      color: var(--muted);
+      font-size: 12px;
+    }
+
+    .control-toggle input {
+      accent-color: var(--accent);
+    }
+
     .grid {
       display: grid;
       grid-template-columns: repeat(auto-fit, minmax(var(--grid), 1fr));
@@ -220,6 +394,11 @@
       font-weight: 600;
     }
 
+    .status-pill.big {
+      font-size: 11px;
+      padding: 4px 10px;
+    }
+
     .status.running {
       color: var(--accent);
     }
@@ -232,6 +411,10 @@
       color: var(--danger);
     }
 
+    .status.crashed {
+      color: var(--danger);
+    }
+
     .status.skipped {
       color: var(--muted);
     }
@@ -241,6 +424,42 @@
       gap: 8px;
       flex-wrap: wrap;
       margin-top: 8px;
+    }
+
+    .cost-table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 12px;
+    }
+
+    .cost-table th,
+    .cost-table td {
+      text-align: left;
+      padding: 8px 6px;
+      border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+      vertical-align: top;
+    }
+
+    .cost-table th {
+      font-size: 11px;
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+      color: var(--muted);
+    }
+
+    .cost-name {
+      font-weight: 600;
+    }
+
+    .cost-sub {
+      font-size: 11px;
+      color: var(--muted);
+      font-family: "IBM Plex Mono", monospace;
+      margin-top: 2px;
+    }
+
+    .cost-value {
+      font-family: "IBM Plex Mono", monospace;
     }
 
     .chip {
@@ -503,7 +722,22 @@
   <section class="controls">
     <div>
       <label for="run-select">Run</label>
-      <select id="run-select"></select>
+      <div class="run-row">
+        <div class="run-select" id="run-select">
+          <button type="button" id="run-select-btn">
+            <span class="label" id="run-select-label">Select a run…</span>
+            <span class="chev">▾</span>
+          </button>
+          <div class="run-popover" id="run-popover">
+            <input class="run-filter" id="run-filter" placeholder="Filter runs…" />
+            <div class="run-options" id="run-options"></div>
+          </div>
+        </div>
+        <label class="control-toggle" for="show-external" title="Include runs outside output/runs (e.g. /tmp)">
+          <input type="checkbox" id="show-external" />
+          External
+        </label>
+      </div>
     </div>
     <div>
       <label for="manual-run">Manual Run ID</label>
@@ -522,6 +756,7 @@
   <div class="layout" id="layout">
     <div id="main-col">
       <section class="grid" id="summary-grid"></section>
+      <section class="card" id="cost-breakdown"></section>
       <section class="grid" id="stage-grid"></section>
       <section class="card timeline">
         <h3>Recent Events</h3>
@@ -554,12 +789,19 @@
   <script>
     const ROOT = window.location.pathname.includes("/docs/") ? ".." : ".";
     const runSelect = document.getElementById("run-select");
+    const runSelectBtn = document.getElementById("run-select-btn");
+    const runSelectLabel = document.getElementById("run-select-label");
+    const runPopover = document.getElementById("run-popover");
+    const runFilter = document.getElementById("run-filter");
+    const runOptions = document.getElementById("run-options");
     const manualRun = document.getElementById("manual-run");
     const loadBtn = document.getElementById("load-btn");
     const toggleAuto = document.getElementById("toggle-auto");
     const refreshInput = document.getElementById("refresh-ms");
+    const showExternal = document.getElementById("show-external");
     const lastRefresh = document.getElementById("last-refresh");
     const summaryGrid = document.getElementById("summary-grid");
+    const costBreakdown = document.getElementById("cost-breakdown");
     const stageGrid = document.getElementById("stage-grid");
     const timelineList = document.getElementById("timeline-list");
     const layout = document.getElementById("layout");
@@ -583,6 +825,7 @@
       "running": { text: "Running", class: "running" },
       "done": { text: "Done", class: "done" },
       "failed": { text: "Failed", class: "failed" },
+      "crashed": { text: "Crashed", class: "failed" },
       "skipped": { text: "Skipped", class: "skipped" },
       "queued": { text: "Queued", class: "muted" }
     };
@@ -675,73 +918,210 @@
       return isNaN(ts) ? -Infinity : ts;
     }
 
+    function isValidTs(ts) {
+      return Number.isFinite(ts) && ts > 0;
+    }
+
+    function summariseRunState(state) {
+      const topStatus = (state?.status || "").toLowerCase();
+      if (topStatus) {
+        const percentsTop = Object.values(state?.stages || {}).map(s => (
+          s?.progress?.percent != null ? s.progress.percent : (s?.status === "done" ? 100 : 0)
+        ));
+        const avgTop = percentsTop.length ? Math.round(percentsTop.reduce((a, b) => a + b, 0) / percentsTop.length) : null;
+        return { status: topStatus, percent: avgTop };
+      }
+      const stages = state?.stages || {};
+      const entries = Object.entries(stages);
+      if (!entries.length) {
+        const status = (state?.status || "unknown").toLowerCase();
+        return { status, percent: null };
+      }
+      const failed = entries.some(([, s]) => s?.status === "failed");
+      const running = entries.some(([, s]) => s?.status === "running");
+      const allDone = entries.every(([, s]) => ["done", "failed", "skipped"].includes(s?.status));
+      let status = "queued";
+      if (failed) status = "failed";
+      else if (allDone) status = "done";
+      else if (running) status = "running";
+
+      const percents = entries.map(([, s]) => (s?.progress?.percent != null ? s.progress.percent : (s?.status === "done" ? 100 : 0)));
+      const avg = percents.length ? Math.round(percents.reduce((a, b) => a + b, 0) / percents.length) : null;
+      return { status, percent: avg };
+    }
+
+    function formatRunLabel(entry) {
+      const row = entry.row || {};
+      const status = entry.status || "unknown";
+      const percent = entry.percent != null ? `${entry.percent}%` : "—";
+      const ts = isValidTs(entry.ts) ? new Date(entry.ts).toLocaleString() : "unknown";
+      const input = row.input?.pdf || row.path || "unknown";
+      return `${row.run_id} — ${status} • ${percent} • ${ts} • ${input}`;
+    }
+
+    function renderRunOptions(list) {
+      if (!runOptions) return;
+      runOptions.innerHTML = "";
+      if (!list.length) {
+        const empty = document.createElement("div");
+        empty.className = "mono";
+        empty.textContent = "No runs found.";
+        runOptions.appendChild(empty);
+        return;
+      }
+      list.forEach(entry => {
+        const row = entry.row || {};
+        const opt = document.createElement("div");
+        opt.className = `run-option${row.run_id === currentRun ? " active" : ""}`;
+        opt.dataset.runId = row.run_id;
+        const status = entry.status || "unknown";
+        const percent = entry.percent != null ? `${entry.percent}%` : "—";
+        const ts = isValidTs(entry.ts) ? new Date(entry.ts).toLocaleString() : "unknown";
+        const input = row.input?.pdf || row.path || "unknown";
+        opt.innerHTML = `
+          <div class="run-title">
+            <span class="status-pill ${status}">${status}</span>
+            <span>${row.run_id}</span>
+          </div>
+          <div class="run-meta">
+            <span>${percent}</span>
+            <span>${ts}</span>
+            <span>${input}</span>
+          </div>
+        `;
+        opt.onclick = () => {
+          currentRun = row.run_id;
+          userSelectedRun = true;
+          runSelectLabel.textContent = formatRunLabel(entry);
+          closeRunPopover();
+          loadRun(currentRun);
+        };
+        runOptions.appendChild(opt);
+      });
+    }
+
+    function openRunPopover() {
+      if (!runPopover) return;
+      runPopover.classList.add("open");
+      if (runFilter) {
+        runFilter.value = "";
+        runFilter.focus();
+        renderRunOptions(runEntries);
+      }
+    }
+
+    function closeRunPopover() {
+      if (!runPopover) return;
+      runPopover.classList.remove("open");
+    }
+
+    function isInternalRunPath(row) {
+      const path = row?.path || "";
+      if (!path) return true; // default to output/runs/<run_id>
+      if (path.startsWith("output/runs/")) return true;
+      return path.includes("/output/runs/");
+    }
+
     async function loadManifest() {
       const manifestPath = `${ROOT}/output/run_manifest.jsonl`;
       try {
         const res = await fetch(manifestPath);
         if (!res.ok) throw new Error();
         const lines = parseJSONL(await res.text());
-        runSelect.innerHTML = "";
 
         const candidates = lines.slice(-150); // last N entries
 
-        async function resolveTs(row) {
+        async function resolveEntry(row) {
+          if (!row?.run_id) return { row, ts: 0, exists: false };
+          const base = row.path ? `${ROOT}/${row.path}` : `${ROOT}/output/runs/${row.run_id}`;
+          let state = null;
+          let exists = false;
+          try {
+            state = await fetchJSON(`${base}/pipeline_state.json`);
+            exists = true;
+          } catch {
+            exists = false;
+          }
+
           // Try to parse timestamp from run_id (e.g. ...20251124e)
+          let ts = 0;
           const dateMatch = row.run_id.match(/(\d{8})([a-z]?)$/);
           if (dateMatch) {
             const dStr = dateMatch[1];
             const suffix = dateMatch[2] || "";
             // approximate time: date + suffix offset
             const y = dStr.slice(0, 4), m = dStr.slice(4, 6), d = dStr.slice(6, 8);
-            let ts = new Date(`${y}-${m}-${d}T00:00:00Z`).getTime();
+            ts = new Date(`${y}-${m}-${d}T00:00:00Z`).getTime();
             if (suffix) ts += (suffix.charCodeAt(0) - 96) * 1000; // a=1s, b=2s...
-            return ts;
           }
 
           const direct = parseTimestamp(row.created_at || row.updated_at || "");
-          if (direct) return direct;
-          if (!row.path) return 0;
-          try {
-            const state = await fetchJSON(`${ROOT}/${row.path}/pipeline_state.json`);
-            let ts = parseTimestamp(state.updated_at || state.created_at || state.timestamp || "");
-            if (!ts && state.stages) {
+          if (isValidTs(direct)) ts = direct;
+          if (state) {
+            let stateTs = parseTimestamp(state.updated_at || state.created_at || state.timestamp || "");
+            if (!stateTs && state.stages) {
               const stageTimes = Object.values(state.stages).map(s => parseTimestamp(s.updated_at));
               const maxStage = Math.max(0, ...stageTimes.filter(Boolean));
-              ts = maxStage;
+              stateTs = maxStage;
             }
-            return ts;
-          } catch {
-            return 0;
+            if (isValidTs(stateTs)) ts = Math.max(ts || 0, stateTs);
           }
+          const summary = state ? summariseRunState(state) : { status: "unknown", percent: null };
+          return { row, ts, exists, status: summary.status, percent: summary.percent };
         }
 
-        const withTs = await Promise.all(candidates.map(async (row) => ({
-          row,
-          ts: await resolveTs(row),
-        })));
-
-        const sorted = withTs.sort((a, b) => (b.ts || 0) - (a.ts || 0)).map(x => x.row);
-
-        // reverse for display so newest is first in dropdown
-        sorted.forEach(row => {
-          runMeta[row.run_id] = row;
-          const opt = document.createElement("option");
-          opt.value = row.run_id;
-          opt.textContent = `${row.run_id} — ${row.input?.pdf || row.path}`;
-          runSelect.appendChild(opt);
+        const resolved = await Promise.all(candidates.map(resolveEntry));
+        const includeExternal = !!showExternal?.checked;
+        const filtered = resolved.filter(r => r.exists && (includeExternal || isInternalRunPath(r.row)));
+        const byPath = new Map();
+        filtered.forEach(entry => {
+          const row = entry.row || {};
+          const key = row.path || `output/runs/${row.run_id}`;
+          const prev = byPath.get(key);
+          if (!prev || (entry.ts || 0) > (prev.ts || 0)) {
+            byPath.set(key, entry);
+          }
         });
-        const currentExists = sorted.some(r => r.run_id === currentRun);
+        const unique = Array.from(byPath.values());
+        const sorted = unique
+          .sort((a, b) => (b.ts || 0) - (a.ts || 0))
+          .map(x => x);
+
+        runEntries = sorted;
+        renderRunOptions(runEntries);
+        sorted.forEach(entry => {
+          const row = entry.row;
+          runMeta[row.run_id] = row;
+        });
+        const currentExists = sorted.some(r => r.row?.run_id === currentRun);
         if (!userSelectedRun || !currentExists) {
-          currentRun = sorted.length ? sorted[0].run_id : null; // newest
+          currentRun = sorted.length ? sorted[0].row.run_id : null; // newest
         }
-        if (currentRun) runSelect.value = currentRun;
-        lastRefresh.textContent = `Manifest: ${manifestPath}`;
+        if (currentRun && runSelectLabel) {
+          const entry = sorted.find(r => r.row?.run_id === currentRun);
+          if (entry) runSelectLabel.textContent = formatRunLabel(entry);
+        }
+        lastRefresh.textContent = `Manifest: ${manifestPath} (${sorted.length}/${filtered.length} shown)`;
       } catch {
-        runSelect.innerHTML = "";
-        const opt = document.createElement("option");
-        opt.value = "";
-        opt.textContent = "No manifest found (add run manually)";
-        runSelect.appendChild(opt);
+        runEntries = [];
+        renderRunOptions(runEntries);
+        if (runSelectLabel) runSelectLabel.textContent = "No manifest found (add run manually)";
+      }
+    }
+
+    function formatCurrency(value, currency) {
+      const num = Number(value);
+      if (!isFinite(num)) return "—";
+      const code = currency || "USD";
+      try {
+        return new Intl.NumberFormat("en-US", {
+          style: "currency",
+          currency: code,
+          minimumFractionDigits: 4,
+          maximumFractionDigits: 4
+        }).format(num);
+      } catch {
+        return `${num.toFixed(4)} ${code}`;
       }
     }
 
@@ -894,6 +1274,7 @@
       const stages = state.stages || {};
       const stats = summariseStages(stages);
       const meta = runMeta[state.run_id || currentRun] || {};
+      const currency = instrumentation?.pricing?.currency || "USD";
       // Resolve input artifact (pdf, images_dir, etc.)
       const inputMeta = meta.input || {};
       let inputPath = null;
@@ -921,12 +1302,19 @@
       const finalArtifact = findFinalArtifact(stages);
 
       summaryGrid.innerHTML = "";
+      const runSummary = summariseRunState(state);
       summaryGrid.appendChild(makeStatCard("Overall Progress", `${stats.avg}%`, [
+        `<span class="status-pill big ${runSummary.status || "unknown"}">${(runSummary.status || "unknown").toUpperCase()}</span>`,
         `${stats.done}/${stats.total} done`,
         `${stats.running} running`,
         `${stats.failed} failed`,
         getRunDurationHtml(state, events)
       ]));
+      summaryGrid.appendChild(makeStatCard("Total Cost", instrumentation ? formatCurrency(instrumentation.totals?.cost, currency) : "N/A", [
+        instrumentation ? `Currency: ${currency}` : "Instrumentation not found",
+        instrumentation ? `Calls: ${instrumentation.totals?.calls || 0}` : "",
+        instrumentation ? `Tokens: ${instrumentation.totals?.prompt_tokens || 0} / ${instrumentation.totals?.completion_tokens || 0}` : ""
+      ].filter(Boolean)));
       summaryGrid.appendChild(makeStatCard("Run", state.run_id || currentRun || "n/a", [
         state.updated_at ? `updated ${state.updated_at}` : "live",
         base.replace(`${ROOT}/`, "")
@@ -972,7 +1360,7 @@
         const stats = document.createElement("div");
         stats.className = "meta";
         stats.innerHTML = `
-          <span>Total cost: ${(totals.cost || 0).toFixed(4)} ${(instrumentation.pricing?.currency) || "USD"}</span>
+          <span>Total cost: ${formatCurrency(totals.cost, currency)}</span>
           <span>Calls: ${totals.calls || 0}</span>
           <span>Tokens: ${totals.prompt_tokens || 0} / ${totals.completion_tokens || 0}</span>
         `;
@@ -980,7 +1368,7 @@
         if (models.length) {
           const top = document.createElement("div");
           top.className = "meta";
-          top.innerHTML = `<span>Top models:</span>${models.map(([m, v]) => `<span>${m}: ${(v.cost || 0).toFixed(4)}</span>`).join("")}`;
+          top.innerHTML = `<span>Top models:</span>${models.map(([m, v]) => `<span>${m}: ${formatCurrency(v.cost, currency)}</span>`).join("")}`;
           inst.appendChild(top);
         }
       } else {
@@ -993,7 +1381,8 @@
       summaryGrid.appendChild(inst);
 
       const durations = computeStageDurations(events, stages);
-      renderStages(stages, events, base, instrumentation, durations);
+      renderCostBreakdown(stages, instrumentation, currency);
+      renderStages(stages, events, base, instrumentation, durations, currency);
       renderTimeline(events);
     }
 
@@ -1023,7 +1412,69 @@
       return card;
     }
 
-    function renderStages(stages, events, base, instrumentation, durations) {
+    function renderCostBreakdown(stages, instrumentation, currency) {
+      if (!costBreakdown) return;
+      costBreakdown.innerHTML = "";
+      const title = document.createElement("h3");
+      title.textContent = "Cost Breakdown";
+      costBreakdown.appendChild(title);
+
+      if (!instrumentation?.stages || !instrumentation.stages.length) {
+        const msg = document.createElement("div");
+        msg.className = "meta";
+        msg.textContent = "No instrumentation cost data for this run.";
+        costBreakdown.appendChild(msg);
+        return;
+      }
+
+      const totalCost = Number(instrumentation.totals?.cost);
+      const rows = instrumentation.stages
+        .filter(s => s?.id)
+        .map(s => ({
+          id: s.id,
+          moduleId: stages?.[s.id]?.module_id || "",
+          cost: Number(s.llm_totals?.cost || 0)
+        }))
+        .sort((a, b) => b.cost - a.cost);
+
+      const table = document.createElement("table");
+      table.className = "cost-table";
+      table.innerHTML = `
+        <thead>
+          <tr>
+            <th>Stage</th>
+            <th>Cost</th>
+            <th>% of total</th>
+          </tr>
+        </thead>
+        <tbody></tbody>
+      `;
+      const tbody = table.querySelector("tbody");
+      rows.forEach(row => {
+        const tr = document.createElement("tr");
+        const stageCell = document.createElement("td");
+        stageCell.innerHTML = `<div class="cost-name">${row.id}</div>${row.moduleId ? `<div class="cost-sub">${row.moduleId}</div>` : ""}`;
+
+        const costCell = document.createElement("td");
+        costCell.className = "cost-value";
+        costCell.textContent = formatCurrency(row.cost, currency);
+
+        const pctCell = document.createElement("td");
+        if (isFinite(totalCost) && totalCost > 0) {
+          pctCell.textContent = `${((row.cost / totalCost) * 100).toFixed(1)}%`;
+        } else {
+          pctCell.textContent = "—";
+        }
+
+        tr.appendChild(stageCell);
+        tr.appendChild(costCell);
+        tr.appendChild(pctCell);
+        tbody.appendChild(tr);
+      });
+      costBreakdown.appendChild(table);
+    }
+
+    function renderStages(stages, events, base, instrumentation, durations, currency) {
       stageGrid.innerHTML = "";
       const instMap = {};
       if (instrumentation?.stages) {
@@ -1113,7 +1564,7 @@
         const costChip = document.createElement("div");
         costChip.className = "chip";
         costChip.title = costVal === 0 ? "No LLM calls recorded for this stage (non-LLM step or module emitted no usage)" : "";
-        costChip.innerHTML = `<strong>Cost</strong> ${costVal.toFixed(4)}`;
+        costChip.innerHTML = `<strong>Cost</strong> ${instrumentation ? formatCurrency(costVal, currency) : "N/A"}`;
         chips.appendChild(costChip);
         if (inst && inst.wall_seconds != null) {
           const timeChip = document.createElement("div");
@@ -1316,12 +1767,13 @@
       openPane();
       artifactPanel.scrollIntoView({ behavior: "smooth", block: "start" });
       const inst = getStageInstrumentation(stage);
+      const currency = instCache[currentRun]?.pricing?.currency || "USD";
       const chips = [
         `<div class="chip"><strong>Stage</strong> ${stage}</div>`,
         `<div class="chip"><strong>Path</strong> ${artifactPath}</div>`
       ];
       if (inst) {
-        chips.push(`<div class="chip"><strong>Cost</strong> ${(inst.llm_totals?.cost || 0).toFixed(4)}</div>`);
+        chips.push(`<div class="chip"><strong>Cost</strong> ${formatCurrency(inst.llm_totals?.cost, currency)}</div>`);
         chips.push(`<div class="chip"><strong>Calls</strong> ${inst.llm_totals?.calls || 0}</div>`);
         chips.push(`<div class="chip"><strong>Tokens</strong> ${inst.llm_totals?.prompt_tokens ||
           0}/${inst.llm_totals?.completion_tokens || 0}</div>`);
@@ -1421,17 +1873,38 @@
     }
 
     loadBtn.onclick = () => {
-      const chosen = manualRun.value || runSelect.value;
+      const chosen = manualRun.value || currentRun;
       loadRun(chosen);
       startAuto();
     };
-    runSelect.onchange = () => {
-      userSelectedRun = true;
-      loadRun(runSelect.value);
-    };
+    if (runSelectBtn) {
+      runSelectBtn.onclick = (e) => {
+        e.stopPropagation();
+        if (runPopover?.classList.contains("open")) closeRunPopover();
+        else openRunPopover();
+      };
+    }
+    document.addEventListener("click", (e) => {
+      if (!runPopover?.classList.contains("open")) return;
+      if (runSelect && runSelect.contains(e.target)) return;
+      closeRunPopover();
+    });
+    if (runFilter) {
+      runFilter.oninput = () => {
+        const q = runFilter.value.toLowerCase();
+        const filtered = runEntries.filter(entry => {
+          const row = entry.row || {};
+          return `${row.run_id} ${row.input?.pdf || ""} ${row.path || ""}`.toLowerCase().includes(q);
+        });
+        renderRunOptions(filtered);
+      };
+    }
     toggleAuto.onclick = () => {
       if (autoTimer) stopAuto(); else startAuto();
     };
+    if (showExternal) {
+      showExternal.onchange = () => loadManifest();
+    }
 
     function getRunDurationHtml(state, events) {
       if (!events || !events.length) return "Duration: —";
@@ -1442,8 +1915,14 @@
       if (!start) return "Duration: —";
 
       const now = Date.now();
+      const topStatus = (state.status || "").toLowerCase();
+      const endedAt = parseTimestamp(state.ended_at);
+      const endTs = isValidTs(endedAt) ? endedAt : end;
+      const ago = Math.floor((now - endTs) / 1000);
+      let agoStr = "just now";
+      if (ago > 0) agoStr = formatDuration(ago) + " ago";
       // Check if run is truly done based on state status OR if all stages are done
-      let isDone = (state.status || "").toLowerCase() === "done" || (state.status || "").toLowerCase() === "failed";
+      let isDone = topStatus === "done" || topStatus === "failed" || topStatus === "crashed";
       if (!isDone && state.stages) {
         const stages = Object.values(state.stages);
         if (stages.length > 0 && stages.every(s => s.status === "done" || s.status === "failed" || s.status === "skipped")) {
@@ -1454,9 +1933,12 @@
       if (isDone) {
         const duration = end - start;
         const durStr = formatDuration(duration / 1000);
-        const ago = Math.floor((now - end) / 1000);
-        let agoStr = "just now";
-        if (ago > 0) agoStr = formatDuration(ago) + " ago";
+        if (topStatus === "failed") {
+          return `Failed ${agoStr} (took ${durStr})`;
+        }
+        if (topStatus === "crashed") {
+          return `Crashed ${agoStr} (took ${durStr})`;
+        }
         return `Finished ${agoStr} (took ${durStr})`;
       } else {
         // Running
@@ -1492,3 +1974,4 @@
 </body>
 
 </html>
+    let runEntries = [];

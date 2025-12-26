@@ -57,7 +57,7 @@ def encode_image(path: str) -> str:
 def vision_transcribe(image_path: str, prompt: str, model: str, client=None) -> str:
     if client is None:
         try:
-            from openai import OpenAI
+            from modules.common.openai_client import OpenAI
         except ImportError as e:  # pragma: no cover - defensive
             raise RuntimeError("openai package not installed; pip install openai") from e
         client = OpenAI()
@@ -409,7 +409,7 @@ def main():
         return
 
     try:
-        from openai import OpenAI
+        from modules.common.openai_client import OpenAI
         client = OpenAI()
     except Exception as e:  # pragma: no cover - defensive
         client = None

@@ -2,9 +2,8 @@ import argparse
 import json
 from typing import Any, Dict, List
 
-from openai import OpenAI
-
-from modules.common.utils import ProgressLogger, log_llm_usage, read_jsonl, save_jsonl
+from modules.common.openai_client import OpenAI
+from modules.common.utils import ProgressLogger, read_jsonl, save_jsonl
 
 SYSTEM_PROMPT = """You are a context-aware proofreading assistant for Fighting Fantasy sections.
 Correct the supplied section text so it reads coherently: fix missing words, fragmented sentences, and obvious grammar/spacing glitches while preserving punctuation, stats, choices, and original meaning. Use the supplied reasons/quality signals to guide the repair, but do NOT invent new plot elements.
@@ -35,14 +34,6 @@ def call_context_model(client: OpenAI, text: str, section_id: str, reasons: List
         ],
         response_format={"type": "json_object"},
     )
-    usage = getattr(completion, "usage", None)
-    if usage:
-        log_llm_usage(
-            model=model,
-            prompt_tokens=getattr(usage, "prompt_tokens", 0) or 0,
-            completion_tokens=getattr(usage, "completion_tokens", 0) or 0,
-            request_ms=None,
-        )
     data = json.loads(completion.choices[0].message.content)
     corrected = (data.get("context_corrected") or "").strip()
     confidence = float(data.get("confidence", 0.0))

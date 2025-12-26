@@ -2,9 +2,8 @@ import argparse
 import json
 from typing import Dict, List, Optional, Tuple
 
-from openai import OpenAI
-
-from modules.common.utils import read_jsonl, save_jsonl, ProgressLogger, log_llm_usage
+from modules.common.openai_client import OpenAI
+from modules.common.utils import read_jsonl, save_jsonl, ProgressLogger
 
 SYSTEM_PROMPT = """You are analyzing text extracted from a Fighting Fantasy gamebook. Sections are numbered consecutively.
 You receive:
@@ -65,10 +64,6 @@ def call_llm(client: OpenAI, model: str, messages: List[Dict], max_tokens: int) 
         response_format={"type": "json_object"},
         max_tokens=max_tokens,
     )
-    usage = getattr(completion, "usage", None)
-    pt = getattr(usage, "prompt_tokens", 0) if usage else 0
-    ct = getattr(usage, "completion_tokens", 0) if usage else 0
-    log_llm_usage(model=model, prompt_tokens=pt, completion_tokens=ct, request_ms=None)
     content = completion.choices[0].message.content
     data = json.loads(content)
     return data.get("sections") or data.get("results") or data.get("found") or []

@@ -21,7 +21,7 @@ def load_prompt(path: str) -> str:
 
 def vision_transcribe(image_path: str, prompt: str, model: str, client=None) -> str:
     if client is None:
-        from openai import OpenAI
+        from modules.common.openai_client import OpenAI
 
         client = OpenAI()
     image_data = encode_image(image_path)
@@ -107,7 +107,7 @@ def main():
         batches += 1
         print(f"Batch {batches}: escalating pages {cand}")
 
-        from openai import OpenAI
+        from modules.common.openai_client import OpenAI
 
         client = OpenAI() if not args.dry_run else None
 

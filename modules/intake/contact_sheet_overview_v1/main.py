@@ -4,9 +4,7 @@ from pathlib import Path
 from typing import List
 import base64
 from modules.common.utils import read_jsonl, ensure_dir, save_jsonl
-from openai import OpenAI
-
-
+from modules.common.openai_client import OpenAI
 def parse_json_relaxed(text: str):
     try:
         return json.loads(text)

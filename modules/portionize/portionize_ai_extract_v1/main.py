@@ -5,10 +5,10 @@ from pathlib import Path
 from typing import List, Dict, Optional
 from collections import defaultdict
 
-from openai import OpenAI
+from modules.common.openai_client import OpenAI
 from tqdm import tqdm
 
-from modules.common.utils import read_jsonl, append_jsonl, ensure_dir, ProgressLogger, log_llm_usage, save_jsonl, save_json
+from modules.common.utils import read_jsonl, append_jsonl, ensure_dir, ProgressLogger, save_jsonl, save_json
 from schemas import EnrichedPortion, Choice, Combat, ItemEffect
 
 SYSTEM_PROMPT = """You are analyzing a Fighting Fantasy gamebook section to extract gameplay data.
@@ -224,16 +224,6 @@ Please extract all gameplay data (choices, combat, luck tests, item effects)."""
 
     completion = client.chat.completions.create(**create_kwargs)
 
-    # Log usage
-    usage = getattr(completion, "usage", None)
-    pt = getattr(usage, "prompt_tokens", 0) if usage else 0
-    ct = getattr(usage, "completion_tokens", 0) if usage else 0
-    log_llm_usage(
-        model=model,
-        prompt_tokens=pt,
-        completion_tokens=ct,
-        request_ms=None,
-    )
 
     # Parse response
     response_text = completion.choices[0].message.content

@@ -15,7 +15,7 @@ from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple
 
 try:
-    from openai import OpenAI
+    from modules.common.openai_client import OpenAI
 except Exception as exc:  # pragma: no cover
     OpenAI = None
     _OPENAI_IMPORT_ERROR = exc

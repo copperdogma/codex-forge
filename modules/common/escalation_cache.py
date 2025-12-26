@@ -312,8 +312,8 @@ IMPORTANT:
 
         # Make API call
         try:
-            import openai
-            client = openai.OpenAI()
+            from modules.common.openai_client import OpenAI
+            client = OpenAI()
             
             # NOTE: Some newer OpenAI models (e.g., gpt-5) have stricter/limited
             # parameter support (e.g., fixed temperature). Prefer max_completion_tokens

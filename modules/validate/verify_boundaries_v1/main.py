@@ -13,9 +13,8 @@ import os
 import random
 from typing import Dict, List, Any
 
-from openai import OpenAI
-
-from modules.common.utils import read_jsonl, save_json, ProgressLogger, ensure_dir, log_llm_usage
+from modules.common.openai_client import OpenAI
+from modules.common.utils import read_jsonl, save_json, ProgressLogger, ensure_dir
 from schemas import SectionBoundary, ElementCore, BoundaryIssue, BoundaryVerificationReport
 
 
@@ -163,11 +162,6 @@ Question: Does this look like a plausible start of a numbered gameplay section? 
             temperature=0,
         )
 
-        usage = getattr(completion, "usage", None)
-        log_llm_usage(model=model,
-                      prompt_tokens=getattr(usage, "prompt_tokens", 0) if usage else 0,
-                      completion_tokens=getattr(usage, "completion_tokens", 0) if usage else 0,
-                      request_ms=None)
 
         resp = completion.choices[0].message.content
         verdict = json.loads(resp)

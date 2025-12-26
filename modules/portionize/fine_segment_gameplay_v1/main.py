@@ -20,7 +20,7 @@ import tempfile
 from itertools import product
 from typing import List, Dict, Optional, Set, Tuple
 
-from modules.common.utils import read_jsonl, save_json, save_jsonl, log_llm_usage, ProgressLogger
+from modules.common.utils import read_jsonl, save_json, save_jsonl, ProgressLogger
 
 
 # Reuse OCR-glitch handling from detect_gameplay_numbers_v1
@@ -467,7 +467,7 @@ def check_llm_confirmation(missing_ids: List[str], elements: List[Dict],
     Use LLM to confirm if missing sections are truly absent from elements.
     Returns confirmation status for each section.
     """
-    from openai import OpenAI
+    from modules.common.openai_client import OpenAI
     client = OpenAI()
     
     confirmations = {}
@@ -534,14 +534,6 @@ Return only JSON."""
             )
             
             response = json.loads(completion.choices[0].message.content)
-            usage = getattr(completion, "usage", None)
-            if usage is not None:
-                pt = getattr(usage, "prompt_tokens", None)
-                ct = getattr(usage, "completion_tokens", None)
-                if pt is not None and ct is not None:
-                    log_llm_usage(model=model, prompt_tokens=pt, completion_tokens=ct,
-                                  stage_id="fine_segment_gameplay_v1")
-            
             confirmations[sid_str] = {
                 "found": response.get("found", False),
                 "confidence": response.get("confidence", 0.5),

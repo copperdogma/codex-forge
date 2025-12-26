@@ -15,11 +15,11 @@ from PIL import Image
 # Allow large page images from high-resolution scans.
 Image.MAX_IMAGE_PIXELS = None
 
-from modules.common.utils import read_jsonl, append_jsonl, ensure_dir, ProgressLogger, log_llm_usage
+from modules.common.utils import read_jsonl, append_jsonl, ensure_dir, ProgressLogger
 from modules.extract.ocr_ai_gpt51_v1.main import SYSTEM_PROMPT, sanitize_html
 
 try:
-    from openai import OpenAI
+    from modules.common.openai_client import OpenAI
 except Exception as exc:  # pragma: no cover - environment dependency
     OpenAI = None
     _OPENAI_IMPORT_ERROR = exc
@@ -411,10 +411,6 @@ def main() -> None:
                                 "table_chars": len(new_table),
                             }
                         )
-                        if usage2:
-                            usage = usage2
-                            request_id = request_id2
-
                     rescue_meta.update(
                         {
                             "attempts": attempts,
@@ -441,18 +437,6 @@ def main() -> None:
                     )
                     row["rescue"] = rescue_meta
 
-                    if usage:
-                        prompt_tokens = getattr(usage, "input_tokens", None) or getattr(usage, "prompt_tokens", None)
-                        completion_tokens = getattr(usage, "output_tokens", None) or getattr(usage, "completion_tokens", None)
-                        if prompt_tokens is not None and completion_tokens is not None:
-                            log_llm_usage(
-                                model=args.model,
-                                prompt_tokens=prompt_tokens,
-                                completion_tokens=completion_tokens,
-                                provider="openai",
-                                request_id=request_id,
-                                run_id=args.run_id,
-                            )
         elif page_number in skipped_pages:
             rescue_meta = {
                 "attempted": False,

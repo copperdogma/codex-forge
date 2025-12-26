@@ -4,11 +4,9 @@ from base64 import b64encode
 from pathlib import Path
 from typing import Dict, List, Tuple, Union
 
-from openai import OpenAI
-
+from modules.common.openai_client import OpenAI
 from modules.common.utils import (
     ProgressLogger,
-    log_llm_usage,
     read_jsonl,
     save_json,
     save_jsonl,
@@ -116,14 +114,6 @@ def call_llm(
         ],
         response_format={"type": "json_object"},
     )
-    usage = getattr(completion, "usage", None)
-    if usage:
-        log_llm_usage(
-            model=model,
-            prompt_tokens=getattr(usage, "prompt_tokens", 0) or 0,
-            completion_tokens=getattr(usage, "completion_tokens", 0) or 0,
-            request_ms=None,
-        )
     data = json.loads(completion.choices[0].message.content)
     clean_text = data.get("clean_text", "").strip()
     confidence = float(data.get("confidence", 0.0))

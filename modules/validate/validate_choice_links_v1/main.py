@@ -14,11 +14,11 @@ from typing import List, Dict, Set, Tuple, Optional
 from dataclasses import dataclass
 from collections import defaultdict
 
-from modules.common.utils import read_jsonl, save_jsonl, ProgressLogger, log_llm_usage
+from modules.common.utils import read_jsonl, save_jsonl, ProgressLogger
 from modules.common.html_utils import html_to_text
 
 try:
-    from openai import OpenAI
+    from modules.common.openai_client import OpenAI
 except ImportError:
     OpenAI = None
 
@@ -326,7 +326,6 @@ def main():
                     client, args.model, text, suspect['source_id'], suspect['target_id'], suspect['orphan_id'], orphan_text
                 )
                 ai_calls += 1
-                if usage: log_llm_usage(model=args.model, prompt_tokens=usage.prompt_tokens, completion_tokens=usage.completion_tokens, provider="openai", run_id=args.run_id)
 
                 print(f"[Orphan Check] {suspect['source_id']}->{suspect['target_id']} (orphan {suspect['orphan_id']}): Conf={conf}")
 
@@ -351,7 +350,6 @@ def main():
                     client, args.model, text, suspect['source_id'], suspect['target_id'], tgt_text
                 )
                 ai_calls += 1
-                if usage: log_llm_usage(model=args.model, prompt_tokens=usage.prompt_tokens, completion_tokens=usage.completion_tokens, provider="openai", run_id=args.run_id)
                 
                 print(f"[Collision Check] {suspect['source_id']}->{suspect['target_id']}: Conf={conf}")
                 

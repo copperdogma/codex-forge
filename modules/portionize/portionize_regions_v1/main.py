@@ -4,8 +4,7 @@ import os
 import re
 from typing import List, Dict, Any
 
-from openai import OpenAI
-
+from modules.common.openai_client import OpenAI
 from modules.common.utils import ProgressLogger, read_jsonl, ensure_dir, save_json
 
 SYSTEM_PROMPT = """You split Fighting Fantasy books into coarse regions.

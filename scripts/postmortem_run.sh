@@ -56,4 +56,32 @@ print(json.dumps({
 }))
 PY
 
+RUN_DIR="$RUN_DIR" PID="$PID" python - <<'PY'
+import datetime
+import json
+import os
+from pathlib import Path
+
+run_dir = Path(os.environ.get("RUN_DIR", ""))
+pid = os.environ.get("PID", "")
+state_path = run_dir / "pipeline_state.json"
+if not state_path.exists():
+    raise SystemExit(0)
+
+try:
+    state = json.loads(state_path.read_text())
+except Exception:
+    state = {}
+
+status = (state.get("status") or "").lower()
+if status in {"done", "failed", "skipped", "crashed"}:
+    raise SystemExit(0)
+
+now = datetime.datetime.utcnow().isoformat(timespec="microseconds") + "Z"
+state["status"] = "crashed"
+state["status_reason"] = f"run_postmortem: process {pid} not running"
+state["ended_at"] = now
+state_path.write_text(json.dumps(state, indent=2))
+PY
+
 exit 0

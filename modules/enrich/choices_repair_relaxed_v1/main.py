@@ -2,11 +2,11 @@ import argparse
 import json
 from typing import List, Dict, Optional
 
-from modules.common.utils import read_jsonl, save_jsonl, ProgressLogger, log_llm_usage
+from modules.common.utils import read_jsonl, save_jsonl, ProgressLogger
 from modules.common.html_utils import html_to_text
 
 try:
-    from openai import OpenAI
+    from modules.common.openai_client import OpenAI
 except Exception as exc:  # pragma: no cover - environment dependency
     OpenAI = None
     _OPENAI_IMPORT_ERROR = exc
@@ -213,18 +213,6 @@ def main():
                 raw = resp.choices[0].message.content
                 usage = getattr(resp, "usage", None)
                 request_id = getattr(resp, "id", None)
-            if usage:
-                prompt_tokens = getattr(usage, "input_tokens", None) or getattr(usage, "prompt_tokens", None)
-                completion_tokens = getattr(usage, "output_tokens", None) or getattr(usage, "completion_tokens", None)
-                if prompt_tokens is not None and completion_tokens is not None:
-                    log_llm_usage(
-                        model=args.model,
-                        prompt_tokens=prompt_tokens,
-                        completion_tokens=completion_tokens,
-                        provider="openai",
-                        request_id=request_id,
-                        run_id=args.run_id,
-                    )
         except Exception as exc:
             repair_errors += 1
             logger.log(
