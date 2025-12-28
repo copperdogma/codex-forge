@@ -246,7 +246,14 @@ def main():
                     if not p.stat_modifications:
                         p.stat_modifications = []
                     for a_data in additions_map[sid]:
-                        p.stat_modifications.append(StatModification(**a_data))
+                        if not isinstance(a_data, dict):
+                            print(f"Warning: Skipping invalid stat modification addition for section {sid}: {a_data}")
+                            continue
+                        try:
+                            p.stat_modifications.append(StatModification(**a_data))
+                        except Exception as e:
+                            print(f"Warning: Skipping invalid stat modification addition for section {sid}: {e}")
+                            continue
 
     final_rows = [p.model_dump(exclude_none=True) for p in out_portions]
     save_jsonl(args.out, final_rows)

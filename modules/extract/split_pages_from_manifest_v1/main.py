@@ -16,6 +16,16 @@ from modules.common.image_utils import (
 )
 
 
+def _bucket_size(value: int, bucket: int) -> int:
+    return int(round(value / bucket) * bucket)
+
+
+def _size_group_key(width: int, height: int, ratio_bucket: float, size_bucket: int) -> tuple:
+    ratio = width / max(height, 1)
+    ratio_key = round(ratio / ratio_bucket) * ratio_bucket
+    return (_bucket_size(width, size_bucket), _bucket_size(height, size_bucket), round(ratio_key, 3))
+
+
 def _utc() -> str:
     return datetime.utcnow().isoformat() + "Z"
 
@@ -27,11 +37,13 @@ def _build_manifest_row(
     image_path: str,
     spread_side: str | None,
     run_id: str | None,
+    source: Any | None,
 ) -> Dict[str, Any]:
     return {
         "schema_version": "page_image_v1",
         "module_id": "split_pages_from_manifest_v1",
         "run_id": run_id,
+        "source": source,
         "created_at": _utc(),
         "page": page,
         "page_number": page_number,
@@ -46,6 +58,8 @@ def main() -> None:
     parser.add_argument("--pages", required=True, help="Path to page_image_v1 manifest JSONL")
     parser.add_argument("--outdir", required=True, help="Output directory")
     parser.add_argument("--pdf", help="Ignored. Present for driver compatibility.")
+    parser.add_argument("--ratio-bucket", dest="ratio_bucket", type=float, default=0.05, help="Bucket size for aspect ratio grouping")
+    parser.add_argument("--size-bucket", dest="size_bucket", type=int, default=50, help="Bucket size in pixels for width/height grouping")
     parser.add_argument("--progress-file", help="Path to pipeline_events.jsonl")
     parser.add_argument("--state-file", help="Path to pipeline_state.json")
     parser.add_argument("--run-id", help="Run identifier for logging")
@@ -59,6 +73,7 @@ def main() -> None:
 
     rows = list(read_jsonl(args.pages))
     image_paths = [row["image"] for row in rows]
+    row_by_path = {row["image"]: row for row in rows if row.get("image")}
 
     if not image_paths:
         logger.log(
@@ -72,23 +87,49 @@ def main() -> None:
         )
         return
 
-    spread_decision = sample_spread_decision(image_paths, sample_size=min(5, len(image_paths)))
-    is_spread_book = spread_decision["is_spread"]
-    gutter_position = spread_decision["gutter_position"]
-    total_progress = len(image_paths) * (2 if is_spread_book else 1)
+    # Group by size + aspect ratio to handle mixed-layout PDFs (spreads + single pages).
+    size_groups: Dict[tuple, List[str]] = {}
+    page_sizes: Dict[str, tuple] = {}
+    for path in image_paths:
+        img = Image.open(path)
+        w, h = img.size
+        page_sizes[path] = (w, h)
+        key = _size_group_key(w, h, args.ratio_bucket, args.size_bucket)
+        size_groups.setdefault(key, []).append(path)
 
-    spread_log_path = os.path.join(args.outdir, "spread_decision.json")
-    save_json(spread_log_path, spread_decision)
+    group_decisions: Dict[tuple, Dict[str, Any]] = {}
+    for key, paths in size_groups.items():
+        decision = sample_spread_decision(paths, sample_size=min(5, len(paths)))
+        group_decisions[key] = decision
+
+    split_diagnostics = {
+        "group_count": len(size_groups),
+        "ratio_bucket": args.ratio_bucket,
+        "size_bucket": args.size_bucket,
+        "groups": [],
+    }
+    for key, paths in size_groups.items():
+        decision = group_decisions[key]
+        split_diagnostics["groups"].append({
+            "group_key": key,
+            "count": len(paths),
+            "decision": decision,
+        })
+
+    total_progress = len(image_paths) * 2
+
+    split_log_path = os.path.join(args.outdir, "split_decisions.json")
+    save_json(split_log_path, split_diagnostics)
     logger.log(
         "extract",
         "running",
         current=0,
-        total=total_progress,
-        message=f"Spread mode: {is_spread_book}, gutter: {gutter_position:.3f}",
-        artifact=spread_log_path,
+        total=len(image_paths),
+        message=f"Split groups: {len(size_groups)}",
+        artifact=split_log_path,
         module_id="split_pages_from_manifest_v1",
         schema_version="page_image_v1",
-        extra={"is_spread": is_spread_book, "gutter_position": gutter_position, "confidence": spread_decision["confidence"]},
+        extra={"group_count": len(size_groups)},
     )
 
     output_page_number = 0
@@ -100,30 +141,32 @@ def main() -> None:
         img_path = row["image"]
         pil_img = Image.open(img_path)
 
-        if is_spread_book:
+        group_key = _size_group_key(pil_img.size[0], pil_img.size[1], args.ratio_bucket, args.size_bucket)
+        group_decision = group_decisions.get(group_key) or {"is_spread": False, "gutter_position": 0.5, "confidence": 0.0}
+        is_spread_group = group_decision.get("is_spread", False)
+        gutter_position = group_decision.get("gutter_position", 0.5)
+
+        w_px, h_px = pil_img.size
+        is_landscape = (w_px / max(h_px, 1)) > 1.1
+
+        source = row_by_path.get(img_path, {}).get("source")
+        if is_spread_group and is_landscape:
             page_gutter_frac, _, page_contrast, page_continuity = find_gutter_position(pil_img)
             min_contrast_threshold = 0.15
             min_continuity_threshold = 0.7
-            min_center_distance = 0.02
-            distance_from_center = abs(page_gutter_frac - 0.5)
-
             has_strong_seam = (
                 page_contrast >= min_contrast_threshold
                 and page_continuity >= min_continuity_threshold
-                and distance_from_center >= min_center_distance
             )
 
             if has_strong_seam:
                 actual_gutter = page_gutter_frac
                 gutter_source = "per-page (strong seam)"
-            elif distance_from_center < min_center_distance:
-                actual_gutter = 0.5
-                gutter_source = "center (detected too close)"
             else:
-                actual_gutter = 0.5
-                gutter_source = "center (weak signal)"
+                # Use group gutter when per-page signal is weak/ambiguous.
+                actual_gutter = gutter_position
+                gutter_source = "group (weak signal)"
 
-            w_px = pil_img.size[0]
             center_px = int(0.5 * w_px)
             actual_px = int(actual_gutter * w_px)
             diff_from_center_px = actual_px - center_px
@@ -162,6 +205,7 @@ def main() -> None:
                     image_path=left_path,
                     spread_side="L",
                     run_id=args.run_id,
+                    source=source,
                 )
             )
             output_page_number += 1
@@ -173,6 +217,7 @@ def main() -> None:
                     image_path=right_path,
                     spread_side="R",
                     run_id=args.run_id,
+                    source=source,
                 )
             )
         else:
@@ -191,6 +236,7 @@ def main() -> None:
                     image_path=out_path,
                     spread_side=None,
                     run_id=args.run_id,
+                    source=source,
                 )
             )
 

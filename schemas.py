@@ -161,6 +161,16 @@ class PageHtml(BaseModel):
     original_page_number: Optional[int] = None
     image: Optional[str] = None
     spread_side: Optional[str] = None
+    # OCR diagnostics (optional; populated by AI OCR stage)
+    ocr_quality: Optional[float] = None
+    ocr_integrity: Optional[float] = None
+    continuation_risk: Optional[float] = None
+    ocr_metadata_warning: Optional[str] = None
+    ocr_metadata_tag: Optional[str] = None
+    ocr_metadata_missing: Optional[bool] = None
+    ocr_empty: Optional[bool] = None
+    ocr_empty_reason: Optional[str] = None
+    raw_html: Optional[str] = None
     html: str
 
 

@@ -576,3 +576,18 @@
 
 ### Fixed
 - Dashboard now treats stale runs as crashed when status is stamped.
+## [2025-12-28] - Game-ready validation consolidation and OCR robustness
+
+### Added
+- Consolidated game-ready validation report with attempt details for orphans and broken links.
+- Choice/text alignment and orphan-trace validators wired into canonical recipes.
+- OCR metadata fields preserved through schema stamping.
+
+### Changed
+- PDF extraction now falls back when embedded images are partial or multi-XObject.
+- Splitter now groups by size/aspect and gates per-page spread splits.
+- Pipeline visibility UI now shows running stage, URL-selected run, and improved progress handling.
+
+### Fixed
+- Choice repair no longer overrides explicit numeric references; HTML anchors are patched on repair.
+- Ordering/duplicate header issues surfaced in issues report and game-ready validation.

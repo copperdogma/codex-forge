@@ -1,0 +1,9 @@
+module_id: validate_choice_text_alignment_v1
+entrypoint: modules/validate/validate_choice_text_alignment_v1/main.py
+inputs:
+  - name: portions
+    schema: enriched_portion_v1
+outputs:
+  - name: report
+    schema: validation_report_v1
+description: "Validate that extracted choices match explicit 'turn to' references in section text."

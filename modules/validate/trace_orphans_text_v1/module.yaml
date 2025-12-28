@@ -1,0 +1,9 @@
+module_id: trace_orphans_text_v1
+entrypoint: modules/validate/trace_orphans_text_v1/main.py
+inputs:
+  - name: portions
+    schema: enriched_portion_v1
+outputs:
+  - name: report
+    schema: validation_report_v1
+description: "Trace orphan sections by scanning section text for explicit references."

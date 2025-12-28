@@ -14,6 +14,7 @@ This repo processes scanned (or text) books into structured JSON, using modular 
 - **100% Accuracy Requirement:** The final artifacts (gamebook.json) are used directly in a game engine. **If even ONE section number or choice is wrong, the game is broken.** Partial success on section coverage or choice extraction is a complete failure. Pipeline must achieve 100% accuracy or fail explicitly.
 - **Inspect outputs, not just logs:** A green or non-crashing run is not evidence of correctness. Always manually open produced artifacts and check for logical errors (e.g., concatenated sections, missing data, incorrect values).
 - Keep artifacts append-only; never rewrite user data or outputs in `output/` or `input/`.
+- **Precompute context for readers:** Prefer computing metrics (e.g., costs/usage/quality signals) at the stage that produces them and write them into artifacts/logs (e.g., `instrumentation.json`) instead of relying on downstream recomputation.
 
 ## Generality & Non-Overfitting (Read First)
 - Optimize for an input *category* (e.g., Fighting Fantasy scans), not a single PDF/run.
@@ -316,3 +317,5 @@ Before portionization, automatically flag pages for high-fidelity re-OCR if eith
   - If results are mixed, say so explicitly and name the remaining failure mode(s).
 - **Debugging discipline:** when diagnosing issues, inspect the actual data/artifacts at each stage before changing code. Prefer evidence-driven plans (e.g., grep/rg on outputs, view JSONL samples) over guess-and-edit loops. Document what was observed and the decision that follows.
 - **Reuse working patterns first:** before inventing a new solution, look for an existing working pattern in this repo (code, UX, helper). Read it, understand it, and adapt with minimal changes.
+- **Schema stamping gotcha (critical):** `driver.py` *stamps* artifacts using `schemas.py`. Any output fields not declared in the schema **will be dropped** when stamping rewrites the JSONL. If you add new fields in a module output, **you must add them to the corresponding schema** (e.g., `PageHtml`) or they will disappear. Always verify the stamped artifact (`output/runs/<run_id>/.../*.jsonl`) contains the new fields after the stage completes.
+- **Validation report HTML generation:** `validation_report.html` is produced by `tools/generate_forensic_html.py` when `validate_ff_engine_v2` runs with `forensics: true`. The JSON report (`validation_report.json`) lives in the run root and is the source of the HTML.

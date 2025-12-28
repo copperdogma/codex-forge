@@ -135,9 +135,19 @@ class ProgressLogger:
             schema_version: Optional[str] = None, stage_description: Optional[str] = None,
             extra: Optional[Dict[str, Any]] = None):
         now = _utc()
+        override_stage = os.getenv("PIPELINE_STAGE_ID") or os.getenv("STAGE_ID")
+        stage_alias = stage
+        if override_stage:
+            override_stage = override_stage.strip()
+            if override_stage:
+                stage = override_stage
         percent = None
         if current is not None and total:
             percent = round((current / total) * 100, 1)
+
+        payload_extra = dict(extra or {})
+        if stage_alias != stage:
+            payload_extra.setdefault("stage_alias", stage_alias)
 
         event = {
             "timestamp": now,
@@ -152,7 +162,7 @@ class ProgressLogger:
             "module_id": module_id,
             "schema_version": schema_version,
             "stage_description": stage_description,
-            "extra": extra or {},
+            "extra": payload_extra,
         }
 
         validate_progress_event(event)

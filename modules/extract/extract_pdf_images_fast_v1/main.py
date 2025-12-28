@@ -148,12 +148,14 @@ def _extract_image_from_xobject(xobject, page_w_pts: float, page_h_pts: float) -
         return None
 
     candidates = []
+    image_xobject_count = 0
 
     for name, ref in xobject.items():
         obj = _resolve_obj(ref)
         subtype = obj.get("/Subtype") if hasattr(obj, "get") else None
 
         if subtype == "/Image":
+            image_xobject_count += 1
             width = obj.get("/Width")
             height = obj.get("/Height")
             if not width or not height:
@@ -213,6 +215,9 @@ def _extract_image_from_xobject(xobject, page_w_pts: float, page_h_pts: float) -
             "is_full_page": best["is_full_page"],
             "coverage_x": round(best["coverage_x"], 3),
             "coverage_y": round(best["coverage_y"], 3),
+            "coverage_min": round(min(best["coverage_x"], best["coverage_y"]), 3),
+            "candidates_count": len(candidates),
+            "image_xobject_count": image_xobject_count,
             "format": img.format,
             "mode": img.mode,
         }
@@ -233,11 +238,12 @@ def _render_page_fallback(pdf_path: str, page_num: int, dpi: int) -> Optional[Im
         return None
 
 
-def _build_manifest_row(page: int, page_number: int, image_path: str, run_id: Optional[str]) -> Dict[str, Any]:
+def _build_manifest_row(page: int, page_number: int, image_path: str, run_id: Optional[str], source_pdf: Optional[str]) -> Dict[str, Any]:
     return {
         "schema_version": "page_image_v1",
         "module_id": "extract_pdf_images_fast_v1",
         "run_id": run_id,
+        "source": [source_pdf] if source_pdf else None,
         "created_at": _utc(),
         "page": page,
         "page_number": page_number,
@@ -261,6 +267,14 @@ def main() -> None:
                         help="Disable rendering fallback")
     parser.add_argument("--fallback-dpi", "--fallback_dpi", dest="fallback_dpi", type=int, default=300,
                         help="DPI for rendering fallback (default: 300)")
+    parser.add_argument("--min-coverage", "--min_coverage", dest="min_coverage", type=float, default=0.93,
+                        help="Minimum coverage for fast-extracted image before forcing render fallback")
+    parser.add_argument("--require-full-page", "--require_full_page", dest="require_full_page", action="store_true", default=True,
+                        help="Force render fallback when extracted image is below min-coverage (default: True)")
+    parser.add_argument("--allow-partial", dest="require_full_page", action="store_false",
+                        help="Allow partial fast-extracted images (disable coverage fallback)")
+    parser.add_argument("--max-xobject-images", "--max_xobject_images", dest="max_xobject_images", type=int, default=1,
+                        help="Maximum number of image XObjects allowed before forcing render fallback")
     parser.add_argument("--target-line-height", "--target_line_height", dest="target_line_height", type=int, default=20,
                         help="Target text height in pixels for OCR normalization (default: 20). Global scale applied uniformly to all pages based on Tesseract-measured x-height. Never upscales.")
     parser.add_argument("--baseline-dpi", "--baseline_dpi", dest="baseline_dpi", type=int, default=72,
@@ -346,6 +360,18 @@ def main() -> None:
         extraction_method = None
         img = None
         metadata = {}
+        fallback_reason = None
+
+        if result and args.require_full_page:
+            _, meta = result
+            coverage_min = meta.get("coverage_min", 1.0)
+            image_xobject_count = meta.get("image_xobject_count", 1)
+            if image_xobject_count > args.max_xobject_images:
+                result = None
+                fallback_reason = f"xobjects>{args.max_xobject_images}"
+            elif coverage_min < args.min_coverage:
+                result = None
+                fallback_reason = f"coverage<{args.min_coverage}"
 
         if result:
             # Fast extraction succeeded
@@ -363,6 +389,8 @@ def main() -> None:
                     "width": img.width,
                     "height": img.height,
                 }
+                if fallback_reason:
+                    metadata["fallback_reason"] = fallback_reason
             else:
                 failed_count += 1
         else:
@@ -526,7 +554,7 @@ def main() -> None:
         img.save(out_path, "JPEG", quality=95)
 
         page_number += 1
-        manifest_rows.append(_build_manifest_row(page_idx, page_number, out_path, args.run_id))
+        manifest_rows.append(_build_manifest_row(page_idx, page_number, out_path, args.run_id, os.path.abspath(args.pdf)))
         report_rows.append({
             "page": page_idx,
             **metadata,

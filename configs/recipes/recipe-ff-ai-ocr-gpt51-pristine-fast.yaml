@@ -136,10 +136,26 @@ stages:
       max_sources: 50
       max_calls: 50
 
+  - id: validate_choice_text_alignment
+    stage: validate
+    module: validate_choice_text_alignment_v1
+    needs: [repair_choices]
+    inputs:
+      portions: repair_choices
+    out: choice_text_alignment_report.json
+
+  - id: trace_orphans_text
+    stage: validate
+    module: trace_orphans_text_v1
+    needs: [repair_choices]
+    inputs:
+      portions: repair_choices
+    out: orphan_trace_report.json
+
   - id: validate_choice_links
     stage: enrich
     module: validate_choice_links_v1
-    needs: [repair_choices]
+    needs: [repair_choices, validate_choice_text_alignment, trace_orphans_text]
     inputs:
       pages: html_blocks_repaired
       input: repair_choices
@@ -148,6 +164,8 @@ stages:
       model: gpt-4.1-mini
       max_ai_calls: 50
       check_multi_links: true
+      alignment_report: validate_choice_text_alignment
+      orphan_trace_report: trace_orphans_text
 
   - id: extract_combat
     stage: enrich
@@ -270,3 +288,26 @@ stages:
     out: validation_report.json
     params:
       forensics: true
+
+  - id: validate_choice_completeness
+    stage: validate
+    module: validate_choice_completeness_v1
+    needs: [clean_presentation]
+    inputs:
+      gamebook: clean_presentation
+    out: choice_completeness_report.json
+    params:
+      max_discrepancy: 0
+      expected_range: "1-400"
+
+  - id: validate_game_ready
+    stage: validate
+    module: validate_game_ready_v1
+    needs: [validate_gamebook, validate_choice_completeness, report_pipeline_issues, validate_reachability, clean_presentation]
+    inputs:
+      gamebook: clean_presentation
+      choice_report: validate_choice_completeness
+      reachability_report: validate_reachability
+      engine_report: validate_gamebook
+      issues_report: report_pipeline_issues
+    out: game_ready_validation_report.json

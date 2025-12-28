@@ -47,6 +47,58 @@ def _collect_missing_bundles(run_dir: str) -> List[Dict]:
     return issues
 
 
+def _collect_ordering_conflicts(run_dir: str) -> List[Dict]:
+    issues: List[Dict] = []
+    for root, dirs, files in os.walk(run_dir):
+        for name in files:
+            if name != "ordering_conflicts.json":
+                continue
+            path = os.path.join(root, name)
+            try:
+                data = json.loads(Path(path).read_text(encoding="utf-8"))
+            except Exception:
+                data = None
+            conflicts = data.get("ordering_conflicts") if isinstance(data, dict) else None
+            if not isinstance(conflicts, list):
+                continue
+            for conflict in conflicts:
+                issues.append({
+                    "type": "boundary_ordering_conflict",
+                    "severity": "error",
+                    "section_id": str(conflict.get("section_id")) if conflict.get("section_id") is not None else None,
+                    "note": "Section ordering conflict detected; boundary spans may be inverted.",
+                    "details": conflict,
+                    "evidence_path": path,
+                })
+    return issues
+
+
+def _collect_duplicate_headers(run_dir: str) -> List[Dict]:
+    issues: List[Dict] = []
+    for root, dirs, files in os.walk(run_dir):
+        for name in files:
+            if name != "duplicate_headers.json":
+                continue
+            path = os.path.join(root, name)
+            try:
+                data = json.loads(Path(path).read_text(encoding="utf-8"))
+            except Exception:
+                data = None
+            duplicates = data.get("duplicate_headers") if isinstance(data, dict) else None
+            if not isinstance(duplicates, list):
+                continue
+            for dup in duplicates:
+                issues.append({
+                    "type": "boundary_duplicate_header",
+                    "severity": "error",
+                    "section_id": str(dup.get("section_id")) if dup.get("section_id") is not None else None,
+                    "note": "Multiple candidate headers detected for same section id; dedupe may be wrong.",
+                    "details": dup,
+                    "evidence_path": path,
+                })
+    return issues
+
+
 def _select_choice_stats_files(run_dir: str) -> List[str]:
     stats_files = []
     for root, dirs, files in os.walk(run_dir):
@@ -65,8 +117,23 @@ def _select_choice_stats_files(run_dir: str) -> List[str]:
     return relaxed or stats_files
 
 
+def _load_reachability_orphans(run_dir: str) -> Optional[List[str]]:
+    report_path = os.path.join(run_dir, "18_validate_holistic_reachability_v1", "reachability_report.json")
+    if not os.path.exists(report_path):
+        return None
+    try:
+        data = json.loads(Path(report_path).read_text(encoding="utf-8"))
+    except Exception:
+        return None
+    orphans = data.get("forensics", {}).get("orphans")
+    if isinstance(orphans, list):
+        return [str(o) for o in orphans]
+    return None
+
+
 def _collect_choice_orphans(run_dir: str) -> List[Dict]:
     issues: List[Dict] = []
+    true_orphans = _load_reachability_orphans(run_dir)
     for path in _select_choice_stats_files(run_dir):
         try:
             data = json.loads(Path(path).read_text(encoding="utf-8"))
@@ -75,6 +142,8 @@ def _collect_choice_orphans(run_dir: str) -> List[Dict]:
         if not isinstance(data, dict):
             continue
         orphans = data.get("orphaned_sections") or []
+        if true_orphans is not None:
+            orphans = [str(o) for o in orphans if str(o) in set(true_orphans)]
         repair_no_sources = data.get("repair_no_sources")
         repair_sources_examined = data.get("repair_sources_examined")
         relaxed_index = data.get("relaxed_reference_index") or {}
@@ -131,11 +200,15 @@ def main() -> None:
 
     issues: List[Dict] = []
     issues.extend(_collect_missing_bundles(run_dir))
+    issues.extend(_collect_ordering_conflicts(run_dir))
+    issues.extend(_collect_duplicate_headers(run_dir))
     issues.extend(_collect_choice_orphans(run_dir))
 
     summary = {
         "issue_count": len(issues),
         "missing_section_count": sum(1 for i in issues if i.get("type") == "missing_section"),
+        "boundary_ordering_conflict_count": sum(1 for i in issues if i.get("type") == "boundary_ordering_conflict"),
+        "boundary_duplicate_header_count": sum(1 for i in issues if i.get("type") == "boundary_duplicate_header"),
         "orphaned_section_count": sum(1 for i in issues if i.get("type") == "orphaned_section"),
         "orphaned_section_no_sources_count": sum(1 for i in issues if i.get("type") == "orphaned_section_no_sources"),
         "orphaned_section_relaxed_hit_count": sum(1 for i in issues if i.get("type") == "orphaned_section_relaxed_hit"),
@@ -160,6 +233,8 @@ def main() -> None:
     logger = ProgressLogger(state_path=args.state_file, progress_path=progress_path, run_id=run_id)
     summary_msg = (
         f"Issues: missing {summary['missing_section_count']}, "
+        f"ordering_conflicts {summary['boundary_ordering_conflict_count']}, "
+        f"duplicate_headers {summary['boundary_duplicate_header_count']}, "
         f"orphans {summary['orphaned_section_count']}, "
         f"orphans_no_sources {summary['orphaned_section_no_sources_count']} → {out_path}"
     )

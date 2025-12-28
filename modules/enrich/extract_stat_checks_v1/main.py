@@ -245,6 +245,21 @@ def main():
             for a in additions:
                 additions_map.setdefault(str(a.get("section_id")), []).append(a.get("data"))
 
+            def _valid_str(val):
+                return isinstance(val, str) and val.strip()
+
+            def _sanitize_test_luck(data):
+                if not _valid_str(data.get("lucky_section")):
+                    return None
+                if not _valid_str(data.get("unlucky_section")):
+                    return None
+                return data
+
+            def _sanitize_stat_check(data):
+                if not _valid_str(data.get("pass_section")):
+                    return None
+                return data
+
             for p in out_portions:
                 sid = str(p.section_id or p.portion_id)
                 
@@ -266,7 +281,15 @@ def main():
                             l_idx = idx - len(p.stat_checks)
                             merged = p.test_luck[l_idx].model_dump()
                             merged.update(new_data)
-                            p.test_luck[l_idx] = TestLuck(**merged)
+                            merged = _sanitize_test_luck(merged)
+                            if merged is None:
+                                print(f"Warning: Skipping invalid luck correction for section {sid}, index {l_idx}")
+                                continue
+                            try:
+                                p.test_luck[l_idx] = TestLuck(**merged)
+                            except Exception as e:
+                                print(f"Warning: Skipping invalid luck correction for section {sid}, index {l_idx}: {e}")
+                                continue
                 
                 # Apply removals
                 if sid in removals_map:
@@ -276,11 +299,30 @@ def main():
                 # Apply additions
                 if sid in additions_map:
                     for a_data in additions_map[sid]:
+                        if not isinstance(a_data, dict):
+                            print(f"Warning: Skipping invalid addition for section {sid}: {a_data}")
+                            continue
                         is_luck = "lucky_section" in a_data and "unlucky_section" in a_data
                         if is_luck:
-                            p.test_luck.append(TestLuck(**a_data))
+                            clean = _sanitize_test_luck(a_data)
+                            if clean is None:
+                                print(f"Warning: Skipping invalid luck addition for section {sid}")
+                                continue
+                            try:
+                                p.test_luck.append(TestLuck(**clean))
+                            except Exception as e:
+                                print(f"Warning: Skipping invalid luck addition for section {sid}: {e}")
+                                continue
                         elif "pass_section" in a_data:
-                            p.stat_checks.append(StatCheck(**a_data))
+                            clean = _sanitize_stat_check(a_data)
+                            if clean is None:
+                                print(f"Warning: Skipping invalid stat check addition for section {sid}")
+                                continue
+                            try:
+                                p.stat_checks.append(StatCheck(**clean))
+                            except Exception as e:
+                                print(f"Warning: Skipping invalid stat check addition for section {sid}: {e}")
+                                continue
 
     final_rows = [p.model_dump(exclude_none=True) for p in out_portions]
     save_jsonl(args.out, final_rows)

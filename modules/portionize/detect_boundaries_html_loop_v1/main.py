@@ -225,6 +225,46 @@ def _extract_running_head(html: str) -> Optional[str]:
     return match.group(1).strip() if match else None
 
 
+def _doc_order_key(boundary: Dict[str, Any]) -> Tuple[int, int]:
+    return (_coerce_int(boundary.get("start_page")) or 0, _coerce_int(boundary.get("start_line_idx")) or 0)
+
+
+def _detect_ordering_conflicts(boundaries: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+    ordered = sorted(boundaries, key=_doc_order_key)
+    conflicts: List[Dict[str, Any]] = []
+    last_id: Optional[int] = None
+    last_page: Optional[int] = None
+    for b in ordered:
+        sid = str(b.get("section_id") or "")
+        if not sid.isdigit():
+            continue
+        sec = int(sid)
+        page = _coerce_int(b.get("start_page"))
+        if last_id is not None and sec < last_id:
+            conflicts.append({
+                "prev_section_id": str(last_id),
+                "prev_page": last_page,
+                "section_id": sid,
+                "page": page,
+                "start_element_id": b.get("start_element_id"),
+            })
+        last_id = sec
+        last_page = page
+    return conflicts
+
+
+def _write_ordering_report(out_dir: str, conflicts: List[Dict[str, Any]]) -> Optional[str]:
+    if not conflicts:
+        return None
+    path = os.path.join(out_dir, "ordering_conflicts.json")
+    with open(path, "w", encoding="utf-8") as f:
+        json.dump({
+            "schema_version": "boundary_order_conflicts_v1",
+            "ordering_conflicts": conflicts,
+        }, f, indent=2)
+    return path
+
+
 def _build_missing_bundles(
     out_dir: str,
     missing_ids: List[int],
@@ -421,18 +461,22 @@ def main() -> None:
         apply_macro_section(boundaries, coarse)
 
         missing = _compute_missing(boundaries, args.min_section, args.max_section)
+        ordering_conflicts = _detect_ordering_conflicts(boundaries)
         expected_total = args.max_section - args.min_section + 1
         boundaries_out_path = os.path.join(out_dir, args.boundaries_out)
         missing_path = os.path.join(out_dir, args.missing_out)
+        ordering_report_path = _write_ordering_report(out_dir, ordering_conflicts)
         with open(missing_path, "w", encoding="utf-8") as f:
             for sec in missing:
                 f.write(json.dumps({"section_id": str(sec)}) + "\n")
 
-        if not missing:
+        if not missing and not ordering_conflicts:
             save_jsonl(boundaries_out_path, boundaries)
             save_jsonl(out_pages_path, pages_html)
             save_jsonl(os.path.join(out_dir, args.out_blocks), blocks_rows)
             summary_msg = f"Coverage: {len(boundaries)}/{expected_total} sections; missing 0"
+            if ordering_report_path:
+                summary_msg += f"; ordering_conflicts {len(ordering_conflicts)}"
             logger.log(
                 "html_repair_loop",
                 "done",
@@ -456,7 +500,9 @@ def main() -> None:
             page_map = _suspected_pages_for_missing(missing, section_pages, page_numbers, args.adjacent_window)
             bundle_dir = _build_missing_bundles(out_dir, missing, boundaries, pages_html, page_map)
             summary_msg = f"Missing sections: {len(missing)}/{expected_total}; missing list: {missing_path}; bundles: {bundle_dir}"
-            metrics = {"blocks_repaired_count": total_blocks_repaired, "sections_found": len(boundaries), "missing_count": len(missing)}
+            if ordering_report_path:
+                summary_msg += f"; ordering_conflicts {len(ordering_conflicts)}"
+            metrics = {"blocks_repaired_count": total_blocks_repaired, "sections_found": len(boundaries), "missing_count": len(missing), "ordering_conflicts": len(ordering_conflicts)}
             if args.allow_missing:
                 logger.log(
                     "html_repair_loop",
@@ -492,6 +538,21 @@ def main() -> None:
         section_pages = _build_section_page_map(boundaries)
         page_numbers = [p.get("page_number") for p in pages_for_detection if p.get("page_number") is not None]
         page_map = _suspected_pages_for_missing(missing, section_pages, page_numbers, args.adjacent_window)
+        if ordering_conflicts:
+            page_to_sections: Dict[int, List[int]] = {}
+            for b in deduped:
+                sid = _coerce_int(b.get("section_id"))
+                page = _coerce_int(b.get("start_page"))
+                if sid is None or page is None:
+                    continue
+                page_to_sections.setdefault(page, []).append(sid)
+            for conflict in ordering_conflicts:
+                page = _coerce_int(conflict.get("page"))
+                if page is None:
+                    continue
+                expected_ids = page_to_sections.get(page, [])
+                if expected_ids:
+                    page_map.setdefault(page, []).extend(expected_ids)
         if not page_map:
             raise SystemExit("Missing sections detected but no suspect pages identified")
 

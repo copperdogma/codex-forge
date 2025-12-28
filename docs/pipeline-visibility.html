@@ -820,6 +820,7 @@
     const artifactCache = {};
     const instCache = {};
     const runMeta = {};
+    let costBreakdownOpen = false;
 
     const statusDescriptors = {
       "running": { text: "Running", class: "running" },
@@ -829,6 +830,29 @@
       "skipped": { text: "Skipped", class: "skipped" },
       "queued": { text: "Queued", class: "muted" }
     };
+
+    const RUN_PARAM = "run";
+    function getRunFromUrl() {
+      try {
+        const params = new URLSearchParams(window.location.search);
+        const runId = params.get(RUN_PARAM);
+        return runId && runId.trim() ? runId.trim() : null;
+      } catch {
+        return null;
+      }
+    }
+
+    function setRunInUrl(runId, replace = false) {
+      try {
+        const url = new URL(window.location.href);
+        if (runId) url.searchParams.set(RUN_PARAM, runId);
+        else url.searchParams.delete(RUN_PARAM);
+        if (replace) window.history.replaceState(null, "", url.toString());
+        else window.history.pushState(null, "", url.toString());
+      } catch {
+        // ignore URL update failures (file://, restrictive history, etc.)
+      }
+    }
 
     function artifactUrl(artifact, base) {
       if (!artifact) return null;
@@ -992,6 +1016,7 @@
         opt.onclick = () => {
           currentRun = row.run_id;
           userSelectedRun = true;
+          setRunInUrl(currentRun);
           runSelectLabel.textContent = formatRunLabel(entry);
           closeRunPopover();
           loadRun(currentRun);
@@ -1094,8 +1119,10 @@
           runMeta[row.run_id] = row;
         });
         const currentExists = sorted.some(r => r.row?.run_id === currentRun);
-        if (!userSelectedRun || !currentExists) {
+        if (!userSelectedRun) {
           currentRun = sorted.length ? sorted[0].row.run_id : null; // newest
+        } else if (!currentExists && currentRun) {
+          // Keep user-selected run (URL/manual), but still attempt to load it.
         }
         if (currentRun && runSelectLabel) {
           const entry = sorted.find(r => r.row?.run_id === currentRun);
@@ -1228,14 +1255,27 @@
       return map;
     }
 
-    function summariseStages(stages) {
+    function summariseStages(stages, totalOverride = null) {
       const entries = Object.entries(stages || {});
       const done = entries.filter(([, s]) => s.status === "done").length;
       const failed = entries.filter(([, s]) => s.status === "failed").length;
       const running = entries.filter(([, s]) => s.status === "running").length;
-      const percents = entries.map(([, s]) => (s.progress && s.progress.percent != null ? s.progress.percent : (s.status === "done" ? 100 : 0)));
-      const avg = percents.length ? Math.round(percents.reduce((a, b) => a + b, 0) / percents.length) : 0;
-      return { done, failed, running, avg, total: entries.length };
+      const percents = entries.map(([, s]) => {
+        if (s.progress && s.progress.percent != null) return s.progress.percent;
+        if (["done", "failed", "skipped"].includes(s.status)) return 100;
+        return 0;
+      });
+      const total = totalOverride && totalOverride > entries.length ? totalOverride : entries.length;
+      const sum = percents.reduce((a, b) => a + b, 0);
+      const avg = total ? Math.round(sum / total) : 0;
+      return { done, failed, running, avg, total };
+    }
+
+    function getRunningStageName(stages) {
+      const entries = Object.entries(stages || {}).filter(([, s]) => s.status === "running");
+      if (!entries.length) return null;
+      entries.sort((a, b) => parseTimestamp(b[1]?.updated_at) - parseTimestamp(a[1]?.updated_at));
+      return entries[0][0];
     }
 
     function badge(status) {
@@ -1255,13 +1295,14 @@
         const instPath = meta.instrumentation?.json
           ? `${ROOT}/${meta.instrumentation.json}`
           : `${base}/instrumentation.json`;
-        const [state, events, instrumentation] = await Promise.all([
+        const [state, events, instrumentation, plan] = await Promise.all([
           fetchJSON(`${base}/pipeline_state.json`),
           fetchJSONL(`${base}/pipeline_events.jsonl`).catch(() => []),
-          fetchJSON(instPath).catch(() => null)
+          fetchJSON(instPath).catch(() => null),
+          fetchJSON(`${base}/snapshots/plan.json`).catch(() => null)
         ]);
         if (instrumentation) instCache[runId] = instrumentation;
-        render(state, events, base, instCache[runId]);
+        render(state, events, base, instCache[runId], plan);
         lastRefresh.textContent = `Updated ${new Date().toLocaleTimeString()}`;
       } catch (e) {
         stageGrid.innerHTML = "";
@@ -1270,9 +1311,11 @@
       }
     }
 
-    function render(state, events, base, instrumentation) {
+    function render(state, events, base, instrumentation, plan) {
       const stages = state.stages || {};
-      const stats = summariseStages(stages);
+      const plannedTotal = plan && plan.nodes ? Object.keys(plan.nodes).length : null;
+      const stats = summariseStages(stages, plannedTotal);
+      const runningStage = getRunningStageName(stages);
       const meta = runMeta[state.run_id || currentRun] || {};
       const currency = instrumentation?.pricing?.currency || "USD";
       // Resolve input artifact (pdf, images_dir, etc.)
@@ -1307,14 +1350,25 @@
         `<span class="status-pill big ${runSummary.status || "unknown"}">${(runSummary.status || "unknown").toUpperCase()}</span>`,
         `${stats.done}/${stats.total} done`,
         `${stats.running} running`,
+        runningStage ? `Running: <strong>${runningStage}</strong>` : "Running: —",
         `${stats.failed} failed`,
         getRunDurationHtml(state, events)
       ]));
-      summaryGrid.appendChild(makeStatCard("Total Cost", instrumentation ? formatCurrency(instrumentation.totals?.cost, currency) : "N/A", [
+      const costCard = makeStatCard("Total Cost", instrumentation ? formatCurrency(instrumentation.totals?.cost, currency) : "N/A", [
         instrumentation ? `Currency: ${currency}` : "Instrumentation not found",
         instrumentation ? `Calls: ${instrumentation.totals?.calls || 0}` : "",
-        instrumentation ? `Tokens: ${instrumentation.totals?.prompt_tokens || 0} / ${instrumentation.totals?.completion_tokens || 0}` : ""
-      ].filter(Boolean)));
+        instrumentation ? `Tokens: ${instrumentation.totals?.prompt_tokens || 0} / ${instrumentation.totals?.completion_tokens || 0}` : "",
+        `<button class="btn-small" id="toggle-cost-breakdown">${costBreakdownOpen ? "Hide" : "Show"} Cost Breakdown</button>`
+      ].filter(Boolean));
+      summaryGrid.appendChild(costCard);
+      const toggleBtn = costCard.querySelector("#toggle-cost-breakdown");
+      if (toggleBtn) {
+        toggleBtn.onclick = () => {
+          costBreakdownOpen = !costBreakdownOpen;
+          if (costBreakdown) costBreakdown.style.display = costBreakdownOpen ? "block" : "none";
+          toggleBtn.textContent = `${costBreakdownOpen ? "Hide" : "Show"} Cost Breakdown`;
+        };
+      }
       summaryGrid.appendChild(makeStatCard("Run", state.run_id || currentRun || "n/a", [
         state.updated_at ? `updated ${state.updated_at}` : "live",
         base.replace(`${ROOT}/`, "")
@@ -1381,6 +1435,7 @@
       summaryGrid.appendChild(inst);
 
       const durations = computeStageDurations(events, stages);
+      if (costBreakdown) costBreakdown.style.display = costBreakdownOpen ? "block" : "none";
       renderCostBreakdown(stages, instrumentation, currency);
       renderStages(stages, events, base, instrumentation, durations, currency);
       renderTimeline(events);
@@ -1873,8 +1928,12 @@
     }
 
     loadBtn.onclick = () => {
-      const chosen = manualRun.value || currentRun;
-      loadRun(chosen);
+      const chosen = (manualRun.value || currentRun || "").trim();
+      if (!chosen) return;
+      currentRun = chosen;
+      userSelectedRun = true;
+      setRunInUrl(currentRun);
+      loadRun(currentRun);
       startAuto();
     };
     if (runSelectBtn) {
@@ -1962,6 +2021,13 @@
     // Start live timer loop
     if (!liveTimer) {
       liveTimer = setInterval(updateLiveTimers, 1000);
+    }
+
+    const runFromUrl = getRunFromUrl();
+    if (runFromUrl) {
+      currentRun = runFromUrl;
+      userSelectedRun = true;
+      if (manualRun) manualRun.value = runFromUrl;
     }
 
     loadManifest().then(() => {

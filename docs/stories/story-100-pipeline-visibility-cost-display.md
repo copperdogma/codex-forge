@@ -171,3 +171,9 @@ Enhance the pipeline visibility dashboard to prominently display API costs at th
 - **Notes:** Fixed syntax error in `macro_section_detector_ff_v1`, removed dangling `pt/ct` references, and re-ran smoke as `story-100-central-20251225e`.
 - **Evidence:** `output/runs/story-100-central-20251225e/instrumentation.json` (totals cost 0.201374 USD), `output/runs/story-100-central-20251225e/pipeline_state.json` (status done), `output/runs/story-100-central-20251225e/gamebook.json` (sample sections: `background`, `1`).
 - **Next:** None for this story unless further UI or tracking changes requested.
+
+### 20251227-1213 — Live cost aggregation fix for OCR stage
+- **Result:** Success (code change).
+- **Notes:** Live `instrumentation.json` totals were zero during OCR because OCR calls were logged under `stage_id=extract` while the running stage id is `ocr_ai`. Added `_resolve_stage_calls` in `driver.py` to map OCR calls to the active stage during live updates and finalization (back-compat), and now include `per_model` + `calls_stage_id` in stage extra.
+- **Files:** `driver.py`.
+- **Next:** Requires a new run to observe non-zero live costs during OCR.

@@ -375,7 +375,24 @@ def build_plan(recipe: Dict[str, Any], registry: Dict[str, Any]) -> Dict[str, An
         merged_params.update(conf.get("params") or {})
         merged_params.update(stage_overrides)
         params = _merge_params(entry.get("default_params", {}), merged_params, entry.get("param_schema"))
-        _validate_params(params, entry.get("param_schema"), stage_id, module_id)
+        # Validate params with awareness of stage inputs/out to avoid false missing-required errors.
+        params_for_validation = dict(params)
+        inputs = conf.get("inputs", {}) or {}
+        props, required = _normalize_param_schema(entry.get("param_schema"))
+        if "out" in required and params_for_validation.get("out") is None and conf.get("out"):
+            params_for_validation["out"] = conf.get("out")
+        for key in required:
+            if params_for_validation.get(key) is not None:
+                continue
+            if key in inputs:
+                params_for_validation[key] = inputs.get(key)
+                continue
+            if key == "gamebook" and inputs.get("input"):
+                params_for_validation[key] = inputs.get("input")
+                continue
+            if key == "inputs" and inputs.get("inputs"):
+                params_for_validation[key] = inputs.get("inputs")
+        _validate_params(params_for_validation, entry.get("param_schema"), stage_id, module_id)
         artifact_name = _artifact_name_for_stage(stage_id, stage_type, outputs_map, conf)
         description = conf.get("description") or entry.get("notes") or entry.get("description")
         output_schema = entry.get("output_schema") or params.get("schema_version")
@@ -959,6 +976,13 @@ def build_command(entrypoint: str, params: Dict[str, Any], stage_conf: Dict[str,
                     val = art
                 else:
                     val = os.path.abspath(val) if not os.path.isabs(str(val)) else val
+        if stage_conf.get("module") == "validate_game_ready_v1":
+            if key == "expected_range_start":
+                flag = "--expected-range-start"
+            elif key == "expected_range_end":
+                flag = "--expected-range-end"
+            elif key == "known_missing":
+                flag = "--known-missing"
         if flag in seen_flags:
             continue
         if val is None:
@@ -982,11 +1006,21 @@ def stamp_artifact(artifact_path: str, schema_name: str, module_id: str, run_id:
     if schema_name not in SCHEMA_MAP:
         return
     model_cls = SCHEMA_MAP[schema_name]
+    allowed_keys = set()
+    if hasattr(model_cls, "__fields__"):
+        allowed_keys = set(model_cls.__fields__.keys())
+    elif hasattr(model_cls, "model_fields"):
+        allowed_keys = set(model_cls.model_fields.keys())
     rows = []
+    dropped_keys = set()
     for row in read_jsonl(artifact_path):
         if isinstance(row, dict) and row.get("error"):
             continue  # skip invalid rows
         try:
+            if isinstance(row, dict) and allowed_keys:
+                extra = set(row.keys()) - allowed_keys
+                if extra:
+                    dropped_keys.update(extra)
             row.setdefault("schema_version", schema_name)
             if not row.get("module_id"):
                 row["module_id"] = module_id
@@ -999,6 +1033,9 @@ def stamp_artifact(artifact_path: str, schema_name: str, module_id: str, run_id:
             print(f"[stamp-skip] skipping row due to validation error: {e}")
     save_jsonl(artifact_path, rows)
     print(f"[stamp] {artifact_path} stamped with {schema_name} ({len(rows)} rows)")
+    if dropped_keys:
+        dropped_list = ", ".join(sorted(dropped_keys))
+        print(f"[stamp-warning] {artifact_path} dropped unknown fields not in schema {schema_name}: {dropped_list}")
 
 
 def copy_key_artifact_to_root(artifact_path: str, run_dir: str, artifact_name: str, artifact_index: Dict[str, Any] = None) -> None:
@@ -1236,6 +1273,10 @@ def main():
         print(json.dumps({"topo": plan["topo"], "nodes": plan["nodes"]}, indent=2))
         return
 
+    if args.start_from and args.force:
+        print("⚠️  --force ignored because --start-from is set (resume mode).", file=sys.stderr)
+        args.force = False
+
     # Validate output directory to prevent artifact mixing
     if os.path.exists(run_dir) and os.listdir(run_dir):
         if not (args.force or args.allow_run_id_reuse):
@@ -1288,6 +1329,7 @@ def main():
         os.remove(sink_path)
     sink_offset = 0
     stage_call_map: Dict[str, List[Dict[str, Any]]] = {}
+    run_validation_failed = False
 
     run_totals = {"calls": 0, "prompt_tokens": 0, "completion_tokens": 0, "cost": 0.0, "per_model": {}, "wall_seconds": 0.0}
     instrumentation_run = None
@@ -1325,21 +1367,7 @@ def main():
             if sid:
                 stage_call_map.setdefault(sid, []).append(ev)
 
-    def record_stage_instrumentation(stage_id: str, module_id: str, status: str, artifact_path: str,
-                                     schema_version: str, stage_started_at: str,
-                                     stage_wall_start: float, stage_cpu_start):
-        if not instrument_enabled:
-            return
-        ingest_sink_events()
-        ended_at = datetime.utcnow().isoformat() + "Z"
-        wall_seconds = round(time.perf_counter() - stage_wall_start, 6)
-        cpu_user = cpu_sys = None
-        end_cpu = _get_cpu_times()
-        if stage_cpu_start and end_cpu:
-            cpu_user = round(end_cpu[0] - stage_cpu_start[0], 6)
-            cpu_sys = round(end_cpu[1] - stage_cpu_start[1], 6)
-        calls = stage_call_map.pop(stage_id, [])
-        call_total = len(calls)
+    def _compute_llm_totals(calls: List[Dict[str, Any]]):
         prompt_tokens = sum(int(c.get("prompt_tokens", 0)) for c in calls)
         completion_tokens = sum(int(c.get("completion_tokens", 0)) for c in calls)
         cost_total = 0.0
@@ -1356,11 +1384,93 @@ def main():
             pm["completion_tokens"] += int(c.get("completion_tokens", 0))
             pm["cost"] += ev_cost
         llm_totals = {
-            "calls": call_total,
+            "calls": len(calls),
             "prompt_tokens": prompt_tokens,
             "completion_tokens": completion_tokens,
             "cost": round(cost_total, 6),
         }
+        return llm_totals, per_model
+
+    def _resolve_stage_calls(stage_id: str, module_id: str):
+        calls = stage_call_map.get(stage_id, [])
+        if calls:
+            return calls, stage_id
+        # Back-compat for OCR: older runs used stage_id="extract"
+        if module_id == "ocr_ai_gpt51_v1" and stage_call_map.get("extract"):
+            return stage_call_map.get("extract", []), "extract"
+        return [], stage_id
+
+    def update_live_instrumentation(stage_id: str, module_id: str, stage_description: str,
+                                    stage_started_at: str, stage_wall_start: float, stage_cpu_start):
+        if not instrument_enabled or not instrumentation_run:
+            return
+        ingest_sink_events()
+        calls, call_stage_id = _resolve_stage_calls(stage_id, module_id)
+        llm_totals, per_model = _compute_llm_totals(calls)
+        wall_seconds = round(time.perf_counter() - stage_wall_start, 6)
+
+        # Replace any existing running entry for this stage
+        instrumentation_run["stages"] = [
+            s for s in instrumentation_run["stages"]
+            if not (s.get("id") == stage_id and s.get("status") == "running")
+        ]
+        stage_entry = {
+            "schema_version": "instrumentation_stage_v1",
+            "id": stage_id,
+            "stage": plan["nodes"][stage_id]["stage"],
+            "module_id": module_id,
+            "description": stage_description,
+            "status": "running",
+            "artifact": plan["nodes"][stage_id].get("artifact"),
+            "schema_version_output": plan["nodes"][stage_id].get("output_schema"),
+            "started_at": stage_started_at,
+            "ended_at": None,
+            "wall_seconds": wall_seconds,
+            "cpu_user_seconds": None,
+            "cpu_system_seconds": None,
+            "llm_calls": calls,
+            "llm_totals": llm_totals,
+            "extra": {"per_model": per_model, "calls_stage_id": call_stage_id if call_stage_id != stage_id else None},
+        }
+        instrumentation_run["stages"].append(stage_entry)
+
+        # Compute live totals (completed stages + current running)
+        live_totals = {"calls": 0, "prompt_tokens": 0, "completion_tokens": 0, "cost": 0.0, "per_model": {}, "wall_seconds": 0.0}
+        for s in instrumentation_run["stages"]:
+            totals = s.get("llm_totals") or {}
+            live_totals["calls"] += int(totals.get("calls", 0))
+            live_totals["prompt_tokens"] += int(totals.get("prompt_tokens", 0))
+            live_totals["completion_tokens"] += int(totals.get("completion_tokens", 0))
+            live_totals["cost"] = round(live_totals["cost"] + float(totals.get("cost", 0.0)), 6)
+            for model, stats in (s.get("extra", {}).get("per_model") or {}).items():
+                agg = live_totals["per_model"].setdefault(model, {"calls": 0, "prompt_tokens": 0, "completion_tokens": 0, "cost": 0.0})
+                agg["calls"] += stats["calls"]
+                agg["prompt_tokens"] += stats["prompt_tokens"]
+                agg["completion_tokens"] += stats["completion_tokens"]
+                agg["cost"] = round(agg["cost"] + stats["cost"], 6)
+        live_totals["wall_seconds"] = round(time.perf_counter() - run_wall_start, 6)
+        instrumentation_run["totals"] = live_totals
+        save_json(instr_json_path, instrumentation_run)
+
+    def record_stage_instrumentation(stage_id: str, module_id: str, status: str, artifact_path: str,
+                                     schema_version: str, stage_started_at: str,
+                                     stage_wall_start: float, stage_cpu_start):
+        if not instrument_enabled:
+            return
+        ingest_sink_events()
+        ended_at = datetime.utcnow().isoformat() + "Z"
+        wall_seconds = round(time.perf_counter() - stage_wall_start, 6)
+        cpu_user = cpu_sys = None
+        end_cpu = _get_cpu_times()
+        if stage_cpu_start and end_cpu:
+            cpu_user = round(end_cpu[0] - stage_cpu_start[0], 6)
+            cpu_sys = round(end_cpu[1] - stage_cpu_start[1], 6)
+        calls, call_stage_id = _resolve_stage_calls(stage_id, module_id)
+        if call_stage_id != stage_id:
+            stage_call_map.pop(call_stage_id, None)
+        else:
+            stage_call_map.pop(stage_id, None)
+        llm_totals, per_model = _compute_llm_totals(calls)
         stage_entry = {
             "schema_version": "instrumentation_stage_v1",
             "id": stage_id,
@@ -1377,13 +1487,18 @@ def main():
             "cpu_system_seconds": cpu_sys,
             "llm_calls": calls,
             "llm_totals": llm_totals,
-            "extra": {},
+            "extra": {"per_model": per_model, "calls_stage_id": call_stage_id if call_stage_id != stage_id else None},
         }
+        # Remove any running entry for this stage before appending final entry.
+        instrumentation_run["stages"] = [
+            s for s in instrumentation_run["stages"]
+            if not (s.get("id") == stage_id and s.get("status") == "running")
+        ]
         instrumentation_run["stages"].append(stage_entry)
-        run_totals["calls"] += call_total
-        run_totals["prompt_tokens"] += prompt_tokens
-        run_totals["completion_tokens"] += completion_tokens
-        run_totals["cost"] = round(run_totals["cost"] + cost_total, 6)
+        run_totals["calls"] += llm_totals["calls"]
+        run_totals["prompt_tokens"] += llm_totals["prompt_tokens"]
+        run_totals["completion_tokens"] += llm_totals["completion_tokens"]
+        run_totals["cost"] = round(run_totals["cost"] + llm_totals["cost"], 6)
         for model, stats in per_model.items():
             agg = run_totals["per_model"].setdefault(model, {"calls": 0, "prompt_tokens": 0, "completion_tokens": 0, "cost": 0.0})
             agg["calls"] += stats["calls"]
@@ -1668,6 +1783,7 @@ def main():
             env["INSTRUMENT_STAGE"] = stage_id
             env["RUN_ID"] = run_id or ""
             env["INSTRUMENT_ENABLED"] = "1"
+        env["PIPELINE_STAGE_ID"] = stage_id
         # Mitigate libomp SHM failures for EasyOCR/torch by forcing file-backed registration.
         if module_id == "extract_ocr_ensemble_v1":
             env.setdefault("KMP_USE_SHMEM", "0")
@@ -1679,8 +1795,37 @@ def main():
             env.setdefault("OMP_NUM_THREADS", "1")
             env.setdefault("KMP_AFFINITY", "disabled")
             env.setdefault("KMP_INIT_AT_FORK", "FALSE")
-        result = subprocess.run(cmd, cwd=cwd, env=env)
+        if instrument_enabled:
+            proc = subprocess.Popen(cmd, cwd=cwd, env=env)
+            last_live_update = 0.0
+            while True:
+                rc = proc.poll()
+                if rc is not None:
+                    result = subprocess.CompletedProcess(cmd, rc)
+                    break
+                now = time.time()
+                if now - last_live_update >= 2.0:
+                    update_live_instrumentation(stage_id, module_id, stage_description,
+                                                stage_started_at, stage_wall_start, stage_cpu_start)
+                    last_live_update = now
+                time.sleep(0.2)
+        else:
+            result = subprocess.run(cmd, cwd=cwd, env=env)
         if result.returncode != 0:
+            # Treat validation failure as a successful stage completion for game-ready checks.
+            if module_id == "validate_game_ready_v1" and result.returncode == 1:
+                try:
+                    update_state(state_path, progress_path, stage_id, "done", artifact_path, run_id, module_id, out_schema,
+                                 stage_description=stage_description)
+                    record_stage_instrumentation(stage_id, module_id, "done", artifact_path, out_schema,
+                                                 stage_started_at, stage_wall_start, stage_cpu_start)
+                    logger.log(stage_id, "warning", artifact=artifact_path, module_id=module_id,
+                               message="Game-ready validation failed (report generated).", extra={"exit_code": 1})
+                except Exception:
+                    pass
+                # Continue pipeline but mark run as failed at end.
+                run_validation_failed = True
+                continue
             update_state(state_path, progress_path, stage_id, "failed", artifact_path, run_id, module_id, out_schema,
                          stage_description=stage_description)
             record_stage_instrumentation(stage_id, module_id, "failed", artifact_path, out_schema,
@@ -1689,6 +1834,17 @@ def main():
                 elapsed = time.perf_counter() - stage_wall_start
                 logger.log(stage_id, "failed", artifact=artifact_path, module_id=module_id,
                            message=f"Stage failed after {elapsed:.2f}s", extra={"elapsed_seconds": round(elapsed, 2)})
+            except Exception:
+                pass
+            try:
+                if state_path and os.path.exists(state_path):
+                    with open(state_path, "r", encoding="utf-8") as f:
+                        state = json.load(f)
+                    state["status"] = "failed"
+                    state["status_reason"] = f"stage {stage_id} failed"
+                    state["ended_at"] = datetime.utcnow().isoformat(timespec="microseconds") + "Z"
+                    with open(state_path, "w", encoding="utf-8") as f:
+                        json.dump(state, f, indent=2)
             except Exception:
                 pass
             raise SystemExit(f"Stage {stage_id} failed with code {result.returncode}")
@@ -1847,7 +2003,11 @@ def main():
         if os.path.exists(state_path):
             with open(state_path, "r", encoding="utf-8") as f:
                 state = json.load(f)
-        state["status"] = "done"
+        if run_validation_failed:
+            state["status"] = "failed"
+            state["status_reason"] = "game_ready_validation_failed"
+        else:
+            state["status"] = "done"
         state["ended_at"] = datetime.utcnow().isoformat(timespec="microseconds") + "Z"
         with open(state_path, "w", encoding="utf-8") as f:
             json.dump(state, f, indent=2)

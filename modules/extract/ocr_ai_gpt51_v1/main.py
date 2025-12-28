@@ -37,6 +37,7 @@ Allowed tags (only):
 - Navigation: <a href="#123"> (use for explicit navigation choices like 'turn to 123')
 - Running head / page number: <p class="running-head">, <p class="page-number">
 - Images: <img alt="..."> (placeholder only, no src)
+- Metadata: <meta name="ocr-metadata" data-ocr-quality="0.0-1.0" data-ocr-integrity="0.0-1.0" data-continuation-risk="0.0-1.0">
 
 Rules:
 - Preserve exact wording, punctuation, and numbers.
@@ -50,6 +51,15 @@ Rules:
 - Use <img alt="..."> when an illustration appears (short, factual description).
 - Tables must be represented as a single <table> with headers/rows (no splitting).
 - If uncertain, default to <p> with plain text.
+
+Also include a single metadata tag as the FIRST line:
+<meta name="ocr-metadata" data-ocr-quality="0.0-1.0" data-ocr-integrity="0.0-1.0" data-continuation-risk="0.0-1.0">
+
+Metadata guidance:
+- ocr-quality: 1.0 = crisp/easy to read; 0.0 = barely legible (blur/smudging/low contrast).
+- ocr-integrity: 1.0 = complete/undistorted; 0.0 = severe cropping/warping/missing parts.
+- continuation-risk: 1.0 = strong evidence of continuation (mid-sentence at top or cut-off at bottom); 0.0 = self-contained page.
+- If you are confident the page is blank, set ocr-quality and ocr-integrity high (0.9–1.0) and continuation-risk low.
 
 Output ONLY HTML, no Markdown, no code fences, no extra commentary."""
 
@@ -71,6 +81,49 @@ def _extract_code_fence(text: str) -> str:
     if len(parts) >= 3:
         return parts[1].strip()
     return text.replace("```", "").strip()
+
+def _extract_ocr_metadata(raw_html: str) -> (str, dict, Optional[str], Optional[str]):
+    if not raw_html:
+        return raw_html, {}, None, None
+    # Expect metadata tag on the first line; strip it before sanitizing.
+    lines = raw_html.lstrip().splitlines()
+    if not lines:
+        return raw_html, {}, None, None
+    tag = None
+    tag_index = None
+    for i, line in enumerate(lines[:5]):
+        candidate = line.strip()
+        if candidate.lower().startswith("<meta") and re.search(r"name\s*=\s*['\"]ocr-metadata['\"]", candidate, re.IGNORECASE):
+            tag = candidate
+            tag_index = i
+            break
+    if tag is None:
+        return raw_html, {}, None, None
+    def _attr(name: str) -> Optional[float]:
+        m_attr = re.search(rf"\b{name}\s*=\s*[\"']([^\"']+)[\"']", tag, re.IGNORECASE)
+        if not m_attr:
+            return None
+        try:
+            val = float(m_attr.group(1))
+        except Exception:
+            return None
+        if val < 0:
+            return 0.0
+        if val > 1:
+            return 1.0
+        return val
+    meta = {
+        "ocr_quality": _attr("data-ocr-quality"),
+        "ocr_integrity": _attr("data-ocr-integrity"),
+        "continuation_risk": _attr("data-continuation-risk"),
+    }
+    if tag_index is not None:
+        del lines[tag_index]
+    cleaned = "\n".join(lines)
+    warning = None
+    if tag_index is not None and tag_index != 0:
+        warning = f"ocr_metadata_not_first_line:{tag_index}"
+    return cleaned.strip(), meta, tag, warning
 
 
 class TagSanitizer(HTMLParser):
@@ -160,7 +213,6 @@ def main() -> None:
     parser.add_argument("--allow-empty", dest="allow_empty", action="store_true")
     parser.add_argument("--ocr-hints", dest="ocr_hints", help="Recipe-level OCR hints text")
     parser.add_argument("--ocr_hints", dest="ocr_hints", help="Recipe-level OCR hints text")
-    parser.add_argument("--save-raw", "--save_raw", dest="save_raw", action="store_true")
     parser.add_argument("--force", action="store_true", help="Overwrite existing output")
     parser.add_argument("--resume", action="store_true", help="Skip pages already written (default)")
     parser.set_defaults(resume=True)
@@ -187,9 +239,11 @@ def main() -> None:
         if total == 0:
             raise SystemExit(f"Manifest is empty: {manifest_path}")
 
+        # Preserve stage id for instrumentation; driver sets INSTRUMENT_STAGE to recipe stage id.
+
         logger = ProgressLogger(state_path=args.state_file, progress_path=args.progress_file, run_id=args.run_id)
         logger.log(
-            "ocr_ai",
+            "extract",
             "running",
             current=0,
             total=total,
@@ -236,83 +290,113 @@ def main() -> None:
             mime = "image/jpeg" if image_path.lower().endswith((".jpg", ".jpeg")) else "image/png"
             b64 = base64.b64encode(Path(image_path).read_bytes()).decode("utf-8")
 
-            try:
-                if hasattr(client, "responses"):
-                    resp = client.responses.create(
-                        model=args.model,
-                        temperature=args.temperature,
-                        max_output_tokens=args.max_output_tokens,
-                        input=[
-                            {
-                                "role": "system",
-                                "content": [{"type": "input_text", "text": system_prompt}],
-                            },
-                            {
-                                "role": "user",
-                                "content": [
-                                    {"type": "input_text", "text": "Return HTML only."},
-                                    {"type": "input_image", "image_url": f"data:{mime};base64,{b64}"},
-                                ],
-                            },
-                        ],
+            raw = ""
+            usage = None
+            request_id = None
+            meta = {}
+            meta_tag = None
+            cleaned = ""
+            # Retry once if the model returns empty HTML.
+            for attempt in range(2):
+                try:
+                    if hasattr(client, "responses"):
+                        resp = client.responses.create(
+                            model=args.model,
+                            temperature=args.temperature,
+                            max_output_tokens=args.max_output_tokens,
+                            input=[
+                                {
+                                    "role": "system",
+                                    "content": [{"type": "input_text", "text": system_prompt}],
+                                },
+                                {
+                                    "role": "user",
+                                    "content": [
+                                        {"type": "input_text", "text": "Return HTML only. FIRST line MUST be: <meta name=\"ocr-metadata\" data-ocr-quality=\"0.0-1.0\" data-ocr-integrity=\"0.0-1.0\" data-continuation-risk=\"0.0-1.0\">"},
+                                        {"type": "input_image", "image_url": f"data:{mime};base64,{b64}"},
+                                    ],
+                                },
+                            ],
+                        )
+                        raw = resp.output_text or ""
+                        usage = getattr(resp, "usage", None)
+                        request_id = getattr(resp, "id", None)
+                    else:
+                        resp = client.chat.completions.create(
+                            model=args.model,
+                            temperature=args.temperature,
+                            max_completion_tokens=args.max_output_tokens,
+                            messages=[
+                                {"role": "system", "content": system_prompt},
+                                {
+                                    "role": "user",
+                                    "content": [
+                                        {"type": "text", "text": "Return HTML only. FIRST line MUST be: <meta name=\"ocr-metadata\" data-ocr-quality=\"0.0-1.0\" data-ocr-integrity=\"0.0-1.0\" data-continuation-risk=\"0.0-1.0\">"},
+                                        {"type": "image_url", "image_url": {"url": f"data:{mime};base64,{b64}"}},
+                                    ],
+                                },
+                            ],
+                        )
+                        raw = resp.choices[0].message.content or ""
+                        usage = getattr(resp, "usage", None)
+                        request_id = getattr(resp, "id", None)
+                except Exception as exc:
+                    logger.log(
+                        "extract",
+                        "failed",
+                        current=idx,
+                        total=total,
+                        message=f"OCR failed on page {page_number}: {exc}",
+                        artifact=str(out_path),
+                        module_id="ocr_ai_gpt51_v1",
+                        schema_version="page_html_v1",
                     )
-                    raw = resp.output_text or ""
-                    usage = getattr(resp, "usage", None)
-                    request_id = getattr(resp, "id", None)
-                else:
-                    resp = client.chat.completions.create(
-                        model=args.model,
-                        temperature=args.temperature,
-                        max_completion_tokens=args.max_output_tokens,
-                        messages=[
-                            {"role": "system", "content": system_prompt},
-                            {
-                                "role": "user",
-                                "content": [
-                                    {"type": "text", "text": "Return HTML only."},
-                                    {"type": "image_url", "image_url": {"url": f"data:{mime};base64,{b64}"}},
-                                ],
-                            },
-                        ],
-                    )
-                    raw = resp.choices[0].message.content or ""
-                    usage = getattr(resp, "usage", None)
-                    request_id = getattr(resp, "id", None)
-            except Exception as exc:
+                    raise
+                raw = _extract_code_fence(raw)
+                raw, meta, meta_tag, meta_warning = _extract_ocr_metadata(raw)
+                cleaned = sanitize_html(raw)
+                if cleaned.strip():
+                    break
+            empty_msg = None
+            if not cleaned.strip():
+                empty_msg = f"Empty HTML output for page {page.get('page_number')}"
+                cleaned = ""
                 logger.log(
                     "extract",
-                    "failed",
+                    "warning",
                     current=idx,
                     total=total,
-                    message=f"OCR failed on page {page_number}: {exc}",
+                    message=empty_msg + (" (meta tag present)" if meta_tag else ""),
                     artifact=str(out_path),
                     module_id="ocr_ai_gpt51_v1",
                     schema_version="page_html_v1",
                 )
-                raise
-            raw = _extract_code_fence(raw)
-            cleaned = sanitize_html(raw)
-            if not cleaned.strip():
-                msg = f"Empty HTML output for page {page.get('page_number')}"
-                if args.allow_empty:
-                    cleaned = ""
-                else:
-                    raise SystemExit(msg)
 
             row = {
                 "schema_version": "page_html_v1",
                 "module_id": "ocr_ai_gpt51_v1",
                 "run_id": args.run_id,
+                "source": page.get("source"),
                 "created_at": _utc(),
                 "page": page.get("page"),
                 "page_number": page.get("page_number"),
                 "original_page_number": page.get("original_page_number"),
                 "image": image_path,
                 "spread_side": page.get("spread_side"),
-                "html": cleaned,
             }
-            if args.save_raw:
-                row["raw_html"] = raw
+            if meta:
+                row.update({k: v for k, v in meta.items() if v is not None})
+            if meta_warning:
+                row["ocr_metadata_warning"] = meta_warning
+            if meta_tag and not all(v is not None for v in meta.values()):
+                row["ocr_metadata_tag"] = meta_tag
+            if not meta_tag:
+                row["ocr_metadata_missing"] = True
+            row["html"] = cleaned
+            if empty_msg:
+                row["ocr_empty"] = True
+                row["ocr_empty_reason"] = empty_msg
+            row["raw_html"] = raw
 
             append_jsonl(str(out_path), row)
 
@@ -340,7 +424,7 @@ def main() -> None:
                 )
 
         logger.log(
-            "ocr_ai",
+            "extract",
             "done",
             current=total,
             total=total,
@@ -353,7 +437,7 @@ def main() -> None:
     except Exception as exc:
         logger = ProgressLogger(state_path=args.state_file, progress_path=args.progress_file, run_id=args.run_id)
         logger.log(
-            "ocr_ai",
+            "extract",
             "failed",
             message=f"Unhandled OCR failure: {exc}",
             module_id="ocr_ai_gpt51_v1",

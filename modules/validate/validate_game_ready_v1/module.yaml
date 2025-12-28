@@ -1,0 +1,42 @@
+module_id: validate_game_ready_v1
+stage: validate
+entrypoint: modules/validate/validate_game_ready_v1/main.py
+input_schema: null
+output_schema: null
+default_params:
+  expected_range_start: 1
+  expected_range_end: 400
+param_schema:
+  properties:
+    gamebook:
+      type: string
+      description: "Path to gamebook.json"
+    choice_report:
+      type: string
+      description: "Path to choice completeness report JSON"
+    reachability_report:
+      type: string
+      description: "Path to reachability report JSON"
+    engine_report:
+      type: string
+      description: "Path to engine validation report JSON"
+    issues_report:
+      type: string
+      description: "Path to pipeline issues report JSONL"
+    out:
+      type: string
+      description: "Output path for consolidated game-ready report JSON"
+    expected_range_start:
+      type: integer
+      description: "Expected section range start (default: 1)"
+    expected_range_end:
+      type: integer
+      description: "Expected section range end (default: 400)"
+    known_missing:
+      type: string
+      description: "Comma-separated list of known-missing section ids"
+    run_id:
+      type: string
+      description: "Run id for provenance"
+  required: [gamebook, out]
+notes: "Aggregates validation outputs into a single game-ready pass/fail report."

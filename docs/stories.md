@@ -11,13 +11,13 @@ Guiding priorities: **development stability first**, then **quality definitions*
 7. DONE: **102 — X-Height Measurement and Target Investigation**: Critical investigation into x-height measurement accuracy and optimal target selection. System measurements don't match manual measurements, and 24px target may be unnecessarily large if native 14px works well.
 8. DONE: **087 — Retire Legacy OCR-Only Recipe**: Housekeeping to reduce maintenance overhead and prevent accidental use of superseded OCR-ensemble paths.
 8. DONE: **101 — ARM64 Environment Cleanup Investigation**: Investigate and clean up obsolete ARM64/MPS environment requirements now that canonical pipeline uses AI-first OCR instead of EasyOCR.
-9. **075 — Booktype Text Cleanup Adapter (Downstream Normalization)**: Refines final text fidelity via deterministic tools and lexicon-guided normalization.
-10. **080 — Central Escalation Cache (Premium OCR Overlay)**: Architectural cleanup to eliminate redundant vision calls and unify page-level provenance.
+9. **075 — Booktype Text Cleanup Adapter (Downstream Normalization)**: Won't Do (GPT‑5.1 OCR quality is sufficient; no recurring defects to justify deterministic cleanup).
+10. **080 — Central Escalation Cache (Premium OCR Overlay)**: Won't Do (GPT‑5.1 baseline minimizes escalations; cache not justified).
 11. **024 — Image cropper follow-up**: Improves quality of extracted illustrations and diagrams via more advanced detector backends.
 12. **011 — AI planner to assemble pipelines**: Facilitates easier configuration for diverse book types via agentic goal-to-recipe matching.
 13. **038 — Agentic Pipeline Coordinator**: Fundamental shift toward autonomous quality monitoring, sanity checking, and self-healing artifacts.
 14. **098 — Late-Stage Section Validation and Reachability Analysis**: Final integrity pass to ensure 100% graph connectivity across all extracted gameplay mechanics.
-15. **083 — Game-Ready Validation Checklist**: Establishes the formal quality bar for "authoritative" artifacts before declaring the FF phase complete.
+15. DONE: **083 — Game-Ready Validation Checklist**: Establishes the formal quality bar for "authoritative" artifacts before declaring the FF phase complete.
 16. **009 — Layout-preserving extractor**: Prerequisite capability for handling non-narrative (tabular/complex) book layouts in the next phase.
 17. **026 — Onward to the Unknown — Arthur L'Heureux pilot**: First end-to-end testbed for genealogy/complex layouts; depends on 009.
 18. **099 — Remove dev-only backcompat disclaimer**: Final milestone marking the entire pipeline as stable and production-ready.
@@ -90,15 +90,15 @@ This index tracks stories in `/docs/stories/` for the codex-forge pipeline.
 || 072 | OCR Spell-Weighted Voting Enhancement | Medium | Obsolete | /docs/stories/story-072-ocr-spell-weighted-voting.md |
 || 073 | 100% Section Detection — Segmentation Architecture | High | Done | /docs/stories/story-073-100-percent-section-detection.md |
 || 074 | Missing Sections Investigation — Complete 100% Coverage | High | Done | /docs/stories/story-074-missing-sections-investigation.md |
-|| 075 | Booktype Text Cleanup Adapter (Downstream Normalization) | Medium | To Do | /docs/stories/story-075-booktype-text-cleanup-adapter.md |
+|| 075 | Booktype Text Cleanup Adapter (Downstream Normalization) | Medium | Won't Do | /docs/stories/story-075-booktype-text-cleanup-adapter.md |
 || 076 | AI Vision Engine Evaluation — Best Value for Pipeline | Medium | Done | /docs/stories/story-076-ai-vision-engine-evaluation.md |
 || 077 | AI OCR Radical Simplification — Challenging the Escalation Assumption | High | Done | /docs/stories/story-077-ai-ocr-simplification.md |
 || 078 | Boundary Ordering Guard + Targeted Escalation | High | Done | /docs/stories/story-078-boundary-ordering-escalation.md |
 || 079 | Sequential Page Numbering Refactor — Dual-Field Provenance | High | Done | /docs/stories/story-079-page-numbering-refactor.md |
-|| 080 | Central Escalation Cache (Premium OCR Overlay) | High | To Do | /docs/stories/story-080-central-escalation-cache.md |
+|| 080 | Central Escalation Cache (Premium OCR Overlay) | High | Won't Do | /docs/stories/story-080-central-escalation-cache.md |
 || 081 | GPT‑5.1 AI‑First OCR Pipeline (HTML‑First) | High | Done | /docs/stories/story-081-ai-ocr-gpt51-pipeline.md |
 || 082 | Large-Image PDF Cost Optimization | High | Done | /docs/stories/story-082-large-image-pdf-cost-optimization.md |
-|| 083 | Game-Ready Validation Checklist | High | To Do | /docs/stories/story-083-game-ready-validation-checklist.md |
+|| 083 | Game-Ready Validation Checklist | High | Done | /docs/stories/story-083-game-ready-validation-checklist.md |
 || 084 | Fast PDF Image Extraction (Embedded Streams) | High | Done | /docs/stories/story-084-fast-pdf-image-extraction.md |
 || 085 | Table Rescue OCR Pass | High | Done | /docs/stories/story-085-table-rescue-ocr.md |
 || 086 | Preserve HTML Through Final Gamebook | High | Done | /docs/stories/story-086-preserve-html-final-output.md |
@@ -118,6 +118,7 @@ This index tracks stories in `/docs/stories/` for the codex-forge pipeline.
 ||| 100 | Pipeline Visibility Cost Display Enhancement | Medium | Done | /docs/stories/story-100-pipeline-visibility-cost-display.md |
 ||| 101 | ARM64 Environment Cleanup Investigation | Medium | Done | /docs/stories/story-101-arm64-environment-cleanup.md |
 ||| 102 | X-Height Measurement and Target Investigation | High | Done | /docs/stories/story-102-x-height-measurement-and-target-investigation.md |
+||| 103 | Pipeline Dashboard Validation Report Integration | Medium | To Do | /docs/stories/story-103-pipeline-dashboard-validation-integration.md |
 
 ## Notes
 - Status "Done" reflects current working state in codex-forge. "To Do" items are planned next steps aligned with `docs/requirements.md` and `snapshot.md`.

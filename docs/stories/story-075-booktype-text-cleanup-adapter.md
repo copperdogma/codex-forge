@@ -1,6 +1,6 @@
 # Story: Booktype Text Cleanup Adapter (Downstream Normalization)
 
-**Status**: To Do  
+**Status**: Won't Do  
 **Created**: 2025-12-18  
 **Priority**: Low
 **Related Stories**: story-072 (spell-weighted voting + downstream tolerance), story-058 (post-OCR text quality & repair)  
@@ -109,6 +109,10 @@ We also want consistent architecture:
 ---
 
 ## Work Log
+### 2025-12-26: Marked Won't Do (post GPT-5.1 OCR baseline)
+- **Result:** Won't Do.
+- **Reasoning:** GPT-5.1 HTML-first OCR quality is already high, and we lack concrete recurring HTML-level defects that survive re-read/escalation and materially harm downstream extraction. Without evidence of a repeatable error class that can be safely corrected via conservative, deterministic cleanup, this stage adds risk and cost with unclear benefit. Revisit only if future QA shows systematic errors not addressed by current escalation.
+
 ### 20251221-1550 — Reframed for HTML-first OCR
 - **Result:** Success.
 - **Notes:** Updated scope to operate on HTML output (not pagelines). Likely lower priority given GPT‑5.1 OCR quality; re‑evaluate after baseline runs.

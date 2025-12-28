@@ -1,6 +1,6 @@
 # Story: Central Escalation Cache (Premium OCR Overlay)
 
-**Status**: To Do  
+**Status**: Won't Do  
 **Created**: 2025-12-18  
 **Priority**: Low
 **Parent Stories**: story-078 (boundary ordering escalation), story-035 (FF pipeline optimization)  
@@ -62,6 +62,10 @@ A central escalation cache makes sense if the escalation output is **generic pre
 ---
 
 ## Work Log
+### 2025-12-26: Marked Won't Do (GPT-5.1 baseline eliminates need)
+- **Result:** Won't Do.
+- **Reasoning:** GPT-5.1 HTML-first OCR is now the baseline, and recent outputs are solid with minimal or no escalation. Without evidence of repeated cross-module vision re-reads, a central cache adds complexity with little cost benefit. Revisit only if escalation frequency increases or duplicate vision calls become measurable.
+
 ### 20251221-1555 — Added GPT‑5.1 context note
 - **Result:** Success.
 - **Notes:** Central cache may be unnecessary if GPT‑5.1 OCR eliminates most escalations; keep but re‑evaluate after full‑book run.

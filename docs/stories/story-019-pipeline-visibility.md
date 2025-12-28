@@ -67,3 +67,8 @@
 ### 20251122-2358 — Story closed
 - **Result:** Marked Story 019 as Done; residual UI polish scoped into Story 021.
 - **Next:** Execute Story 021 for highlight/pane improvements; optionally add a smoke checklist in README.
+
+### 20251227-0122 — Fix stage-id mismatch from module progress logs
+- **Result:** Success.
+- **Notes:** ProgressLogger now honors `PIPELINE_STAGE_ID`/`STAGE_ID` env override and records the original stage as `extra.stage_alias` when overridden. Driver now sets `PIPELINE_STAGE_ID` for all module subprocesses so module progress logs land on the correct stage id (prevents duplicate “running” stages like `extract` alongside `ocr_ai`).
+- **Next:** Smoke a short run to confirm stages reach 100% and no duplicate stage entries appear in `pipeline_state.json`.

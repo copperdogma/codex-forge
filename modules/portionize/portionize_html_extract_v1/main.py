@@ -340,6 +340,17 @@ def main() -> None:
         end_id = b.get("end_element_id")
         end_idx = id_to_index.get(end_id, len(elements)) if end_id else len(elements)
 
+        # Guard against stray headers inside a span (e.g., duplicate headers on a page).
+        if section_id and str(section_id).isdigit():
+            for scan_idx in range(start_idx + 1, end_idx):
+                block = elements[scan_idx]
+                if block.get("block_type") != "h2":
+                    continue
+                header_text = (block.get("text") or "").strip()
+                if header_text.isdigit() and header_text != str(section_id):
+                    end_idx = scan_idx
+                    break
+
         span = elements[start_idx:end_idx]
         raw_text = _assemble_text(span, args.skip_running_heads, args.skip_page_numbers, args.skip_endmatter) if args.emit_raw_text else ""
 

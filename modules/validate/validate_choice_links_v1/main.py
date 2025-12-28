@@ -60,6 +60,54 @@ def get_suspect_targets(orphan_id: int) -> Set[int]:
     return suspects
 
 
+def _explicit_target_in_html(html: str, target_id: str) -> bool:
+    if not html or not target_id:
+        return False
+    # Explicit anchor link is strong evidence; never override.
+    anchor_pat = re.compile(r'href=["\']#\s*' + re.escape(target_id) + r'\s*["\']', re.IGNORECASE)
+    if anchor_pat.search(html):
+        return True
+    text = html_to_text(html)
+    if not text:
+        return False
+    # Explicit navigation phrasing should block overrides.
+    phrase_pat = re.compile(
+        r'\b(?:turn|go|refer|continue|proceed)\s+to\s+' + re.escape(target_id) + r'\b',
+        re.IGNORECASE,
+    )
+    return bool(phrase_pat.search(text))
+
+
+def _suspect_truncated_target(orphan_id: str, target_id: str) -> bool:
+    if not (orphan_id and target_id):
+        return False
+    if not (orphan_id.isdigit() and target_id.isdigit()):
+        return False
+    # Allow overrides when the only difference is a likely truncated or misread leading digit.
+    if len(orphan_id) == 3 and len(target_id) == 3 and orphan_id[1:] == target_id[1:]:
+        return True
+    if len(orphan_id) == 3 and len(target_id) == 2 and orphan_id[1:] == target_id:
+        return True
+    return False
+
+
+def _patch_anchor_target(html: str, old: str, new: str) -> str:
+    if not html or not old or not new:
+        return html
+    pattern = re.compile(
+        r'(<a\s+[^>]*href=["\']#' + re.escape(old) + r'["\'][^>]*>)(.*?)(</a>)',
+        re.IGNORECASE | re.DOTALL,
+    )
+
+    def repl(match: re.Match) -> str:
+        prefix, inner, suffix = match.group(1), match.group(2), match.group(3)
+        prefix = prefix.replace(f"#{old}", f"#{new}")
+        inner = re.sub(r'\b' + re.escape(old) + r'\b', new, inner)
+        return prefix + inner + suffix
+
+    return pattern.sub(repl, html, count=1)
+
+
 def find_orphans(portions: List[Dict], expected_range: Tuple[int, int] = (1, 400)) -> Set[str]:
     referenced = set()
     existing = set()
@@ -79,6 +127,41 @@ def find_orphans(portions: List[Dict], expected_range: Tuple[int, int] = (1, 400
     
     # Filter by expected range if needed, but string IDs are safer
     return orphans
+
+
+def _load_report(path: Optional[str]) -> Dict:
+    if not path:
+        return {}
+    try:
+        with open(path, "r", encoding="utf-8") as f:
+            return json.load(f)
+    except Exception:
+        return {}
+
+
+def _choice_targets(choice_list: List[Dict]) -> Set[str]:
+    targets: Set[str] = set()
+    for choice in choice_list or []:
+        target = choice.get("target")
+        if target is None:
+            continue
+        targets.add(str(target))
+    return targets
+
+
+def _add_choice(portion: Dict, target: str, reason: str) -> bool:
+    if not target:
+        return False
+    choices = portion.setdefault("choices", [])
+    if str(target) in _choice_targets(choices):
+        return False
+    choices.append({
+        "text": f"Turn to {target}",
+        "target": str(target),
+        "confidence": 0.99,
+        "extraction_method": reason,
+    })
+    return True
 
 
 def validate_link_with_ai(
@@ -222,6 +305,8 @@ def main():
     parser.add_argument('--input', '--inputs', '--portions', dest='inputs', help='Input portions JSONL')
     parser.add_argument('--pages', help='Ignored (driver enrich-stage compatibility)')
     parser.add_argument('--out', help='Output portions JSONL')
+    parser.add_argument('--alignment-report', '--alignment_report', dest='alignment_report', help='Choice/text alignment report JSON')
+    parser.add_argument('--orphan-trace-report', '--orphan_trace_report', dest='orphan_trace_report', help='Orphan trace report JSON')
     parser.add_argument('--confidence-threshold', '--confidence_threshold', type=float, default=0.6)
     parser.add_argument('--max-ai-calls', '--max_ai_calls', type=int, default=50)
     parser.add_argument('--model', default='gpt-4.1-mini')
@@ -237,6 +322,31 @@ def main():
     portions = list(read_jsonl(args.inputs))
     logger = ProgressLogger(state_path=args.state_file, progress_path=args.progress_file, run_id=args.run_id)
     section_map = {p.get('section_id'): p for p in portions}
+
+    # 0. Deterministic repairs based on alignment/orphan trace reports.
+    alignment_report = _load_report(args.alignment_report)
+    orphan_trace_report = _load_report(args.orphan_trace_report)
+    alignment_additions = 0
+    orphan_trace_additions = 0
+
+    issues = alignment_report.get("issues", []) if isinstance(alignment_report, dict) else []
+    for issue in issues:
+        sid = str(issue.get("section_id") or "")
+        if not sid or sid not in section_map:
+            continue
+        missing_targets = issue.get("missing_choice_targets") or []
+        for target in missing_targets:
+            if _add_choice(section_map[sid], str(target), "alignment_missing_target"):
+                alignment_additions += 1
+
+    orphan_sources = orphan_trace_report.get("orphan_sources", {}) if isinstance(orphan_trace_report, dict) else {}
+    if isinstance(orphan_sources, dict):
+        for orphan_id, sources in orphan_sources.items():
+            if not sources:
+                continue
+            for src_id in sources:
+                if src_id in section_map and _add_choice(section_map[src_id], str(orphan_id), "orphan_trace_missing_target"):
+                    orphan_trace_additions += 1
 
     # 1. Detect Orphans
     orphans = find_orphans(portions)
@@ -321,6 +431,9 @@ def main():
             if suspect['type'] == 'orphan_repair':
                 orphan_p = section_map.get(suspect['orphan_id'])
                 orphan_text = html_to_text(orphan_p.get('raw_html', '')) if orphan_p else ""
+                if _explicit_target_in_html(html, suspect['target_id']) and not _suspect_truncated_target(suspect['orphan_id'], suspect['target_id']):
+                    # Explicit numeric reference in source; do not override unless likely truncated/misread.
+                    continue
                 
                 conf, reason, usage = validate_link_with_ai(
                     client, args.model, text, suspect['source_id'], suspect['target_id'], suspect['orphan_id'], orphan_text
@@ -340,6 +453,15 @@ def main():
                             old_choice['extraction_method'] = 'ai_repair_orphan_logic'
                             old_choice['original_target'] = str(suspect['target_id'])
                             old_choice['repair_reason'] = reason
+                            old_choice['text'] = f"Turn to {suspect['orphan_id']}"
+                            # Keep HTML/text consistent with repaired target.
+                            src_p['raw_html'] = _patch_anchor_target(
+                                src_p.get('raw_html', ''),
+                                str(suspect['target_id']),
+                                str(suspect['orphan_id']),
+                            )
+                            if 'raw_text' in src_p:
+                                src_p['raw_text'] = html_to_text(src_p.get('raw_html', ''))
                             modifications += 1
 
             elif suspect['type'] == 'multi_link_check':
@@ -361,15 +483,39 @@ def main():
                          choices[suspect['choice_idx']]['suspicion_reason'] = reason
     
     # Save output
-    save_jsonl(args.out or 'portions_validated.jsonl', portions)
+    out_path = args.out or 'portions_validated.jsonl'
+    save_jsonl(out_path, portions)
+
+    # Emit orphan stats so report_pipeline_issues can consume current results.
+    try:
+        orphans_after = sorted([o for o in find_orphans(portions) if str(o).isdigit()], key=lambda x: int(x))
+        stats_out = {
+            "orphaned_sections": orphans_after,
+            "orphaned_count": len(orphans_after),
+            "repair_calls": ai_calls,
+            "repair_added_choices": modifications,
+            "repair_sources_examined": ai_calls,
+            "repair_errors": 0,
+            "repair_no_sources": False,
+            "alignment_added_choices": alignment_additions,
+            "orphan_trace_added_choices": orphan_trace_additions,
+        }
+        stats_path = out_path.replace(".jsonl", "_stats.json")
+        with open(stats_path, "w", encoding="utf-8") as f:
+            json.dump(stats_out, f, indent=2)
+    except Exception:
+        pass
     
     logger.log(
         "validate_choice_links",
         "done",
         current=len(portions),
         total=len(portions),
-        message=f"Validated choices. Checked {ai_calls} links, repaired {modifications}.",
-        artifact=args.out or 'portions_validated.jsonl',
+        message=(
+            f"Validated choices. Checked {ai_calls} links, repaired {modifications}. "
+            f"Added {alignment_additions} alignment choices, {orphan_trace_additions} orphan-trace choices."
+        ),
+        artifact=out_path,
         module_id="validate_choice_links_v1",
     )
 
