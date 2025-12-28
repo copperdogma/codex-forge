@@ -118,7 +118,7 @@ This index tracks stories in `/docs/stories/` for the codex-forge pipeline.
 ||| 100 | Pipeline Visibility Cost Display Enhancement | Medium | Done | /docs/stories/story-100-pipeline-visibility-cost-display.md |
 ||| 101 | ARM64 Environment Cleanup Investigation | Medium | Done | /docs/stories/story-101-arm64-environment-cleanup.md |
 ||| 102 | X-Height Measurement and Target Investigation | High | Done | /docs/stories/story-102-x-height-measurement-and-target-investigation.md |
-||| 103 | Pipeline Dashboard Validation Report Integration | Medium | To Do | /docs/stories/story-103-pipeline-dashboard-validation-integration.md |
+||| 103 | Pipeline Dashboard Validation Report Integration | Medium | Done | /docs/stories/story-103-pipeline-dashboard-validation-integration.md |
 
 ## Notes
 - Status "Done" reflects current working state in codex-forge. "To Do" items are planned next steps aligned with `docs/requirements.md` and `snapshot.md`.

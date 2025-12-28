@@ -1311,6 +1311,92 @@
       }
     }
 
+    async function loadValidationReport(base, state) {
+      const validationJsonPath = `${base}/validation_report.json`;
+      const validationHtmlPath = `${base}/validation_report.html`;
+
+      try {
+        // Check if HTML report exists
+        const htmlRes = await fetch(validationHtmlPath + "?t=" + Date.now());
+        if (htmlRes.ok) {
+          const linkBtn = document.getElementById("validation-report-link");
+          if (linkBtn) linkBtn.style.display = "inline-block";
+        }
+      } catch {
+        // HTML report doesn't exist, that's okay
+      }
+
+      try {
+        // Try to load JSON report
+        const jsonRes = await fetch(validationJsonPath + "?t=" + Date.now());
+        if (!jsonRes.ok) return;
+
+        const validationData = await jsonRes.json();
+
+        // Only show validation summary if run is complete
+        const runStatus = (state.status || "").toLowerCase();
+        const isComplete = runStatus === "done" || runStatus === "failed" || runStatus === "crashed";
+        if (!isComplete && state.stages) {
+          const stages = Object.values(state.stages);
+          const allDone = stages.length > 0 && stages.every(s =>
+            s.status === "done" || s.status === "failed" || s.status === "skipped"
+          );
+          if (!allDone) return; // Run not complete yet
+        }
+
+        // Create validation summary card
+        const validationCard = document.createElement("div");
+        validationCard.className = "card";
+        validationCard.innerHTML = "<h3>Validation Summary</h3>";
+
+        const isValid = validationData.is_valid;
+        const statusClass = isValid ? "status-pill big done" : "status-pill big failed";
+        const statusText = isValid ? "VALID" : "INVALID";
+
+        const stats = document.createElement("div");
+        stats.className = "meta";
+        stats.style.marginTop = "10px";
+
+        const missingCount = (validationData.missing_sections || []).length;
+        const noTextCount = (validationData.sections_with_no_text || []).length;
+        const noChoicesCount = (validationData.sections_with_no_choices || []).length;
+        const brokenLinksCount = Object.keys(validationData.forensics?.broken_links || {}).length;
+        const orphansCount = Object.keys(validationData.forensics?.orphans || {}).length;
+
+        stats.innerHTML = `
+          <span class="${statusClass}">${statusText}</span>
+          <span>Total Sections: <strong>${validationData.total_sections || 0}</strong></span>
+          <span>Missing: <strong>${missingCount}</strong></span>
+          <span>No Text: <strong>${noTextCount}</strong></span>
+          <span>No Choices: <strong>${noChoicesCount}</strong></span>
+          <span>Broken Links: <strong>${brokenLinksCount}</strong></span>
+          <span>Orphans: <strong>${orphansCount}</strong></span>
+        `;
+
+        validationCard.appendChild(stats);
+
+        // Add link to full report if HTML exists
+        const linkBtn = document.getElementById("validation-report-link");
+        if (linkBtn && linkBtn.style.display !== "none") {
+          const reportLink = document.createElement("div");
+          reportLink.style.marginTop = "10px";
+          reportLink.innerHTML = `<button class="btn-small" onclick="window.open('${validationHtmlPath}', '_blank')">View Full Forensic Report</button>`;
+          validationCard.appendChild(reportLink);
+        }
+
+        // Insert validation card before the debug card
+        const debugCard = document.querySelector("#debug-details")?.closest(".card");
+        if (debugCard) {
+          debugCard.parentNode.insertBefore(validationCard, debugCard);
+        } else {
+          summaryGrid.appendChild(validationCard);
+        }
+
+      } catch (e) {
+        console.log("No validation report found or error loading:", e);
+      }
+    }
+
     function render(state, events, base, instrumentation, plan) {
       const stages = state.stages || {};
       const plannedTotal = plan && plan.nodes ? Object.keys(plan.nodes).length : null;
@@ -1346,11 +1432,14 @@
 
       summaryGrid.innerHTML = "";
       const runSummary = summariseRunState(state);
+      const runningStageDisplay = runningStage
+        ? `<strong>Currently Running:</strong> ${runningStage}`
+        : "No stage currently running";
       summaryGrid.appendChild(makeStatCard("Overall Progress", `${stats.avg}%`, [
         `<span class="status-pill big ${runSummary.status || "unknown"}">${(runSummary.status || "unknown").toUpperCase()}</span>`,
+        runningStageDisplay,
         `${stats.done}/${stats.total} done`,
         `${stats.running} running`,
-        runningStage ? `Running: <strong>${runningStage}</strong>` : "Running: —",
         `${stats.failed} failed`,
         getRunDurationHtml(state, events)
       ]));
@@ -1373,6 +1462,8 @@
         state.updated_at ? `updated ${state.updated_at}` : "live",
         base.replace(`${ROOT}/`, "")
       ]));
+      // Check for validation_report.html
+      const validationReportHtml = `${base}/validation_report.html`;
       summaryGrid.appendChild(makeStatCard("Artifacts", "", [
         inputPath
           ? `<button class="btn-small" onclick="window.open('${inputPath}', '_blank')">${inputLabel}</button>`
@@ -1380,6 +1471,7 @@
         finalArtifact
           ? `<button class="btn-small" onclick="openArtifactTab('final', '${ROOT}/${finalArtifact}')">Final JSON</button>`
           : "Final artifact not detected",
+        `<button class="btn-small" id="validation-report-link" onclick="window.open('${validationReportHtml}', '_blank')" style="display:none;">Validation Report</button>`,
         "Click any stage to open artifacts"
       ]));
 
@@ -1433,6 +1525,9 @@
       }
       if (links.children.length) inst.appendChild(links);
       summaryGrid.appendChild(inst);
+
+      // Load and display validation report if available
+      loadValidationReport(base, state);
 
       const durations = computeStageDurations(events, stages);
       if (costBreakdown) costBreakdown.style.display = costBreakdownOpen ? "block" : "none";
