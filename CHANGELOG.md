@@ -591,3 +591,20 @@
 ### Fixed
 - Choice repair no longer overrides explicit numeric references; HTML anchors are patched on repair.
 - Ordering/duplicate header issues surfaced in issues report and game-ready validation.
+## [2025-12-29] - Gamebook output cleanup, ending status, and validator guards
+
+### Added
+- Story 105 (choice text enrichment spec) and Story 107 (shared validator unification) scaffolds.
+- `status` field propagation for ending sections (victory/death) via `ending_guard_v1` output.
+
+### Changed
+- `html_to_blocks_v1` now preserves inline `<a>` content within paragraphs to avoid choice-sentence truncation.
+- `clean_html_presentation_v1` drops `html`, `text`, `raw_text`, and `clean_text` from final `gamebook.json`.
+- `validate_choice_links_v1` adds a content-overlap guard to prevent over-aggressive orphan repairs.
+- `enriched_portion_v1` schema now retains ending flags (`is_gameplay`, `end_game`, `ending`).
+
+### Fixed
+- Section 114 text loss after inline anchors (restored full choice sentence in final output).
+
+### Tested
+- `python driver.py --recipe configs/recipes/recipe-ff-ai-ocr-gpt51-pristine-fast.yaml --run-id ff-ai-ocr-gpt51-pristine-fast-full --output-dir output/runs/ff-ai-ocr-gpt51-pristine-fast-full --start-from detect_endings --allow-run-id-reuse`

@@ -378,6 +378,9 @@ class EnrichedPortion(BaseModel):
     repair_hints: Optional[Dict[str, Any]] = None
     context_correction: Optional[Dict[str, Any]] = None
     macro_section: Optional[str] = None  # frontmatter | gameplay | endmatter
+    is_gameplay: Optional[bool] = None
+    end_game: Optional[bool] = None
+    ending: Optional[str] = None
 
     @field_validator("combat", mode="before")
     def combat_default(cls, v):

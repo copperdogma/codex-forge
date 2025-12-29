@@ -111,8 +111,7 @@ def build_section(portion: Dict[str, Any], emit_text: bool, emit_provenance_text
         "isGameplaySection": is_gameplay(section_id, portion, candidate_type),
         "type": candidate_type,
     }
-    if emit_text:
-        section["text"] = text_body
+    # Omit plain text fields from final gamebook output.
 
     if nav_links:
         section["navigationLinks"] = nav_links
@@ -120,6 +119,9 @@ def build_section(portion: Dict[str, Any], emit_text: bool, emit_provenance_text
     # Propagate end_game marker (used to suppress no-choice warnings)
     if portion.get("end_game") or portion.get("endGame") or portion.get("is_endgame"):
         section["end_game"] = True
+    ending_status = portion.get("ending")
+    if ending_status in ("death", "victory", "defeat"):
+        section["status"] = ending_status
 
     # Optional fields if present
     if portion.get("items"):
@@ -165,9 +167,7 @@ def build_section(portion: Dict[str, Any], emit_text: bool, emit_provenance_text
         "module_id": portion.get("module_id"),
         "run_id": portion.get("run_id"),
     }
-    if emit_provenance_text:
-        provenance["raw_text"] = raw_body
-        provenance["clean_text"] = text_body
+    # Omit raw/clean text in provenance for final gamebook output.
     section["provenance"] = provenance
     return section_id, section
 
@@ -322,8 +322,6 @@ def main():
             "type": "section",
             "provenance": {"stub": True, "reason": reason},
         }
-        if args.emit_text:
-            stub_section["text"] = ""
         sections[mid] = stub_section
 
     start_section = str(args.start_section)

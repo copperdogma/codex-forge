@@ -34,7 +34,20 @@ class HtmlBlockParser(HTMLParser):
         if tag not in BLOCK_TAGS and tag not in CONTAINER_TAGS:
             return
 
-        if self._current is not None and tag in BLOCK_TAGS and tag not in {"table", "img"}:
+        # Inline anchors inside a text block should not split the current block.
+        if self._current is not None and tag == "a":
+            href = ""
+            for k, v in attrs:
+                if k.lower() == "href" and v:
+                    href = v
+                    break
+            if href:
+                self._current["text_parts"].append(f'<a href="{href}">')
+            else:
+                self._current["text_parts"].append("<a>")
+            return
+
+        if self._current is not None and tag in BLOCK_TAGS and tag not in {"table", "img", "a"}:
             self._flush_current()
 
         if tag == "img":
@@ -83,6 +96,9 @@ class HtmlBlockParser(HTMLParser):
 
     def handle_endtag(self, tag: str):
         tag = tag.lower()
+        if self._current is not None and tag == "a":
+            self._current["text_parts"].append("</a>")
+            return
         if self._current and self._current.get("block_type") == tag:
             self._flush_current()
         if tag == "p" and not self._current:

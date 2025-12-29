@@ -91,6 +91,25 @@ def _suspect_truncated_target(orphan_id: str, target_id: str) -> bool:
     return False
 
 
+def _content_overlap_hint(source_text: str, orphan_text: str) -> bool:
+    if not (source_text and orphan_text):
+        return False
+    stop = {
+        "the", "and", "then", "than", "that", "this", "with", "from", "your", "you", "are", "for", "into",
+        "have", "has", "had", "will", "would", "should", "could", "turn", "to", "if", "but", "not", "too",
+        "him", "her", "his", "she", "himself", "herself", "yourself", "their", "them", "they", "was", "were",
+        "as", "in", "on", "at", "of", "a", "an", "it", "is", "be", "by", "or", "after", "before", "when",
+        "while", "so", "do", "does", "did", "up", "down", "out", "over", "under", "again",
+        "door", "doors",
+    }
+    def tokens(txt: str) -> Set[str]:
+        words = re.findall(r"[a-zA-Z]{4,}", txt.lower())
+        return {w for w in words if w not in stop}
+    s = tokens(source_text)
+    o = tokens(orphan_text)
+    return bool(s.intersection(o))
+
+
 def _patch_anchor_target(html: str, old: str, new: str) -> str:
     if not html or not old or not new:
         return html
@@ -431,9 +450,13 @@ def main():
             if suspect['type'] == 'orphan_repair':
                 orphan_p = section_map.get(suspect['orphan_id'])
                 orphan_text = html_to_text(orphan_p.get('raw_html', '')) if orphan_p else ""
-                if _explicit_target_in_html(html, suspect['target_id']) and not _suspect_truncated_target(suspect['orphan_id'], suspect['target_id']):
-                    # Explicit numeric reference in source; do not override unless likely truncated/misread.
-                    continue
+                if _explicit_target_in_html(html, suspect['target_id']):
+                    # Explicit numeric reference in source; only consider overrides if a truncation is likely
+                    # and the source/orphan share meaningful content hints (prevents over-aggressive rewrites).
+                    if not _suspect_truncated_target(suspect['orphan_id'], suspect['target_id']):
+                        continue
+                    if not _content_overlap_hint(text, orphan_text):
+                        continue
                 
                 conf, reason, usage = validate_link_with_ai(
                     client, args.model, text, suspect['source_id'], suspect['target_id'], suspect['orphan_id'], orphan_text

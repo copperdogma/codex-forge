@@ -119,6 +119,10 @@ This index tracks stories in `/docs/stories/` for the codex-forge pipeline.
 ||| 101 | ARM64 Environment Cleanup Investigation | Medium | Done | /docs/stories/story-101-arm64-environment-cleanup.md |
 ||| 102 | X-Height Measurement and Target Investigation | High | Done | /docs/stories/story-102-x-height-measurement-and-target-investigation.md |
 ||| 103 | Pipeline Dashboard Validation Report Integration | Medium | Done | /docs/stories/story-103-pipeline-dashboard-validation-integration.md |
+||| 104 | Gamebook Output File Tweaks | High | In Progress | /docs/stories/story-104-gamebook-output-tweaks.md |
+||| 105 | Choice Text Enrichment (Spec Only) | Medium | To Do | /docs/stories/story-105-choice-text-enrichment.md |
+||| 107 | Shared Validator Unification (Node/AJV Canonical) | High | To Do | /docs/stories/story-107-shared-validator-unification.md |
+|||| 106 | Gamebook Schema Navigation Improvements | Medium | To Do | /docs/stories/story-106-gamebook-schema-navigation-improvements.md |
 
 ## Notes
 - Status "Done" reflects current working state in codex-forge. "To Do" items are planned next steps aligned with `docs/requirements.md` and `snapshot.md`.

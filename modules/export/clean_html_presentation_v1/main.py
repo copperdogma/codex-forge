@@ -118,6 +118,16 @@ def main():
             
             cleaned_count += 1
 
+        # Drop any plain-text fields; presentation_html is the only narrative field.
+        for key in ("text", "raw_text", "clean_text"):
+            section.pop(key, None)
+        # Drop original html; keep only presentation_html for narrative content.
+        section.pop("html", None)
+        provenance = section.get("provenance")
+        if isinstance(provenance, dict):
+            for key in ("raw_text", "clean_text"):
+                provenance.pop(key, None)
+
         if idx % 50 == 0:
              logger.log("clean_html_presentation", "running", current=idx, total=total_sections, 
                         message=f"Cleaned {idx}/{total_sections} sections", module_id="clean_html_presentation_v1")
