@@ -13,58 +13,34 @@
  */
 export type SectionId = string;
 /**
- * Navigation link extracted from section text
- * Parser should extract "Turn to X" patterns and structure them
+ * Canonical navigation edge for a section
  */
-export interface NavigationLink {
+export interface NavigationEdge {
     /** Target section ID */
     targetSection: SectionId;
+    /** Navigation kind (choice vs mechanic) */
+    kind: 'choice' | 'test_luck' | 'item_check' | 'combat' | 'stat_check' | 'death' | 'custom';
+    /** Outcome label for conditional navigation */
+    outcome?: 'lucky' | 'unlucky' | 'has_item' | 'no_item' | 'win' | 'lose' | 'escape' | 'pass' | 'fail' | 'death' | string;
     /** Optional descriptive text for the choice (if available from context) */
     choiceText?: string;
-    /** Whether this link is conditional (requires evaluation) */
-    isConditional?: boolean;
-}
-/**
- * Conditional navigation - navigation that depends on game state
- */
-export interface ConditionalNavigation {
-    /** Condition type */
-    condition: 'has_item' | 'test_luck' | 'stat_check' | 'skill_check' | 'custom';
-    /** Condition parameters (item name, stat name, etc.) */
-    conditionParams?: Record<string, unknown>;
-    /** Navigation if condition is true */
-    ifTrue: NavigationLink;
-    /** Navigation if condition is false */
-    ifFalse: NavigationLink;
-}
-/**
- * Combat encounter creature stats
- * Parser should extract from text like "CREATURE NAME SKILL X STAMINA Y"
- */
-export interface CreatureStats {
-    /** Creature name */
-    name: string;
-    /** Combat Skill value */
-    skill: number;
-    /** Stamina (hit points) */
-    stamina: number;
-    /** Optional special combat rules */
-    specialRules?: string[];
-    /** Whether escape is allowed from this combat */
-    allowEscape?: boolean;
-    /** Section to navigate to if player escapes */
-    escapeSection?: SectionId;
+    /** Optional parameters (item name, enemy name, etc.) */
+    params?: Record<string, unknown>;
 }
 /**
  * Combat encounter embedded in a section
  */
 export interface CombatEncounter {
-    /** Creature statistics */
-    creature: CreatureStats;
-    /** Section to navigate to if player wins */
-    winSection: SectionId;
-    /** Section to navigate to if player loses (optional, death may be implicit) */
-    loseSection?: SectionId;
+    /** Creature name */
+    enemy: string;
+    /** Combat Skill value */
+    skill: number;
+    /** Stamina (hit points) */
+    stamina: number;
+    /** Optional special combat rules */
+    special_rules?: string;
+    /** Whether escape is allowed from this combat */
+    allow_escape?: boolean;
 }
 /**
  * Item reference - items mentioned in section text
@@ -74,10 +50,6 @@ export interface ItemReference {
     name: string;
     /** Whether this section adds the item to inventory */
     action: 'add' | 'remove' | 'check' | 'reference';
-    /** Section to navigate to if item check is true (for check actions) */
-    checkSuccessSection?: SectionId;
-    /** Section to navigate to if item check is false (for check actions) */
-    checkFailureSection?: SectionId;
 }
 /**
  * Stat modification - changes to player stats (Skill, Stamina, Luck)
@@ -98,19 +70,6 @@ export interface DeathCondition {
     trigger: 'stamina_zero' | 'instant_death' | 'conditional';
     /** Death message/reason */
     message?: string;
-    /** Section to navigate to on death (if different from standard game over) */
-    deathSection?: SectionId;
-}
-/**
- * Test Your Luck mechanic
- */
-export interface TestYourLuck {
-    /** Section to navigate to if lucky */
-    luckySection: SectionId;
-    /** Section to navigate to if unlucky */
-    unluckySection: SectionId;
-    /** Optional description of consequences */
-    description?: string;
 }
 /**
  * Section types - categorizes different kinds of content
@@ -138,20 +97,16 @@ export interface GamebookSection {
     isGameplaySection: boolean;
     /** Section type - categorizes the content */
     type: SectionType;
-    /** Navigation links extracted from text (only for gameplay sections) */
-    navigationLinks?: NavigationLink[];
-    /** Conditional navigation paths (only for gameplay sections) */
-    conditionalNavigation?: ConditionalNavigation[];
-    /** Combat encounter (only for gameplay sections) */
-    combat?: CombatEncounter;
+    /** Canonical navigation edges (only for gameplay sections) */
+    navigation?: NavigationEdge[];
+    /** Combat encounters (only for gameplay sections) */
+    combat?: CombatEncounter[];
     /** Item references (only for gameplay sections) */
     items?: ItemReference[];
     /** Stat modifications (only for gameplay sections) */
     statModifications?: StatModification[];
     /** Death conditions (only for gameplay sections) */
     deathConditions?: DeathCondition[];
-    /** Test Your Luck mechanics (only for gameplay sections) */
-    testYourLuck?: TestYourLuck[];
     /** Section metadata */
     metadata?: {
         /** Section title (if available) */

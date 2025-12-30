@@ -85,18 +85,11 @@
           ],
           "description": "Section type categorizing the content"
         },
-        "navigationLinks": {
+        "navigation": {
           "type": "array",
-          "description": "Simple navigation links (only for gameplay sections)",
+          "description": "Canonical navigation edges for this section",
           "items": {
-            "$ref": "#/definitions/NavigationLink"
-          }
-        },
-        "conditionalNavigation": {
-          "type": "array",
-          "description": "Conditional navigation logic (only for gameplay sections)",
-          "items": {
-            "$ref": "#/definitions/ConditionalNavigation"
+            "$ref": "#/definitions/NavigationEdge"
           }
         },
         "combat": {
@@ -127,13 +120,6 @@
             "$ref": "#/definitions/DeathCondition"
           }
         },
-        "testYourLuck": {
-          "type": "array",
-          "description": "Test Your Luck mechanics (only for gameplay sections)",
-          "items": {
-            "$ref": "#/definitions/TestYourLuck"
-          }
-        },
         "metadata": {
           "type": "object",
           "description": "Additional section metadata",
@@ -146,52 +132,74 @@
         }
       }
     },
-    "NavigationLink": {
+    "NavigationEdge": {
       "type": "object",
-      "required": ["targetSection"],
+      "required": ["targetSection", "kind"],
       "properties": {
         "targetSection": {
           "$ref": "#/definitions/SectionId",
-          "description": "Target section ID extracted from 'Turn to X' patterns"
+          "description": "Target section ID"
+        },
+        "kind": {
+          "type": "string",
+          "enum": ["choice", "test_luck", "item_check", "combat", "stat_check", "death", "custom"],
+          "description": "Navigation kind (choice vs mechanic)"
+        },
+        "outcome": {
+          "type": "string",
+          "description": "Outcome label for conditional navigation (e.g., lucky/unlucky, win/lose)"
         },
         "choiceText": {
           "type": "string",
           "description": "Optional descriptive text for the choice"
         },
-        "isConditional": {
-          "type": "boolean",
-          "description": "Whether this link is conditional (requires evaluation)",
-          "default": false
-        }
-      }
-    },
-    "ConditionalNavigation": {
-      "type": "object",
-      "required": ["condition", "ifTrue", "ifFalse"],
-      "properties": {
-        "condition": {
-          "type": "string",
-          "enum": ["has_item", "test_luck", "stat_check", "skill_check", "custom"],
-          "description": "Condition type"
-        },
-        "conditionParams": {
+        "params": {
           "type": "object",
-          "description": "Condition parameters (e.g., { itemName: 'key' })",
+          "description": "Optional parameters for this navigation edge (e.g., item name, enemy name)",
           "additionalProperties": true
-        },
-        "ifTrue": {
-          "$ref": "#/definitions/NavigationLink",
-          "description": "Navigation if condition is true"
-        },
-        "ifFalse": {
-          "$ref": "#/definitions/NavigationLink",
-          "description": "Navigation if condition is false"
         }
-      }
+      },
+      "allOf": [
+        {
+          "if": { "properties": { "kind": { "const": "test_luck" } } },
+          "then": {
+            "required": ["outcome"],
+            "properties": { "outcome": { "enum": ["lucky", "unlucky"] } }
+          }
+        },
+        {
+          "if": { "properties": { "kind": { "const": "item_check" } } },
+          "then": {
+            "required": ["outcome"],
+            "properties": { "outcome": { "enum": ["has_item", "no_item"] } }
+          }
+        },
+        {
+          "if": { "properties": { "kind": { "const": "combat" } } },
+          "then": {
+            "required": ["outcome"],
+            "properties": { "outcome": { "enum": ["win", "lose", "escape"] } }
+          }
+        },
+        {
+          "if": { "properties": { "kind": { "const": "stat_check" } } },
+          "then": {
+            "required": ["outcome"],
+            "properties": { "outcome": { "enum": ["pass", "fail"] } }
+          }
+        },
+        {
+          "if": { "properties": { "kind": { "const": "death" } } },
+          "then": {
+            "required": ["outcome"],
+            "properties": { "outcome": { "enum": ["death"] } }
+          }
+        }
+      ]
     },
     "CombatEncounter": {
       "type": "object",
-      "required": ["enemy", "skill", "stamina", "win_section"],
+      "required": ["enemy", "skill", "stamina"],
       "properties": {
         "enemy": {
           "type": "string",
@@ -205,21 +213,13 @@
           "type": "number",
           "description": "Stamina (hit points)"
         },
-        "win_section": {
-          "$ref": "#/definitions/SectionId",
-          "description": "Section to navigate to if player wins"
-        },
-        "loss_section": {
-          "$ref": "#/definitions/SectionId",
-          "description": "Section to navigate to if player loses"
-        },
-        "escape_section": {
-          "$ref": "#/definitions/SectionId",
-          "description": "Section to navigate to if player escapes"
-        },
         "special_rules": {
           "type": "string",
           "description": "Optional special combat rules"
+        },
+        "allow_escape": {
+          "type": "boolean",
+          "description": "Whether escape is allowed from this combat"
         }
       }
     },
@@ -268,14 +268,6 @@
           "type": "string",
           "enum": ["add", "remove", "check", "reference"],
           "description": "Item action: add to inventory, remove from inventory, check if player has, or just reference"
-        },
-        "checkSuccessSection": {
-          "$ref": "#/definitions/SectionId",
-          "description": "Section to navigate to if item check is true (for check actions)"
-        },
-        "checkFailureSection": {
-          "$ref": "#/definitions/SectionId",
-          "description": "Section to navigate to if item check is false (for check actions)"
         }
       }
     },
@@ -311,31 +303,8 @@
         "message": {
           "type": "string",
           "description": "Death message/reason"
-        },
-        "deathSection": {
-          "$ref": "#/definitions/SectionId",
-          "description": "Section to navigate to on death (if different from standard game over)"
-        }
-      }
-    },
-    "TestYourLuck": {
-      "type": "object",
-      "required": ["luckySection", "unluckySection"],
-      "properties": {
-        "luckySection": {
-          "$ref": "#/definitions/SectionId",
-          "description": "Section to navigate to if lucky"
-        },
-        "unluckySection": {
-          "$ref": "#/definitions/SectionId",
-          "description": "Section to navigate to if unlucky"
-        },
-        "description": {
-          "type": "string",
-          "description": "Optional description of consequences"
         }
       }
     }
   }
 }
-

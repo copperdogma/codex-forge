@@ -155,12 +155,12 @@ function validateNavigationTargets(gamebook) {
     for (const [sectionKey, section] of Object.entries(gamebook.sections)) {
         if (!section.isGameplaySection)
             continue;
-        // Validate navigation links
-        if (section.navigationLinks) {
-            section.navigationLinks.forEach((link, index) => {
+        // Validate navigation edges
+        if (section.navigation) {
+            section.navigation.forEach((link, index) => {
                 if (!sectionIds.has(link.targetSection)) {
                     errors.push({
-                        path: `/sections/${sectionKey}/navigationLinks/${index}/targetSection`,
+                        path: `/sections/${sectionKey}/navigation/${index}/targetSection`,
                         message: `Navigation target section "${link.targetSection}" does not exist`,
                         expected: 'existing section ID',
                         received: link.targetSection,
@@ -168,129 +168,6 @@ function validateNavigationTargets(gamebook) {
                 }
             });
         }
-        // Validate conditional navigation
-        if (section.conditionalNavigation) {
-            section.conditionalNavigation.forEach((conditional, condIndex) => {
-                if (!sectionIds.has(conditional.ifTrue.targetSection)) {
-                    errors.push({
-                        path: `/sections/${sectionKey}/conditionalNavigation/${condIndex}/ifTrue/targetSection`,
-                        message: `Conditional navigation ifTrue target section "${conditional.ifTrue.targetSection}" does not exist`,
-                        expected: 'existing section ID',
-                        received: conditional.ifTrue.targetSection,
-                    });
-                }
-                if (!sectionIds.has(conditional.ifFalse.targetSection)) {
-                    errors.push({
-                        path: `/sections/${sectionKey}/conditionalNavigation/${condIndex}/ifFalse/targetSection`,
-                        message: `Conditional navigation ifFalse target section "${conditional.ifFalse.targetSection}" does not exist`,
-                        expected: 'existing section ID',
-                        received: conditional.ifFalse.targetSection,
-                    });
-                }
-            });
-        }
-    }
-    return errors;
-}
-/**
- * Validate combat encounter target sections
- */
-function validateCombatTargets(gamebook) {
-    const errors = [];
-    const sectionIds = new Set(Object.keys(gamebook.sections));
-    for (const [sectionKey, section] of Object.entries(gamebook.sections)) {
-        if (!section.isGameplaySection || !section.combat)
-            continue;
-        const combat = section.combat;
-        // Validate win section
-        if (!sectionIds.has(combat.winSection)) {
-            errors.push({
-                path: `/sections/${sectionKey}/combat/winSection`,
-                message: `Combat winSection "${combat.winSection}" does not exist`,
-                expected: 'existing section ID',
-                received: combat.winSection,
-            });
-        }
-        // Validate lose section (if present)
-        if (combat.loseSection && !sectionIds.has(combat.loseSection)) {
-            errors.push({
-                path: `/sections/${sectionKey}/combat/loseSection`,
-                message: `Combat loseSection "${combat.loseSection}" does not exist`,
-                expected: 'existing section ID',
-                received: combat.loseSection,
-            });
-        }
-        // Validate escape section (if present)
-        if (combat.creature.escapeSection && !sectionIds.has(combat.creature.escapeSection)) {
-            errors.push({
-                path: `/sections/${sectionKey}/combat/creature/escapeSection`,
-                message: `Combat escapeSection "${combat.creature.escapeSection}" does not exist`,
-                expected: 'existing section ID',
-                received: combat.creature.escapeSection,
-            });
-        }
-    }
-    return errors;
-}
-/**
- * Validate Test Your Luck target sections
- */
-function validateTestYourLuckTargets(gamebook) {
-    const errors = [];
-    const sectionIds = new Set(Object.keys(gamebook.sections));
-    for (const [sectionKey, section] of Object.entries(gamebook.sections)) {
-        if (!section.isGameplaySection || !section.testYourLuck)
-            continue;
-        section.testYourLuck.forEach((tyl, index) => {
-            if (!sectionIds.has(tyl.luckySection)) {
-                errors.push({
-                    path: `/sections/${sectionKey}/testYourLuck/${index}/luckySection`,
-                    message: `Test Your Luck luckySection "${tyl.luckySection}" does not exist`,
-                    expected: 'existing section ID',
-                    received: tyl.luckySection,
-                });
-            }
-            if (!sectionIds.has(tyl.unluckySection)) {
-                errors.push({
-                    path: `/sections/${sectionKey}/testYourLuck/${index}/unluckySection`,
-                    message: `Test Your Luck unluckySection "${tyl.unluckySection}" does not exist`,
-                    expected: 'existing section ID',
-                    received: tyl.unluckySection,
-                });
-            }
-        });
-    }
-    return errors;
-}
-/**
- * Validate item check target sections
- */
-function validateItemCheckTargets(gamebook) {
-    const errors = [];
-    const sectionIds = new Set(Object.keys(gamebook.sections));
-    for (const [sectionKey, section] of Object.entries(gamebook.sections)) {
-        if (!section.isGameplaySection || !section.items)
-            continue;
-        section.items.forEach((item, index) => {
-            if (item.action === 'check') {
-                if (item.checkSuccessSection && !sectionIds.has(item.checkSuccessSection)) {
-                    errors.push({
-                        path: `/sections/${sectionKey}/items/${index}/checkSuccessSection`,
-                        message: `Item check checkSuccessSection "${item.checkSuccessSection}" does not exist`,
-                        expected: 'existing section ID',
-                        received: item.checkSuccessSection,
-                    });
-                }
-                if (item.checkFailureSection && !sectionIds.has(item.checkFailureSection)) {
-                    errors.push({
-                        path: `/sections/${sectionKey}/items/${index}/checkFailureSection`,
-                        message: `Item check checkFailureSection "${item.checkFailureSection}" does not exist`,
-                        expected: 'existing section ID',
-                        received: item.checkFailureSection,
-                    });
-                }
-            }
-        });
     }
     return errors;
 }
@@ -310,58 +187,11 @@ function findReachableSections(gamebook) {
         if (!section || !section.isGameplaySection)
             continue;
         reachable.add(currentId);
-        // Add navigation links
-        if (section.navigationLinks) {
-            section.navigationLinks.forEach(link => {
+        // Add navigation edges
+        if (section.navigation) {
+            section.navigation.forEach(link => {
                 if (!visited.has(link.targetSection)) {
                     queue.push(link.targetSection);
-                }
-            });
-        }
-        // Add conditional navigation (both paths)
-        if (section.conditionalNavigation) {
-            section.conditionalNavigation.forEach(conditional => {
-                if (!visited.has(conditional.ifTrue.targetSection)) {
-                    queue.push(conditional.ifTrue.targetSection);
-                }
-                if (!visited.has(conditional.ifFalse.targetSection)) {
-                    queue.push(conditional.ifFalse.targetSection);
-                }
-            });
-        }
-        // Add combat outcomes
-        if (section.combat) {
-            if (!visited.has(section.combat.winSection)) {
-                queue.push(section.combat.winSection);
-            }
-            if (section.combat.loseSection && !visited.has(section.combat.loseSection)) {
-                queue.push(section.combat.loseSection);
-            }
-            if (section.combat.creature.escapeSection && !visited.has(section.combat.creature.escapeSection)) {
-                queue.push(section.combat.creature.escapeSection);
-            }
-        }
-        // Add Test Your Luck outcomes
-        if (section.testYourLuck) {
-            section.testYourLuck.forEach(tyl => {
-                if (!visited.has(tyl.luckySection)) {
-                    queue.push(tyl.luckySection);
-                }
-                if (!visited.has(tyl.unluckySection)) {
-                    queue.push(tyl.unluckySection);
-                }
-            });
-        }
-        // Add item check outcomes
-        if (section.items) {
-            section.items.forEach(item => {
-                if (item.action === 'check') {
-                    if (item.checkSuccessSection && !visited.has(item.checkSuccessSection)) {
-                        queue.push(item.checkSuccessSection);
-                    }
-                    if (item.checkFailureSection && !visited.has(item.checkFailureSection)) {
-                        queue.push(item.checkFailureSection);
-                    }
                 }
             });
         }
@@ -442,19 +272,13 @@ function validateGamebook(gamebook) {
         errors.push(...validateSectionIds(gamebook));
         // 4. Navigation target validation
         errors.push(...validateNavigationTargets(gamebook));
-        // 5. Combat target validation
-        errors.push(...validateCombatTargets(gamebook));
-        // 6. Test Your Luck target validation
-        errors.push(...validateTestYourLuckTargets(gamebook));
-        // 7. Item check target validation
-        errors.push(...validateItemCheckTargets(gamebook));
-        // 8. Stat modifications validation (schema covers this, but placeholder for custom checks)
+        // 5. Stat modifications validation (schema covers this, but placeholder for custom checks)
         errors.push(...validateStatModifications(gamebook));
-        // 9. Item actions validation (schema covers this)
+        // 6. Item actions validation (schema covers this)
         errors.push(...validateItemActions(gamebook));
-        // 10. Creature stats validation (schema covers this)
+        // 7. Creature stats validation (schema covers this)
         errors.push(...validateCreatureStats(gamebook));
-        // 11. Reachability analysis (warnings, not errors)
+        // 8. Reachability analysis (warnings, not errors)
         // Only run if startSection exists and is valid
         if (gamebook.metadata.startSection && gamebook.sections[gamebook.metadata.startSection]) {
             warnings.push(...findUnreachableSections(gamebook));

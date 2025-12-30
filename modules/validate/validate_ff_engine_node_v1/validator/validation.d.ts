@@ -16,7 +16,7 @@ import { GamebookJSON } from './types';
  * Validation error with path and message
  */
 export interface ValidationError {
-    /** JSON path to the error (e.g., "/sections/1/navigationLinks/0/targetSection") */
+    /** JSON path to the error (e.g., "/sections/1/navigation/0/targetSection") */
     path: string;
     /** Human-readable error message */
     message: string;

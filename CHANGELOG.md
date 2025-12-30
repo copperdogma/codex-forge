@@ -1,3 +1,16 @@
+## [2025-12-30] - Unified navigation schema and validators
+
+### Added
+- Canonical `navigation` edges with typed kinds/outcomes in the gamebook schema.
+
+### Changed
+- Builders now emit unified `navigation` and strip mechanic target fields from items/combat/stat checks.
+- Validators and smoke checks now read `navigation` only; node validator schema/types updated.
+- Story 106 marked Done with work log updates and validation notes.
+
+### Tested
+- `PYTHONPATH=. python modules/validate/validate_ff_engine_v2/main.py --gamebook output/runs/ff-ai-ocr-gpt51-pristine-fast-full/gamebook.json --out output/runs/ff-ai-ocr-gpt51-pristine-fast-full/validation_report.navigation.json --expected-range-start 1 --expected-range-end 400`
+
 ## [2025-12-25] - Scope ARM64/MPS to legacy EasyOCR and split deps
 
 ### Added

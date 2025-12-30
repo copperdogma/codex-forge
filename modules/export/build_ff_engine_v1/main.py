@@ -7,24 +7,109 @@ from modules.common.utils import read_jsonl, save_json, ProgressLogger
 from modules.common.html_utils import html_to_text
 
 
+def _append_nav(
+    nav: List[Dict[str, Any]],
+    seen: set,
+    *,
+    target: Optional[Any],
+    kind: str,
+    outcome: Optional[str] = None,
+    choice_text: Optional[str] = None,
+    params: Optional[Dict[str, Any]] = None,
+) -> None:
+    if target is None:
+        return
+    entry: Dict[str, Any] = {"targetSection": str(target), "kind": kind}
+    if outcome:
+        entry["outcome"] = outcome
+    if choice_text:
+        entry["choiceText"] = choice_text
+    if params:
+        entry["params"] = params
+    key = (
+        entry["targetSection"],
+        entry.get("kind"),
+        entry.get("outcome"),
+        entry.get("choiceText"),
+        json.dumps(entry.get("params"), sort_keys=True) if entry.get("params") is not None else None,
+    )
+    if key in seen:
+        return
+    seen.add(key)
+    nav.append(entry)
+
+
 def make_navigation(portion: Dict[str, Any]) -> List[Dict[str, Any]]:
-    nav: List[Dict[str, Any]] = []
+    choice_nav: List[Dict[str, Any]] = []
+    mech_nav: List[Dict[str, Any]] = []
+    choice_seen: set = set()
+    mech_seen: set = set()
     for choice in portion.get("choices") or []:
         if not isinstance(choice, dict):
             continue
-        tgt = choice.get("target")
-        if tgt is None:
-            continue
-        nav.append({
-            "targetSection": str(tgt),
-            "choiceText": choice.get("text"),
-            "isConditional": False,
-        })
-    if not nav:
+        _append_nav(
+            choice_nav,
+            choice_seen,
+            target=choice.get("target"),
+            kind="choice",
+            choice_text=choice.get("text"),
+        )
+    if not choice_nav:
         # Fall back to targets list if present
         for tgt in portion.get("targets") or []:
-            nav.append({"targetSection": str(tgt), "isConditional": False})
-    return nav
+            _append_nav(choice_nav, choice_seen, target=tgt, kind="choice")
+
+    # Test Your Luck
+    for ty in portion.get("testYourLuck") or []:
+        if not isinstance(ty, dict):
+            continue
+        _append_nav(mech_nav, mech_seen, target=ty.get("luckySection"), kind="test_luck", outcome="lucky")
+        _append_nav(mech_nav, mech_seen, target=ty.get("unluckySection"), kind="test_luck", outcome="unlucky")
+
+    # Item checks
+    for item in portion.get("items") or []:
+        if not isinstance(item, dict):
+            continue
+        if item.get("action") != "check":
+            continue
+        params = {"itemName": item.get("name")} if item.get("name") else None
+        _append_nav(mech_nav, mech_seen, target=item.get("checkSuccessSection"), kind="item_check", outcome="has_item", params=params)
+        _append_nav(mech_nav, mech_seen, target=item.get("checkFailureSection"), kind="item_check", outcome="no_item", params=params)
+
+    # Combat outcomes
+    combat = portion.get("combat")
+    combat_list = [combat] if isinstance(combat, dict) else (combat or [])
+    for c in combat_list:
+        if not isinstance(c, dict):
+            continue
+        params = {"enemy": c.get("name") or c.get("enemy")} if (c.get("name") or c.get("enemy")) else None
+        _append_nav(mech_nav, mech_seen, target=c.get("winSection"), kind="combat", outcome="win", params=params)
+        _append_nav(mech_nav, mech_seen, target=c.get("loseSection"), kind="combat", outcome="lose", params=params)
+        _append_nav(mech_nav, mech_seen, target=c.get("escapeSection"), kind="combat", outcome="escape", params=params)
+
+    # Death conditions
+    for death in portion.get("deathConditions") or []:
+        if not isinstance(death, dict):
+            continue
+        params = None
+        if death.get("description"):
+            params = {"description": death.get("description")}
+        _append_nav(mech_nav, mech_seen, target=death.get("deathSection"), kind="death", outcome="death", params=params)
+
+    # Merge choice text into mechanics and drop overlapping choice targets
+    choice_text_by_target = {}
+    for entry in choice_nav:
+        if entry.get("targetSection") and entry.get("choiceText"):
+            choice_text_by_target.setdefault(entry["targetSection"], entry["choiceText"])
+
+    mech_targets = {e.get("targetSection") for e in mech_nav if e.get("targetSection")}
+    for entry in mech_nav:
+        tgt = entry.get("targetSection")
+        if tgt and not entry.get("choiceText") and tgt in choice_text_by_target:
+            entry["choiceText"] = choice_text_by_target[tgt]
+
+    filtered_choices = [e for e in choice_nav if e.get("targetSection") not in mech_targets]
+    return filtered_choices + mech_nav
 
 
 def classify_type(section_id: str, portion: Dict[str, Any], text_body: str) -> str:
@@ -93,12 +178,12 @@ def build_section(portion: Dict[str, Any], emit_text: bool, emit_provenance_text
     text_body = portion.get("raw_text") or html_to_text(html_body)
     raw_body = text_body
 
-    nav_links = make_navigation(portion)
-    if not nav_links and section_id.lower() == "background":
-        nav_links = [{
+    navigation = make_navigation(portion)
+    if not navigation and section_id.lower() == "background":
+        navigation = [{
             "targetSection": "1",
+            "kind": "choice",
             "choiceText": "Turn to 1",
-            "isConditional": False,
         }]
 
     candidate_type = classify_type(section_id, portion, text_body)
@@ -113,8 +198,8 @@ def build_section(portion: Dict[str, Any], emit_text: bool, emit_provenance_text
     }
     # Omit plain text fields from final gamebook output.
 
-    if nav_links:
-        section["navigationLinks"] = nav_links
+    if navigation:
+        section["navigation"] = navigation
 
     # Propagate end_game marker (used to suppress no-choice warnings)
     if portion.get("end_game") or portion.get("endGame") or portion.get("is_endgame"):
@@ -125,34 +210,50 @@ def build_section(portion: Dict[str, Any], emit_text: bool, emit_provenance_text
 
     # Optional fields if present
     if portion.get("items"):
-        section["items"] = portion["items"]
+        # Strip navigation targets from item checks; navigation is canonical.
+        sanitized_items = []
+        for item in portion["items"]:
+            if not isinstance(item, dict):
+                continue
+            cleaned = dict(item)
+            cleaned.pop("checkSuccessSection", None)
+            cleaned.pop("checkFailureSection", None)
+            sanitized_items.append(cleaned)
+        if sanitized_items:
+            section["items"] = sanitized_items
     if portion.get("stat_modifications"):
         section["statModifications"] = portion["stat_modifications"]
-    if portion.get("testYourLuck"):
-        section["testYourLuck"] = portion["testYourLuck"]
+    # testYourLuck targets are encoded in navigation; omit to avoid duplication.
     if portion.get("deathConditions"):
-        section["deathConditions"] = portion["deathConditions"]
+        sanitized_deaths = []
+        for death in portion["deathConditions"]:
+            if not isinstance(death, dict):
+                continue
+            cleaned = dict(death)
+            cleaned.pop("deathSection", None)
+            sanitized_deaths.append(cleaned)
+        if sanitized_deaths:
+            section["deathConditions"] = sanitized_deaths
     combat = portion.get("combat")
-    if combat and isinstance(combat, dict) and combat.get("skill") is not None and combat.get("stamina") is not None:
-        creature = {
-            "name": combat.get("name") or "Creature",
-            "skill": combat.get("skill"),
-            "stamina": combat.get("stamina"),
+    combat_list = [combat] if isinstance(combat, dict) else (combat or [])
+    section_combat = []
+    for c in combat_list:
+        if not isinstance(c, dict):
+            continue
+        if c.get("skill") is None or c.get("stamina") is None:
+            continue
+        enemy = {
+            "enemy": c.get("name") or c.get("enemy") or "Creature",
+            "skill": c.get("skill"),
+            "stamina": c.get("stamina"),
         }
-        if combat.get("specialRules"):
-            creature["specialRules"] = combat["specialRules"]
-        if combat.get("allowEscape") is not None:
-            creature["allowEscape"] = combat["allowEscape"]
-        if combat.get("escapeSection"):
-            creature["escapeSection"] = str(combat["escapeSection"])
-        # Only include combat if we have a winSection to satisfy schema; otherwise keep in provenance
-        if combat.get("winSection"):
-            section["combat"] = {
-                "creature": creature,
-                "winSection": str(combat["winSection"]),
-            }
-            if combat.get("loseSection"):
-                section["combat"]["loseSection"] = str(combat["loseSection"])
+        if c.get("specialRules"):
+            enemy["special_rules"] = c.get("specialRules")
+        if c.get("allowEscape") is not None:
+            enemy["allow_escape"] = c.get("allowEscape")
+        section_combat.append(enemy)
+    if section_combat:
+        section["combat"] = section_combat
 
     provenance = {
         "portion_id": portion.get("portion_id"),
@@ -174,34 +275,9 @@ def build_section(portion: Dict[str, Any], emit_text: bool, emit_provenance_text
 
 def collect_targets(section: Dict[str, Any]) -> List[str]:
     targets: List[str] = []
-    for nav in section.get("navigationLinks") or []:
+    for nav in section.get("navigation") or []:
         if nav.get("targetSection"):
             targets.append(str(nav["targetSection"]))
-    for cond in section.get("conditionalNavigation") or []:
-        for key in ("ifTrue", "ifFalse"):
-            link = cond.get(key) or {}
-            tgt = link.get("targetSection")
-            if tgt:
-                targets.append(str(tgt))
-    combat = section.get("combat") or {}
-    for key in ("winSection", "loseSection"):
-        tgt = combat.get(key)
-        if tgt:
-            targets.append(str(tgt))
-    for ty in section.get("testYourLuck") or []:
-        for key in ("luckySection", "unluckySection"):
-            tgt = ty.get(key)
-            if tgt:
-                targets.append(str(tgt))
-    for item in section.get("items") or []:
-        for key in ("checkSuccessSection", "checkFailureSection"):
-            tgt = item.get(key)
-            if tgt:
-                targets.append(str(tgt))
-    for death in section.get("deathConditions") or []:
-        tgt = death.get("deathSection")
-        if tgt:
-            targets.append(str(tgt))
     return targets
 
 

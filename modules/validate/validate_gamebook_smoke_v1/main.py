@@ -76,10 +76,10 @@ def main() -> None:
                     errors.append(f"empty text/html for gameplay section {sid}")
 
         # Validate navigation targets
-        for link in section.get("navigationLinks") or []:
+        for link in section.get("navigation") or []:
             tgt = link.get("targetSection")
             if tgt is None:
-                errors.append(f"section {sid} has navigation link without targetSection")
+                errors.append(f"section {sid} has navigation entry without targetSection")
                 continue
             tgt_str = str(tgt)
             if not tgt_str.isdigit():

@@ -105,21 +105,8 @@ def validate_gamebook(
         if section.get("end_game"):
             continue
 
-        nav_links = section.get("navigationLinks", [])
-        combat = section.get("combat") or [] # In ff_engine_v2 combat is a list
-        if not isinstance(combat, list): combat = [combat]
-        
-        test_luck = section.get("testYourLuck") or []
-        if not isinstance(test_luck, list): test_luck = [test_luck]
-        
-        items = section.get("items", [])
-
-        has_navigation = (
-            bool(nav_links) or
-            any(c.get("win_section") or c.get("loss_section") for c in combat if isinstance(c, dict)) or
-            any(l.get("luckySection") or l.get("unluckySection") for l in test_luck if isinstance(l, dict)) or
-            any(item.get("checkSuccessSection") or item.get("checkFailureSection") for item in items if isinstance(item, dict))
-        )
+        nav_links = section.get("navigation", [])
+        has_navigation = bool(nav_links)
 
         if not has_navigation:
             sections_with_no_choices.append(sid)

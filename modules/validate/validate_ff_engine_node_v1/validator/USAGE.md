@@ -58,7 +58,7 @@ Output:
   "valid": false,
   "errors": [
     {
-      "path": "/sections/1/navigationLinks/0/targetSection",
+      "path": "/sections/1/navigation/0/targetSection",
       "message": "Navigation target section \"999\" does not exist",
       "expected": "existing section ID",
       "received": "999"
@@ -219,7 +219,7 @@ function categorizeErrors(errors: ValidationError[]) {
   };
   
   errors.forEach(error => {
-    if (error.path.includes('navigationLinks') || error.path.includes('conditionalNavigation')) {
+    if (error.path.includes('navigation')) {
       categories.navigation.push(error);
     } else if (error.path.includes('combat')) {
       categories.combat.push(error);
@@ -278,7 +278,7 @@ interface ValidationResult {
 }
 
 interface ValidationError {
-  path: string;        // JSON path (e.g., "/sections/1/navigationLinks/0/targetSection")
+  path: string;        // JSON path (e.g., "/sections/1/navigation/0/targetSection")
   message: string;     // Human-readable error message
   expected?: string;   // Expected value
   received?: string;   // Received value
@@ -421,4 +421,3 @@ console.log(`Sections: ${result.summary?.totalSections}`);
 - **Performance**: Validation is fast enough for development workflows. For very large gamebooks (1000+ sections), consider caching the compiled schema.
 
 - **Error Messages**: All error messages include JSON paths, making it easy to locate issues in your JSON files.
-

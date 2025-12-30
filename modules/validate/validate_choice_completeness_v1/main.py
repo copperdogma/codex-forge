@@ -55,27 +55,27 @@ def validate_section_choices(section_id: str, section: Dict) -> Tuple[bool, Dict
     """
     text = section.get('text', '')
     choices = section.get('choices', [])
-    navigation_links = section.get('navigationLinks', [])
+    navigation = section.get('navigation', [])
     
     # Extract referenced sections from text
     text_refs = extract_turn_to_references(text)
     
-    # Extract choice targets (support both choices[] and navigationLinks[])
+    # Extract choice targets (support both choices[] and navigation[])
     choice_targets = set()
     choice_source = "choices"
     for choice in choices:
         target = choice.get('target')
         if target and target.isdigit():
             choice_targets.add(int(target))
-    if not choice_targets and navigation_links:
-        choice_source = "navigationLinks"
-        for link in navigation_links:
+    if not choice_targets and navigation:
+        choice_source = "navigation"
+        for link in navigation:
             target = link.get('targetSection') or link.get('target')
             if target and str(target).isdigit():
                 choice_targets.add(int(target))
-    elif navigation_links:
-        choice_source = "choices+navigationLinks"
-        for link in navigation_links:
+    elif navigation:
+        choice_source = "choices+navigation"
+        for link in navigation:
             target = link.get('targetSection') or link.get('target')
             if target and str(target).isdigit():
                 choice_targets.add(int(target))
