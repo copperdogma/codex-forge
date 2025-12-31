@@ -23,6 +23,12 @@ node cli-validator.js <gamebook.json>
 node cli-validator.js <gamebook.json> --json  # JSON output
 ```
 
+**Portable bundle (single file, no deps):**
+```bash
+node gamebook-validator.bundle.js <gamebook.json>
+node gamebook-validator.bundle.js <gamebook.json> --json
+```
+
 **Library:**
 ```javascript
 const { validateGamebook } = require('./validation');
@@ -37,21 +43,38 @@ This folder contains everything needed for validation:
 - `validation.js` - Core validation logic
 - `types.js` - Type definitions
 - `gamebook-schema.json` - JSON Schema
+- `gamebook-validator.bundle.js` - Single-file portable validator (schema embedded)
 - `*.d.ts` - TypeScript definitions (optional)
 
-**Total size: ~32KB**
+**Total size:** core validator is small; the portable bundle includes embedded schema and compiled validation logic.
+
+## Portable Bundle
+
+`gamebook-validator.bundle.js` is a single-file validator with the schema embedded. It has no npm/runtime dependencies and can be copied next to `gamebook.json` in the game engine.
+
+To regenerate the bundle:
+```bash
+node build_bundle.js
+```
 
 ## What It Validates
 
 ✅ JSON Schema compliance (types, required fields, enums)  
-✅ Navigation targets exist (all links point to real sections)  
-✅ Combat targets exist (win/lose/escape sections)  
-✅ Test Your Luck targets exist  
-✅ Item check targets exist  
+✅ Sequence targets exist (all targets point to real sections)  
 ✅ Section IDs match keys  
+✅ Missing/duplicate section detection  
+✅ Empty text + no-choice warnings  
 ✅ Start section exists  
 ✅ Reachability (warns about unreachable sections)  
 ✅ Allows extra data (won't error on additional properties)
+
+Missing section checks use `gamebook.provenance.expected_range` when available (defaults to `1-400`).
+
+## Expected Section Payload
+
+Each section must include **`presentation_html`** (cleaned HTML for display). The validator does **not** require the older `text` field and treats any additional fields as optional extras.
+Gameplay sections must include an ordered **`sequence`** array. Outcomes may omit `targetSection` when terminal (e.g., death), using a `terminal` object.
+Gamebooks should include `metadata.validatorVersion` so the validator can warn on version mismatch.
 
 ## Output Format
 
@@ -147,4 +170,3 @@ node cli-validator.js gamebook.json && echo "Valid!" || echo "Invalid!"
 ## For More Details
 
 See `USAGE.md` in this folder for comprehensive usage examples and integration patterns.
-

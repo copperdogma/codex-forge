@@ -8,7 +8,9 @@
  * Features:
  * - JSON Schema validation using docs/gamebook-schema.json
  * - Collects ALL errors (not just first)
- * - Validates all navigation paths
+ * - Validates all sequence targets
+ * - Missing/duplicate section checks
+ * - Empty text + no-choice warnings
  * - Reachability analysis (warnings for unreachable sections)
  * - Detailed, actionable error messages with JSON paths
  */
@@ -109,6 +111,125 @@ function ajvErrorToValidationError(error) {
         received: String(error.data),
     };
 }
+function stripHtmlToText(html) {
+    if (!html) {
+        return '';
+    }
+    return html
+        .replace(/<script[\s\S]*?<\/script>/gi, ' ')
+        .replace(/<style[\s\S]*?<\/style>/gi, ' ')
+        .replace(/<[^>]+>/g, ' ')
+        .replace(/\s+/g, ' ')
+        .trim();
+}
+function parseExpectedRange(gamebook) {
+    const fromProvenance = gamebook?.provenance?.expected_range || gamebook?.provenance?.expectedRange;
+    const raw = typeof fromProvenance === 'string' && fromProvenance ? fromProvenance : '1-400';
+    const match = raw.match(/^\s*(\d+)\s*-\s*(\d+)\s*$/);
+    if (!match) {
+        return { min: 1, max: 400 };
+    }
+    const min = Number(match[1]);
+    const max = Number(match[2]);
+    if (!Number.isFinite(min) || !Number.isFinite(max) || min <= 0 || max <= 0 || min > max) {
+        return { min: 1, max: 400 };
+    }
+    return { min, max };
+}
+function validateMissingSections(gamebook) {
+    const errors = [];
+    const sectionIds = Object.keys(gamebook.sections || {});
+    const numericIds = new Set(sectionIds.filter(id => /^\d+$/.test(id)));
+    const { min, max } = parseExpectedRange(gamebook);
+    const missing = [];
+    for (let i = min; i <= max; i += 1) {
+        const sid = String(i);
+        if (!numericIds.has(sid)) {
+            missing.push(sid);
+        }
+    }
+    if (missing.length > 0) {
+        const sample = missing.slice(0, 10);
+        let msg = `Missing ${missing.length} sections in range ${min}-${max}: ${sample.join(', ')}`;
+        if (missing.length > 10) {
+            msg += ` (and ${missing.length - 10} more)`;
+        }
+        errors.push({
+            path: '/sections',
+            message: msg,
+            expected: `all sections in range ${min}-${max}`,
+            received: `missing ${missing.length} sections`,
+        });
+    }
+    return errors;
+}
+function validateDuplicateSections(gamebook) {
+    const errors = [];
+    const seen = new Map();
+    for (const [key, section] of Object.entries(gamebook.sections || {})) {
+        const id = section?.id || key;
+        if (!seen.has(id)) {
+            seen.set(id, [key]);
+        }
+        else {
+            seen.get(id).push(key);
+        }
+    }
+    const duplicates = [];
+    for (const [id, keys] of seen.entries()) {
+        if (keys.length > 1) {
+            duplicates.push({ id, keys });
+        }
+    }
+    if (duplicates.length > 0) {
+        errors.push({
+            path: '/sections',
+            message: `Duplicate section IDs detected: ${duplicates
+                .map(d => `${d.id} (keys: ${d.keys.join(', ')})`)
+                .join('; ')}`,
+            expected: 'unique section IDs',
+            received: 'duplicates',
+        });
+    }
+    return errors;
+}
+function validateEmptyText(gamebook) {
+    const warnings = [];
+    for (const [key, section] of Object.entries(gamebook.sections || {})) {
+        const rawHtml = section?.presentation_html || section?.html || '';
+        const text = stripHtmlToText(rawHtml);
+        if (!text) {
+            warnings.push({
+                path: `/sections/${key}/presentation_html`,
+                message: `Section "${key}" has no text`,
+            });
+        }
+    }
+    return warnings;
+}
+function validateNoChoices(gamebook) {
+    const warnings = [];
+    for (const [key, section] of Object.entries(gamebook.sections || {})) {
+        if (!section?.isGameplaySection) {
+            continue;
+        }
+        if (section?.end_game) {
+            continue;
+        }
+        if (section?.provenance?.stub) {
+            continue;
+        }
+        const sequence = section?.sequence || [];
+        const hasChoice = sequence.some(event => event && event.kind === 'choice');
+        if (!hasChoice) {
+            warnings.push({
+                path: `/sections/${key}/sequence`,
+                message: `Gameplay section "${key}" has no choices (potential dead end)`,
+            });
+        }
+    }
+    return warnings;
+}
 /**
  * Validate gamebook using JSON Schema
  */
@@ -147,27 +268,118 @@ function validateSectionIds(gamebook) {
     return errors;
 }
 /**
- * Validate all navigation target sections exist
+ * Validate all sequence target sections exist
  */
-function validateNavigationTargets(gamebook) {
+function validateSequenceTargets(gamebook) {
     const errors = [];
     const sectionIds = new Set(Object.keys(gamebook.sections));
+    const validateEvents = (events, pathPrefix, sectionKey) => {
+        if (!Array.isArray(events))
+            return;
+        events.forEach((event, index) => {
+            const pathBase = `${pathPrefix}/${index}`;
+            const kind = event.kind;
+            const checkOutcome = (outcome, pathSuffix) => {
+                if (!outcome)
+                    return;
+                if (outcome.targetSection) {
+                    if (!sectionIds.has(outcome.targetSection)) {
+                        errors.push({
+                            path: `${pathBase}/${pathSuffix}/targetSection`,
+                            message: `Sequence target section "${outcome.targetSection}" does not exist`,
+                            expected: 'existing section ID',
+                            received: outcome.targetSection,
+                        });
+                    }
+                }
+                else if (!outcome.terminal) {
+                    errors.push({
+                        path: `${pathBase}/${pathSuffix}`,
+                        message: "Outcome missing targetSection or terminal outcome",
+                        expected: "targetSection or terminal",
+                        received: "none",
+                    });
+                }
+            };
+            if (kind === 'choice') {
+                if (!event.targetSection) {
+                    errors.push({
+                        path: `${pathBase}/targetSection`,
+                        message: "Choice event missing targetSection",
+                        expected: "targetSection",
+                        received: "none",
+                    });
+                }
+                else if (!sectionIds.has(event.targetSection)) {
+                    errors.push({
+                        path: `${pathBase}/targetSection`,
+                        message: `Sequence target section "${event.targetSection}" does not exist`,
+                        expected: 'existing section ID',
+                        received: event.targetSection,
+                    });
+                }
+                return;
+            }
+            if (kind === 'stat_check') {
+                checkOutcome(event.pass, 'pass');
+                checkOutcome(event.fail, 'fail');
+                return;
+            }
+            if (kind === 'stat_change') {
+                checkOutcome(event.else, 'else');
+                return;
+            }
+            if (kind === 'test_luck') {
+                checkOutcome(event.lucky, 'lucky');
+                checkOutcome(event.unlucky, 'unlucky');
+                return;
+            }
+            if (kind === 'item_check' || kind === 'state_check') {
+                checkOutcome(event.has, 'has');
+                checkOutcome(event.missing, 'missing');
+                if (kind === 'item_check' && Array.isArray(event.itemsAll)) {
+                    if (event.itemsAll.length < 2) {
+                        errors.push({
+                            path: `${pathBase}/itemsAll`,
+                            message: 'itemsAll must include at least two items',
+                            expected: 'array length >= 2',
+                            received: String(event.itemsAll.length)
+                        });
+                    }
+                    event.itemsAll.forEach((item, idx) => {
+                        if (typeof item !== 'string' || item.trim().length === 0) {
+                            errors.push({
+                                path: `${pathBase}/itemsAll/${idx}`,
+                                message: 'itemsAll entries must be non-empty strings',
+                                expected: 'non-empty string',
+                                received: typeof item
+                            });
+                        }
+                    });
+                }
+                return;
+            }
+            if (kind === 'conditional') {
+                validateEvents(event.then || [], `${pathBase}/then`, sectionKey);
+                validateEvents(event.else || [], `${pathBase}/else`, sectionKey);
+                return;
+            }
+            if (kind === 'combat') {
+                const outcomes = event.outcomes || {};
+                checkOutcome(outcomes.win, 'outcomes/win');
+                checkOutcome(outcomes.lose, 'outcomes/lose');
+                checkOutcome(outcomes.escape, 'outcomes/escape');
+                return;
+            }
+            if (kind === 'death') {
+                checkOutcome(event.outcome, 'outcome');
+            }
+        });
+    };
     for (const [sectionKey, section] of Object.entries(gamebook.sections)) {
         if (!section.isGameplaySection)
             continue;
-        // Validate navigation edges
-        if (section.navigation) {
-            section.navigation.forEach((link, index) => {
-                if (!sectionIds.has(link.targetSection)) {
-                    errors.push({
-                        path: `/sections/${sectionKey}/navigation/${index}/targetSection`,
-                        message: `Navigation target section "${link.targetSection}" does not exist`,
-                        expected: 'existing section ID',
-                        received: link.targetSection,
-                    });
-                }
-            });
-        }
+        validateEvents(section.sequence || [], `/sections/${sectionKey}/sequence`, sectionKey);
     }
     return errors;
 }
@@ -187,14 +399,53 @@ function findReachableSections(gamebook) {
         if (!section || !section.isGameplaySection)
             continue;
         reachable.add(currentId);
-        // Add navigation edges
-        if (section.navigation) {
-            section.navigation.forEach(link => {
-                if (!visited.has(link.targetSection)) {
-                    queue.push(link.targetSection);
+        const pushTargetsFromEvents = (events) => {
+            if (!Array.isArray(events))
+                return;
+            events.forEach(event => {
+                const kind = event.kind;
+                const pushTarget = (outcome) => {
+                    if (outcome && outcome.targetSection && !visited.has(outcome.targetSection)) {
+                        queue.push(outcome.targetSection);
+                    }
+                };
+                if (kind === 'choice' && event.targetSection) {
+                    pushTarget({ targetSection: event.targetSection });
+                }
+                else if (kind === 'stat_check') {
+                    pushTarget(event.pass);
+                    pushTarget(event.fail);
+                }
+                else if (kind === 'stat_change') {
+                    pushTarget(event.else);
+                }
+                else if (kind === 'test_luck') {
+                    pushTarget(event.lucky);
+                    pushTarget(event.unlucky);
+                }
+                else if (kind === 'item_check' || kind === 'state_check') {
+                    pushTarget(event.has);
+                    pushTarget(event.missing);
+                }
+                else if (kind === 'conditional') {
+                    pushTargetsFromEvents(event.then || []);
+                    pushTargetsFromEvents(event.else || []);
+                }
+                else if (kind === 'combat') {
+                    const outcomes = event.outcomes || {};
+                    pushTarget(outcomes.win);
+                    pushTarget(outcomes.lose);
+                    pushTarget(outcomes.escape);
+                }
+                else if (kind === 'death') {
+                    pushTarget(event.outcome);
+                }
+                else if (event.targetSection) {
+                    pushTarget({ targetSection: event.targetSection });
                 }
             });
-        }
+        };
+        pushTargetsFromEvents(section.sequence || []);
     }
     return reachable;
 }
@@ -241,11 +492,30 @@ function validateCreatureStats(_gamebook) {
     // For now, we rely on schema validation
     return [];
 }
+
+function getValidatorVersion() {
+    const pkgPath = path.join(__dirname, 'package.json');
+    if (!fs.existsSync(pkgPath)) {
+        return null;
+    }
+    try {
+        const pkg = JSON.parse(fs.readFileSync(pkgPath, 'utf-8'));
+        const name = pkg.name;
+        const version = pkg.version;
+        if (name && version) {
+            return `${name}@${version}`;
+        }
+        return version || null;
+    }
+    catch (_a) {
+        return null;
+    }
+}
 /**
  * Comprehensive gamebook validation
  *
  * Validates a gamebook JSON against the JSON Schema and performs custom validation
- * checks for navigation paths, reachability, etc.
+ * checks for sequence targets, reachability, etc.
  *
  * @param gamebook - The gamebook JSON to validate
  * @returns Validation result with errors and warnings
@@ -253,6 +523,7 @@ function validateCreatureStats(_gamebook) {
 function validateGamebook(gamebook) {
     const errors = [];
     const warnings = [];
+    const validatorVersion = getValidatorVersion();
     // 1. JSON Schema validation
     errors.push(...validateWithSchema(gamebook));
     // Only proceed with other validations if basic structure is valid
@@ -270,18 +541,39 @@ function validateGamebook(gamebook) {
         }
         // 3. Section ID validation
         errors.push(...validateSectionIds(gamebook));
-        // 4. Navigation target validation
-        errors.push(...validateNavigationTargets(gamebook));
-        // 5. Stat modifications validation (schema covers this, but placeholder for custom checks)
+        // 4. Missing/duplicate section validation
+        errors.push(...validateMissingSections(gamebook));
+        errors.push(...validateDuplicateSections(gamebook));
+        // 5. Sequence target validation
+        errors.push(...validateSequenceTargets(gamebook));
+        // 6. Stat modifications validation (schema covers this, but placeholder for custom checks)
         errors.push(...validateStatModifications(gamebook));
-        // 6. Item actions validation (schema covers this)
+        // 7. Item actions validation (schema covers this)
         errors.push(...validateItemActions(gamebook));
-        // 7. Creature stats validation (schema covers this)
+        // 8. Creature stats validation (schema covers this)
         errors.push(...validateCreatureStats(gamebook));
-        // 8. Reachability analysis (warnings, not errors)
+        // 9. Empty text / no-choice warnings
+        warnings.push(...validateEmptyText(gamebook));
+        warnings.push(...validateNoChoices(gamebook));
+        // 10. Reachability analysis (warnings, not errors)
         // Only run if startSection exists and is valid
         if (gamebook.metadata.startSection && gamebook.sections[gamebook.metadata.startSection]) {
             warnings.push(...findUnreachableSections(gamebook));
+        }
+        if (validatorVersion) {
+            const expectedVersion = gamebook.metadata.validatorVersion;
+            if (!expectedVersion) {
+                warnings.push({
+                    path: '/metadata/validatorVersion',
+                    message: 'metadata.validatorVersion missing; version mismatch checks disabled',
+                });
+            }
+            else if (expectedVersion !== validatorVersion) {
+                warnings.push({
+                    path: '/metadata/validatorVersion',
+                    message: `Validator version mismatch (gamebook expects ${expectedVersion}, validator is ${validatorVersion})`,
+                });
+            }
         }
     }
     // Calculate summary statistics (only if basic structure exists)
@@ -310,6 +602,10 @@ function validateGamebook(gamebook) {
         errors,
         warnings,
         summary,
+        validatorVersion: validatorVersion || undefined,
+        versionMismatch: Boolean(validatorVersion &&
+            gamebook?.metadata?.validatorVersion &&
+            gamebook.metadata.validatorVersion !== validatorVersion),
     };
 }
 /**

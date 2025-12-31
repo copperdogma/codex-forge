@@ -28,11 +28,22 @@ node cli-validator.js gamebook.json
 node cli-validator.js gamebook.json --json  # JSON output
 ```
 
+**Portable bundle (single file, no deps):**
+```bash
+node gamebook-validator.bundle.js gamebook.json
+node gamebook-validator.bundle.js gamebook.json --json
+```
+
 **Library:**
 ```javascript
 const { validateGamebook } = require('./validation');
 const result = validateGamebook(gamebookData);
 ```
+
+**Input expectation:** Sections should include `presentation_html` as the narrative field. The validator no longer requires the older `text` field.
+Gameplay sections must include ordered `sequence` events. Outcomes can be terminal (no `targetSection`) when the outcome ends the game; represent these with a `terminal` object.
+Include `metadata.validatorVersion` in gamebook output to detect validator mismatches.
+Missing section checks use `gamebook.provenance.expected_range` when available (defaults to `1-400`).
 
 ---
 
@@ -58,8 +69,8 @@ Output:
   "valid": false,
   "errors": [
     {
-      "path": "/sections/1/navigation/0/targetSection",
-      "message": "Navigation target section \"999\" does not exist",
+      "path": "/sections/1/sequence/0/targetSection",
+      "message": "Sequence target section \"999\" does not exist",
       "expected": "existing section ID",
       "received": "999"
     }
@@ -87,6 +98,16 @@ Output:
 #!/bin/bash
 # Validate gamebook in CI pipeline
 if ! node cli-validator.js gamebook.json; then
+  echo "Validation failed!"
+  exit 1
+fi
+echo "Validation passed!"
+```
+
+```bash
+#!/bin/bash
+# Portable bundle (no npm install required)
+if ! node gamebook-validator.bundle.js gamebook.json; then
   echo "Validation failed!"
   exit 1
 fi
@@ -213,14 +234,14 @@ function validateOnSave(content: string) {
 function categorizeErrors(errors: ValidationError[]) {
   const categories = {
     schema: [] as ValidationError[],
-    navigation: [] as ValidationError[],
+    sequence: [] as ValidationError[],
     combat: [] as ValidationError[],
     other: [] as ValidationError[],
   };
   
   errors.forEach(error => {
-    if (error.path.includes('navigation')) {
-      categories.navigation.push(error);
+    if (error.path.includes('sequence')) {
+      categories.sequence.push(error);
     } else if (error.path.includes('combat')) {
       categories.combat.push(error);
     } else if (error.path.startsWith('/')) {
@@ -237,7 +258,7 @@ const result = validateGamebook(gamebook);
 if (!result.valid) {
   const categorized = categorizeErrors(result.errors);
   console.error('Schema errors:', categorized.schema.length);
-  console.error('Navigation errors:', categorized.navigation.length);
+  console.error('Sequence errors:', categorized.sequence.length);
   console.error('Combat errors:', categorized.combat.length);
 }
 ```
@@ -278,7 +299,7 @@ interface ValidationResult {
 }
 
 interface ValidationError {
-  path: string;        // JSON path (e.g., "/sections/1/navigation/0/targetSection")
+  path: string;        // JSON path (e.g., "/sections/1/sequence/0/targetSection")
   message: string;     // Human-readable error message
   expected?: string;   // Expected value
   received?: string;   // Received value
@@ -332,8 +353,8 @@ The validator checks:
    - Schema structure
 
 2. **Navigation Validation**
-   - All navigation link targets exist
-   - All conditional navigation targets exist
+   - All sequence targets exist
+   - All conditional sequence targets exist
    - All combat encounter targets exist (win/lose/escape)
    - All Test Your Luck targets exist
    - All item check targets exist

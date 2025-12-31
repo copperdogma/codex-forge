@@ -44,6 +44,11 @@ Before writing any significant code or starting implementation:
 
 **When adding new behaviors**, prefer shipping them as a separate module first, run a baseline, and only merge into an existing module after comparing baselines to prove no regressions.
 
+### AI-Assist Guideline (Fundamental)
+- Prefer code-first extraction for speed/cost, but **use targeted AI calls** when rules would balloon or edge cases are too varied.
+- Keep AI calls bounded and **focused on flagged sections**; avoid overfitting regexes to brittle cases.
+- Any AI-assisted outputs must still be validated (tests + pipeline run) and logged in the work log.
+
 ## Module Development & Testing Workflow
 
 This is a **data pipeline** project. Success means correct data in `output/runs/`, not just code that runs without errors.
@@ -211,6 +216,7 @@ Before portionization, automatically flag pages for high-fidelity re-OCR if eith
 - Use `driver.py` with recipes in `configs/recipes/`.
 - **Primary recipe for Fighting Fantasy**: `recipe-ff-ai-ocr-gpt51.yaml` (GPT-5.1 AI-first OCR, HTML output)
 - Legacy OCR ensemble recipe (`configs/recipes/legacy/recipe-ff-canonical.yaml`) is deprecated; do not use.
+- **Canonical validator**: `validate_ff_engine_node_v1` (Node/Ajv) is the authoritative schema validator and should ship alongside `gamebook.json` to the game engine. Python `validate_ff_engine_v2` remains for forensics only.
 - Other recipes: `configs/recipes/legacy/recipe-ocr.yaml`, `configs/recipes/recipe-text.yaml` (for reference/testing only)
 - Legacy linear scripts were removed; use modules only.
 

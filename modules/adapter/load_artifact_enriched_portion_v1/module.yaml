@@ -1,0 +1,15 @@
+module_id: load_artifact_enriched_portion_v1
+stage: extract
+entrypoint: modules/adapter/load_artifact_enriched_portion_v1/main.py
+output_schema: enriched_portion_v1
+params:
+  - name: path
+    desc: "Path to existing enriched portions artifact"
+    required: true
+  - name: out
+    desc: "Output path (where driver expects artifact to be)"
+    required: true
+  - name: schema_version
+    desc: "Schema version to stamp artifact with"
+    required: false
+notes: "Load an existing enriched_portion_v1 artifact without re-running upstream stages."

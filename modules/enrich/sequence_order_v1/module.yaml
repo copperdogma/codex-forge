@@ -1,0 +1,10 @@
+module_id: sequence_order_v1
+stage: enrich
+entrypoint: modules/enrich/sequence_order_v1/main.py
+input_schema: enriched_portion_v1
+output_schema: enriched_portion_v1
+default_params: {}
+param_schema:
+  properties: {}
+  required: []
+notes: "Orders gameplay sequence events for enriched portions using deterministic HTML/text heuristics."

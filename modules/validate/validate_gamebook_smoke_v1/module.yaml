@@ -3,4 +3,4 @@ stage: validate
 entrypoint: modules/validate/validate_gamebook_smoke_v1/main.py
 input_schema: null
 output_schema: null
-notes: "Lightweight validation for gamebook JSON; checks section IDs, navigation targets, and empty gameplay sections."
+notes: "Lightweight validation for gamebook JSON; checks section IDs, sequence targets, and empty gameplay sections."

@@ -7,7 +7,9 @@
  * Features:
  * - JSON Schema validation using docs/gamebook-schema.json
  * - Collects ALL errors (not just first)
- * - Validates all navigation paths
+ * - Validates all sequence targets
+ * - Missing/duplicate section checks
+ * - Empty text + no-choice warnings
  * - Reachability analysis (warnings for unreachable sections)
  * - Detailed, actionable error messages with JSON paths
  */
@@ -16,7 +18,7 @@ import { GamebookJSON } from './types';
  * Validation error with path and message
  */
 export interface ValidationError {
-    /** JSON path to the error (e.g., "/sections/1/navigation/0/targetSection") */
+    /** JSON path to the error (e.g., "/sections/1/sequence/0/targetSection") */
     path: string;
     /** Human-readable error message */
     message: string;
@@ -63,12 +65,16 @@ export interface ValidationResult {
     warnings: ValidationWarning[];
     /** Summary statistics (optional, included when available) */
     summary?: ValidationSummary;
+    /** Validator version used for this validation run */
+    validatorVersion?: string;
+    /** Whether the validator version mismatched gamebook metadata */
+    versionMismatch?: boolean;
 }
 /**
  * Comprehensive gamebook validation
  *
  * Validates a gamebook JSON against the JSON Schema and performs custom validation
- * checks for navigation paths, reachability, etc.
+ * checks for sequence targets, reachability, etc.
  *
  * @param gamebook - The gamebook JSON to validate
  * @returns Validation result with errors and warnings

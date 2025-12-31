@@ -32,5 +32,7 @@ param_schema:
       type: boolean
     emit_provenance_text:
       type: boolean
+    validator_version:
+      type: string
   required: []
 notes: "Build FF engine gamebook with issues provenance propagation; copied from build_ff_engine_v1 and extended." 

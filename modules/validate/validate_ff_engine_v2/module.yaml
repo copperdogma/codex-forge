@@ -19,4 +19,4 @@ param_schema:
     forensics:
       type: boolean
   required: []
-notes: "Validates Fighting Fantasy Engine gamebook.json output. Checks for missing sections, duplicates, empty sections, and structural issues. Generates detailed validation report."
+notes: "Forensics-only validator for gamebook.json (missing sections, duplicates, empty sections, structural issues). Does not gate pipeline success."

@@ -4,12 +4,19 @@
   "title": "Fighting Fantasy Gamebook JSON Schema",
   "description": "Schema specification for Fighting Fantasy gamebook JSON format. This is the required format that the PDF-to-JSON parser must produce.",
   "type": "object",
-  "required": ["metadata", "sections"],
+  "required": [
+    "metadata",
+    "sections"
+  ],
   "additionalProperties": true,
   "properties": {
     "metadata": {
       "type": "object",
-      "required": ["title", "startSection", "formatVersion"],
+      "required": [
+        "title",
+        "startSection",
+        "formatVersion"
+      ],
       "additionalProperties": true,
       "properties": {
         "title": {
@@ -27,6 +34,10 @@
         "formatVersion": {
           "type": "string",
           "description": "Format version (e.g., '1.0.0')"
+        },
+        "validatorVersion": {
+          "type": "string",
+          "description": "Validator version expected to validate this gamebook"
         }
       }
     },
@@ -47,15 +58,20 @@
     },
     "GamebookSection": {
       "type": "object",
-      "required": ["id", "text", "isGameplaySection", "type"],
+      "required": [
+        "id",
+        "presentation_html",
+        "isGameplaySection",
+        "type"
+      ],
       "additionalProperties": true,
       "properties": {
         "id": {
           "$ref": "#/definitions/SectionId"
         },
-        "text": {
+        "presentation_html": {
           "type": "string",
-          "description": "Raw text content from the book (preserve original text exactly)"
+          "description": "Cleaned HTML content for display (final narrative payload)"
         },
         "pageStart": {
           "type": "number",
@@ -67,7 +83,7 @@
         },
         "isGameplaySection": {
           "type": "boolean",
-          "description": "true = gameplay section (has navigation, combat, etc.), false = non-gameplay content (cover, rules, etc.)"
+          "description": "true = gameplay section (has sequence), false = non-gameplay content (cover, rules, etc.)"
         },
         "type": {
           "type": "string",
@@ -81,43 +97,29 @@
             "intro",
             "rules",
             "adventure_sheet",
-            "template"
+            "template",
+            "background"
           ],
           "description": "Section type categorizing the content"
         },
-        "navigation": {
-          "type": "array",
-          "description": "Canonical navigation edges for this section",
-          "items": {
-            "$ref": "#/definitions/NavigationEdge"
-          }
+        "status": {
+          "type": "string",
+          "enum": [
+            "death",
+            "victory",
+            "defeat"
+          ],
+          "description": "Optional ending status for the section"
         },
-        "combat": {
-          "type": "array",
-          "description": "Combat encounter data (only for gameplay sections)",
-          "items": {
-            "$ref": "#/definitions/CombatEncounter"
-          }
+        "end_game": {
+          "type": "boolean",
+          "description": "Optional end-game marker (suppresses no-choice warnings)"
         },
-        "items": {
+        "sequence": {
           "type": "array",
-          "description": "Item references (only for gameplay sections)",
+          "description": "Ordered gameplay sequence events for this section",
           "items": {
-            "$ref": "#/definitions/ItemReference"
-          }
-        },
-        "statModifications": {
-          "type": "array",
-          "description": "Changes to player stats (only for gameplay sections)",
-          "items": {
-            "$ref": "#/definitions/StatModification"
-          }
-        },
-        "deathConditions": {
-          "type": "array",
-          "description": "Death conditions (only for gameplay sections)",
-          "items": {
-            "$ref": "#/definitions/DeathCondition"
+            "$ref": "#/definitions/SequenceEvent"
           }
         },
         "metadata": {
@@ -130,76 +132,453 @@
             }
           }
         }
-      }
-    },
-    "NavigationEdge": {
-      "type": "object",
-      "required": ["targetSection", "kind"],
-      "properties": {
-        "targetSection": {
-          "$ref": "#/definitions/SectionId",
-          "description": "Target section ID"
-        },
-        "kind": {
-          "type": "string",
-          "enum": ["choice", "test_luck", "item_check", "combat", "stat_check", "death", "custom"],
-          "description": "Navigation kind (choice vs mechanic)"
-        },
-        "outcome": {
-          "type": "string",
-          "description": "Outcome label for conditional navigation (e.g., lucky/unlucky, win/lose)"
-        },
-        "choiceText": {
-          "type": "string",
-          "description": "Optional descriptive text for the choice"
-        },
-        "params": {
-          "type": "object",
-          "description": "Optional parameters for this navigation edge (e.g., item name, enemy name)",
-          "additionalProperties": true
-        }
       },
       "allOf": [
         {
-          "if": { "properties": { "kind": { "const": "test_luck" } } },
+          "if": {
+            "properties": {
+              "isGameplaySection": {
+                "const": true
+              }
+            }
+          },
           "then": {
-            "required": ["outcome"],
-            "properties": { "outcome": { "enum": ["lucky", "unlucky"] } }
+            "required": [
+              "sequence"
+            ]
           }
         },
         {
-          "if": { "properties": { "kind": { "const": "item_check" } } },
-          "then": {
-            "required": ["outcome"],
-            "properties": { "outcome": { "enum": ["has_item", "no_item"] } }
+          "not": {
+            "required": [
+              "navigation"
+            ]
           }
         },
         {
-          "if": { "properties": { "kind": { "const": "combat" } } },
-          "then": {
-            "required": ["outcome"],
-            "properties": { "outcome": { "enum": ["win", "lose", "escape"] } }
+          "not": {
+            "required": [
+              "combat"
+            ]
           }
         },
         {
-          "if": { "properties": { "kind": { "const": "stat_check" } } },
-          "then": {
-            "required": ["outcome"],
-            "properties": { "outcome": { "enum": ["pass", "fail"] } }
+          "not": {
+            "required": [
+              "items"
+            ]
           }
         },
         {
-          "if": { "properties": { "kind": { "const": "death" } } },
-          "then": {
-            "required": ["outcome"],
-            "properties": { "outcome": { "enum": ["death"] } }
+          "not": {
+            "required": [
+              "statModifications"
+            ]
+          }
+        },
+        {
+          "not": {
+            "required": [
+              "statChanges"
+            ]
+          }
+        },
+        {
+          "not": {
+            "required": [
+              "diceChecks"
+            ]
+          }
+        },
+        {
+          "not": {
+            "required": [
+              "deathConditions"
+            ]
           }
         }
       ]
     },
+    "SequenceEvent": {
+      "oneOf": [
+        {
+          "$ref": "#/definitions/ChoiceEvent"
+        },
+        {
+          "$ref": "#/definitions/StatChangeEvent"
+        },
+        {
+          "$ref": "#/definitions/StatCheckEvent"
+        },
+        {
+          "$ref": "#/definitions/TestLuckEvent"
+        },
+        {
+          "$ref": "#/definitions/ItemEvent"
+        },
+        {
+          "$ref": "#/definitions/ItemCheckEvent"
+        },
+        {
+          "$ref": "#/definitions/StateCheckEvent"
+        },
+        {
+          "$ref": "#/definitions/ConditionalEvent"
+        },
+        {
+          "$ref": "#/definitions/CombatEvent"
+        },
+        {
+          "$ref": "#/definitions/DeathEvent"
+        },
+        {
+          "$ref": "#/definitions/CustomEvent"
+        }
+      ]
+    },
+    "Condition": {
+      "oneOf": [
+        {
+          "$ref": "#/definitions/ItemCondition"
+        }
+      ]
+    },
+    "ItemCondition": {
+      "type": "object",
+      "required": [
+        "kind",
+        "itemName"
+      ],
+      "properties": {
+        "kind": {
+          "const": "item"
+        },
+        "itemName": {
+          "type": "string"
+        },
+        "operator": {
+          "type": "string",
+          "enum": [
+            "has",
+            "missing"
+          ]
+        }
+      }
+    },
+    "ConditionalEvent": {
+      "type": "object",
+      "required": [
+        "kind",
+        "condition",
+        "then"
+      ],
+      "properties": {
+        "kind": {
+          "const": "conditional"
+        },
+        "condition": {
+          "$ref": "#/definitions/Condition"
+        },
+        "then": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/SequenceEvent"
+          }
+        },
+        "else": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/SequenceEvent"
+          }
+        }
+      }
+    },
+    "OutcomeRef": {
+      "type": "object",
+      "properties": {
+        "targetSection": {
+          "$ref": "#/definitions/SectionId"
+        },
+        "terminal": {
+          "$ref": "#/definitions/TerminalOutcome"
+        }
+      },
+      "oneOf": [
+        {
+          "required": [
+            "targetSection"
+          ]
+        },
+        {
+          "required": [
+            "terminal"
+          ]
+        }
+      ]
+    },
+    "ChoiceEvent": {
+      "type": "object",
+      "required": [
+        "kind",
+        "targetSection"
+      ],
+      "properties": {
+        "kind": {
+          "const": "choice"
+        },
+        "targetSection": {
+          "$ref": "#/definitions/SectionId"
+        },
+        "choiceText": {
+          "type": "string"
+        },
+        "effects": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/ItemEvent"
+          }
+        }
+      }
+    },
+    "StatChangeEvent": {
+      "type": "object",
+      "required": [
+        "kind",
+        "stat",
+        "amount"
+      ],
+      "properties": {
+        "kind": {
+          "const": "stat_change"
+        },
+        "stat": {
+          "oneOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            }
+          ]
+        },
+        "amount": {
+          "type": [
+            "number",
+            "string"
+          ]
+        },
+        "permanent": {
+          "type": "boolean"
+        }
+      }
+    },
+    "StatCheckEvent": {
+      "type": "object",
+      "required": [
+        "kind",
+        "stat"
+      ],
+      "properties": {
+        "kind": {
+          "const": "stat_check"
+        },
+        "stat": {
+          "oneOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            }
+          ]
+        },
+        "diceRoll": {
+          "type": "string"
+        },
+        "passCondition": {
+          "type": "string"
+        },
+        "failCondition": {
+          "type": "string"
+        },
+        "pass": {
+          "$ref": "#/definitions/OutcomeRef"
+        },
+        "fail": {
+          "$ref": "#/definitions/OutcomeRef"
+        }
+      }
+    },
+    "TestLuckEvent": {
+      "type": "object",
+      "required": [
+        "kind"
+      ],
+      "properties": {
+        "kind": {
+          "const": "test_luck"
+        },
+        "lucky": {
+          "$ref": "#/definitions/OutcomeRef"
+        },
+        "unlucky": {
+          "$ref": "#/definitions/OutcomeRef"
+        }
+      }
+    },
+    "ItemEvent": {
+      "type": "object",
+      "required": [
+        "kind",
+        "action",
+        "name"
+      ],
+      "properties": {
+        "kind": {
+          "const": "item"
+        },
+        "action": {
+          "type": "string",
+          "enum": [
+            "add",
+            "remove",
+            "reference"
+          ]
+        },
+        "name": {
+          "type": "string"
+        }
+      }
+    },
+    "ItemCheckEvent": {
+      "type": "object",
+      "required": [
+        "kind"
+      ],
+      "properties": {
+        "kind": {
+          "const": "item_check"
+        },
+        "itemName": {
+          "type": "string"
+        },
+        "has": {
+          "$ref": "#/definitions/OutcomeRef"
+        },
+        "missing": {
+          "$ref": "#/definitions/OutcomeRef"
+        },
+        "itemsAll": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "minItems": 2
+        }
+      }
+    },
+    "CombatEvent": {
+      "type": "object",
+      "required": [
+        "kind",
+        "enemies"
+      ],
+      "properties": {
+        "kind": {
+          "const": "combat"
+        },
+        "enemies": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/CombatEncounter"
+          }
+        },
+        "outcomes": {
+          "type": "object",
+          "properties": {
+            "win": {
+              "$ref": "#/definitions/OutcomeRef"
+            },
+            "lose": {
+              "$ref": "#/definitions/OutcomeRef"
+            },
+            "escape": {
+              "$ref": "#/definitions/OutcomeRef"
+            }
+          },
+          "additionalProperties": false
+        }
+      }
+    },
+    "DeathEvent": {
+      "type": "object",
+      "required": [
+        "kind",
+        "outcome"
+      ],
+      "properties": {
+        "kind": {
+          "const": "death"
+        },
+        "outcome": {
+          "$ref": "#/definitions/OutcomeRef"
+        },
+        "description": {
+          "type": "string"
+        }
+      }
+    },
+    "CustomEvent": {
+      "type": "object",
+      "required": [
+        "kind"
+      ],
+      "properties": {
+        "kind": {
+          "const": "custom"
+        },
+        "data": {
+          "type": "object",
+          "additionalProperties": true
+        }
+      },
+      "additionalProperties": true
+    },
+    "TerminalOutcome": {
+      "type": "object",
+      "required": [
+        "kind"
+      ],
+      "properties": {
+        "kind": {
+          "type": "string",
+          "enum": [
+            "death",
+            "victory",
+            "defeat",
+            "end"
+          ],
+          "description": "Terminal outcome type"
+        },
+        "message": {
+          "type": "string",
+          "description": "Optional narrative message"
+        }
+      }
+    },
     "CombatEncounter": {
       "type": "object",
-      "required": ["enemy", "skill", "stamina"],
+      "required": [
+        "enemy",
+        "skill",
+        "stamina"
+      ],
       "properties": {
         "enemy": {
           "type": "string",
@@ -225,7 +604,11 @@
     },
     "CreatureStats": {
       "type": "object",
-      "required": ["name", "skill", "stamina"],
+      "required": [
+        "name",
+        "skill",
+        "stamina"
+      ],
       "properties": {
         "name": {
           "type": "string",
@@ -258,7 +641,10 @@
     },
     "ItemReference": {
       "type": "object",
-      "required": ["name", "action"],
+      "required": [
+        "name",
+        "action"
+      ],
       "properties": {
         "name": {
           "type": "string",
@@ -266,18 +652,30 @@
         },
         "action": {
           "type": "string",
-          "enum": ["add", "remove", "check", "reference"],
+          "enum": [
+            "add",
+            "remove",
+            "check",
+            "reference"
+          ],
           "description": "Item action: add to inventory, remove from inventory, check if player has, or just reference"
         }
       }
     },
     "StatModification": {
       "type": "object",
-      "required": ["stat", "amount"],
+      "required": [
+        "stat",
+        "amount"
+      ],
       "properties": {
         "stat": {
           "type": "string",
-          "enum": ["skill", "stamina", "luck"],
+          "enum": [
+            "skill",
+            "stamina",
+            "luck"
+          ],
           "description": "Stat name: 'skill', 'stamina', or 'luck'"
         },
         "amount": {
@@ -293,16 +691,42 @@
     },
     "DeathCondition": {
       "type": "object",
-      "required": ["trigger"],
+      "required": [
+        "trigger"
+      ],
       "properties": {
         "trigger": {
           "type": "string",
-          "enum": ["stamina_zero", "instant_death", "conditional"],
+          "enum": [
+            "stamina_zero",
+            "instant_death",
+            "conditional"
+          ],
           "description": "Death trigger type"
         },
         "message": {
           "type": "string",
           "description": "Death message/reason"
+        }
+      }
+    },
+    "StateCheckEvent": {
+      "type": "object",
+      "required": [
+        "kind"
+      ],
+      "properties": {
+        "kind": {
+          "const": "state_check"
+        },
+        "conditionText": {
+          "type": "string"
+        },
+        "has": {
+          "$ref": "#/definitions/OutcomeRef"
+        },
+        "missing": {
+          "$ref": "#/definitions/OutcomeRef"
         }
       }
     }

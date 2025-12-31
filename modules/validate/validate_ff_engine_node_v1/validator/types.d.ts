@@ -13,19 +13,98 @@
  */
 export type SectionId = string;
 /**
- * Canonical navigation edge for a section
+ * Terminal outcome when a sequence event ends the game without a target section
  */
-export interface NavigationEdge {
-    /** Target section ID */
+export interface TerminalOutcome {
+    /** Terminal outcome type */
+    kind: 'death' | 'victory' | 'defeat' | 'end';
+    /** Optional narrative message */
+    message?: string;
+}
+/**
+ * Outcome reference for conditional events (target or terminal)
+ */
+export interface OutcomeRef {
+    targetSection?: SectionId;
+    terminal?: TerminalOutcome;
+}
+/**
+ * Sequence events define ordered gameplay flow
+ */
+export type SequenceEvent = ChoiceEvent | StatChangeEvent | StatCheckEvent | TestLuckEvent | ItemEvent | ItemCheckEvent | StateCheckEvent | ConditionalEvent | CombatEvent | DeathEvent | CustomEvent;
+export interface ChoiceEvent {
+    kind: 'choice';
     targetSection: SectionId;
-    /** Navigation kind (choice vs mechanic) */
-    kind: 'choice' | 'test_luck' | 'item_check' | 'combat' | 'stat_check' | 'death' | 'custom';
-    /** Outcome label for conditional navigation */
-    outcome?: 'lucky' | 'unlucky' | 'has_item' | 'no_item' | 'win' | 'lose' | 'escape' | 'pass' | 'fail' | 'death' | string;
-    /** Optional descriptive text for the choice (if available from context) */
     choiceText?: string;
-    /** Optional parameters (item name, enemy name, etc.) */
-    params?: Record<string, unknown>;
+    effects?: ItemEvent[];
+}
+export interface StatChangeEvent {
+    kind: 'stat_change';
+    stat: 'skill' | 'stamina' | 'luck' | string | string[];
+    amount: number | string;
+    permanent?: boolean;
+}
+export interface StatCheckEvent {
+    kind: 'stat_check';
+    stat: 'skill' | 'stamina' | 'luck' | string | string[];
+    diceRoll?: string;
+    passCondition?: string;
+    failCondition?: string;
+    pass?: OutcomeRef;
+    fail?: OutcomeRef;
+}
+export interface TestLuckEvent {
+    kind: 'test_luck';
+    lucky?: OutcomeRef;
+    unlucky?: OutcomeRef;
+}
+export interface ItemEvent {
+    kind: 'item';
+    action: 'add' | 'remove' | 'reference';
+    name: string;
+}
+export interface ItemCheckEvent {
+    kind: 'item_check';
+    itemName?: string;
+    itemsAll?: string[];
+    has?: OutcomeRef;
+    missing?: OutcomeRef;
+}
+export interface StateCheckEvent {
+    kind: 'state_check';
+    conditionText?: string;
+    has?: OutcomeRef;
+    missing?: OutcomeRef;
+}
+export interface ItemCondition {
+    kind: 'item';
+    itemName: string;
+    operator?: 'has' | 'missing';
+}
+export type Condition = ItemCondition;
+export interface ConditionalEvent {
+    kind: 'conditional';
+    condition: Condition;
+    then: SequenceEvent[];
+    else?: SequenceEvent[];
+}
+export interface CombatEvent {
+    kind: 'combat';
+    enemies: CombatEncounter[];
+    outcomes?: {
+        win?: OutcomeRef;
+        lose?: OutcomeRef;
+        escape?: OutcomeRef;
+    };
+}
+export interface DeathEvent {
+    kind: 'death';
+    outcome: OutcomeRef;
+    description?: string;
+}
+export interface CustomEvent {
+    kind: 'custom';
+    data?: Record<string, unknown>;
 }
 /**
  * Combat encounter embedded in a section
@@ -74,7 +153,7 @@ export interface DeathCondition {
 /**
  * Section types - categorizes different kinds of content
  */
-export type SectionType = 'section' | 'front_cover' | 'back_cover' | 'title_page' | 'publishing_info' | 'toc' | 'intro' | 'rules' | 'adventure_sheet' | 'template';
+export type SectionType = 'section' | 'front_cover' | 'back_cover' | 'title_page' | 'publishing_info' | 'toc' | 'intro' | 'rules' | 'adventure_sheet' | 'template' | 'background';
 /**
  * A gamebook section - represents any content from the book
  *
@@ -84,29 +163,25 @@ export type SectionType = 'section' | 'front_cover' | 'back_cover' | 'title_page
 export interface GamebookSection {
     /** Unique section identifier */
     id: SectionId;
-    /** Narrative text content */
-    text: string;
+    /** Cleaned HTML content for display (final narrative payload) */
+    presentation_html: string;
     /** Page reference (optional, for citation) */
     pageStart?: number;
     pageEnd?: number;
     /**
      * Whether this is a gameplay section that the engine should process.
      * Set to false for covers, rules, publishing info, etc.
-     * Only gameplay sections have navigation, combat, items, etc.
+     * Gameplay sections define ordered sequence events.
      */
     isGameplaySection: boolean;
     /** Section type - categorizes the content */
     type: SectionType;
-    /** Canonical navigation edges (only for gameplay sections) */
-    navigation?: NavigationEdge[];
-    /** Combat encounters (only for gameplay sections) */
-    combat?: CombatEncounter[];
-    /** Item references (only for gameplay sections) */
-    items?: ItemReference[];
-    /** Stat modifications (only for gameplay sections) */
-    statModifications?: StatModification[];
-    /** Death conditions (only for gameplay sections) */
-    deathConditions?: DeathCondition[];
+    /** Optional ending status for the section */
+    status?: 'death' | 'victory' | 'defeat';
+    /** Optional end-game marker (suppresses no-choice warnings) */
+    end_game?: boolean;
+    /** Ordered gameplay sequence events (required for gameplay sections) */
+    sequence?: SequenceEvent[];
     /** Section metadata */
     metadata?: {
         /** Section title (if available) */
@@ -127,6 +202,8 @@ export interface GamebookJSON {
         startSection: SectionId;
         /** Version of the JSON format */
         formatVersion: string;
+        /** Validator version expected to validate this gamebook */
+        validatorVersion?: string;
     };
     /** All sections in the gamebook, keyed by section ID */
     sections: Record<SectionId, GamebookSection>;

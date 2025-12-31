@@ -381,6 +381,7 @@ class EnrichedPortion(BaseModel):
     is_gameplay: Optional[bool] = None
     end_game: Optional[bool] = None
     ending: Optional[str] = None
+    sequence: Optional[List[Dict[str, Any]]] = None
 
     @field_validator("combat", mode="before")
     def combat_default(cls, v):

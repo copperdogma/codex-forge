@@ -17,6 +17,11 @@ SEP_STAT_PATTERN = re.compile(r"(?:SKILL|skill)\s*[:]?\s*(\d+).*?(?:STAMINA|stam
 WIN_PATTERN = re.compile(r"if\s+you\s+win,\s+turn\s+to\s+(\d+)", re.IGNORECASE)
 LOSS_PATTERN = re.compile(r"if\s+you\s+lose,\s+turn\s+to\s+(\d+)", re.IGNORECASE)
 ESCAPE_PATTERN = re.compile(r"if\s+you\s+wish\s+to\s+escape,\s+turn\s+to\s+(\d+)", re.IGNORECASE)
+ESCAPE_FLEX_PATTERN = re.compile(r"\bescape\b.{0,80}?\bturn\s+to\s+(\d+)", re.IGNORECASE | re.DOTALL)
+SPECIAL_RULE_PATTERN = re.compile(
+    r"(reduce\s+your\s+(?:attack\s+strength|skill)\s+by\s+\d+[^.]*?)",
+    re.IGNORECASE
+)
 
 SYSTEM_PROMPT = """You are an expert at parsing Fighting Fantasy gamebook sections.
 Extract combat encounter information from the provided text into a JSON list of enemies.
@@ -54,7 +59,9 @@ def extract_combat_regex(text: str) -> List[Combat]:
     # Try to find common outcomes
     win_match = WIN_PATTERN.search(text)
     loss_match = LOSS_PATTERN.search(text)
-    escape_match = ESCAPE_PATTERN.search(text)
+    escape_match = ESCAPE_PATTERN.search(text) or ESCAPE_FLEX_PATTERN.search(text)
+    special_rule_match = SPECIAL_RULE_PATTERN.search(text)
+    special_rules = special_rule_match.group(1).strip() if special_rule_match else None
     
     win_section = win_match.group(1) if win_match else None
     loss_section = loss_match.group(1) if loss_match else None
@@ -72,6 +79,7 @@ def extract_combat_regex(text: str) -> List[Combat]:
             win_section=win_section,
             loss_section=loss_section,
             escape_section=escape_section,
+            special_rules=special_rules,
             confidence=0.9
         ))
         
@@ -91,6 +99,7 @@ def extract_combat_regex(text: str) -> List[Combat]:
                 win_section=win_section,
                 loss_section=loss_section,
                 escape_section=escape_section,
+                special_rules=special_rules,
                 confidence=0.5
             ))
             

@@ -16,6 +16,7 @@ Strategy:
 import argparse
 import json
 import re
+from modules.common.html_utils import html_to_text
 from typing import Dict, List, Set, Tuple
 from collections import defaultdict
 
@@ -53,30 +54,35 @@ def validate_section_choices(section_id: str, section: Dict) -> Tuple[bool, Dict
     
     Returns: (is_valid, details)
     """
-    text = section.get('text', '')
+    html = section.get('presentation_html') or section.get('html') or ''
+    text = section.get('text') or html_to_text(html)
     choices = section.get('choices', [])
-    navigation = section.get('navigation', [])
+    sequence = section.get('sequence', []) or []
     
     # Extract referenced sections from text
     text_refs = extract_turn_to_references(text)
     
-    # Extract choice targets (support both choices[] and navigation[])
+    # Extract choice targets (support choices[] and sequence[])
     choice_targets = set()
     choice_source = "choices"
     for choice in choices:
         target = choice.get('target')
         if target and target.isdigit():
             choice_targets.add(int(target))
-    if not choice_targets and navigation:
-        choice_source = "navigation"
-        for link in navigation:
-            target = link.get('targetSection') or link.get('target')
+    if not choice_targets and sequence:
+        choice_source = "sequence"
+        for event in sequence:
+            if event.get("kind") != "choice":
+                continue
+            target = event.get("targetSection")
             if target and str(target).isdigit():
                 choice_targets.add(int(target))
-    elif navigation:
-        choice_source = "choices+navigation"
-        for link in navigation:
-            target = link.get('targetSection') or link.get('target')
+    elif sequence:
+        choice_source = "choices+sequence"
+        for event in sequence:
+            if event.get("kind") != "choice":
+                continue
+            target = event.get("targetSection")
             if target and str(target).isdigit():
                 choice_targets.add(int(target))
     

@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 import argparse
 import json
+import re
 from typing import Dict, List, Set
 
 from modules.common.utils import ProgressLogger
@@ -65,9 +66,8 @@ def main() -> None:
             if not (min_section <= n <= max_section):
                 warnings.append(f"section id {sid} outside expected range {expected_range}")
         if section.get("isGameplaySection"):
-            text = (section.get("text") or "").strip()
-            html = (section.get("html") or "").strip()
-            if not text and not html:
+            text = (section.get("presentation_html") or section.get("text") or section.get("html") or "").strip()
+            if not text:
                 if sid in stub_targets:
                     warnings.append(f"empty text/html for stub target section {sid}")
                 elif sid in unresolved_missing:
@@ -75,18 +75,69 @@ def main() -> None:
                 else:
                     errors.append(f"empty text/html for gameplay section {sid}")
 
-        # Validate navigation targets
-        for link in section.get("navigation") or []:
-            tgt = link.get("targetSection")
-            if tgt is None:
-                errors.append(f"section {sid} has navigation entry without targetSection")
-                continue
-            tgt_str = str(tgt)
-            if not tgt_str.isdigit():
-                errors.append(f"section {sid} has non-numeric target {tgt_str}")
-                continue
-            if tgt_str not in sections and tgt_str not in unresolved_missing:
-                errors.append(f"section {sid} targets missing section {tgt_str} (not in unresolved_missing)")
+        # Validate sequence targets
+        for idx, event in enumerate(section.get("sequence") or []):
+            kind = event.get("kind")
+            if kind == "choice":
+                tgt = event.get("targetSection")
+                if tgt is None:
+                    errors.append(f"section {sid} has choice without targetSection at sequence[{idx}]")
+                    continue
+                tgt_str = str(tgt)
+                if not tgt_str.isdigit():
+                    errors.append(f"section {sid} has non-numeric target {tgt_str}")
+                    continue
+                if tgt_str not in sections and tgt_str not in unresolved_missing:
+                    errors.append(f"section {sid} targets missing section {tgt_str} (not in unresolved_missing)")
+            else:
+                # Validate outcome refs where present
+                outcome_refs = []
+                if kind == "stat_check":
+                    outcome_refs.extend([event.get("pass"), event.get("fail")])
+                elif kind == "stat_change":
+                    outcome_refs.append(event.get("else"))
+                elif kind == "test_luck":
+                    outcome_refs.extend([event.get("lucky"), event.get("unlucky")])
+                elif kind == "item_check":
+                    outcome_refs.extend([event.get("has"), event.get("missing")])
+                elif kind == "combat":
+                    outcomes = event.get("outcomes") or {}
+                    outcome_refs.extend([outcomes.get("win"), outcomes.get("lose"), outcomes.get("escape")])
+                elif kind == "death":
+                    outcome_refs.append(event.get("outcome"))
+                for outcome in outcome_refs:
+                    if not outcome or not outcome.get("targetSection"):
+                        continue
+                    tgt_str = str(outcome.get("targetSection"))
+                    if not tgt_str.isdigit():
+                        errors.append(f"section {sid} has non-numeric target {tgt_str}")
+                        continue
+                    if tgt_str not in sections and tgt_str not in unresolved_missing:
+                        errors.append(f"section {sid} targets missing section {tgt_str} (not in unresolved_missing)")
+
+        if section.get("isGameplaySection"):
+            html_text = (section.get("presentation_html") or section.get("text") or section.get("html") or "")
+            text_lower = html_text.lower()
+            stamina_sentence = False
+            for sentence in re.split(r"[.!?]", text_lower):
+                sentence = sentence.strip()
+                if not sentence:
+                    continue
+                if "attack strength" in sentence:
+                    continue
+                if re.search(r"\b(?:lose|reduce|reduces|deduct|subtract)\b.{0,40}\bstamina\b", sentence):
+                    stamina_sentence = True
+                    break
+                if re.search(r"\bstamina\b.{0,40}\b(?:lose|reduce|reduces|deduct|subtract)\b", sentence):
+                    stamina_sentence = True
+                    break
+            if stamina_sentence:
+                has_stamina_change = any(
+                    e.get("kind") == "stat_change" and str(e.get("stat", "")).lower() == "stamina"
+                    for e in (section.get("sequence") or [])
+                )
+                if not has_stamina_change:
+                    errors.append(f"section {sid} mentions losing STAMINA but has no stat_change in sequence")
 
     report = {
         "gamebook": args.gamebook,

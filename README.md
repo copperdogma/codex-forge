@@ -209,15 +209,23 @@ The legacy OCR-ensemble recipe is archived at `configs/recipes/legacy/recipe-ff-
 - **What it does**: Assembles final gamebook.json from portions with choices, combat, items, etc.
 - **Why**: Creates final output format for game engine consumption
 - **Type**: Code-only assembly
+- **Output note**: Gameplay flow is encoded in ordered `sequence` events (replaces legacy `navigation`).
 
 #### Validate Stage
 
-**27. `validate_ff_engine_v2`** (Code)
-- **What it does**: Validates gamebook.json for missing sections, duplicates, empty sections, structural issues
-- **Why**: Ensures final output meets quality requirements before use
+**27. `validate_ff_engine_node_v1`** (Node/AJV)
+- **What it does**: Canonical schema validator shared with the game engine (Node + Ajv)
+- **Why**: Ensures pipeline/game engine use identical validation logic
+- **Type**: Node validator (bundled, portable)
+- **Ship**: Include `modules/validate/validate_ff_engine_node_v1/validator` alongside `gamebook.json` in the game engine build.
+- **How to ship**: Copy `gamebook.json` + `modules/validate/validate_ff_engine_node_v1/validator/gamebook-validator.bundle.js` into the game engine bundle, then run `node gamebook-validator.bundle.js gamebook.json --json` before loading.
+
+**28. `forensics_gamebook` / `validate_ff_engine_v2`** (Code)
+- **What it does**: Forensic validation (missing sections, duplicates, empty sections, structural issues)
+- **Why**: Provides detailed traces for debugging and repair; not the canonical schema validator
 - **Type**: Code-only validation
 
-**28. `validate_choice_completeness_v1`** (Code)
+**29. `validate_choice_completeness_v1`** (Code)
 - **What it does**: Compares "turn to X" references in section text with extracted choices to find missing choices
 - **Why**: Critical for 100% game engine accuracy; missing choices break gameplay
 - **Type**: Code-only validation (pattern matching + comparison)

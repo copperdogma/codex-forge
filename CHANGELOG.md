@@ -1,3 +1,23 @@
+## [2025-12-31] - Canonical sequence pipeline + Node validator alignment
+
+### Added
+- `sequence_order_v1` for deterministic sequence ordering.
+- Portable Node validator bundle (`gamebook-validator.bundle.js`) and bundling script.
+- Resume-build recipe and load adapter for reusing enriched portions.
+- Tests covering sequence normalization, choice effects, inventory/stat/combat extraction, and stat-change dice patterns.
+
+### Changed
+- `sequence` replaces legacy navigation fields throughout build/validation outputs.
+- Node validator is canonical in recipes; Python validator is forensics-only.
+- Stat modification extraction handles dice-based reductions; smoke validator now checks sequence targets and STAMINA loss mentions.
+- Documentation updated for validator shipping guidance and AI-assist policy.
+
+### Tested
+- `PYTHONPATH=. python -m pytest tests/test_extract_stat_modifications_v1.py`
+- `python driver.py --recipe configs/recipes/recipe-ff-ai-ocr-gpt51.yaml --run-id ff-ai-ocr-gpt51-pristine-fast-full --allow-run-id-reuse --output-dir output/runs/ff-ai-ocr-gpt51-pristine-fast-full --start-from extract_stat_modifications`
+- `PYTHONPATH=. python modules/validate/validate_ff_engine_node_v1/main.py --input output/runs/ff-ai-ocr-gpt51-pristine-fast-full/gamebook.json --out output/runs/ff-ai-ocr-gpt51-pristine-fast-full/gamebook_validation_node.json`
+- `PYTHONPATH=. python modules/validate/validate_gamebook_smoke_v1/main.py --gamebook output/runs/ff-ai-ocr-gpt51-pristine-fast-full/gamebook.json --out output/runs/ff-ai-ocr-gpt51-pristine-fast-full/validation_report_smoke.json`
+
 ## [2025-12-30] - Unified navigation schema and validators
 
 ### Added

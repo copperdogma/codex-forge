@@ -71,6 +71,15 @@ def main():
 
     ensure_ajv(args.node_bin, args.validator_dir)
 
+    bundle_script = os.path.join(args.validator_dir, "build_bundle.js")
+    if os.path.exists(bundle_script):
+        bundle_proc = subprocess.run([args.node_bin, bundle_script], cwd=args.validator_dir, capture_output=True, text=True)
+        if bundle_proc.returncode != 0:
+            raise RuntimeError(
+                "Failed to regenerate validator bundle. "
+                f"stdout: {bundle_proc.stdout.strip()} stderr: {bundle_proc.stderr.strip()}"
+            )
+
     report = run_node_validator(args.node_bin, args.validator_dir, args.input)
     report["validator_dir"] = args.validator_dir
 

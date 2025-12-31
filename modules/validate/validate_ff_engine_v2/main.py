@@ -5,6 +5,7 @@ import re
 from typing import Dict, List, Any, Optional
 
 from modules.common.utils import save_json, ensure_dir, ProgressLogger, read_jsonl
+from modules.common.html_utils import html_to_text
 from modules.common.page_numbers import validate_sequential_page_numbers
 from schemas import ValidationReport
 
@@ -91,8 +92,9 @@ def validate_gamebook(
     # Check for sections with no text
     sections_with_no_text = []
     for sid, section in sections.items():
-        text = section.get("text", "").strip()
-        if not text:
+        raw_html = section.get("presentation_html") or section.get("html") or ""
+        text = section.get("text") or html_to_text(raw_html)
+        if not (text or "").strip():
             sections_with_no_text.append(sid)
 
     # Check for sections with no choices (potential dead ends)
@@ -105,10 +107,9 @@ def validate_gamebook(
         if section.get("end_game"):
             continue
 
-        nav_links = section.get("navigation", [])
-        has_navigation = bool(nav_links)
-
-        if not has_navigation:
+        sequence = section.get("sequence", []) or []
+        has_choice = any(e.get("kind") == "choice" for e in sequence)
+        if not has_choice:
             sections_with_no_choices.append(sid)
 
     # Build warnings and errors

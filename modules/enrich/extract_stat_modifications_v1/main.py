@@ -15,10 +15,14 @@ from schemas import EnrichedPortion, StatModification
 MOD_KEYWORDS = ["lose", "gain", "reduce", "increase", "restore", "add", "deduct", "subtract", "SKILL", "STAMINA", "LUCK"]
 
 # Specific regex for common deterministic cases
-REDUCE_PATTERN = re.compile(r"\b(?:lose|reduce|deduct|subtract)\s+(?:your\s+)?(.*?)\s+by\s+(\d+)\b", re.IGNORECASE)
-LOSE_PATTERN = re.compile(r"\b(?:lose|deduct)\s+(\d+)\s+(.*?)\b", re.IGNORECASE)
+REDUCE_PATTERN = re.compile(r"\b(?:reduce|reduces|deduct|subtract)\s+(?:your\s+)?(.*?)\s+by\s+(\d+|one|two|three|four|five|six|seven|eight|nine|ten)\b", re.IGNORECASE)
+LOSE_PATTERN = re.compile(r"\b(?:lose|deduct)\s+(\d+)\s+(skill|stamina|luck)\b", re.IGNORECASE)
 GAIN_PATTERN = re.compile(r"\b(?:gain|increase|restore|add)\s+(?:your\s+)?(.*?)\s+by\s+(\d+)\b", re.IGNORECASE)
-GAIN_VAL_PATTERN = re.compile(r"\b(?:gain|restore|add)\s+(\d+)\s+(.*?)\b", re.IGNORECASE)
+GAIN_VAL_PATTERN = re.compile(r"\b(?:gain|restore|add)\s+(\d+)\s+(skill|stamina|luck)\b", re.IGNORECASE)
+SENTENCE_MOD_PATTERN = re.compile(
+    r"\b(?:(lose|deduct|reduce|reduces|subtract|gain|increase|restore|add)\s+(\d+)\s+(skill|stamina|luck)|and\s+(\d+)\s+(skill|stamina|luck))\b",
+    re.IGNORECASE,
+)
 
 SYSTEM_PROMPT = """You are an expert at parsing Fighting Fantasy gamebook sections.
 Extract stat modifications (SKILL, STAMINA, LUCK) from the provided text into a JSON object.
@@ -75,20 +79,287 @@ def normalize_stat(name: str) -> Optional[str]:
     if "luck" in name: return "luck"
     return None
 
+def _filter_combat_modifier_mods(text: str, mods: List[StatModification]) -> List[StatModification]:
+    if not mods:
+        return mods
+    sentences = [s.strip() for s in re.split(r"[.!?]", text) if s.strip()]
+    combat_sentences = [s for s in sentences if _is_combat_modifier(s)]
+    if not combat_sentences:
+        return mods
+    filtered = []
+    for m in mods:
+        stat = str(m.stat).lower()
+        if any(stat in s.lower() for s in combat_sentences):
+            continue
+        filtered.append(m)
+    return filtered
+
+
+def _is_combat_modifier(sentence: str) -> bool:
+    lower = sentence.lower()
+    return (
+        "attack strength" in lower
+        or "attack round" in lower
+        or "during this combat" in lower
+        or "during the combat" in lower
+        or "for this combat" in lower
+        or "duration of the combat" in lower
+        or "duration of combat" in lower
+    )
+
+
 def extract_stat_modifications_regex(text: str) -> List[StatModification]:
     mods = []
-    # Very simple regex attempt; most extraction will rely on AI due to phrasing variety
-    for match in REDUCE_PATTERN.finditer(text):
-        stat = normalize_stat(match.group(1))
+    seen = set()
+    word_numbers = {
+        "one": 1,
+        "two": 2,
+        "three": 3,
+        "four": 4,
+        "five": 5,
+        "six": 6,
+        "seven": 7,
+        "eight": 8,
+        "nine": 9,
+        "ten": 10,
+    }
+    def _to_int(raw: str) -> Optional[int]:
+        if raw is None:
+            return None
+        raw = str(raw).strip().lower()
+        if raw.isdigit():
+            return int(raw)
+        return word_numbers.get(raw)
+
+    def _append(stat: Optional[str], amount: int) -> None:
+        if not stat:
+            return
+        key = (stat, amount)
+        if key in seen:
+            return
+        seen.add(key)
+        mods.append(StatModification(stat=stat, amount=amount, confidence=0.7))
+
+    def _append_expr(stat: Optional[str], expr: str) -> None:
+        if not stat:
+            return
+        key = (stat, expr)
+        if key in seen:
+            return
+        seen.add(key)
+        mods.append(StatModification(stat=stat, amount=expr, confidence=0.7))
+
+    def _dice_count(raw: str) -> Optional[int]:
+        if raw is None:
+            return None
+        raw = str(raw).strip().lower()
+        if raw.isdigit():
+            return int(raw)
+        return word_numbers.get(raw)
+
+    def _sentence_for(span_start: int, span_end: int) -> str:
+        start = max(text.rfind(".", 0, span_start), text.rfind("!", 0, span_start), text.rfind("?", 0, span_start))
+        end_candidates = [text.find(".", span_end), text.find("!", span_end), text.find("?", span_end)]
+        end_candidates = [c for c in end_candidates if c != -1]
+        end = min(end_candidates) if end_candidates else len(text)
+        return text[start + 1:end]
+
+
+    roll_each_pattern = re.compile(
+        r"roll\s+(one|two|three|four|five|six|\d+)\s+(?:die|dice)"
+        r".{0,200}?(?:lose|loses|reduces|reduce)"
+        r"\s+(\d+|one|two|three|four|five|six|seven|eight|nine|ten)\s+"
+        r"(skill|stamina|luck)\s+points?\s+for\s+each",
+        re.IGNORECASE | re.DOTALL,
+    )
+    each_one_pattern = re.compile(
+        r"roll\s+(one|two|three|four|five|six|\d+)\s+(?:die|dice)"
+        r".{0,200}?each\s+one\s+reduces?\s+your\s+"
+        r"(skill|stamina|luck)\s+by\s+"
+        r"(\d+|one|two|three|four|five|six|seven|eight|nine|ten)",
+        re.IGNORECASE | re.DOTALL,
+    )
+    each_stats_pattern = re.compile(
+        r"\b(?:add|increase)\s+(one|two|three|four|five|six|seven|eight|nine|ten|\d+)\s+to\s+each\s+of\s+your\s+"
+        r"(skill|stamina|luck)"
+        r"(?:\s*,\s*|\s+and\s+)(skill|stamina|luck)"
+        r"(?:\s*,\s*|\s+and\s+)?(skill|stamina|luck)?"
+        r"(?:\s+scores?)?\b",
+        re.IGNORECASE,
+    )
+    roll_add_each_pattern = re.compile(
+        r"roll\s+(one|two|three|four|five|six|\d+)\s+(?:die|dice)\s+and\s+add\s+"
+        r"(\d+|one|two|three|four|five|six|seven|eight|nine|ten)\s+"
+        r"(?:to\s+the\s+total|to\s+this\s+total)?"
+        r".{0,220}?(?:lose|loses|reduces|reduce)\s+(?:your\s+)?"
+        r"(skill|stamina|luck)\s+by\s+"
+        r"(\d+|one|two|three|four|five|six|seven|eight|nine|ten)\s+for\s+each",
+        re.IGNORECASE | re.DOTALL,
+    )
+    roll_reduce_total_pattern = re.compile(
+        r"roll\s+(one|two|three|four|five|six|\d+)\s+(?:die|dice)"
+        r"(?:\s*,?\s*(?:and\s+)?add\s+(\d+|one|two|three|four|five|six|seven|eight|nine|ten)\s+to\s+the\s+number)?"
+        r".{0,220}?(?:lose|loses|reduces|reduce|deduct|subtract)\s+(?:your\s+)?"
+        r"(skill|stamina|luck)\s+(?:score\s+)?by\s+(?:the\s+)?(?:total|number|amount)",
+        re.IGNORECASE | re.DOTALL,
+    )
+    roll_deduct_number_pattern = re.compile(
+        r"roll\s+(one|two|three|four|five|six|\d+)\s+(?:die|dice)"
+        r"(?:\s*,?\s*(?:and\s+)?add\s+(\d+|one|two|three|four|five|six|seven|eight|nine|ten)\s+to\s+the\s+number)?"
+        r".{0,200}?(?:deduct|subtract)\s+(?:the\s+)?(?:number|total|amount)\s+from\s+(?:your\s+)?"
+        r"(skill|stamina|luck)\s*(?:score)?",
+        re.IGNORECASE | re.DOTALL,
+    )
+
+    dice_spans: List[Tuple[int, int]] = []
+    for match in roll_each_pattern.finditer(text):
+        dice_raw = match.group(1)
+        loss_raw = match.group(2)
+        stat = normalize_stat(match.group(3))
+        dice_count = _dice_count(dice_raw) or 1
+        loss_val = _to_int(loss_raw)
+        if stat and loss_val is not None:
+            expr = f"-({dice_count}d6)" if loss_val == 1 else f"-({dice_count}d6*{loss_val})"
+            _append_expr(stat, expr)
+            dice_spans.append((match.start(), match.end()))
+
+    for match in each_one_pattern.finditer(text):
+        dice_raw = match.group(1)
+        stat = normalize_stat(match.group(2))
+        loss_raw = match.group(3)
+        dice_count = _dice_count(dice_raw) or 1
+        loss_val = _to_int(loss_raw)
+        if stat and loss_val is not None:
+            expr = f"-({dice_count}d6)" if loss_val == 1 else f"-({dice_count}d6*{loss_val})"
+            _append_expr(stat, expr)
+            dice_spans.append((match.start(), match.end()))
+
+    for match in each_stats_pattern.finditer(text):
+        amount = _to_int(match.group(1))
+        if amount is None:
+            continue
+        for stat_raw in match.groups()[1:]:
+            stat = normalize_stat(stat_raw)
+            if stat:
+                _append(stat, amount)
+
+    for match in roll_add_each_pattern.finditer(text):
+        dice_raw = match.group(1)
+        add_raw = match.group(2)
+        stat = normalize_stat(match.group(3))
+        loss_raw = match.group(4)
+        dice_count = _dice_count(dice_raw) or 1
+        add_val = _to_int(add_raw)
+        loss_val = _to_int(loss_raw)
+        if stat and add_val is not None and loss_val is not None:
+            expr = f"-({dice_count}d6+{add_val})" if loss_val == 1 else f"-(({dice_count}d6+{add_val})*{loss_val})"
+            _append_expr(stat, expr)
+            dice_spans.append((match.start(), match.end()))
+
+    for match in roll_reduce_total_pattern.finditer(text):
+        dice_raw = match.group(1)
+        add_raw = match.group(2)
+        stat = normalize_stat(match.group(3))
+        dice_count = _dice_count(dice_raw) or 1
+        add_val = _to_int(add_raw) if add_raw else 0
         if stat:
-            mods.append(StatModification(stat=stat, amount=-int(match.group(2)), confidence=0.7))
-            
+            expr = f"-({dice_count}d6+{add_val})" if add_val else f"-({dice_count}d6)"
+            _append_expr(stat, expr)
+            dice_spans.append((match.start(), match.end()))
+
+    for match in roll_deduct_number_pattern.finditer(text):
+        dice_raw = match.group(1)
+        add_raw = match.group(2)
+        stat = normalize_stat(match.group(3))
+        dice_count = _dice_count(dice_raw) or 1
+        add_val = _to_int(add_raw) if add_raw else 0
+        if stat:
+            expr = f"-({dice_count}d6+{add_val})" if add_val else f"-({dice_count}d6)"
+            _append_expr(stat, expr)
+            dice_spans.append((match.start(), match.end()))
+
+    # Very simple regex attempt; most extraction will rely on AI due to phrasing variety
+    def _in_dice_span(start: int, end: int) -> bool:
+        return any(start >= s and end <= e for s, e in dice_spans)
+
+    for match in REDUCE_PATTERN.finditer(text):
+        if _in_dice_span(match.start(), match.end()):
+            continue
+        if _is_combat_modifier(_sentence_for(match.start(), match.end())):
+            continue
+        stat = normalize_stat(match.group(1))
+        amount = _to_int(match.group(2))
+        if stat and amount is not None:
+            _append(stat, -amount)
+
     for match in LOSE_PATTERN.finditer(text):
+        if _in_dice_span(match.start(), match.end()):
+            continue
+        if _is_combat_modifier(_sentence_for(match.start(), match.end())):
+            continue
         stat = normalize_stat(match.group(2))
         if stat:
-            mods.append(StatModification(stat=stat, amount=-int(match.group(1)), confidence=0.7))
+            _append(stat, -int(match.group(1)))
+
+    for match in GAIN_PATTERN.finditer(text):
+        if _is_combat_modifier(_sentence_for(match.start(), match.end())):
+            continue
+        stat = normalize_stat(match.group(1))
+        amount = _to_int(match.group(2))
+        if stat and amount is not None:
+            _append(stat, amount)
+
+    for match in GAIN_VAL_PATTERN.finditer(text):
+        if _is_combat_modifier(_sentence_for(match.start(), match.end())):
+            continue
+        stat = normalize_stat(match.group(2))
+        if stat:
+            _append(stat, int(match.group(1)))
+
+    for sentence in re.split(r"[.!?]", text):
+        sentence = sentence.strip()
+        if not sentence:
+            continue
+        if _is_combat_modifier(sentence):
+            continue
+        current_sign: Optional[int] = None
+        for match in SENTENCE_MOD_PATTERN.finditer(sentence):
+            if match.group(1):
+                keyword = match.group(1).lower()
+                amount = int(match.group(2))
+                stat = normalize_stat(match.group(3))
+                if keyword in ("lose", "deduct", "reduce", "subtract"):
+                    current_sign = -1
+                else:
+                    current_sign = 1
+                _append(stat, current_sign * amount)
+            else:
+                amount = int(match.group(4))
+                stat = normalize_stat(match.group(5))
+                if current_sign is None:
+                    continue
+                _append(stat, current_sign * amount)
             
-    return mods
+    lower_text = text.lower()
+    if "for each" in lower_text or "each one" in lower_text:
+        dice_stats = {m.stat for m in mods if isinstance(m.amount, str) and "d6" in m.amount}
+        if dice_stats:
+            mods = [m for m in mods if not (m.stat in dice_stats and isinstance(m.amount, (int, float)))]
+
+    return _filter_combat_modifier_mods(text, mods)
+
+
+def _preserve_combat_special_rules(portion: EnrichedPortion, raw_row: Dict[str, Any]) -> None:
+    raw_combat = raw_row.get("combat")
+    if not raw_combat or not portion.combat:
+        return
+    for idx, raw_entry in enumerate(raw_combat):
+        if idx >= len(portion.combat):
+            break
+        if not isinstance(raw_entry, dict):
+            continue
+        if raw_entry.get("special_rules") and not getattr(portion.combat[idx], "special_rules", None):
+            portion.combat[idx].special_rules = raw_entry.get("special_rules")
 
 def extract_stat_modifications_llm(text: str, model: str, client: OpenAI) -> Tuple[List[StatModification], Dict[str, Any]]:
     try:
@@ -140,6 +411,39 @@ def audit_stat_modifications_batch(audit_list: List[Dict[str, Any]], model: str,
         print(f"Global stat modification audit error: {e}")
         return {"removals": [], "corrections": [], "additions": []}
 
+
+def _build_audit_maps(removals: list, corrections: list, additions: list) -> tuple[dict, dict, dict]:
+    removals_map = {}
+    for r in removals or []:
+        sid_r = str(r.get("section_id"))
+        idx = r.get("item_index")
+        if idx is None:
+            continue
+        try:
+            idx_int = int(idx)
+        except (TypeError, ValueError):
+            continue
+        removals_map.setdefault(sid_r, set()).add(idx_int)
+
+    corrections_map = {}
+    for c in corrections or []:
+        sid_c = str(c.get("section_id"))
+        idx = c.get("item_index")
+        if idx is None:
+            continue
+        try:
+            idx_int = int(idx)
+        except (TypeError, ValueError):
+            continue
+        corrections_map.setdefault(sid_c, {})[idx_int] = c.get("data")
+
+    additions_map = {}
+    for a in additions or []:
+        sid_a = str(a.get("section_id"))
+        additions_map.setdefault(sid_a, []).append(a.get("data"))
+
+    return removals_map, corrections_map, additions_map
+
 def main():
     parser = argparse.ArgumentParser(description="Extract stat modifications from enriched portions.")
     parser.add_argument("--portions", required=True, help="Input enriched_portion_v1 JSONL")
@@ -164,6 +468,7 @@ def main():
 
     for idx, row in enumerate(portions):
         portion = EnrichedPortion(**row)
+        _preserve_combat_special_rules(portion, row)
         text = portion.raw_text or html_to_text(portion.raw_html or "")
         
         # 1. TRY: Regex
@@ -184,6 +489,9 @@ def main():
             ai_calls += 1
             if m_ai:
                 mods = m_ai
+        
+        if mods:
+            mods = _filter_combat_modifier_mods(text, mods)
         
         portion.stat_modifications = mods
         
@@ -214,20 +522,7 @@ def main():
             print(f"Global audit identified {len(removals)} removals, {len(corrections)} corrections, and {len(additions)} additions.")
             
             # Map by section ID for easy access
-            removals_map = {}
-            for r in removals:
-                sid_r = str(r.get("section_id"))
-                removals_map.setdefault(sid_r, set()).add(int(r.get("item_index")))
-            
-            corrections_map = {}
-            for c in corrections:
-                sid_c = str(c.get("section_id"))
-                corrections_map.setdefault(sid_c, {})[int(c.get("item_index"))] = c.get("data")
-            
-            additions_map = {}
-            for a in additions:
-                sid_a = str(a.get("section_id"))
-                additions_map.setdefault(sid_a, []).append(a.get("data"))
+            removals_map, corrections_map, additions_map = _build_audit_maps(removals, corrections, additions)
 
             for p in out_portions:
                 sid = str(p.section_id or p.portion_id)
@@ -235,6 +530,8 @@ def main():
                 if sid in corrections_map:
                     for idx, new_data in corrections_map[sid].items():
                         if idx < len(p.stat_modifications):
+                            if not isinstance(new_data, dict):
+                                continue
                             p.stat_modifications[idx] = StatModification(**new_data)
                 
                 # Apply removals

@@ -19,6 +19,15 @@ UNLUCKY_PATTERN = re.compile(r"\bif\s+you\s+are\s+unlucky\b.*?\bturn\s+to\s+(\d+
 # Numeric word map
 NUM_MAP = {"one": 1, "two": 2, "three": 3, "four": 4, "five": 5, "six": 6}
 
+ROLL_CHECK_PATTERN = re.compile(
+    r"roll\s+(one|two|three|four|five|six|\d+)\s+(?:die(?:s)?|dice)"
+    r".{0,160}?\b(skill|stamina|luck)\b"
+    r".{0,80}?turn\s+to\s+(\d+)"
+    r".{0,160}?(?:greater\s+than|more\s+than)"
+    r".{0,80}?turn\s+to\s+(\d+)",
+    re.IGNORECASE | re.DOTALL,
+)
+
 SYSTEM_PROMPT = """You are an expert at parsing Fighting Fantasy gamebook sections.
 Extract stat check mechanics and "Test Your Luck" instructions from the provided text into a JSON object.
 
@@ -95,8 +104,53 @@ def extract_stat_checks_regex(text: str) -> Tuple[List[StatCheck], List[TestLuck
                 unlucky_section=unlucky_match.group(1),
                 confidence=0.7
             ))
+
+    roll_match = ROLL_CHECK_PATTERN.search(text)
+    if roll_match:
+        dice_word = roll_match.group(1).lower()
+        dice_count = NUM_MAP.get(dice_word, None)
+        if dice_count is None:
+            dice_count = int(dice_word) if dice_word.isdigit() else 2
+        stat = roll_match.group(2).upper()
+        pass_section = roll_match.group(3)
+        fail_section = roll_match.group(4)
+        dice_roll = f"{dice_count}d6"
+        checks.append(StatCheck(
+            stat=stat,
+            dice_roll=dice_roll,
+            dice_count=dice_count,
+            dice_sides=6,
+            pass_condition=f"total <= {stat}",
+            pass_section=pass_section,
+            fail_condition=f"total > {stat}",
+            fail_section=fail_section,
+            confidence=0.7
+        ))
             
     return checks, luck_tests
+
+def ensure_test_luck(text: str, luck_tests: List[TestLuck]) -> List[TestLuck]:
+    if luck_tests:
+        return luck_tests
+    if not LUCK_PATTERN.search(text):
+        return luck_tests
+    lucky_match = LUCKY_PATTERN.search(text)
+    unlucky_match = UNLUCKY_PATTERN.search(text)
+    if lucky_match and unlucky_match:
+        return [TestLuck(
+            lucky_section=lucky_match.group(1),
+            unlucky_section=unlucky_match.group(1),
+            confidence=0.7
+        )]
+    return luck_tests
+
+def _filter_stat_checks(text: str, checks: List[StatCheck]) -> List[StatCheck]:
+    lower = text.lower()
+    has_roll = any(k in lower for k in ("roll", "dice", "die"))
+    has_test = any(k in lower for k in ("test your skill", "test your luck", "test your stamina"))
+    if not (has_roll or has_test):
+        return []
+    return checks
 
 def extract_stat_checks_llm(text: str, model: str, client: OpenAI) -> Tuple[List[StatCheck], List[TestLuck], Dict[str, Any]]:
     try:
@@ -194,6 +248,7 @@ def main():
             ai_calls += 1
             if c_ai or l_ai:
                 checks, luck_tests = c_ai, l_ai
+        checks = _filter_stat_checks(text, checks)
         
         portion.stat_checks = checks
         portion.test_luck = luck_tests
@@ -323,6 +378,10 @@ def main():
                             except Exception as e:
                                 print(f"Warning: Skipping invalid stat check addition for section {sid}: {e}")
                                 continue
+
+    for p in out_portions:
+        text = p.raw_text or html_to_text(p.raw_html or "")
+        p.test_luck = ensure_test_luck(text, p.test_luck or [])
 
     final_rows = [p.model_dump(exclude_none=True) for p in out_portions]
     save_jsonl(args.out, final_rows)

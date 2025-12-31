@@ -237,6 +237,15 @@ stages:
       skip_ai: false
       # Auto-detects sections with is_gameplay=true and no choices
 
+  - id: order_sequence
+    stage: enrich
+    module: sequence_order_v1
+    needs: [detect_endings]
+    inputs:
+      portions: detect_endings
+      pages: html_blocks_repaired
+    out: portions_with_sequence.jsonl
+
   - id: report_pipeline_issues
     stage: adapter
     module: report_pipeline_issues_v1
@@ -246,9 +255,9 @@ stages:
   - id: build_gamebook
     stage: build
     module: build_ff_engine_with_issues_v1
-    needs: [report_pipeline_issues, detect_endings]
+    needs: [report_pipeline_issues, order_sequence]
     inputs:
-      portions: detect_endings
+      portions: order_sequence
       issues_report: report_pipeline_issues
     out: gamebook_raw.json
     params:
@@ -272,7 +281,7 @@ stages:
       remove_page_numbers: true
       remove_images: true
 
-  - id: validate_gamebook
+  - id: forensics_gamebook
     stage: validate
     module: validate_ff_engine_v2
     needs: [clean_presentation, report_pipeline_issues, detect_endings, detect_boundaries_html, html_blocks_repaired, validate_reachability]
@@ -285,6 +294,14 @@ stages:
     out: validation_report.json
     params:
       forensics: true
+
+  - id: validate_gamebook_node
+    stage: export
+    module: validate_ff_engine_node_v1
+    needs: [clean_presentation]
+    inputs:
+      input: clean_presentation
+    out: gamebook_validation_node.json
 
   - id: validate_choice_completeness
     stage: validate
@@ -300,11 +317,11 @@ stages:
   - id: validate_game_ready
     stage: validate
     module: validate_game_ready_v1
-    needs: [validate_gamebook, validate_choice_completeness, report_pipeline_issues, validate_reachability, clean_presentation]
+    needs: [validate_gamebook_node, validate_choice_completeness, report_pipeline_issues, validate_reachability, clean_presentation]
     inputs:
       gamebook: clean_presentation
       choice_report: validate_choice_completeness
       reachability_report: validate_reachability
-      engine_report: validate_gamebook
+      engine_report: validate_gamebook_node
       issues_report: report_pipeline_issues
     out: game_ready_validation_report.json

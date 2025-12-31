@@ -34,6 +34,9 @@ params:
     desc: Include raw/clean text in provenance
     required: false
     default: true
+  - name: validator_version
+    desc: Validator version stamp (defaults to bundled Node validator version)
+    required: false
 notes: >
   Emits Fighting Fantasy Engine schema-compatible JSON with extra provenance
   retained under each section. Safe to run on resolved_portion or enriched_portion outputs.
