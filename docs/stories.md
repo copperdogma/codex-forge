@@ -123,7 +123,7 @@ This index tracks stories in `/docs/stories/` for the codex-forge pipeline.
 ||| 105 | Choice Text Enrichment (Spec Only) | Medium | To Do | /docs/stories/story-105-choice-text-enrichment.md |
 |||| 106 | Gamebook Schema Navigation Improvements | Medium | Done | /docs/stories/story-106-gamebook-schema-navigation-improvements.md |
 |||| 107 | Shared Validator Unification (Node/AJV Canonical) | High | Done | /docs/stories/story-107-shared-validator-unification.md |
-|||| 108 | Game-Ready Output Package | High | To Do | /docs/stories/story-108-game-ready-output-package.md |
+|||| 108 | Game-Ready Output Package | High | Done | /docs/stories/story-108-game-ready-output-package.md |
 
 ## Notes
 - Status "Done" reflects current working state in codex-forge. "To Do" items are planned next steps aligned with `docs/requirements.md` and `snapshot.md`.

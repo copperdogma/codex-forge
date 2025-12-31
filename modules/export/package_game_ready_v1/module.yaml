@@ -1,0 +1,23 @@
+module_id: package_game_ready_v1
+stage: export
+description: Package game-ready artifacts (gamebook.json + validator) into a single output folder.
+entrypoint: modules/export/package_game_ready_v1/main.py
+input_schema: null
+output_schema: null
+params:
+  - name: input
+    desc: Path to gamebook.json (clean_presentation output)
+    required: true
+  - name: gamebook
+    desc: Alias for --input (optional)
+    required: false
+  - name: recipe
+    desc: Optional path to recipe yaml; defaults to snapshots/recipe.yaml in run dir
+    required: false
+  - name: run_dir
+    desc: Optional run directory; inferred from gamebook path if omitted
+    required: false
+  - name: out
+    desc: Output directory for the packaged artifacts (defaults to <run_dir>/output)
+    required: false
+notes: "Creates output/ package containing gamebook.json, validator folder, and README.md. Additive only."

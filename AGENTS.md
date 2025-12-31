@@ -228,6 +228,7 @@ Before portionization, automatically flag pages for high-fidelity re-OCR if eith
 - Artifacts live under `output/runs/<run_id>/`.
 - **Artifact organization**: Each module's artifacts are in `{ordinal:02d}_{module_id}/` folders directly in run_dir (e.g., `01_extract_ocr_ensemble_v1/pages_raw.jsonl`)
 - **Final outputs**: `gamebook.json` stays in root for easy access
+- **Game-ready package**: `output/runs/<run_id>/output/` (contains `gamebook.json` + `validator/` bundle + README)
 - **Pipeline metadata**: `pipeline_state.json`, `pipeline_events.jsonl`, `snapshots/` remain in root
 - Driver now auto-generates a fresh `run_id`/output directory per run; reuse is opt-in via `--allow-run-id-reuse` (or explicit `--run-id`).
 - Input PDF: `input/06 deathtrap dungeon.pdf`; images: `input/images/`.

@@ -641,3 +641,14 @@
 
 ### Tested
 - `python driver.py --recipe configs/recipes/recipe-ff-ai-ocr-gpt51-pristine-fast.yaml --run-id ff-ai-ocr-gpt51-pristine-fast-full --output-dir output/runs/ff-ai-ocr-gpt51-pristine-fast-full --start-from detect_endings --allow-run-id-reuse`
+## [2025-12-31] - Game-ready output package bundling
+
+### Added
+- `package_game_ready_v1` export module to bundle `gamebook.json` and validator into `output/` with README.
+
+### Changed
+- Canonical GPT‑5.1 FF recipes now append the game-ready package stage.
+- Docs reference `output/runs/<run_id>/output/` as the ship-ready bundle location.
+
+### Tested
+- `python driver.py --recipe configs/recipes/recipe-ff-ai-ocr-gpt51.yaml --run-id ff-ai-ocr-gpt51-pristine-fast-full --allow-run-id-reuse --output-dir output/runs/ff-ai-ocr-gpt51-pristine-fast-full --start-from package_game_ready`

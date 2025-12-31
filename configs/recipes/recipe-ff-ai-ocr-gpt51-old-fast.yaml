@@ -330,3 +330,11 @@ stages:
     out: game_ready_validation_report.json
     params:
       known_missing: "169,170"
+
+  - id: package_game_ready
+    stage: export
+    module: package_game_ready_v1
+    needs: [clean_presentation, validate_game_ready, validate_gamebook_node]
+    inputs:
+      gamebook: clean_presentation
+    out: ../output
