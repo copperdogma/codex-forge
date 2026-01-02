@@ -360,9 +360,26 @@ def _normalize_target(raw: Optional[Any]) -> Tuple[Optional[str], Optional[Dict[
     match = re.search(r"\b(\d+)\b", s)
     if match:
         return match.group(1), None
-    if any(phrase in lower for phrase in ("continue", "still alive", "if alive", "if you're alive", "if you are alive", "if you survive")):
-        return None, None
+    if re.search(r"\bcontinue\b", lower) or any(phrase in lower for phrase in ("still alive", "if alive", "if you're alive", "if you are alive", "if you survive")):
+        return None, {"kind": "continue", "message": s}
     return s, None
+
+
+def _normalize_outcome_ref(outcome: Optional[Dict[str, Any]]) -> Optional[Dict[str, Any]]:
+    if not isinstance(outcome, dict):
+        return None
+    if outcome.get("terminal"):
+        return {"terminal": outcome.get("terminal")}
+    target_raw = outcome.get("targetSection")
+    if isinstance(target_raw, str) and not re.search(r"\d", target_raw):
+        if not re.search(r"\bcontinue\b", target_raw.lower()):
+            return None
+    target, terminal = _normalize_target(target_raw)
+    if terminal:
+        return {"terminal": terminal}
+    if target:
+        return {"targetSection": target}
+    return None
 
 
 def _outcome_ref(target: Optional[str], terminal: Optional[Dict[str, Any]]) -> Optional[Dict[str, Any]]:
@@ -428,7 +445,7 @@ def _is_survival_damage_check(
     fail_target, fail_terminal = _normalize_target(check.get("fail_section"))
     pass_continues = pass_target is None or pass_target == section_id
     fail_is_terminal = fail_terminal is not None and fail_target is None
-    return pass_continues and fail_is_terminal and pass_terminal is None
+    return pass_continues and fail_is_terminal and (pass_terminal is None or pass_terminal.get("kind") == "continue")
 
 
 def _append_choice(events: List[Dict[str, Any]], seen: set, *, target: Optional[Any], choice_text: Optional[str] = None) -> None:
@@ -472,8 +489,10 @@ def build_sequence_from_portion(portion: Dict[str, Any], section_id: str) -> Lis
             "kind": "stat_change",
             "stat": mod.get("stat"),
             "amount": mod.get("amount"),
-            "permanent": mod.get("permanent", False),
+            "scope": mod.get("scope", "section"),
         })
+        if mod.get("reason"):
+            stat_events[-1]["reason"] = mod.get("reason")
 
     stat_checks = [c for c in (portion.get("stat_checks") or []) if isinstance(c, dict)]
     plain_dice_check = _extract_plain_dice_check(portion.get("raw_html", ""))
@@ -642,36 +661,36 @@ def build_sequence_from_portion(portion: Dict[str, Any], section_id: str) -> Lis
     portion_combat = portion.get("combat") or []
     if not isinstance(portion_combat, list):
         portion_combat = [portion_combat]
-    enemies = []
-    combat_outcomes: Dict[str, Any] = {}
     for c in portion_combat:
         if not isinstance(c, dict):
             continue
-        if c.get("skill") is None or c.get("stamina") is None:
+        enemies = c.get("enemies") or []
+        if not isinstance(enemies, list) or not enemies:
             continue
-        enemies.append({
-            "enemy": c.get("enemy") or c.get("name") or "Creature",
-            "skill": c.get("skill"),
-            "stamina": c.get("stamina"),
-        })
-        if c.get("special_rules") and isinstance(c.get("special_rules"), str):
-            enemies[-1]["special_rules"] = c.get("special_rules")
-        win_target, win_terminal = _normalize_target(c.get("win_section") or c.get("winSection"))
-        lose_target, lose_terminal = _normalize_target(c.get("loss_section") or c.get("loseSection"))
-        escape_target, escape_terminal = _normalize_target(c.get("escape_section") or c.get("escapeSection"))
-        win_ref = _outcome_ref(win_target, win_terminal)
-        lose_ref = _outcome_ref(lose_target, lose_terminal)
-        escape_ref = _outcome_ref(escape_target, escape_terminal)
-        if win_ref:
-            combat_outcomes["win"] = win_ref
-        if lose_ref:
-            combat_outcomes["lose"] = lose_ref
-        if escape_ref:
-            combat_outcomes["escape"] = escape_ref
-    if enemies:
         combat_event: Dict[str, Any] = {"kind": "combat", "enemies": enemies}
-        if combat_outcomes:
-            combat_event["outcomes"] = combat_outcomes
+        for field in ("mode", "rules", "modifiers", "triggers"):
+            value = c.get(field)
+            if not value:
+                continue
+            if field == "rules" and isinstance(value, list):
+                value = [r for r in value if not (isinstance(r, dict) and r.get("kind") == "note")]
+                if not value:
+                    continue
+            combat_event[field] = value
+        outcomes = c.get("outcomes")
+        if isinstance(outcomes, dict):
+            normalized: Dict[str, Any] = {}
+            for key in ("win", "lose", "escape"):
+                raw = outcomes.get(key)
+                if isinstance(raw, dict):
+                    ref = _normalize_outcome_ref(raw)
+                else:
+                    target, terminal = _normalize_target(raw)
+                    ref = _outcome_ref(target, terminal)
+                if ref:
+                    normalized[key] = ref
+            if normalized:
+                combat_event["outcomes"] = normalized
         mechanics_events.append(combat_event)
 
     for death in portion.get("deathConditions") or []:

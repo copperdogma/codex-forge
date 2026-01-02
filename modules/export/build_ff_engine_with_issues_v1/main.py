@@ -227,6 +227,82 @@ def _reorder_combat_outcomes(sequence: List[Dict[str, Any]]) -> List[Dict[str, A
     return seq
 
 
+def _drop_combat_outcome_choices(sequence: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+    if not sequence:
+        return sequence
+    outcome_targets = set()
+    for ev in sequence:
+        if ev.get("kind") != "combat":
+            continue
+        outcomes = ev.get("outcomes") or {}
+        for ref in outcomes.values():
+            if isinstance(ref, dict) and ref.get("targetSection") is not None:
+                outcome_targets.add(str(ref.get("targetSection")))
+    if not outcome_targets:
+        return sequence
+    filtered = []
+    for ev in sequence:
+        if ev.get("kind") != "choice":
+            filtered.append(ev)
+            continue
+        target = str(ev.get("targetSection") or "")
+        if target not in outcome_targets:
+            filtered.append(ev)
+            continue
+        text = ev.get("choiceText")
+        if text and re.match(rf"^\s*turn\s+to\s+{re.escape(target)}\s*\.?\s*$", text, re.IGNORECASE) and not ev.get("effects"):
+            continue
+        filtered.append(ev)
+    return filtered
+
+
+def _drop_mechanic_outcome_choices(sequence: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+    if not sequence:
+        return sequence
+    outcome_targets = set()
+    for ev in sequence:
+        kind = ev.get("kind")
+        if kind == "test_luck":
+            for key in ("lucky", "unlucky"):
+                ref = ev.get(key) or {}
+                target = ref.get("targetSection")
+                if target is not None:
+                    outcome_targets.add(str(target))
+        elif kind == "stat_check":
+            for key in ("pass", "fail"):
+                ref = ev.get(key) or {}
+                target = ref.get("targetSection")
+                if target is not None:
+                    outcome_targets.add(str(target))
+        elif kind in {"item_check", "state_check"}:
+            for key in ("has", "missing"):
+                ref = ev.get(key) or {}
+                target = ref.get("targetSection")
+                if target is not None:
+                    outcome_targets.add(str(target))
+        elif kind == "conditional":
+            for branch in ("then", "else"):
+                for ev2 in ev.get(branch) or []:
+                    if ev2.get("kind") == "choice" and ev2.get("targetSection") is not None:
+                        outcome_targets.add(str(ev2.get("targetSection")))
+    if not outcome_targets:
+        return sequence
+    filtered = []
+    for ev in sequence:
+        if ev.get("kind") != "choice":
+            filtered.append(ev)
+            continue
+        target = str(ev.get("targetSection") or "")
+        if target not in outcome_targets:
+            filtered.append(ev)
+            continue
+        text = ev.get("choiceText")
+        if text and re.match(rf"^\s*turn\s+to\s+{re.escape(target)}\s*\.?\s*$", text, re.IGNORECASE) and not ev.get("effects"):
+            continue
+        filtered.append(ev)
+    return filtered
+
+
 def _drop_choice_remove_duplicates(sequence: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
     if not sequence:
         return sequence
@@ -263,7 +339,8 @@ def _dedupe_stat_events(sequence: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
         key = (
             str(ev.get("stat") or "").lower(),
             str(ev.get("amount")),
-            bool(ev.get("permanent", False)),
+            str(ev.get("scope") or "section").lower(),
+            str(ev.get("reason") or ""),
         )
         if key in seen:
             continue
@@ -395,8 +472,8 @@ def _normalize_target(raw: Optional[Any]) -> Tuple[Optional[str], Optional[Dict[
     if match:
         return match.group(1), None
     lower = s.lower()
-    if any(phrase in lower for phrase in ("continue", "still alive", "if alive", "if you're alive", "if you are alive", "if you survive")):
-        return None, None
+    if re.search(r"\bcontinue\b", lower) or any(phrase in lower for phrase in ("still alive", "if alive", "if you're alive", "if you are alive", "if you survive")):
+        return None, {"kind": "continue", "message": s}
     if any(k in lower for k in ("death", "die", "dead", "killed", "kill", "slain")):
         return None, {"kind": "death", "message": s}
     return s, None
@@ -409,7 +486,8 @@ def _normalize_outcome_ref(outcome: Optional[Dict[str, Any]]) -> Optional[Dict[s
         return {"terminal": outcome.get("terminal")}
     target_raw = outcome.get("targetSection")
     if isinstance(target_raw, str) and not re.search(r"\d", target_raw):
-        return None
+        if not re.search(r"\bcontinue\b", target_raw.lower()):
+            return None
     target, terminal = _normalize_target(target_raw)
     if terminal:
         return {"terminal": terminal}
@@ -559,7 +637,7 @@ def _is_survival_damage_check(
     fail_target, fail_terminal = _normalize_target(check.get("fail_section"))
     pass_continues = pass_target is None or pass_target == section_id
     fail_is_terminal = fail_terminal is not None and fail_target is None
-    return pass_continues and fail_is_terminal and pass_terminal is None
+    return pass_continues and fail_is_terminal and (pass_terminal is None or pass_terminal.get("kind") == "continue")
 
 
 def _dedupe_item_events(events: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
@@ -647,7 +725,8 @@ def make_sequence(portion: Dict[str, Any], section_id: str) -> List[Dict[str, An
         key = (
             str(mod.get("stat")).lower(),
             str(mod.get("amount")),
-            bool(mod.get("permanent", False)),
+            str(mod.get("scope") or "section").lower(),
+            str(mod.get("reason") or ""),
         )
         if key in stat_seen:
             continue
@@ -656,8 +735,10 @@ def make_sequence(portion: Dict[str, Any], section_id: str) -> List[Dict[str, An
             "kind": "stat_change",
             "stat": mod.get("stat"),
             "amount": mod.get("amount"),
-            "permanent": mod.get("permanent", False),
+            "scope": mod.get("scope", "section"),
         }
+        if mod.get("reason"):
+            stat_event["reason"] = mod.get("reason")
         stat_events.append(stat_event)
 
     # Stat checks (may fold into stat_change)
@@ -812,34 +893,31 @@ def make_sequence(portion: Dict[str, Any], section_id: str) -> List[Dict[str, An
     portion_combat = portion.get("combat") or []
     if not isinstance(portion_combat, list):
         portion_combat = [portion_combat]
-    enemies = []
-    combat_outcomes: Dict[str, Any] = {}
     for c in portion_combat:
         if not isinstance(c, dict):
             continue
-        if c.get("skill") is None or c.get("stamina") is None:
+        enemies = c.get("enemies") or []
+        if not isinstance(enemies, list) or not enemies:
             continue
-        enemies.append({
-            "enemy": c.get("enemy") or c.get("name") or "Creature",
-            "skill": c.get("skill"),
-            "stamina": c.get("stamina"),
-        })
-        win_target, win_terminal = _normalize_target(c.get("win_section") or c.get("winSection"))
-        lose_target, lose_terminal = _normalize_target(c.get("loss_section") or c.get("loseSection"))
-        escape_target, escape_terminal = _normalize_target(c.get("escape_section") or c.get("escapeSection"))
-        win_ref = _outcome_ref(win_target, win_terminal)
-        lose_ref = _outcome_ref(lose_target, lose_terminal)
-        escape_ref = _outcome_ref(escape_target, escape_terminal)
-        if win_ref:
-            combat_outcomes["win"] = win_ref
-        if lose_ref:
-            combat_outcomes["lose"] = lose_ref
-        if escape_ref:
-            combat_outcomes["escape"] = escape_ref
-    if enemies:
         combat_event: Dict[str, Any] = {"kind": "combat", "enemies": enemies}
-        if combat_outcomes:
-            combat_event["outcomes"] = combat_outcomes
+        for field in ("mode", "rules", "modifiers", "triggers"):
+            value = c.get(field)
+            if value:
+                combat_event[field] = value
+        outcomes = c.get("outcomes")
+        if isinstance(outcomes, dict):
+            normalized: Dict[str, Any] = {}
+            for key in ("win", "lose", "escape"):
+                raw = outcomes.get(key)
+                if isinstance(raw, dict):
+                    ref = _normalize_outcome_ref(raw)
+                else:
+                    target, terminal = _normalize_target(raw)
+                    ref = _outcome_ref(target, terminal)
+                if ref:
+                    normalized[key] = ref
+            if normalized:
+                combat_event["outcomes"] = normalized
         mechanics_events.append(combat_event)
 
     # Death conditions
@@ -941,6 +1019,8 @@ def build_section(portion: Dict[str, Any], emit_text: bool, emit_provenance_text
     sequence = _dedupe_stat_events(sequence)
     sequence = _dedupe_item_events(sequence)
     sequence = _reorder_combat_outcomes(sequence)
+    sequence = _drop_combat_outcome_choices(sequence)
+    sequence = _drop_mechanic_outcome_choices(sequence)
     if section_id.lower() == "background":
         has_turn_to_one = False
         for event in sequence or []:
@@ -1177,12 +1257,15 @@ def main():
             start_section = sorted(sections.keys())[0]
 
     validator_version = args.validator_version or _read_validator_version()
+    numeric_ids = [int(sid) for sid in sections.keys() if str(sid).isdigit()]
+    section_count = max(numeric_ids) if numeric_ids else len(sections)
     gamebook = {
         "metadata": {
             "title": args.title,
             "author": args.author,
             "startSection": start_section,
             "formatVersion": args.format_version,
+            "sectionCount": section_count,
             **({"validatorVersion": validator_version} if validator_version else {}),
         },
         "sections": sections,

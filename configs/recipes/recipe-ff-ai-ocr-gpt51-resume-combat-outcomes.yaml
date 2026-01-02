@@ -1,0 +1,140 @@
+name: ff-ai-ocr-gpt51-resume-combat-outcomes
+
+stages:
+  - id: load_portions
+    stage: extract
+    module: load_artifact_enriched_portion_v1
+    out: portions_with_choices_validated.jsonl
+    params:
+      path: output/runs/ff-ai-ocr-gpt51-pristine-fast-full/13_validate_choice_links_v1/portions_with_choices_validated.jsonl
+
+  - id: load_pages
+    stage: extract
+    module: load_artifact_v1
+    out: page_blocks_repaired.jsonl
+    params:
+      path: output/runs/ff-ai-ocr-gpt51-pristine-fast-full/08_html_to_blocks_v1/page_blocks_repaired.jsonl
+
+  - id: extract_combat
+    stage: enrich
+    module: extract_combat_v1
+    needs: [load_portions, load_pages]
+    inputs:
+      portions: load_portions
+      pages: load_pages
+    out: portions_with_combat.jsonl
+    params:
+      model: gpt-4.1-mini
+      use_ai: true
+      max_ai_calls: 50
+
+  - id: extract_inventory
+    stage: enrich
+    module: extract_inventory_v1
+    needs: [extract_combat, load_pages]
+    inputs:
+      portions: extract_combat
+      pages: load_pages
+    out: portions_with_inventory.jsonl
+    params:
+      model: gpt-4.1-mini
+      use_ai: true
+      max_ai_calls: 50
+
+  - id: extract_stat_checks
+    stage: enrich
+    module: extract_stat_checks_v1
+    needs: [extract_inventory, load_pages]
+    inputs:
+      portions: extract_inventory
+      pages: load_pages
+    out: portions_with_stats.jsonl
+    params:
+      model: gpt-4.1-mini
+      use_ai: true
+      max_ai_calls: 50
+
+  - id: extract_stat_modifications
+    stage: enrich
+    module: extract_stat_modifications_v1
+    needs: [extract_stat_checks, load_pages]
+    inputs:
+      portions: extract_stat_checks
+      pages: load_pages
+    out: portions_with_mods.jsonl
+    params:
+      model: gpt-4.1-mini
+      use_ai: true
+      max_ai_calls: 50
+
+  - id: validate_reachability
+    stage: validate
+    module: validate_holistic_reachability_v1
+    needs: [extract_stat_modifications]
+    inputs:
+      portions: extract_stat_modifications
+    out: reachability_report.json
+
+  - id: detect_endings
+    stage: enrich
+    module: ending_guard_v1
+    needs: [extract_stat_modifications]
+    inputs:
+      pages: load_pages
+      inputs: extract_stat_modifications
+    out: portions_with_endings.jsonl
+    params:
+      model: gpt-5.1
+      skip_ai: false
+
+  - id: order_sequence
+    stage: enrich
+    module: sequence_order_v1
+    needs: [detect_endings]
+    inputs:
+      portions: detect_endings
+      pages: load_pages
+    out: portions_with_sequence.jsonl
+
+  - id: report_pipeline_issues
+    stage: adapter
+    module: report_pipeline_issues_v1
+    needs: [detect_endings]
+    out: issues_report.jsonl
+
+  - id: build_gamebook
+    stage: build
+    module: build_ff_engine_with_issues_v1
+    needs: [report_pipeline_issues, order_sequence]
+    inputs:
+      portions: order_sequence
+      issues_report: report_pipeline_issues
+    out: gamebook_raw.json
+    params:
+      title: Deathtrap Dungeon
+      author: Ian Livingstone
+      emit_text: false
+      emit_provenance_text: false
+      allow_stubs: true
+
+  - id: clean_presentation
+    stage: export
+    module: clean_html_presentation_v1
+    needs: [build_gamebook]
+    inputs:
+      input: build_gamebook
+    out: gamebook.json
+    params:
+      preserve_original_html: true
+      remove_section_headers: true
+      remove_running_heads: true
+      remove_page_numbers: true
+      remove_images: true
+
+  - id: validate_gamebook_node
+    stage: export
+    module: validate_ff_engine_node_v1
+    needs: [clean_presentation]
+    inputs:
+      input: clean_presentation
+    out: gamebook_validation_node.json

@@ -1,0 +1,166 @@
+{
+  "metadata": {
+    "title": "Example Fighting Fantasy Book",
+    "author": "Example Author",
+    "startSection": "1",
+    "formatVersion": "1.0.0",
+    "validatorVersion": "1.0.0",
+    "sectionCount": 5
+  },
+  "sections": {
+    "1": {
+      "id": "1",
+      "presentation_html": "<p>You draw your sword as the beast attacks.</p>",
+      "pageStart": 1,
+      "pageEnd": 1,
+      "isGameplaySection": true,
+      "type": "section",
+      "sequence": [
+        {
+          "kind": "combat",
+          "mode": "single",
+          "enemies": [
+            {
+              "enemy": "CAVE BEAST",
+              "skill": 7,
+              "stamina": 8
+            }
+          ],
+          "modifiers": [
+            {
+              "kind": "stat_change",
+              "stat": "skill",
+              "amount": -2,
+              "scope": "combat",
+              "reason": "slippery footing"
+            }
+          ],
+          "rules": [
+            {
+              "kind": "fight_singly"
+            }
+          ],
+          "triggers": [
+            {
+              "kind": "enemy_attack_strength_total",
+              "value": 20,
+              "outcome": {
+                "targetSection": "3"
+              }
+            }
+          ],
+          "outcomes": {
+            "win": {
+              "targetSection": "2"
+            },
+            "lose": {
+              "terminal": {
+                "kind": "death"
+              }
+            },
+            "escape": {
+              "targetSection": "3"
+            }
+          }
+        }
+      ]
+    },
+    "2": {
+      "id": "2",
+      "presentation_html": "<p>You gain the upper hand. As soon as you win your first Attack Round, Test your Luck.</p>",
+      "pageStart": 2,
+      "pageEnd": 2,
+      "isGameplaySection": true,
+      "type": "section",
+      "sequence": [
+        {
+          "kind": "combat",
+          "mode": "single",
+          "enemies": [
+            {
+              "enemy": "BLOODBEAST",
+              "skill": 12,
+              "stamina": 10
+            }
+          ],
+          "triggers": [
+            {
+              "kind": "player_round_win",
+              "count": 1,
+              "outcome": {
+                "terminal": {
+                  "kind": "continue"
+                }
+              }
+            }
+          ],
+          "outcomes": {
+            "win": {
+              "terminal": {
+                "kind": "continue"
+              }
+            }
+          }
+        },
+        {
+          "kind": "test_luck",
+          "lucky": {
+            "targetSection": "4"
+          },
+          "unlucky": {
+            "targetSection": "5"
+          }
+        }
+      ]
+    },
+    "3": {
+      "id": "3",
+      "presentation_html": "<p>You flee back into the tunnel.</p>",
+      "pageStart": 3,
+      "pageEnd": 3,
+      "isGameplaySection": true,
+      "type": "section",
+      "sequence": [
+        {
+          "kind": "choice",
+          "targetSection": "1",
+          "choiceText": "Return to the fight"
+        }
+      ]
+    },
+    "4": {
+      "id": "4",
+      "presentation_html": "<p>Victory is yours.</p>",
+      "pageStart": 4,
+      "pageEnd": 4,
+      "isGameplaySection": true,
+      "type": "section",
+      "sequence": [
+        {
+          "kind": "choice",
+          "targetSection": "5",
+          "choiceText": "Continue"
+        }
+      ]
+    },
+    "5": {
+      "id": "5",
+      "presentation_html": "<p>Your luck fails and the beast overpowers you.</p>",
+      "pageStart": 5,
+      "pageEnd": 5,
+      "isGameplaySection": true,
+      "type": "section",
+      "sequence": [
+        {
+          "kind": "death",
+          "outcome": {
+            "terminal": {
+              "kind": "death"
+            }
+          },
+          "description": "Defeated in battle"
+        }
+      ]
+    }
+  }
+}

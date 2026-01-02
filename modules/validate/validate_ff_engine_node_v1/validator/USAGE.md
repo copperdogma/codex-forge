@@ -41,9 +41,9 @@ const result = validateGamebook(gamebookData);
 ```
 
 **Input expectation:** Sections should include `presentation_html` as the narrative field. The validator no longer requires the older `text` field.
-Gameplay sections must include ordered `sequence` events. Outcomes can be terminal (no `targetSection`) when the outcome ends the game; represent these with a `terminal` object.
+Gameplay sections must include ordered `sequence` events. Outcomes can be non-target (no `targetSection`) for terminal endings or in-section continuation; represent these with a `terminal` object.
 Include `metadata.validatorVersion` in gamebook output to detect validator mismatches.
-Missing section checks use `gamebook.provenance.expected_range` when available (defaults to `1-400`).
+Missing section checks use `gamebook.metadata.sectionCount` when available, otherwise `gamebook.provenance.expected_range` (defaults to `1-400`).
 
 ---
 

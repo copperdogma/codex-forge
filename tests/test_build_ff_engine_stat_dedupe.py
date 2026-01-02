@@ -4,10 +4,10 @@ from modules.export.build_ff_engine_v1.main import build_section, make_sequence
 def test_stat_change_dedupe():
     portion = {
         "stat_modifications": [
-            {"stat": "stamina", "amount": -2, "permanent": False},
-            {"stat": "stamina", "amount": -2, "permanent": False},
-            {"stat": "luck", "amount": -1, "permanent": False},
-            {"stat": "luck", "amount": -1, "permanent": False},
+            {"stat": "stamina", "amount": -2, "scope": "section"},
+            {"stat": "stamina", "amount": -2, "scope": "section"},
+            {"stat": "luck", "amount": -1, "scope": "section"},
+            {"stat": "luck", "amount": -1, "scope": "section"},
         ],
         "stat_checks": [],
         "choices": [{"target": "10", "text": "Turn to 10"}],
@@ -32,8 +32,8 @@ def test_stat_change_dedupe_on_prebuilt_sequence():
         "raw_text": "",
         "raw_html": "",
         "sequence": [
-            {"kind": "stat_change", "stat": "luck", "amount": -2, "permanent": False},
-            {"kind": "stat_change", "stat": "luck", "amount": -2, "permanent": False},
+            {"kind": "stat_change", "stat": "luck", "amount": -2, "scope": "section"},
+            {"kind": "stat_change", "stat": "luck", "amount": -2, "scope": "section"},
             {"kind": "choice", "targetSection": "10", "choiceText": "Turn to 10"},
         ],
     }

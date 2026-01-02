@@ -7,14 +7,19 @@ class Choice(BaseModel):
     text: Optional[str] = None
 
 
-class Combat(BaseModel):
+class CombatEnemy(BaseModel):
+    enemy: Optional[str] = None
     skill: int
     stamina: int
-    enemy: Optional[str] = None
-    win_section: Optional[str] = None
-    loss_section: Optional[str] = None
-    escape_section: Optional[str] = None
-    special_rules: Optional[str] = None
+
+
+class Combat(BaseModel):
+    enemies: List[CombatEnemy] = Field(default_factory=list)
+    outcomes: Optional[Dict[str, Any]] = None
+    mode: Optional[str] = None
+    rules: Optional[List[Dict[str, Any]]] = None
+    modifiers: Optional[List[Dict[str, Any]]] = None
+    triggers: Optional[List[Dict[str, Any]]] = None
     confidence: float = 1.0
 
 
@@ -79,7 +84,8 @@ class TestLuck(BaseModel):
 class StatModification(BaseModel):
     stat: str  # skill, stamina, luck (lowercase normalized)
     amount: Union[int, str]
-    permanent: bool = False
+    scope: str = "section"
+    reason: Optional[str] = None
     confidence: float = 1.0
 
 

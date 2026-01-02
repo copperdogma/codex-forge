@@ -6,6 +6,28 @@
 - Resume-build recipe and load adapter for reusing enriched portions.
 - Tests covering sequence normalization, choice effects, inventory/stat/combat extraction, and stat-change dice patterns.
 
+## [2026-01-02] - Combat vNext outcomes, schema updates, and special-case docs
+
+### Added
+- Combat vNext schema support (rules/modifiers/triggers/modes) with new triggers and terminal continuation outcomes.
+- Resume recipes and export tools for combat section analysis.
+- Integration and validator tests for combat outcomes, including section 143 split-target coverage.
+- Story 111 special-case detection patterns for the edge-case scanner.
+
+### Changed
+- Combat extraction, sequence ordering, and export normalization to enforce `outcomes.win` and dedupe mechanic/choice overlaps.
+- Stat changes now use `scope` instead of legacy `permanent`.
+- Validator now honors `metadata.sectionCount` and enforces combat outcome presence.
+- README updated with combat outcome conventions and examples.
+
+### Fixed
+- Synthetic example now matches schema (`choiceText` usage).
+
+### Tested
+- `pytest tests/test_extract_combat_v1.py tests/test_sequence_order_v1.py tests/test_build_ff_engine_sequence_normalize.py`
+- `pytest tests/test_integration_combat_outcomes.py`
+- `pytest tests/test_validate_combat_outcomes.py`
+
 ### Changed
 - `sequence` replaces legacy navigation fields throughout build/validation outputs.
 - Node validator is canonical in recipes; Python validator is forensics-only.

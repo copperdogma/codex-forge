@@ -28,3 +28,11 @@ def test_ensure_test_luck_recovers_missing():
     assert len(luck) == 1
     assert luck[0].lucky_section == "97"
     assert luck[0].unlucky_section == "21"
+
+
+def test_ensure_test_luck_falls_back_to_two_numbers_near_turn_to():
+    text = "Test your Luck. If you are Lucky, turn to 97 21."
+    luck = ensure_test_luck(text, [])
+    assert len(luck) == 1
+    assert luck[0].lucky_section == "97"
+    assert luck[0].unlucky_section == "21"

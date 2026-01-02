@@ -77,6 +77,10 @@ function stripHtmlToText(html) {
 }
 
 function parseExpectedRange(gamebook) {
+  const metaCount = gamebook?.metadata?.sectionCount;
+  if (Number.isFinite(metaCount) && metaCount > 0) {
+    return { min: 1, max: Math.floor(metaCount) };
+  }
   const fromProvenance = gamebook?.provenance?.expected_range || gamebook?.provenance?.expectedRange;
   const raw = typeof fromProvenance === 'string' && fromProvenance ? fromProvenance : '1-400';
   const match = raw.match(/^\\s*(\\d+)\\s*-\\s*(\\d+)\\s*$/);

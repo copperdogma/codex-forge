@@ -216,7 +216,7 @@ Before portionization, automatically flag pages for high-fidelity re-OCR if eith
 - Use `driver.py` with recipes in `configs/recipes/`.
 - **Primary recipe for Fighting Fantasy**: `recipe-ff-ai-ocr-gpt51.yaml` (GPT-5.1 AI-first OCR, HTML output)
 - Legacy OCR ensemble recipe (`configs/recipes/legacy/recipe-ff-canonical.yaml`) is deprecated; do not use.
-- **Canonical validator**: `validate_ff_engine_node_v1` (Node/Ajv) is the authoritative schema validator and should ship alongside `gamebook.json` to the game engine. Python `validate_ff_engine_v2` remains for forensics only.
+- **Canonical validator**: `validate_ff_engine_node_v1` (Node/Ajv) is the authoritative schema validator and should ship alongside `gamebook.json` to the game engine. It is generic across Fighting Fantasy books (not tuned to a specific title). Python `validate_ff_engine_v2` remains for forensics only.
 - Other recipes: `configs/recipes/legacy/recipe-ocr.yaml`, `configs/recipes/recipe-text.yaml` (for reference/testing only)
 - Legacy linear scripts were removed; use modules only.
 

@@ -68,12 +68,12 @@ node build_bundle.js
 ✅ Reachability (warns about unreachable sections)  
 ✅ Allows extra data (won't error on additional properties)
 
-Missing section checks use `gamebook.provenance.expected_range` when available (defaults to `1-400`).
+Missing section checks use `gamebook.metadata.sectionCount` when available, otherwise `gamebook.provenance.expected_range` (defaults to `1-400`).
 
 ## Expected Section Payload
 
 Each section must include **`presentation_html`** (cleaned HTML for display). The validator does **not** require the older `text` field and treats any additional fields as optional extras.
-Gameplay sections must include an ordered **`sequence`** array. Outcomes may omit `targetSection` when terminal (e.g., death), using a `terminal` object.
+Gameplay sections must include an ordered **`sequence`** array. Outcomes may omit `targetSection` when using a non-target outcome (e.g., death or in-section continuation), using a `terminal` object.
 Gamebooks should include `metadata.validatorVersion` so the validator can warn on version mismatch.
 
 ## Output Format

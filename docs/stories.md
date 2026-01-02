@@ -124,6 +124,9 @@ This index tracks stories in `/docs/stories/` for the codex-forge pipeline.
 |||| 106 | Gamebook Schema Navigation Improvements | Medium | Done | /docs/stories/story-106-gamebook-schema-navigation-improvements.md |
 |||| 107 | Shared Validator Unification (Node/AJV Canonical) | High | Done | /docs/stories/story-107-shared-validator-unification.md |
 |||| 108 | Game-Ready Output Package | High | Done | /docs/stories/story-108-game-ready-output-package.md |
+|||| 109 | Combat Outcome Enhancements | High | Done | /docs/stories/story-109-combat-outcome-enhancements.md |
+|||| 110 | Edge-Case Scanner + Patch Module (Post-Extraction) | Medium | To Do | /docs/stories/story-110-edgecase-scanner-and-patch-module.md |
+|||| 111 | Edge-Case Scanner — Special-Case Detection Patterns | Medium | To Do | /docs/stories/story-111-edgecase-scanner-special-cases.md |
 
 ## Notes
 - Status "Done" reflects current working state in codex-forge. "To Do" items are planned next steps aligned with `docs/requirements.md` and `snapshot.md`.

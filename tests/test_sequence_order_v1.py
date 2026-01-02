@@ -38,7 +38,7 @@ def test_sequence_dedupes_test_luck():
 def test_sequence_preserves_stat_check_after_stat_change():
     portion = {
         "choices": [{"target": "10", "text": "Turn to 10"}, {"target": "11", "text": "Turn to 11"}],
-        "stat_modifications": [{"stat": "stamina", "amount": -2, "permanent": False}],
+        "stat_modifications": [{"stat": "stamina", "amount": -2, "scope": "section"}],
         "stat_checks": [{
             "stat": "SKILL",
             "dice_roll": "2d6",
@@ -58,7 +58,7 @@ def test_sequence_preserves_stat_check_after_stat_change():
 
 def test_sequence_drops_survival_damage_check():
     portion = {
-        "stat_modifications": [{"stat": "stamina", "amount": "-(1d6+1)", "permanent": False}],
+        "stat_modifications": [{"stat": "stamina", "amount": "-(1d6+1)", "scope": "section"}],
         "stat_checks": [{
             "stat": "STAMINA",
             "dice_roll": "1d6",
@@ -79,7 +79,7 @@ def test_sequence_drops_survival_damage_check():
 
 def test_sequence_drops_survival_damage_check_with_implied_death_text():
     portion = {
-        "stat_modifications": [{"stat": "stamina", "amount": "-(1d6+1)", "permanent": False}],
+        "stat_modifications": [{"stat": "stamina", "amount": "-(1d6+1)", "scope": "section"}],
         "stat_checks": [{
             "stat": "STAMINA",
             "dice_roll": "1d6",
@@ -98,29 +98,25 @@ def test_sequence_drops_survival_damage_check_with_implied_death_text():
     assert "stat_check" not in kinds
 
 
-def test_sequence_includes_combat_special_rules():
+def test_sequence_includes_combat_rules():
     portion = {
         "combat": [{
-            "enemy": "BEAST",
-            "skill": 7,
-            "stamina": 8,
-            "special_rules": "Reduce your SKILL by 2 during this combat",
-            "win_section": "9",
+            "enemies": [{"enemy": "BEAST", "skill": 7, "stamina": 8}],
+            "rules": [{"kind": "note", "text": "Reduce your SKILL by 2 during this combat"}],
+            "outcomes": {"win": {"targetSection": "9"}},
         }],
         "raw_html": "<p>Fight the BEAST.</p>",
     }
     seq = build_sequence_from_portion(portion, "4")
     combat = next(e for e in seq if e.get("kind") == "combat")
-    assert "special_rules" in combat["enemies"][0]
+    assert not combat.get("rules")
 
 
 def test_sequence_orders_combat_before_test_luck():
     portion = {
         "combat": [{
-            "enemy": "BEAST",
-            "skill": 7,
-            "stamina": 8,
-            "win_section": "9",
+            "enemies": [{"enemy": "BEAST", "skill": 7, "stamina": 8}],
+            "outcomes": {"win": {"targetSection": "9"}},
         }],
         "test_luck": [{"lucky_section": "9", "unlucky_section": "10"}],
         "choices": [{"target": "9", "text": "Turn to 9"}, {"target": "10", "text": "Turn to 10"}],
@@ -133,10 +129,24 @@ def test_sequence_orders_combat_before_test_luck():
     assert kinds.index("combat") < kinds.index("test_luck")
 
 
+def test_sequence_combat_win_continue_outcome():
+    portion = {
+        "combat": [{
+            "enemies": [{"enemy": "BLOODBEAST", "skill": 12, "stamina": 10}],
+            "outcomes": {"win": {"targetSection": "continue"}},
+        }],
+        "test_luck": [{"lucky_section": "97", "unlucky_section": "21"}],
+        "raw_html": "<p>As soon as you win your first Attack Round, Test your Luck.</p>",
+    }
+    seq = build_sequence_from_portion(portion, "225")
+    combat = next(e for e in seq if e.get("kind") == "combat")
+    assert combat.get("outcomes", {}).get("win") == {"terminal": {"kind": "continue", "message": "continue"}}
+
+
 def test_sequence_orders_damage_before_combat():
     portion = {
-        "stat_modifications": [{"stat": "stamina", "amount": -2, "permanent": False}],
-        "combat": [{"enemy": "IVY", "skill": 9, "stamina": 9, "win_section": "201"}],
+        "stat_modifications": [{"stat": "stamina", "amount": -2, "scope": "section"}],
+        "combat": [{"enemies": [{"enemy": "IVY", "skill": 9, "stamina": 9}], "outcomes": {"win": {"targetSection": "201"}}}],
         "choices": [{"target": "201", "text": "Turn to 201"}],
         "raw_html": "<p>You are hit. Lose 2 STAMINA points. If you are still alive, you fight back. "
                     "IVY SKILL 9 STAMINA 9. If you win, turn to <a href=\"#201\">201</a>.</p>",
@@ -326,7 +336,7 @@ def test_sequence_orders_choices_without_anchors():
 def test_sequence_builds_conditional_item_stat_change():
     portion = {
         "choices": [{"target": "36", "text": "Turn to 36"}],
-        "stat_modifications": [{"stat": "skill", "amount": -1, "permanent": False}],
+        "stat_modifications": [{"stat": "skill", "amount": -1, "scope": "section"}],
         "inventory": {
             "items_gained": [],
             "items_lost": [{"item": "shield", "quantity": 1}],

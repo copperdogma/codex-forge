@@ -30,7 +30,11 @@ Extract stat modifications (SKILL, STAMINA, LUCK) from the provided text into a 
 Detect:
 - stat: \"skill\", \"stamina\", or \"luck\" (normalized to lowercase).
 - amount: The integer amount of change (positive for gains/restoration, negative for losses).
-- permanent: Whether the change affects the INITIAL value (e.g., \"reduce your initial Skill\"). Default false.
+- scope: \"permanent\", \"section\", \"combat\", or \"round\".
+  - Use \"permanent\" when the text changes INITIAL or MAX values (e.g., \"reduce your initial Skill\").
+  - Use \"section\" for one-off changes outside combat.
+  - Use \"combat\" for changes that apply for the duration of the combat.
+  - Use \"round\" for changes that apply only for a single attack round.
 
 Rules:
 - Ignore narrative mentions that aren't modifications (e.g., \"Your Skill is 12\").
@@ -40,8 +44,8 @@ Rules:
 Example output:
 {
   \"stat_modifications\": [
-    { \"stat\": \"skill\", \"amount\": -1, \"permanent\": false },
-    { \"stat\": \"stamina\", \"amount\": 4, \"permanent\": false }
+    { \"stat\": \"skill\", \"amount\": -1, \"scope\": \"section\" },
+    { \"stat\": \"stamina\", \"amount\": 4, \"scope\": \"section\" }
   ]
 }
 
@@ -64,7 +68,7 @@ Return a JSON object with \"removals\" (to delete), \"corrections\" (to update),
     { \"section_id\": \"1\", \"item_index\": 0, \"reason\": \"narrative mention\" }
   ],
   \"corrections\": [
-    { \"section_id\": \"16\", \"item_index\": 0, \"data\": { \"stat\": \"stamina\", \"amount\": \"-(1d6+1)\", \"permanent\": false } }
+    { \"section_id\": \"16\", \"item_index\": 0, \"data\": { \"stat\": \"stamina\", \"amount\": \"-(1d6+1)\", \"scope\": \"section\" } }
   ],
   \"additions\": []
 }
@@ -131,23 +135,31 @@ def extract_stat_modifications_regex(text: str) -> List[StatModification]:
             return int(raw)
         return word_numbers.get(raw)
 
-    def _append(stat: Optional[str], amount: int) -> None:
-        if not stat:
-            return
-        key = (stat, amount)
-        if key in seen:
-            return
-        seen.add(key)
-        mods.append(StatModification(stat=stat, amount=amount, confidence=0.7))
+    def _scope_from_sentence(sentence: str) -> str:
+        lower = sentence.lower()
+        if "initial" in lower or "permanent" in lower or "maximum" in lower or "max" in lower:
+            return "permanent"
+        return "section"
 
-    def _append_expr(stat: Optional[str], expr: str) -> None:
+    def _append(stat: Optional[str], amount: int, sentence: str = "") -> None:
         if not stat:
             return
-        key = (stat, expr)
+        scope = _scope_from_sentence(sentence)
+        key = (stat, amount, scope)
         if key in seen:
             return
         seen.add(key)
-        mods.append(StatModification(stat=stat, amount=expr, confidence=0.7))
+        mods.append(StatModification(stat=stat, amount=amount, scope=scope, confidence=0.7))
+
+    def _append_expr(stat: Optional[str], expr: str, sentence: str = "") -> None:
+        if not stat:
+            return
+        scope = _scope_from_sentence(sentence)
+        key = (stat, expr, scope)
+        if key in seen:
+            return
+        seen.add(key)
+        mods.append(StatModification(stat=stat, amount=expr, scope=scope, confidence=0.7))
 
     def _dice_count(raw: str) -> Optional[int]:
         if raw is None:
@@ -220,7 +232,7 @@ def extract_stat_modifications_regex(text: str) -> List[StatModification]:
         loss_val = _to_int(loss_raw)
         if stat and loss_val is not None:
             expr = f"-({dice_count}d6)" if loss_val == 1 else f"-({dice_count}d6*{loss_val})"
-            _append_expr(stat, expr)
+            _append_expr(stat, expr, _sentence_for(match.start(), match.end()))
             dice_spans.append((match.start(), match.end()))
 
     for match in each_one_pattern.finditer(text):
@@ -231,7 +243,7 @@ def extract_stat_modifications_regex(text: str) -> List[StatModification]:
         loss_val = _to_int(loss_raw)
         if stat and loss_val is not None:
             expr = f"-({dice_count}d6)" if loss_val == 1 else f"-({dice_count}d6*{loss_val})"
-            _append_expr(stat, expr)
+            _append_expr(stat, expr, _sentence_for(match.start(), match.end()))
             dice_spans.append((match.start(), match.end()))
 
     for match in each_stats_pattern.finditer(text):
@@ -241,7 +253,7 @@ def extract_stat_modifications_regex(text: str) -> List[StatModification]:
         for stat_raw in match.groups()[1:]:
             stat = normalize_stat(stat_raw)
             if stat:
-                _append(stat, amount)
+                _append(stat, amount, _sentence_for(match.start(), match.end()))
 
     for match in roll_add_each_pattern.finditer(text):
         dice_raw = match.group(1)
@@ -253,7 +265,7 @@ def extract_stat_modifications_regex(text: str) -> List[StatModification]:
         loss_val = _to_int(loss_raw)
         if stat and add_val is not None and loss_val is not None:
             expr = f"-({dice_count}d6+{add_val})" if loss_val == 1 else f"-(({dice_count}d6+{add_val})*{loss_val})"
-            _append_expr(stat, expr)
+            _append_expr(stat, expr, _sentence_for(match.start(), match.end()))
             dice_spans.append((match.start(), match.end()))
 
     for match in roll_reduce_total_pattern.finditer(text):
@@ -264,7 +276,7 @@ def extract_stat_modifications_regex(text: str) -> List[StatModification]:
         add_val = _to_int(add_raw) if add_raw else 0
         if stat:
             expr = f"-({dice_count}d6+{add_val})" if add_val else f"-({dice_count}d6)"
-            _append_expr(stat, expr)
+            _append_expr(stat, expr, _sentence_for(match.start(), match.end()))
             dice_spans.append((match.start(), match.end()))
 
     for match in roll_deduct_number_pattern.finditer(text):
@@ -275,7 +287,7 @@ def extract_stat_modifications_regex(text: str) -> List[StatModification]:
         add_val = _to_int(add_raw) if add_raw else 0
         if stat:
             expr = f"-({dice_count}d6+{add_val})" if add_val else f"-({dice_count}d6)"
-            _append_expr(stat, expr)
+            _append_expr(stat, expr, _sentence_for(match.start(), match.end()))
             dice_spans.append((match.start(), match.end()))
 
     # Very simple regex attempt; most extraction will rely on AI due to phrasing variety
@@ -290,7 +302,7 @@ def extract_stat_modifications_regex(text: str) -> List[StatModification]:
         stat = normalize_stat(match.group(1))
         amount = _to_int(match.group(2))
         if stat and amount is not None:
-            _append(stat, -amount)
+            _append(stat, -amount, _sentence_for(match.start(), match.end()))
 
     for match in LOSE_PATTERN.finditer(text):
         if _in_dice_span(match.start(), match.end()):
@@ -299,7 +311,7 @@ def extract_stat_modifications_regex(text: str) -> List[StatModification]:
             continue
         stat = normalize_stat(match.group(2))
         if stat:
-            _append(stat, -int(match.group(1)))
+            _append(stat, -int(match.group(1)), _sentence_for(match.start(), match.end()))
 
     for match in GAIN_PATTERN.finditer(text):
         if _is_combat_modifier(_sentence_for(match.start(), match.end())):
@@ -307,14 +319,14 @@ def extract_stat_modifications_regex(text: str) -> List[StatModification]:
         stat = normalize_stat(match.group(1))
         amount = _to_int(match.group(2))
         if stat and amount is not None:
-            _append(stat, amount)
+            _append(stat, amount, _sentence_for(match.start(), match.end()))
 
     for match in GAIN_VAL_PATTERN.finditer(text):
         if _is_combat_modifier(_sentence_for(match.start(), match.end())):
             continue
         stat = normalize_stat(match.group(2))
         if stat:
-            _append(stat, int(match.group(1)))
+            _append(stat, int(match.group(1)), _sentence_for(match.start(), match.end()))
 
     for sentence in re.split(r"[.!?]", text):
         sentence = sentence.strip()
@@ -332,13 +344,15 @@ def extract_stat_modifications_regex(text: str) -> List[StatModification]:
                     current_sign = -1
                 else:
                     current_sign = 1
-                _append(stat, current_sign * amount)
+                sentence = _sentence_for(match.start(), match.end())
+                _append(stat, current_sign * amount, sentence)
             else:
                 amount = int(match.group(4))
                 stat = normalize_stat(match.group(5))
                 if current_sign is None:
                     continue
-                _append(stat, current_sign * amount)
+                sentence = _sentence_for(match.start(), match.end())
+                _append(stat, current_sign * amount, sentence)
             
     lower_text = text.lower()
     if "for each" in lower_text or "each one" in lower_text:
@@ -348,18 +362,6 @@ def extract_stat_modifications_regex(text: str) -> List[StatModification]:
 
     return _filter_combat_modifier_mods(text, mods)
 
-
-def _preserve_combat_special_rules(portion: EnrichedPortion, raw_row: Dict[str, Any]) -> None:
-    raw_combat = raw_row.get("combat")
-    if not raw_combat or not portion.combat:
-        return
-    for idx, raw_entry in enumerate(raw_combat):
-        if idx >= len(portion.combat):
-            break
-        if not isinstance(raw_entry, dict):
-            continue
-        if raw_entry.get("special_rules") and not getattr(portion.combat[idx], "special_rules", None):
-            portion.combat[idx].special_rules = raw_entry.get("special_rules")
 
 def extract_stat_modifications_llm(text: str, model: str, client: OpenAI) -> Tuple[List[StatModification], Dict[str, Any]]:
     try:
@@ -468,7 +470,6 @@ def main():
 
     for idx, row in enumerate(portions):
         portion = EnrichedPortion(**row)
-        _preserve_combat_special_rules(portion, row)
         text = portion.raw_text or html_to_text(portion.raw_html or "")
         
         # 1. TRY: Regex

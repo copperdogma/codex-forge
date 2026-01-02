@@ -142,6 +142,20 @@ def ensure_test_luck(text: str, luck_tests: List[TestLuck]) -> List[TestLuck]:
             unlucky_section=unlucky_match.group(1),
             confidence=0.7
         )]
+    lower = text.lower()
+    idx = lower.find("test your luck")
+    if idx != -1:
+        tail = text[idx:]
+        turn_idx = tail.lower().find("turn to")
+        if turn_idx != -1:
+            window = tail[turn_idx:turn_idx + 160]
+            numbers = re.findall(r"\b(\d+)\b", window)
+            if len(numbers) >= 2:
+                return [TestLuck(
+                    lucky_section=numbers[0],
+                    unlucky_section=numbers[1],
+                    confidence=0.5
+                )]
     return luck_tests
 
 def _filter_stat_checks(text: str, checks: List[StatCheck]) -> List[StatCheck]:

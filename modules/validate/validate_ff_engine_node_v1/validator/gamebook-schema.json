@@ -38,6 +38,11 @@
         "validatorVersion": {
           "type": "string",
           "description": "Validator version expected to validate this gamebook"
+        },
+        "sectionCount": {
+          "type": "integer",
+          "minimum": 1,
+          "description": "Expected numeric section count for validation (optional)"
         }
       }
     },
@@ -345,7 +350,8 @@
       "required": [
         "kind",
         "stat",
-        "amount"
+        "amount",
+        "scope"
       ],
       "properties": {
         "kind": {
@@ -370,8 +376,17 @@
             "string"
           ]
         },
-        "permanent": {
-          "type": "boolean"
+        "scope": {
+          "type": "string",
+          "enum": [
+            "permanent",
+            "section",
+            "combat",
+            "round"
+          ]
+        },
+        "reason": {
+          "type": "string"
         }
       }
     },
@@ -487,11 +502,21 @@
       "type": "object",
       "required": [
         "kind",
-        "enemies"
+        "enemies",
+        "outcomes"
       ],
       "properties": {
         "kind": {
           "const": "combat"
+        },
+        "mode": {
+          "type": "string",
+          "enum": [
+            "single",
+            "sequential",
+            "simultaneous",
+            "split-target"
+          ]
         },
         "enemies": {
           "type": "array",
@@ -499,8 +524,29 @@
             "$ref": "#/definitions/CombatEncounter"
           }
         },
+        "rules": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/CombatRule"
+          }
+        },
+        "modifiers": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/StatChangeEvent"
+          }
+        },
+        "triggers": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/CombatTrigger"
+          }
+        },
         "outcomes": {
           "type": "object",
+          "required": [
+            "win"
+          ],
           "properties": {
             "win": {
               "$ref": "#/definitions/OutcomeRef"
@@ -562,9 +608,10 @@
             "death",
             "victory",
             "defeat",
-            "end"
+            "end",
+            "continue"
           ],
-          "description": "Terminal outcome type"
+          "description": "Non-target outcome type (terminal or in-section continuation)"
         },
         "message": {
           "type": "string",
@@ -591,16 +638,59 @@
         "stamina": {
           "type": "number",
           "description": "Stamina (hit points)"
-        },
-        "special_rules": {
-          "type": "string",
-          "description": "Optional special combat rules"
-        },
-        "allow_escape": {
-          "type": "boolean",
-          "description": "Whether escape is allowed from this combat"
         }
       }
+    },
+    "CombatRule": {
+      "type": "object",
+      "required": [
+        "kind"
+      ],
+      "properties": {
+        "kind": {
+          "type": "string",
+          "enum": [
+            "fight_singly",
+            "both_attack_each_round",
+            "choose_target_each_round",
+            "secondary_target_no_damage",
+            "secondary_enemy_defense_only",
+            "note"
+          ]
+        },
+        "text": {
+          "type": "string"
+        }
+      },
+      "additionalProperties": false
+    },
+    "CombatTrigger": {
+      "type": "object",
+      "required": [
+        "kind",
+        "outcome"
+      ],
+      "properties": {
+        "kind": {
+          "type": "string",
+          "enum": [
+            "enemy_round_win",
+            "no_enemy_round_wins",
+            "enemy_attack_strength_total",
+            "player_round_win"
+          ]
+        },
+        "value": {
+          "type": "number"
+        },
+        "count": {
+          "type": "number"
+        },
+        "outcome": {
+          "$ref": "#/definitions/OutcomeRef"
+        }
+      },
+      "additionalProperties": false
     },
     "CreatureStats": {
       "type": "object",
@@ -666,7 +756,8 @@
       "type": "object",
       "required": [
         "stat",
-        "amount"
+        "amount",
+        "scope"
       ],
       "properties": {
         "stat": {
@@ -682,10 +773,19 @@
           "type": "number",
           "description": "Amount to change (can be negative)"
         },
-        "permanent": {
-          "type": "boolean",
-          "description": "Whether this is a permanent modification (affects initial value)",
-          "default": false
+        "scope": {
+          "type": "string",
+          "enum": [
+            "permanent",
+            "section",
+            "combat",
+            "round"
+          ],
+          "description": "Duration for the change"
+        },
+        "reason": {
+          "type": "string",
+          "description": "Optional explanation of the modification"
         }
       }
     },

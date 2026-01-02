@@ -212,14 +212,53 @@ The legacy OCR-ensemble recipe is archived at `configs/recipes/legacy/recipe-ff-
 - **Type**: Code-only assembly
 - **Output note**: Gameplay flow is encoded in ordered `sequence` events (replaces legacy `navigation`).
 
+##### Combat Outcome Conventions (Sequence Events)
+- **Combat requires outcomes**: every `combat` event must include `outcomes.win`.
+- **Outcome refs**: `outcomes.{win,lose,escape}` are `OutcomeRef` objects with either `targetSection` or `terminal`.
+- **Continue in-section**: when combat win immediately continues within the same section (e.g., “Test your Luck”), set `outcomes.win = { terminal: { kind: "continue" } }` and add a `player_round_win` trigger to indicate the round count if stated.
+- **Triggers**: use `triggers` for mid-combat conditions (e.g., `enemy_attack_strength_total`, `enemy_round_win`, `player_round_win`).
+- **Split-target fights**: multi-part enemies (e.g., pincers/heads) are represented as multiple enemies with `mode: "split-target"` and structured rules; avoid single‑enemy split-target output.
+
+Example (basic win/lose):
+```json
+{
+  "kind": "combat",
+  "mode": "single",
+  "enemies": [{"enemy": "CAVE BEAST", "skill": 7, "stamina": 8}],
+  "outcomes": {
+    "win": {"targetSection": "163"},
+    "lose": {"terminal": {"kind": "death"}}
+  }
+}
+```
+
+Example (win continues in-section with Test Your Luck):
+```json
+{
+  "kind": "combat",
+  "mode": "single",
+  "enemies": [{"enemy": "BLOODBEAST", "skill": 12, "stamina": 10}],
+  "triggers": [{
+    "kind": "player_round_win",
+    "count": 1,
+    "outcome": {"terminal": {"kind": "continue"}}
+  }],
+  "outcomes": {"win": {"terminal": {"kind": "continue"}}}
+}
+```
+
 #### Validate Stage
 
 **27. `validate_ff_engine_node_v1`** (Node/AJV)
 - **What it does**: Canonical schema validator shared with the game engine (Node + Ajv)
 - **Why**: Ensures pipeline/game engine use identical validation logic
 - **Type**: Node validator (bundled, portable)
+- **Scope**: Generic across Fighting Fantasy books (not tuned to a specific title)
 - **Ship**: Include `modules/validate/validate_ff_engine_node_v1/validator` alongside `gamebook.json` in the game engine build.
 - **How to ship**: Copy `gamebook.json` + `modules/validate/validate_ff_engine_node_v1/validator/gamebook-validator.bundle.js` into the game engine bundle, then run `node gamebook-validator.bundle.js gamebook.json --json` before loading.
+- **Validation notes**:
+  - Combat events must include `outcomes.win` (required by schema).
+  - Missing-section checks use `metadata.sectionCount` when present; otherwise fallback to `provenance.expected_range`, then default `1–400`.
 
 **28. `forensics_gamebook` / `validate_ff_engine_v2`** (Code)
 - **What it does**: Forensic validation (missing sections, duplicates, empty sections, structural issues)

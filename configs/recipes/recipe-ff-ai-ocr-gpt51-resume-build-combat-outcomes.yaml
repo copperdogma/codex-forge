@@ -1,0 +1,53 @@
+name: ff-ai-ocr-gpt51-resume-build-combat-outcomes
+
+stages:
+  - id: load_portions
+    stage: extract
+    module: load_artifact_enriched_portion_v1
+    out: portions_with_sequence.jsonl
+    params:
+      path: output/runs/ff-ai-ocr-gpt51-pristine-fast-full-combat-outcomes-20260101b/09_sequence_order_v1/portions_with_sequence.jsonl
+
+  - id: load_issues
+    stage: extract
+    module: load_artifact_v1
+    out: issues_report.jsonl
+    params:
+      path: output/runs/ff-ai-ocr-gpt51-pristine-fast-full-combat-outcomes-20260101b/10_report_pipeline_issues_v1/issues_report.jsonl
+
+  - id: build_gamebook
+    stage: build
+    module: build_ff_engine_with_issues_v1
+    needs: [load_portions, load_issues]
+    inputs:
+      portions: load_portions
+      issues_report: load_issues
+    out: gamebook_raw.json
+    params:
+      title: Deathtrap Dungeon
+      author: Ian Livingstone
+      emit_text: false
+      emit_provenance_text: false
+      allow_stubs: true
+
+  - id: clean_presentation
+    stage: export
+    module: clean_html_presentation_v1
+    needs: [build_gamebook]
+    inputs:
+      input: build_gamebook
+    out: gamebook.json
+    params:
+      preserve_original_html: true
+      remove_section_headers: true
+      remove_running_heads: true
+      remove_page_numbers: true
+      remove_images: true
+
+  - id: validate_gamebook_node
+    stage: export
+    module: validate_ff_engine_node_v1
+    needs: [clean_presentation]
+    inputs:
+      input: clean_presentation
+    out: gamebook_validation_node.json

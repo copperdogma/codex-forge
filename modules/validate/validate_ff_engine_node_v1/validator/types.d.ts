@@ -17,7 +17,7 @@ export type SectionId = string;
  */
 export interface TerminalOutcome {
     /** Terminal outcome type */
-    kind: 'death' | 'victory' | 'defeat' | 'end';
+    kind: 'death' | 'victory' | 'defeat' | 'end' | 'continue';
     /** Optional narrative message */
     message?: string;
 }
@@ -42,7 +42,8 @@ export interface StatChangeEvent {
     kind: 'stat_change';
     stat: 'skill' | 'stamina' | 'luck' | string | string[];
     amount: number | string;
-    permanent?: boolean;
+    scope: 'permanent' | 'section' | 'combat' | 'round';
+    reason?: string;
 }
 export interface StatCheckEvent {
     kind: 'stat_check';
@@ -90,9 +91,13 @@ export interface ConditionalEvent {
 }
 export interface CombatEvent {
     kind: 'combat';
+    mode?: 'single' | 'sequential' | 'simultaneous' | 'split-target';
     enemies: CombatEncounter[];
-    outcomes?: {
-        win?: OutcomeRef;
+    rules?: CombatRule[];
+    modifiers?: StatChangeEvent[];
+    triggers?: CombatTrigger[];
+    outcomes: {
+        win: OutcomeRef;
         lose?: OutcomeRef;
         escape?: OutcomeRef;
     };
@@ -116,10 +121,16 @@ export interface CombatEncounter {
     skill: number;
     /** Stamina (hit points) */
     stamina: number;
-    /** Optional special combat rules */
-    special_rules?: string;
-    /** Whether escape is allowed from this combat */
-    allow_escape?: boolean;
+}
+export interface CombatRule {
+    kind: 'fight_singly' | 'both_attack_each_round' | 'choose_target_each_round' | 'secondary_target_no_damage' | 'secondary_enemy_defense_only' | 'note';
+    text?: string;
+}
+export interface CombatTrigger {
+    kind: 'enemy_round_win' | 'no_enemy_round_wins' | 'enemy_attack_strength_total' | 'player_round_win';
+    value?: number;
+    count?: number;
+    outcome: OutcomeRef;
 }
 /**
  * Item reference - items mentioned in section text
@@ -138,8 +149,10 @@ export interface StatModification {
     stat: 'skill' | 'stamina' | 'luck';
     /** Amount to change (can be negative) */
     amount: number;
-    /** Whether this is a permanent modification (affects initial value) */
-    permanent?: boolean;
+    /** Duration for the change */
+    scope: 'permanent' | 'section' | 'combat' | 'round';
+    /** Optional explanation of the modification */
+    reason?: string;
 }
 /**
  * Death condition - ways the player can die in this section
@@ -204,6 +217,8 @@ export interface GamebookJSON {
         formatVersion: string;
         /** Validator version expected to validate this gamebook */
         validatorVersion?: string;
+        /** Expected numeric section count for validation (optional) */
+        sectionCount?: number;
     };
     /** All sections in the gamebook, keyed by section ID */
     sections: Record<SectionId, GamebookSection>;
