@@ -1,0 +1,6 @@
+module_id: turn_to_link_claims_from_portions_v1
+stage: adapter
+entrypoint: modules/adapter/turn_to_link_claims_from_portions_v1/main.py
+input_schema: null
+output_schema: turn_to_link_claims_v1
+notes: "Emit turn-to link claims from enriched portions (choices/combat/luck/etc.)."

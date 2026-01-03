@@ -1,0 +1,21 @@
+name: edgecase-patch-synthetic
+
+stages:
+  - id: load_gamebook
+    stage: extract
+    module: load_artifact_v1
+    out: gamebook.json
+    params:
+      path: output/runs/edgecase-scan-synthetic-20260102a/inputs/gamebook.json
+
+  - id: apply_edgecase_patches
+    stage: export
+    module: apply_edgecase_patches_v1
+    needs: [load_gamebook]
+    inputs:
+      input: load_gamebook
+    out: gamebook_patched.json
+    params:
+      patches: output/runs/edgecase-scan-synthetic-20260102a/inputs/edgecase_patches.jsonl
+      allow-missing: false
+      report-out: edgecase_patch_report.jsonl

@@ -1,0 +1,6 @@
+module_id: turn_to_link_reconciler_v1
+stage: adapter
+entrypoint: modules/adapter/turn_to_link_reconciler_v1/main.py
+input_schema: null
+output_schema: turn_to_unclaimed_v1
+notes: "Reconcile turn-to link targets against claims and report unclaimed targets."

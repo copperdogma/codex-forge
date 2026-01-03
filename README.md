@@ -25,6 +25,32 @@ The **Intermediate Representation (IR)** stays unchanged throughout; portionizat
 - Assemble per-portion JSON (page spans, source images, raw_text from IR)
 - Run outputs stored under `output/runs/<run_id>/` with manifests and state
 
+## Edgecase Scanner + Patch Workflow (Post-Extraction)
+
+Use this when you want a targeted, auditable pass over extracted gameplay logic without baking book-specific hacks into core modules.
+
+High-level flow:
+1. **Extract `turn_to_links` early** (anchor-derived) during portionization.
+2. **Downstream extractors claim links** (combat/luck/stat checks/choices) via `turn_to_claims`.
+3. **Reconcile** claimed vs. total links → unclaimed targets are high-confidence edge cases.
+4. **Scan** the gamebook for edgecase patterns and emit a structured report.
+5. **AI verify** only flagged sections → emit patch JSONL (empty when correct).
+6. **Apply patches** deterministically (opt-in via recipe) to produce a patched gamebook.
+
+Recommended run (reuse an existing full run; do not re-run OCR):
+```bash
+python driver.py \
+  --recipe configs/recipes/recipe-ff-ai-ocr-gpt51-resume-edgecase-scan.yaml \
+  --run-id edgecase-scan-<run_id> \
+  --output-dir output/runs/edgecase-scan-<run_id>
+```
+
+Artifacts to inspect:
+- `output/runs/<edgecase-run>/04_turn_to_link_reconciler_v1/turn_to_unclaimed.jsonl`
+- `output/runs/<edgecase-run>/05_edgecase_scanner_v1/edgecase_scan.jsonl`
+- `output/runs/<edgecase-run>/06_edgecase_ai_patch_v1/edgecase_patches.jsonl`
+- `output/runs/<edgecase-run>/07_apply_edgecase_patches_v1/gamebook_patched.json`
+
 ## Repository layout
 - CLI modules/scripts: `pages_dump.py`, `clean_pages.py`, `portionize.py`, `consensus.py`, `dedupe_portions.py`, `normalize_portions.py`, `resolve_overlaps.py`, `build_portion_text.py`, etc.
 - `docs/requirements.md`: system requirements

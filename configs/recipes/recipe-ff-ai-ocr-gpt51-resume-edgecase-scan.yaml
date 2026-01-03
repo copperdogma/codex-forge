@@ -1,0 +1,63 @@
+name: ff-ai-ocr-gpt51-resume-edgecase-scan
+
+stages:
+  - id: load_gamebook
+    stage: extract
+    module: load_artifact_v1
+    out: gamebook.json
+    params:
+      path: output/runs/ff-ai-ocr-gpt51-pristine-fast-full/gamebook.json
+
+  - id: load_enriched_portions
+    stage: extract
+    module: load_artifact_v1
+    out: portions_with_choices_validated.jsonl
+    params:
+      path: output/runs/ff-ai-ocr-gpt51-pristine-fast-full/19_validate_choice_links_v1/portions_with_choices_validated.jsonl
+
+  - id: turn_to_link_claims
+    stage: adapter
+    module: turn_to_link_claims_from_portions_v1
+    needs: [load_enriched_portions]
+    inputs:
+      - load_enriched_portions
+    out: turn_to_link_claims.jsonl
+
+  - id: reconcile_turn_to_links
+    stage: adapter
+    module: turn_to_link_reconciler_v1
+    needs: [load_enriched_portions, turn_to_link_claims]
+    out: turn_to_unclaimed.jsonl
+
+  - id: scan_edgecases
+    stage: adapter
+    module: edgecase_scanner_v1
+    needs: [load_gamebook, reconcile_turn_to_links]
+    inputs:
+      - load_gamebook
+      - reconcile_turn_to_links
+    out: edgecase_scan.jsonl
+
+  - id: generate_edgecase_patches
+    stage: adapter
+    module: edgecase_ai_patch_v1
+    needs: [scan_edgecases]
+    inputs:
+      - scan_edgecases
+      - load_gamebook
+    out: edgecase_patches.jsonl
+    params:
+      model: gpt-5.1
+      max-sections: 20
+
+  - id: apply_edgecase_patches
+    stage: export
+    module: apply_edgecase_patches_v1
+    needs: [scan_edgecases, generate_edgecase_patches]
+    inputs:
+      input: load_gamebook
+    out: gamebook_patched.json
+    params:
+      patches: edgecase_patches.jsonl
+      allow-missing: true
+      report-out: edgecase_patch_report.jsonl

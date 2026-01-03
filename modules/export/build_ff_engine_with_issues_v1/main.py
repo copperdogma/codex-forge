@@ -1049,6 +1049,8 @@ def build_section(portion: Dict[str, Any], emit_text: bool, emit_provenance_text
 
     if section.get("isGameplaySection", False):
         section["sequence"] = sequence
+        if portion.get("turn_to_links"):
+            section["turn_to_links"] = portion.get("turn_to_links")
 
     # Propagate end_game marker (used to suppress no-choice warnings)
     if portion.get("end_game") or portion.get("endGame") or portion.get("is_endgame"):

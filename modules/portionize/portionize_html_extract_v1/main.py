@@ -14,6 +14,7 @@ from modules.common.utils import read_jsonl, save_jsonl, ProgressLogger
 
 TEXT_BLOCKS = {"p", "li", "dd", "dt", "td", "th", "a"}
 STRUCTURAL_TAGS = {"table", "thead", "tbody", "tr", "ol", "ul", "dl"}
+ANCHOR_RE = re.compile(r"href=\"#(\d+)\"", re.IGNORECASE)
 
 # Generic endmatter patterns (not book-specific)
 ENDMATTER_RUNNING_HEAD_PATTERNS = [
@@ -250,6 +251,18 @@ def load_boundaries(path: str) -> List[Dict[str, Any]]:
     return [row for row in read_jsonl(path)]
 
 
+def _extract_turn_to_links(html: Optional[str]) -> List[str]:
+    links: List[str] = []
+    seen = set()
+    for match in ANCHOR_RE.finditer(html or ""):
+        target = match.group(1)
+        if target in seen:
+            continue
+        seen.add(target)
+        links.append(target)
+    return links
+
+
 def main() -> None:
     parser = argparse.ArgumentParser(description="Extract section text from HTML blocks.")
     parser.add_argument("--pages", help="page_html_blocks_v1 JSONL path")
@@ -376,6 +389,7 @@ def main() -> None:
                 source_images.append(img)
 
         raw_html = _assemble_html(span, False, False, args.skip_endmatter)
+        turn_to_links = _extract_turn_to_links(raw_html)
         out_rows.append({
             "schema_version": "enriched_portion_v1",
             "module_id": "portionize_html_extract_v1",
@@ -389,6 +403,7 @@ def main() -> None:
             "confidence": b.get("confidence", 0.0),
             "raw_text": raw_text,
             "raw_html": raw_html,
+            "turn_to_links": turn_to_links,
             "element_ids": [e["element_id"] for e in span],
             "source_images": source_images,
             "macro_section": b.get("macro_section"),

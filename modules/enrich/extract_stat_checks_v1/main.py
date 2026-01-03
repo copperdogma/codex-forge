@@ -7,7 +7,8 @@ from typing import Any, Dict, List, Optional, Tuple
 from modules.common.openai_client import OpenAI
 from modules.common.utils import read_jsonl, save_jsonl, ProgressLogger
 from modules.common.html_utils import html_to_text
-from schemas import EnrichedPortion, StatCheck, TestLuck
+from modules.common.turn_to_claims import merge_turn_to_claims
+from schemas import EnrichedPortion, StatCheck, TestLuck, TurnToLinkClaimInline
 
 # --- Patterns ---
 
@@ -396,6 +397,49 @@ def main():
     for p in out_portions:
         text = p.raw_text or html_to_text(p.raw_html or "")
         p.test_luck = ensure_test_luck(text, p.test_luck or [])
+
+    for p in out_portions:
+        claims: List[Dict[str, Any]] = []
+        for idx, sc in enumerate(p.stat_checks or []):
+            pass_section = sc.pass_section
+            fail_section = sc.fail_section
+            if pass_section:
+                claims.append({
+                    "target": str(pass_section),
+                    "claim_type": "stat_check_pass",
+                    "module_id": "extract_stat_checks_v1",
+                    "evidence_path": f"/stat_checks/{idx}/pass_section",
+                })
+            if fail_section:
+                claims.append({
+                    "target": str(fail_section),
+                    "claim_type": "stat_check_fail",
+                    "module_id": "extract_stat_checks_v1",
+                    "evidence_path": f"/stat_checks/{idx}/fail_section",
+                })
+        for idx, tl in enumerate(p.test_luck or []):
+            lucky = tl.lucky_section
+            unlucky = tl.unlucky_section
+            if lucky:
+                claims.append({
+                    "target": str(lucky),
+                    "claim_type": "test_luck_lucky",
+                    "module_id": "extract_stat_checks_v1",
+                    "evidence_path": f"/test_luck/{idx}/lucky_section",
+                })
+            if unlucky:
+                claims.append({
+                    "target": str(unlucky),
+                    "claim_type": "test_luck_unlucky",
+                    "module_id": "extract_stat_checks_v1",
+                    "evidence_path": f"/test_luck/{idx}/unlucky_section",
+                })
+        p.turn_to_claims = merge_turn_to_claims(p.turn_to_claims, claims)
+        p.turn_to_claims = [
+            c if isinstance(c, TurnToLinkClaimInline) else TurnToLinkClaimInline(**c)
+            for c in p.turn_to_claims or []
+            if isinstance(c, (TurnToLinkClaimInline, dict))
+        ]
 
     final_rows = [p.model_dump(exclude_none=True) for p in out_portions]
     save_jsonl(args.out, final_rows)

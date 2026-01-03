@@ -212,6 +212,77 @@ class PipelineIssues(BaseModel):
     issues: List[Dict[str, Any]]
 
 
+class EdgecaseScanReport(BaseModel):
+    schema_version: str = "edgecase_scan_v1"
+    module_id: Optional[str] = None
+    run_id: Optional[str] = None
+    created_at: Optional[str] = None
+    summary: Dict[str, Any]
+    issues: List[Dict[str, Any]]
+
+
+class EdgecasePatchRecord(BaseModel):
+    schema_version: str = "edgecase_patch_v1"
+    module_id: Optional[str] = None
+    run_id: Optional[str] = None
+    created_at: Optional[str] = None
+    section_id: str
+    reason_code: str
+    path: str
+    op: str
+    value: Optional[Any] = None
+    ai_rationale: Optional[str] = None
+
+
+class EdgecasePatchReport(BaseModel):
+    schema_version: str = "edgecase_patch_report_v1"
+    module_id: Optional[str] = None
+    run_id: Optional[str] = None
+    created_at: Optional[str] = None
+    summary: Dict[str, Any]
+    patches: List[Dict[str, Any]]
+
+
+class TurnToLinksRecord(BaseModel):
+    schema_version: str = "turn_to_links_v1"
+    module_id: Optional[str] = None
+    run_id: Optional[str] = None
+    created_at: Optional[str] = None
+    section_id: str
+    portion_id: Optional[str] = None
+    pageStart: Optional[int] = None
+    pageEnd: Optional[int] = None
+    links: List[Dict[str, Any]]
+
+
+class TurnToLinkClaim(BaseModel):
+    schema_version: str = "turn_to_link_claims_v1"
+    module_id: Optional[str] = None
+    run_id: Optional[str] = None
+    created_at: Optional[str] = None
+    section_id: str
+    portion_id: Optional[str] = None
+    target: str
+    claim_type: str
+    evidence_path: Optional[str] = None
+
+
+class TurnToLinkClaimInline(BaseModel):
+    target: str
+    claim_type: str
+    module_id: Optional[str] = None
+    evidence_path: Optional[str] = None
+
+
+class TurnToUnclaimedReport(BaseModel):
+    schema_version: str = "turn_to_unclaimed_v1"
+    module_id: Optional[str] = None
+    run_id: Optional[str] = None
+    created_at: Optional[str] = None
+    summary: Dict[str, Any]
+    issues: List[Dict[str, Any]]
+
+
 class PageLine(BaseModel):
     text: str
     source: Optional[str] = None  # e.g., "betterocr", "gpt4v", "llm_reconcile"
@@ -379,6 +450,8 @@ class EnrichedPortion(BaseModel):
     item_effects: List[ItemEffect] = Field(default_factory=list)
     inventory: Optional[InventoryEnrichment] = None
     targets: List[str] = Field(default_factory=list)
+    turn_to_links: List[str] = Field(default_factory=list)
+    turn_to_claims: List[TurnToLinkClaimInline] = Field(default_factory=list)
     element_ids: Optional[List[str]] = None  # Source element IDs for provenance
     repair: Optional[Dict[str, Any]] = None
     repair_hints: Optional[Dict[str, Any]] = None

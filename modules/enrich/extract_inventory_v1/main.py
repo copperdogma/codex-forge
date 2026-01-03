@@ -7,7 +7,8 @@ from typing import Any, Dict, List, Optional, Tuple
 from modules.common.openai_client import OpenAI
 from modules.common.utils import read_jsonl, save_jsonl, ProgressLogger
 from modules.common.html_utils import html_to_text
-from schemas import EnrichedPortion, InventoryItem, InventoryCheck, InventoryEnrichment
+from modules.common.turn_to_claims import merge_turn_to_claims
+from schemas import EnrichedPortion, InventoryItem, InventoryCheck, InventoryEnrichment, TurnToLinkClaimInline
 
 # --- Patterns ---
 
@@ -48,6 +49,15 @@ NUM_MAP = {
     "one": 1, "two": 2, "three": 3, "four": 4, "five": 5,
     "six": 6, "seven": 7, "eight": 8, "nine": 9, "ten": 10
 }
+
+
+def _coerce_turn_to_claims(raw_claims: Optional[List[Any]]) -> List[TurnToLinkClaimInline]:
+    if not raw_claims:
+        return []
+    return [
+        TurnToLinkClaimInline(**c) if isinstance(c, dict) else c
+        for c in raw_claims
+    ]
 
 ADD_VERBS = [
     "find", "found", "take", "took", "pick up", "picked up", "pick", "grab", "grabbed", "seize", "seized",
@@ -994,6 +1004,21 @@ def main():
                             continue
                         filtered_checks.append(item)
                     p.inventory.inventory_checks = filtered_checks
+
+    for p in out_portions:
+        claims: List[Dict[str, Any]] = []
+        inventory = p.inventory
+        if inventory and inventory.inventory_checks:
+            for idx, item in enumerate(inventory.inventory_checks):
+                if item.target_section:
+                    claims.append({
+                        "target": str(item.target_section),
+                        "claim_type": "inventory_check",
+                        "module_id": "extract_inventory_v1",
+                        "evidence_path": f"/inventory/inventory_checks/{idx}/target_section",
+                    })
+        p.turn_to_claims = merge_turn_to_claims(p.turn_to_claims, claims)
+        p.turn_to_claims = _coerce_turn_to_claims(p.turn_to_claims)
 
     final_rows = [p.model_dump(exclude_none=True) for p in out_portions]
     save_jsonl(args.out, final_rows)

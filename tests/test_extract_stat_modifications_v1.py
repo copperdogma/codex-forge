@@ -41,6 +41,12 @@ def test_roll_die_deduct_number_from_stamina():
     assert any(m.stat == "stamina" and m.amount == "-(1d6)" for m in mods)
 
 
+def test_lose_points_simple():
+    text = "Lose 3 STAMINA points."
+    mods = extract_stat_modifications_regex(text)
+    assert any(m.stat == "stamina" and m.amount == -3 for m in mods)
+
+
 def test_combat_duration_modifier_not_stat_change():
     text = "You must fight bare-handed, reducing your SKILL by 4 for the duration of the combat."
     mods = extract_stat_modifications_regex(text)

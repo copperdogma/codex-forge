@@ -44,33 +44,12 @@ stages:
     params:
       emit_raw_text: true
 
-  - id: extract_choices
-    stage: extract
-    module: extract_choices_relaxed_v1
-    needs: [portionize_html]
-    inputs:
-      pages: portionize_html
-    out: portions_with_choices.jsonl
-
-  - id: validate_choice_links
-    stage: enrich
-    module: validate_choice_links_v1
-    needs: [extract_choices, convert_to_blocks]
-    inputs:
-      pages: convert_to_blocks
-      input: extract_choices
-    out: portions_with_choices_validated.jsonl
-    params:
-      model: gpt-4.1-mini
-      max_ai_calls: 0 # skip AI in smoke
-      check_multi_links: true
-
   - id: extract_combat
     stage: enrich
     module: extract_combat_v1
-    needs: [validate_choice_links, convert_to_blocks]
+    needs: [portionize_html, convert_to_blocks]
     inputs:
-      portions: validate_choice_links
+      portions: portionize_html
       pages: convert_to_blocks
     out: portions_with_combat.jsonl
     params:
@@ -117,21 +96,42 @@ stages:
       use_ai: false # skip AI in smoke
       max_ai_calls: 0
 
+  - id: extract_choices
+    stage: extract
+    module: extract_choices_relaxed_v1
+    needs: [extract_stat_modifications]
+    inputs:
+      pages: extract_stat_modifications
+    out: portions_with_choices.jsonl
+
+  - id: validate_choice_links
+    stage: enrich
+    module: validate_choice_links_v1
+    needs: [extract_choices, convert_to_blocks]
+    inputs:
+      pages: convert_to_blocks
+      input: extract_choices
+    out: portions_with_choices_validated.jsonl
+    params:
+      model: gpt-4.1-mini
+      max_ai_calls: 0 # skip AI in smoke
+      check_multi_links: true
+
   - id: validate_reachability
     stage: validate
     module: validate_holistic_reachability_v1
-    needs: [extract_stat_modifications]
+    needs: [validate_choice_links]
     inputs:
-      portions: extract_stat_modifications
+      portions: validate_choice_links
     out: reachability_report.json
 
   - id: detect_endings
     stage: enrich
     module: ending_guard_v1
-    needs: [extract_stat_modifications, convert_to_blocks]
+    needs: [validate_choice_links, convert_to_blocks]
     inputs:
       pages: convert_to_blocks
-      inputs: extract_stat_modifications
+      inputs: validate_choice_links
     out: portions_with_endings.jsonl
     params:
       model: gpt-5.1
@@ -173,12 +173,24 @@ stages:
       remove_page_numbers: true
       remove_images: true
 
+  - id: apply_edgecase_patches
+    stage: export
+    module: apply_edgecase_patches_v1
+    needs: [clean_presentation]
+    inputs:
+      input: clean_presentation
+    out: gamebook_patched.json
+    params:
+      patches: edgecase_patches.jsonl
+      allow-missing: true
+      report-out: edgecase_patch_report.jsonl
+
   - id: validate_gamebook
     stage: validate
     module: validate_ff_engine_v2
-    needs: [clean_presentation, report_pipeline_issues, detect_endings, load_boundaries, convert_to_blocks, validate_reachability]
+    needs: [apply_edgecase_patches, report_pipeline_issues, detect_endings, load_boundaries, convert_to_blocks, validate_reachability]
     inputs:
-      gamebook: clean_presentation
+      gamebook: apply_edgecase_patches
       portions: detect_endings
       boundaries: load_boundaries
       elements_core: convert_to_blocks

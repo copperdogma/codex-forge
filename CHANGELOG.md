@@ -674,3 +674,21 @@
 
 ### Tested
 - `python driver.py --recipe configs/recipes/recipe-ff-ai-ocr-gpt51.yaml --run-id ff-ai-ocr-gpt51-pristine-fast-full --allow-run-id-reuse --output-dir output/runs/ff-ai-ocr-gpt51-pristine-fast-full --start-from package_game_ready`
+## [2026-01-02] - Edgecase scanner/patch workflow and link-claim tracking
+
+### Added
+- Edgecase scanner + AI verification + patch application modules with schemas and tests.
+- Turn-to link tracking and claim reconciliation across extractors.
+- Resume recipes for edgecase scanning and synthetic patch demo.
+
+### Changed
+- Recipes reorder choice extraction after combat/stat modules and apply edgecase patches before validation/packaging.
+- Choice completeness validation now considers turn-to links and mechanic targets.
+- README updated with edgecase workflow.
+
+### Fixed
+- Package game-ready now resolves recipe snapshots from stage directories.
+- Turn-to claims serialization warnings in inventory/stat/combat modules.
+
+### Tested
+- `python -m pytest tests/test_extract_stat_modifications_v1.py`

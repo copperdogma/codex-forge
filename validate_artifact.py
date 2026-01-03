@@ -22,6 +22,12 @@ from schemas import (
     PageHtml,
     PageHtmlBlocks,
     PipelineIssues,
+    EdgecaseScanReport,
+    EdgecasePatchRecord,
+    EdgecasePatchReport,
+    TurnToLinksRecord,
+    TurnToLinkClaim,
+    TurnToUnclaimedReport,
     ElementCore,
 )
 
@@ -45,6 +51,12 @@ SCHEMA_MAP: Dict[str, Type[BaseModel]] = {
     "page_html_v1": PageHtml,
     "page_html_blocks_v1": PageHtmlBlocks,
     "pipeline_issues_v1": PipelineIssues,
+    "edgecase_scan_v1": EdgecaseScanReport,
+    "edgecase_patch_v1": EdgecasePatchRecord,
+    "edgecase_patch_report_v1": EdgecasePatchReport,
+    "turn_to_links_v1": TurnToLinksRecord,
+    "turn_to_link_claims_v1": TurnToLinkClaim,
+    "turn_to_unclaimed_v1": TurnToUnclaimedReport,
     "element_core_v1": ElementCore,
 }
 

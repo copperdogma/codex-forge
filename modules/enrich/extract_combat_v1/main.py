@@ -2,12 +2,13 @@ import argparse
 import json
 import re
 import os
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any, Dict, Iterable, List, Optional, Tuple
 
 from modules.common.openai_client import OpenAI
 from modules.common.utils import read_jsonl, save_jsonl, ProgressLogger
 from modules.common.html_utils import html_to_text
-from schemas import Combat, CombatEnemy, EnrichedPortion
+from modules.common.turn_to_claims import merge_turn_to_claims
+from schemas import Combat, CombatEnemy, EnrichedPortion, TurnToLinkClaimInline
 
 # Common Fighting Fantasy combat patterns
 # Stat block pattern: NAME followed by SKILL and STAMINA (sometimes on new lines)
@@ -20,13 +21,14 @@ WIN_PATTERNS = [
     re.compile(r"if\s+you\s+(?:manage\s+to\s+)?(?:defeat|kill|slay)\b.*?\bturn\s+to\s+(\d+)", re.IGNORECASE | re.DOTALL),
 ]
 LOSS_PATTERNS = [
-    re.compile(r"if\s+you\s+lose,\s+turn\s+to\s+(\d+)", re.IGNORECASE),
-    re.compile(r"attack\s+strength\s+totals?\s+\d+\s*,?\s*turn\s+to\s+(\d+)", re.IGNORECASE),
-    re.compile(r"attack\s+strength\s+(?:is|was)\s+(?:greater|higher)\s+than\s+(?:your|yours).*?\bturn\s+to\s+(\d+)", re.IGNORECASE | re.DOTALL),
-    re.compile(r"wins?\s+(?:an\s+)?attack\s+round.*?\bturn\s+to\s+(\d+)", re.IGNORECASE | re.DOTALL),
+    re.compile(r"if\s+you\s+lose\b.*?\bturn\s+to\s+(\d+)", re.IGNORECASE | re.DOTALL),
+    re.compile(r"if\s+you\s+lose\s+the\s+(?:fight|combat|battle)\b.*?\bturn\s+to\s+(\d+)", re.IGNORECASE | re.DOTALL),
+    re.compile(r"if\s+you\s+are\s+(?:defeated|killed)\b.*?\bturn\s+to\s+(\d+)", re.IGNORECASE | re.DOTALL),
 ]
 ESCAPE_PATTERN = re.compile(r"if\s+you\s+wish\s+to\s+escape,\s+turn\s+to\s+(\d+)", re.IGNORECASE)
 ESCAPE_FLEX_PATTERN = re.compile(r"\bescape\b.{0,80}?\bturn\s+to\s+(\d+)", re.IGNORECASE | re.DOTALL)
+ESCAPE_CHOICE_PATTERN = re.compile(r"\b(?:may|can|choose)\s+escape\b.{0,80}?\bturn\s+to\s+(\d+)", re.IGNORECASE | re.DOTALL)
+ESCAPE_AFTER_PATTERN = re.compile(r"\bescape\s+after\b.{0,120}?\bturn\s+to\s+(\d+)", re.IGNORECASE | re.DOTALL)
 WIN_CONTINUE_CUES = [
     re.compile(r"\bas\s+soon\s+as\s+you\s+win\b", re.IGNORECASE),
     re.compile(r"\bif\s+you\s+win\b", re.IGNORECASE),
@@ -60,6 +62,48 @@ ENEMY_STRENGTH_GREATER_PATTERN = re.compile(
     r"attack\s+strength\s+(?:is|was)\s+(?:greater|higher)\s+than\s+(?:your|yours).{0,80}?\bturn\s+to\s+(\d+)",
     re.IGNORECASE | re.DOTALL,
 )
+
+
+def _walk_targets(obj: Any, prefix: str = "") -> Iterable[Tuple[str, str]]:
+    if isinstance(obj, dict):
+        for key, value in obj.items():
+            path = f"{prefix}/{key}" if prefix else f"/{key}"
+            if key == "targetSection" and value is not None:
+                yield (str(value), path)
+            else:
+                yield from _walk_targets(value, path)
+    elif isinstance(obj, list):
+        for idx, item in enumerate(obj):
+            path = f"{prefix}/{idx}" if prefix else f"/{idx}"
+            yield from _walk_targets(item, path)
+
+
+def _combat_claims(combats: List[Combat]) -> List[Dict[str, Any]]:
+    claims: List[Dict[str, Any]] = []
+    for idx, combat in enumerate(combats or []):
+        data = combat.model_dump(exclude_none=True) if hasattr(combat, "model_dump") else combat
+        for target, path in _walk_targets(data, f"/combat/{idx}"):
+            claims.append({
+                "target": str(target),
+                "claim_type": "combat",
+                "module_id": "extract_combat_v1",
+                "evidence_path": path,
+            })
+    return claims
+
+
+def _coerce_turn_to_claims(claims: Iterable[Any]) -> List[TurnToLinkClaimInline]:
+    coerced: List[TurnToLinkClaimInline] = []
+    for claim in claims or []:
+        if isinstance(claim, TurnToLinkClaimInline):
+            coerced.append(claim)
+        elif isinstance(claim, dict):
+            coerced.append(TurnToLinkClaimInline(**claim))
+        elif hasattr(claim, "model_dump"):
+            coerced.append(TurnToLinkClaimInline(**claim.model_dump()))
+        elif hasattr(claim, "dict"):
+            coerced.append(TurnToLinkClaimInline(**claim.dict()))
+    return coerced
 
 SYSTEM_PROMPT = """You are an expert at parsing Fighting Fantasy gamebook sections.
 Extract combat encounter information from the provided text into a JSON list of combat events.
@@ -116,7 +160,12 @@ def _detect_outcomes(text: str) -> Tuple[Optional[str], Optional[str], Optional[
         if match:
             loss_section = match.group(1)
             break
-    escape_match = ESCAPE_PATTERN.search(text) or ESCAPE_FLEX_PATTERN.search(text)
+    escape_match = (
+        ESCAPE_PATTERN.search(text)
+        or ESCAPE_AFTER_PATTERN.search(text)
+        or ESCAPE_CHOICE_PATTERN.search(text)
+        or ESCAPE_FLEX_PATTERN.search(text)
+    )
     if escape_match:
         escape_section = escape_match.group(1)
     if win_section is None:
@@ -519,6 +568,23 @@ def _strip_spurious_escape(outcomes: Optional[Dict[str, Any]], text: str) -> Opt
     return trimmed
 
 
+def _strip_spurious_loss(outcomes: Optional[Dict[str, Any]], text: str, triggers: Optional[List[Dict[str, Any]]]) -> Optional[Dict[str, Any]]:
+    if not outcomes or "lose" not in outcomes:
+        return outcomes
+    lower = text.lower()
+    if re.search(r"\bif\s+you\s+lose\b", lower) or re.search(r"\bif\s+you\s+are\s+(?:defeated|killed)\b", lower):
+        return outcomes
+    loss_target = outcomes.get("lose", {}).get("targetSection") if isinstance(outcomes.get("lose"), dict) else None
+    if loss_target and triggers:
+        for trig in triggers:
+            outcome = trig.get("outcome") if isinstance(trig, dict) else None
+            if isinstance(outcome, dict) and outcome.get("targetSection") == loss_target:
+                trimmed = dict(outcomes)
+                trimmed.pop("lose", None)
+                return trimmed
+    return outcomes
+
+
 def _prune_split_target_enemies(combat: Combat, text: str) -> None:
     if combat.mode != "split-target":
         return
@@ -553,13 +619,20 @@ def _expand_split_target_enemies(combat: Combat, text: str) -> None:
 
     count = None
     part = None
+    for noun in part_nouns:
+        if noun in lower:
+            part = noun
+            break
+
+    if not part:
+        return
+
     match = re.search(
-        r"(two|three|four|five|six|seven|eight|nine|ten|\d+)\s+(?:of\s+its\s+)?([a-z\-]+?)(?:s)?\b",
+        rf"(two|three|four|five|six|seven|eight|nine|ten|\d+)\s+(?:of\s+its\s+)?{re.escape(part)}(?:s)?\b",
         lower,
     )
     if match:
         raw_count = match.group(1)
-        part = match.group(2)
         word_map = {
             "two": 2,
             "three": 3,
@@ -575,16 +648,16 @@ def _expand_split_target_enemies(combat: Combat, text: str) -> None:
             count = word_map[raw_count]
         elif raw_count.isdigit():
             count = int(raw_count)
-    else:
-        match = re.search(r"each\s+(?:of\s+its\s+)?([a-z\-]+?)(?:s)?\b", lower)
-        if match:
-            part = match.group(1)
+
+    if count is None:
         if "pair" in lower or "both" in lower or "two" in lower:
             count = 2
-        else:
-            count = 2
 
+    if part and part not in part_nouns:
+        return
     if not count or count < 2:
+        return
+    if count > 10:
         return
 
     base_enemy = combat.enemies[0]
@@ -594,6 +667,24 @@ def _expand_split_target_enemies(combat: Combat, text: str) -> None:
         CombatEnemy(enemy=f"{base_name} - {label} {idx + 1}", skill=base_enemy.skill, stamina=base_enemy.stamina)
         for idx in range(count)
     ]
+
+
+def _prune_ally_assisted_combat(combat: Combat, text: str) -> None:
+    if not text or not combat.enemies or len(combat.enemies) <= 1:
+        return
+    lower = text.lower()
+    ally_pattern = re.compile(
+        r"\b(throm|your companion|your friend|the dwarf|the elf|the barbarian)\b[^.]{0,120}?\battack(?:s|ed)?\b[^.]{0,60}?\b(first|before you|one)\b",
+        re.IGNORECASE,
+    )
+    you_pattern = re.compile(
+        r"\byou\b[^.]{0,140}?\battack(?:s|ed)?\b[^.]{0,80}?\b(second|other)\b",
+        re.IGNORECASE,
+    )
+    if not ally_pattern.search(lower) or not you_pattern.search(lower):
+        return
+    combat.enemies = [combat.enemies[0]]
+    combat.mode = "single"
 
 
 def _normalize_mode(mode: Optional[str], rules: Optional[List[Dict[str, Any]]]) -> Optional[str]:
@@ -843,7 +934,7 @@ def main():
     parser.add_argument("--portions", required=True, help="Input enriched_portion_v1 JSONL")
     parser.add_argument("--pages", help="Input page_html_blocks_v1 JSONL (for driver compatibility)")
     parser.add_argument("--out", required=True, help="Output enriched_portion_v1 JSONL")
-    parser.add_argument("--model", default="gpt-4.1-mini")
+    parser.add_argument("--model", default="gpt-5.1")
     parser.add_argument("--use-ai", "--use_ai", action="store_true", default=True)
     parser.add_argument("--no-ai", "--no_ai", dest="use_ai", action="store_false")
     parser.add_argument("--max-ai-calls", "--max_ai_calls", type=int, default=50)
@@ -923,16 +1014,25 @@ def main():
                     combat.modifiers = _merge_modifiers(combat.modifiers, fallback_modifiers)
                     combat.rules = _prune_redundant_rules(combat.rules, combat.triggers)
                     combat.outcomes = _strip_spurious_escape(combat.outcomes, text)
+                    combat.outcomes = _strip_spurious_loss(combat.outcomes, text, combat.triggers)
                     combat.mode = _normalize_mode(combat.mode, combat.rules)
         
         combats = _merge_sequential_combats(combats, text)
         for combat in combats:
             combat.rules = _prune_redundant_rules(combat.rules, combat.triggers)
             combat.outcomes = _strip_spurious_escape(combat.outcomes, text)
+            combat.outcomes = _strip_spurious_loss(combat.outcomes, text, combat.triggers)
             combat.mode = _normalize_mode(combat.mode, combat.rules)
             _prune_split_target_enemies(combat, text)
             _expand_split_target_enemies(combat, text)
+            _prune_ally_assisted_combat(combat, text)
         portion.combat = combats
+        portion.turn_to_claims = _coerce_turn_to_claims(
+            merge_turn_to_claims(
+                portion.turn_to_claims,
+                _combat_claims(combats),
+            )
+        )
         out_portions.append(portion.model_dump(exclude_none=True))
         
         if (idx + 1) % 50 == 0:

@@ -26,6 +26,7 @@ from pathlib import Path
 
 from modules.common.utils import read_jsonl, save_jsonl, ProgressLogger
 from modules.common.html_utils import html_to_text
+from modules.common.turn_to_claims import merge_turn_to_claims
 
 
 @dataclass
@@ -426,6 +427,18 @@ def main():
         
         # Update portion
         portion['choices'] = all_choices
+        claims = []
+        for idx, choice in enumerate(all_choices):
+            target = choice.get("target")
+            if not target:
+                continue
+            claims.append({
+                "target": str(target),
+                "claim_type": "choice",
+                "module_id": "extract_choices_relaxed_v1",
+                "evidence_path": f"/choices/{idx}/target",
+            })
+        portion["turn_to_claims"] = merge_turn_to_claims(portion.get("turn_to_claims"), claims)
         portion['choices_relaxed'] = relaxed_choices
         output_portions.append(portion)
         

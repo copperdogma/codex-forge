@@ -20,15 +20,23 @@ def _load_recipe(path: Path) -> Dict[str, Any]:
 def _resolve_recipe_path(run_dir: Path, explicit: str | None) -> Path:
     if explicit:
         return Path(explicit)
-    candidates = [
-        run_dir / "snapshots" / "recipe.yaml",
-        run_dir / "snapshots" / "recipe.yml",
-    ]
-    for candidate in candidates:
-        if candidate.exists():
-            return candidate
+    repo_root = _repo_root()
+    current = run_dir
+    checked: list[Path] = []
+    while True:
+        candidates = [
+            current / "snapshots" / "recipe.yaml",
+            current / "snapshots" / "recipe.yml",
+        ]
+        checked.extend(candidates)
+        for candidate in candidates:
+            if candidate.exists():
+                return candidate
+        if current == repo_root or current.parent == current:
+            break
+        current = current.parent
     raise FileNotFoundError(
-        f"Recipe not found. Looked for {candidates[0]} and {candidates[1]}."
+        f"Recipe not found. Looked for {checked[0]} and {checked[1]}."
     )
 
 

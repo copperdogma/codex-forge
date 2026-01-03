@@ -13,7 +13,6 @@ This repo processes scanned (or text) books into structured JSON, using modular 
     4. You have reported the specific artifact paths and sample data verified to the user.
 - **100% Accuracy Requirement:** The final artifacts (gamebook.json) are used directly in a game engine. **If even ONE section number or choice is wrong, the game is broken.** Partial success on section coverage or choice extraction is a complete failure. Pipeline must achieve 100% accuracy or fail explicitly.
 - **Inspect outputs, not just logs:** A green or non-crashing run is not evidence of correctness. Always manually open produced artifacts and check for logical errors (e.g., concatenated sections, missing data, incorrect values).
-- Keep artifacts append-only; never rewrite user data or outputs in `output/` or `input/`.
 - **Precompute context for readers:** Prefer computing metrics (e.g., costs/usage/quality signals) at the stage that produces them and write them into artifacts/logs (e.g., `instrumentation.json`) instead of relying on downstream recomputation.
 
 ## Generality & Non-Overfitting (Read First)

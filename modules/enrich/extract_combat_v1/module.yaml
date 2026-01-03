@@ -5,7 +5,7 @@ entrypoint: modules/enrich/extract_combat_v1/main.py
 input_schema: enriched_portion_v1
 output_schema: enriched_portion_v1
 default_params:
-  model: "gpt-4.1-mini"
+  model: "gpt-5.1"
   use_ai: true
   max_ai_calls: 50
 param_schema:

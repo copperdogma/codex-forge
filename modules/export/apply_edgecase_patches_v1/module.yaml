@@ -1,0 +1,6 @@
+module_id: apply_edgecase_patches_v1
+stage: export
+entrypoint: modules/export/apply_edgecase_patches_v1/main.py
+input_schema: null
+output_schema: null
+notes: "Apply edge-case patch JSONL to gamebook.json and emit a patch report."
