@@ -51,6 +51,28 @@ Artifacts to inspect:
 - `output/runs/<edgecase-run>/06_edgecase_ai_patch_v1/edgecase_patches.jsonl`
 - `output/runs/<edgecase-run>/07_apply_edgecase_patches_v1/gamebook_patched.json`
 
+## Run Configuration (Simplified Workflow)
+
+Running the pipeline via CLI flags can be error-prone. Use the simplified workflow with run configuration files.
+
+### 1. Create a run configuration template
+```bash
+python tools/run_manager.py create-run my-new-run
+```
+This generates `runs/my-new-run.yaml` in the `runs/` directory.
+
+### 2. Edit the configuration
+Customize `runs/my-new-run.yaml` with your recipe, input PDF, and options. The file is validated using Pydantic to ensure all parameters are correct.
+
+### 3. Execute the run
+```bash
+python tools/run_manager.py execute-run my-new-run
+```
+You can still pass additional CLI overrides if needed:
+```bash
+python tools/run_manager.py execute-run my-new-run --dry-run
+```
+
 ## Repository layout
 - CLI modules/scripts: `pages_dump.py`, `clean_pages.py`, `portionize.py`, `consensus.py`, `dedupe_portions.py`, `normalize_portions.py`, `resolve_overlaps.py`, `build_portion_text.py`, etc.
 - `docs/requirements.md`: system requirements

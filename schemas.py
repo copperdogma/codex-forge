@@ -860,3 +860,45 @@ class SectionsStructured(BaseModel):
     """
     macro_sections: List[MacroSection]  # Macro sections (front_matter, game_sections region)
     game_sections: List[GameSectionStructured]  # Game sections with status (certain/uncertain)
+
+
+# ────────────────────────────────────────────────────────────────
+# Run Configuration Schemas
+# ────────────────────────────────────────────────────────────────
+
+
+class ExecutionConfig(BaseModel):
+    start_from: Optional[str] = None
+    end_at: Optional[str] = None
+    skip_done: bool = False
+    force: bool = False
+    dry_run: bool = False
+
+
+class OptionsConfig(BaseModel):
+    mock: bool = False
+    no_validate: bool = False
+    allow_run_id_reuse: bool = False
+    dump_plan: bool = False
+
+
+class InstrumentationConfig(BaseModel):
+    enabled: bool = False
+    price_table: Optional[str] = None
+
+
+class RunConfig(BaseModel):
+    """
+    Structured configuration for a pipeline run.
+    Captures all parameters previously passed as CLI arguments to driver.py.
+    """
+    run_id: Optional[str] = None
+    recipe: str
+    registry: str = "modules"
+    settings: Optional[str] = None
+    input_pdf: Optional[str] = None
+    output_dir: Optional[str] = None
+    
+    execution: ExecutionConfig = Field(default_factory=ExecutionConfig)
+    options: OptionsConfig = Field(default_factory=OptionsConfig)
+    instrumentation: InstrumentationConfig = Field(default_factory=InstrumentationConfig)

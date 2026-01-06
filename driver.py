@@ -19,6 +19,7 @@ import yaml
 from modules.common.utils import ensure_dir, ProgressLogger, append_jsonl, read_jsonl, save_json
 from validate_artifact import SCHEMA_MAP
 from modules.common.utils import save_jsonl
+from schemas import RunConfig
 
 
 DEFAULT_OUTPUTS = {
@@ -588,6 +589,17 @@ def build_command(entrypoint: str, params: Dict[str, Any], stage_conf: Dict[str,
                 raise SystemExit(f"Stage {stage_conf['id']} missing inputs")
             cmd += ["--inputs", in_path, "--out", artifact_path]
             flags_added.update({"--inputs", "--out"})
+        elif stage_conf["module"] == "crop_illustrations_guided_v1":
+            # crop_illustrations_guided_v1 expects --ocr-manifest instead of --pages
+            # It doesn't need --pdf (it gets page images from the OCR manifest's image_native field)
+            # It uses --output-dir (not --outdir)
+            ocr_manifest_path = artifact_inputs.get("ocr_manifest")
+            if not ocr_manifest_path:
+                raise SystemExit(f"Stage {stage_conf['id']} missing ocr_manifest input")
+            module_outdir = os.path.dirname(artifact_path) if not is_final_output else run_dir
+            cmd += ["--output-dir", module_outdir]; flags_added.add("--output-dir")
+            cmd += ["--ocr-manifest", ocr_manifest_path]
+            flags_added.add("--ocr-manifest")
         else:
             if "pdf" in recipe_input:
                 cmd += ["--pdf", recipe_input["pdf"]]; flags_added.add("--pdf")
@@ -867,11 +879,18 @@ def build_command(entrypoint: str, params: Dict[str, Any], stage_conf: Dict[str,
         cmd += ["--out", artifact_path]
         flags_added.update({"--hypotheses", "--out"})
     elif stage_conf["stage"] in {"app", "export"}:
-        in_path = artifact_inputs.get("input")
+        in_path = artifact_inputs.get("input") or artifact_inputs.get("gamebook")
         if not in_path:
             raise SystemExit(f"Stage {stage_conf['id']} missing input")
-        cmd += ["--input", in_path, "--out", artifact_path]
-        flags_added.update({"--input", "--out"})
+        # package_game_ready_v1 expects --out to be relative to run_dir, not the full artifact_path
+        if stage_conf.get("module") == "package_game_ready_v1":
+            # Use the "out" from recipe (should be "output") or fallback
+            out_arg = stage_conf.get("out") or "output"
+            cmd += ["--input", in_path, "--out", out_arg, "--run-dir", run_dir]
+            flags_added.update({"--input", "--out", "--run-dir"})
+        else:
+            cmd += ["--input", in_path, "--out", artifact_path]
+            flags_added.update({"--input", "--out"})
     elif stage_conf["stage"] == "dedupe":
         in_path = artifact_inputs.get("input")
         if not in_path:
@@ -915,6 +934,29 @@ def build_command(entrypoint: str, params: Dict[str, Any], stage_conf: Dict[str,
             raise SystemExit(f"Stage {stage_conf['id']} missing enrich inputs (pages/portions)")
         cmd += ["--pages", pages_path, "--portions", portions_path, "--out", artifact_path]
         flags_added.update({"--pages", "--portions", "--out"})
+    elif stage_conf["stage"] == "transform":
+        # Transform stages: handle associate_illustrations_to_sections_v1 specially
+        if stage_conf["module"] == "associate_illustrations_to_sections_v1":
+            gamebook_path = artifact_inputs.get("gamebook")
+            illustrations_path = artifact_inputs.get("illustrations")
+            pages_html_path = artifact_inputs.get("pages_html")
+            if not gamebook_path or not illustrations_path:
+                raise SystemExit(f"Stage {stage_conf['id']} missing transform inputs (gamebook/illustrations)")
+            cmd += ["--gamebook", gamebook_path, "--illustrations", illustrations_path, "--output", artifact_path]
+            flags_added.update({"--gamebook", "--illustrations", "--output"})
+            if pages_html_path:
+                cmd += ["--pages-html", pages_html_path]
+                flags_added.add("--pages-html")
+        else:
+            # Generic transform: pass all artifact_inputs as flags
+            for key, val in artifact_inputs.items():
+                flag = "--" + key.replace("_", "-")
+                if flag in flags_added:
+                    continue
+                cmd += [flag, str(val)]
+                flags_added.add(flag)
+            cmd += ["--out", artifact_path]
+            flags_added.add("--out")
     elif stage_conf["stage"] == "validate":
         # Validation stages typically want input artifact(s) and explicit out path.
         gamebook_path = artifact_inputs.get("gamebook") or artifact_inputs.get("input")
@@ -983,6 +1025,9 @@ def build_command(entrypoint: str, params: Dict[str, Any], stage_conf: Dict[str,
                 flag = "--expected-range-end"
             elif key == "known_missing":
                 flag = "--known-missing"
+        if stage_conf.get("module") == "associate_illustrations_to_sections_v1":
+            if key == "image_base_path":
+                flag = "--image-base-path"
         if flag in seen_flags:
             continue
         if val is None:
@@ -994,10 +1039,19 @@ def build_command(entrypoint: str, params: Dict[str, Any], stage_conf: Dict[str,
             cmd += [flag, str(val)]; seen_flags.add(flag)
 
     # Progress/state plumbing (skip for adapter modules that don't accept these flags)
-    if stage_conf["stage"] not in {"adapter"}:
+    # Also skip for modules that don't support these flags
+    skip_state_progress = (
+        stage_conf["stage"] == "adapter" or
+        stage_conf.get("module") == "crop_illustrations_guided_v1" or
+        stage_conf.get("module") == "associate_illustrations_to_sections_v1"
+    )
+    if not skip_state_progress:
         cmd += ["--state-file", state_path, "--progress-file", progress_path]
         if run_id:
             cmd += ["--run-id", run_id]
+    elif run_id and stage_conf.get("module") == "crop_illustrations_guided_v1":
+        # crop_illustrations_guided_v1 accepts --run-id but not --state-file/--progress-file
+        cmd += ["--run-id", run_id]
 
     return artifact_path, cmd, os.getcwd()
 
@@ -1190,7 +1244,8 @@ def register_run(run_id: str, run_dir: str, recipe: Dict[str, Any], instrumentat
 
 def main():
     parser = argparse.ArgumentParser(description="Pipeline driver that executes a recipe and module registry.")
-    parser.add_argument("--recipe", required=True, help="Path to recipe yaml")
+    parser.add_argument("--config", help="Path to run configuration YAML")
+    parser.add_argument("--recipe", help="Path to recipe yaml (optional if --config is used)")
     parser.add_argument("--registry", default="modules", help="Module registry directory or yaml")
     parser.add_argument("--dry-run", action="store_true", help="Print commands without running")
     parser.add_argument("--skip-done", action="store_true", help="Skip stages marked done in pipeline_state.json")
@@ -1210,6 +1265,39 @@ def main():
     parser.add_argument("--start-from", dest="start_from", help="Start executing at this stage id (requires upstream artifacts present in state)")
     parser.add_argument("--end-at", dest="end_at", help="Stop after executing this stage id (inclusive)")
     args = parser.parse_args()
+
+    # Load from config if provided
+    if args.config:
+        with open(args.config, "r", encoding="utf-8") as f:
+            config_data = yaml.safe_load(f)
+        config = RunConfig(**config_data)
+        
+        # Apply config to args for backward compatibility in the rest of main()
+        args.recipe = args.recipe or config.recipe
+        args.registry = config.registry or args.registry
+        args.settings = args.settings or config.settings
+        args.input_pdf_override = args.input_pdf_override or config.input_pdf
+        args.run_id_override = args.run_id_override or config.run_id
+        args.output_dir_override = args.output_dir_override or config.output_dir
+        
+        args.dry_run = args.dry_run or config.execution.dry_run
+        args.skip_done = args.skip_done or config.execution.skip_done
+        args.force = args.force or config.execution.force
+        args.start_from = args.start_from or config.execution.start_from
+        args.end_at = args.end_at or config.execution.end_at
+        
+        args.mock = args.mock or config.options.mock
+        args.no_validate = args.no_validate or config.options.no_validate
+        args.allow_run_id_reuse = args.allow_run_id_reuse or config.options.allow_run_id_reuse
+        args.dump_plan = args.dump_plan or config.options.dump_plan
+        
+        args.instrument = args.instrument or config.instrumentation.enabled
+        args.price_table = args.price_table or config.instrumentation.price_table
+        
+
+    if not args.recipe:
+        print("Error: Either --recipe or --config must be provided.")
+        sys.exit(1)
 
     registry = load_registry(args.registry)["modules"]
     recipe = load_recipe(args.recipe)
@@ -1525,6 +1613,18 @@ def main():
                 if stage_id not in artifact_index:
                     raise SystemExit(f"--start-from {args.start_from} provided, but upstream stage {stage_id} has no cached artifact in {state_path}")
                 print(f"[skip-start] {stage_id} skipped due to --start-from (artifact reused)")
+                # Ensure artifact_index is populated even for skipped stages (it should already be from _preload_artifacts_from_state, but verify)
+                if stage_id in artifact_index:
+                    continue
+                # Fallback: try to load from state if not already in artifact_index
+                try:
+                    with open(state_path, "r", encoding="utf-8") as f:
+                        state = json.load(f)
+                    st = state.get("stages", {}).get(stage_id)
+                    if st and st.get("status") == "done" and st.get("artifact") and os.path.exists(st.get("artifact")):
+                        artifact_index[stage_id] = {"path": st.get("artifact"), "schema": st.get("schema_version")}
+                except Exception:
+                    pass
                 continue
         node = plan["nodes"][stage_id]
         stage = node["stage"]
@@ -1593,7 +1693,7 @@ def main():
                         artifact_inputs[key] = artifact_index[origin]["path"]
                     else:
                         artifact_inputs[key] = origin
-        elif stage in {"clean", "portionize", "consensus", "dedupe", "normalize", "resolve", "build", "enrich", "adapter", "export", "app", "validate"}:
+        elif stage in {"clean", "portionize", "consensus", "dedupe", "normalize", "resolve", "build", "enrich", "adapter", "export", "app", "validate", "transform"}:
             # adapters fall-through below
             if stage == "build":
                 inputs_map = node.get("inputs", {}) or {}
@@ -1687,6 +1787,31 @@ def main():
                     # Provide elements_core for filtering/sorting if available
                     if "reduce_ir" in artifact_index:
                         artifact_inputs["elements_core"] = artifact_index["reduce_ir"]["path"]
+            elif stage == "transform":
+                inputs_map = node.get("inputs", {}) or {}
+                for key, origin in inputs_map.items():
+                    if origin in artifact_index:
+                        artifact_inputs[key] = artifact_index[origin]["path"]
+                    else:
+                        # In dry-run or when resuming, artifact_index might not be populated yet, so use the expected path
+                        if origin in plan["nodes"]:
+                            # Try to construct expected path from stage_id
+                            # Get the origin node from the plan
+                            origin_node = plan["nodes"][origin]
+                            expected_artifact_name = origin_node.get("artifact_name") or _artifact_name_for_stage(origin, origin_node.get("stage", "extract"), {}, origin_node)
+                            if stage_ordinal_map and origin in stage_ordinal_map:
+                                ordinal = stage_ordinal_map[origin]
+                                origin_module_id = origin_node.get("module")
+                                if origin_module_id:
+                                    module_folder = f"{ordinal:02d}_{origin_module_id}"
+                                    module_dir = os.path.join(run_dir, module_folder)
+                                    expected_path = os.path.join(module_dir, expected_artifact_name)
+                                    # Only use expected path if file exists or in dry-run
+                                    if args.dry_run or os.path.exists(expected_path):
+                                        artifact_inputs[key] = expected_path
+                                        continue
+                        # Fallback: use origin as-is (might be a path string)
+                        artifact_inputs[key] = origin
             elif stage == "validate":
                 inputs_map = node.get("inputs", {}) or {}
                 for key, origin in inputs_map.items():
@@ -1724,9 +1849,32 @@ def main():
                 if expected_schema and producer_schema and expected_schema != producer_schema:
                     raise SystemExit(f"Schema mismatch: {stage_id} expects {expected_schema} got {producer_schema} from {origin}")
 
+        # In dry-run mode, populate artifact_index with expected paths before building command
+        # so that downstream stages can resolve their inputs
+        if args.dry_run:
+            # Compute artifact_path early for dry-run so artifact_index can be populated
+            artifact_name = node.get("artifact_name") or _artifact_name_for_stage(stage_id, stage, {}, node)
+            is_final_output = (artifact_name in ("gamebook.json", "validation_report.json"))
+            if is_final_output:
+                artifact_path = os.path.join(run_dir, artifact_name)
+            else:
+                if stage_ordinal_map and stage_id and stage_id in stage_ordinal_map:
+                    ordinal = stage_ordinal_map[stage_id]
+                    module_id = node.get("module")
+                    if module_id:
+                        module_folder = f"{ordinal:02d}_{module_id}"
+                        module_dir = os.path.join(run_dir, module_folder)
+                        artifact_path = os.path.join(module_dir, artifact_name)
+                    else:
+                        artifact_path = os.path.join(run_dir, artifact_name)
+                else:
+                    artifact_path = os.path.join(run_dir, artifact_name)
+            artifact_index[stage_id] = {"path": artifact_path, "schema": out_schema}
+
         artifact_path, cmd, cwd = build_command(entrypoint, node["params"], node, run_dir,
                                                 recipe.get("input", {}), state_path, progress_path, run_id,
                                                 artifact_inputs, artifact_index, stage_ordinal_map)
+        
 
         if args.dry_run:
             print(f"[dry-run] {stage_id} -> {' '.join(cmd)}")
@@ -1856,13 +2004,30 @@ def main():
                 if model_cls:
                     errors = 0
                     total = 0
-                    for row in read_jsonl(artifact_path):
-                        total += 1
+                    # Handle both JSONL and JSON files
+                    # JSON files (like validation_report.json) are single objects, not line-delimited
+                    if artifact_path.endswith('.json') and not artifact_path.endswith('.jsonl'):
                         try:
-                            model_cls(**row)
-                        except Exception as e:
-                            errors += 1
-                            print(f"[validate error] {artifact_path} row {total}: {e}")
+                            with open(artifact_path, "r", encoding="utf-8") as f:
+                                data = json.load(f)
+                            total = 1
+                            try:
+                                model_cls(**data)
+                            except Exception as e:
+                                errors = 1
+                                print(f"[validate error] {artifact_path}: {e}")
+                        except json.JSONDecodeError as e:
+                            errors = 1
+                            print(f"[validate error] {artifact_path}: Invalid JSON: {e}")
+                    else:
+                        # JSONL files (line-delimited)
+                        for row in read_jsonl(artifact_path):
+                            total += 1
+                            try:
+                                model_cls(**row)
+                            except Exception as e:
+                                errors += 1
+                                print(f"[validate error] {artifact_path} row {total}: {e}")
                     if errors:
                         update_state(state_path, progress_path, stage_id, "failed", artifact_path, run_id, module_id, out_schema,
                                      stage_description=stage_description)
