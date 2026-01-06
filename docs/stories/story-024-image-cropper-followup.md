@@ -1,6 +1,6 @@
 # Story: Image Extraction & Section Association
 
-**Status**: Complete (~95% accuracy)
+**Status**: Done
 
 **Summary**: Complete end-to-end pipeline for extracting illustrations from gamebook PDFs and associating them with sections. Uses two-pass approach (OCR detects images, CV crops them) with automatic high-resolution support. Achieves 97% section association accuracy and ~95% cropping accuracy.
 
@@ -110,8 +110,8 @@ The downstream gameplay engine will render `<img>` tags using the path + descrip
 - [x] Implement logic to associate images with nearest section based on HTML position
 - [x] Fallback to page-based heuristics when HTML not available
 - [x] **Add full-page image heuristic**: For spread books, full-page images on left page → assign to first section on right page
-- [ ] **Improve image-to-section matching**: Match images by order/alt text instead of assuming first image = first illustration
-- [ ] Test with known problematic cases (e.g., section 3 image that should be in sections 4-5)
+- [x] **Improve image-to-section matching**: Match images by order/alt text instead of assuming first image = first illustration
+- [x] Test with known problematic cases (Section 119 head emerging from water)
 
 ### Phase 8: Fix Alpha Channel Generation for Beige/Cream Paper Scans (TODO)
 **Issue**: Alpha versions of images are not being generated for B&W artwork on beige/cream paper backgrounds (e.g., old book scans).
@@ -132,8 +132,8 @@ The downstream gameplay engine will render `<img>` tags using the path + descrip
 - [x] Add saturation-based detection to `_is_bw_image()` function (using HSV saturation < 0.25 threshold)
 - [x] Convert B&W images to proper grayscale (remove color tint) before alpha channel generation
 - [x] Test with sample images from pristine PDF run (4/4 detected as B&W, alpha versions generated successfully)
-- [ ] **Verify full pipeline run** - Re-run `crop_illustrations` stage to confirm all images get alpha versions
-- [ ] Ensure alpha threshold (`threshold` parameter) works correctly with beige backgrounds (testing in progress)
+- [x] **Verify full pipeline run** - Re-run `crop_illustrations` stage to confirm all images get alpha versions
+- [x] Ensure alpha threshold (`threshold` parameter) works correctly with beige backgrounds
 
 ## Notes
 - Existing `extract_pdf_images_fast_v1` extracts full-page images for OCR - different use case

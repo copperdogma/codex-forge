@@ -51,7 +51,7 @@ This index tracks stories in `/docs/stories/` for the codex-forge pipeline.
 || 021 | Dashboard UI polish (highlighting & pane) | Medium | In Progress | /docs/stories/story-021-dashboard-ui-polish.md |
 || 022 | Pipeline instrumentation (timing & cost) | High | Done | /docs/stories/story-022-instrumentation.md |
 || 023 | Consolidate section target adapters | Medium | Done | /docs/stories/story-023-section-target-guard.md |
-|| 024 | Image cropper follow-up | Medium | To Do | /docs/stories/story-024-image-cropper-followup.md |
+|| 024 | Image cropper follow-up | Medium | Done | /docs/stories/story-024-image-cropper-followup.md |
 || 025 | Module pruning & registry hygiene | Medium | Done | /docs/stories/story-025-module-prune.md |
 || 026 | Onward to the Unknown — Arthur L'Heureux pilot | Medium | To Do | /docs/stories/story-026-onward-unknown-arthur-lheureux.md |
 || 027 | Contact-sheet intake for automatic book type planning | Medium | Done | /docs/stories/story-027-contact-sheet-auto-intake.md |
