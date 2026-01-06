@@ -375,36 +375,47 @@ def detect_spread_and_split(image: Image.Image, min_ratio: float = 1.6,
     return True, [left, right]
 
 
-def reduce_noise(image: Image.Image, method: str = "morphological", 
+def reduce_noise(image: Image.Image, method: str = "morphological",
                  kernel_size: int = 2, iterations: int = 1) -> Image.Image:
     """
     Reduce noise and specks in scanned document images using morphological operations.
-    
+
     This helps fix corruption patterns like "| 4" (where a vertical line artifact
     appears next to a number) and "VPETLUL1E CU pp0dru" (where specks corrupt text).
-    
+
     Uses SOTA approach: morphological opening to remove small specks while preserving
     text strokes. Conservative by default to avoid removing legitimate text.
-    
+
     Args:
         image: PIL Image to denoise
         method: "morphological" (default) or "median" (slower but preserves edges better)
         kernel_size: Size of morphological kernel (default 2, small to preserve text)
         iterations: Number of morphological operations (default 1, conservative)
-    
+
     Returns:
         Denoised image, or original if OpenCV unavailable or method fails
     """
     if not HAS_OPENCV:
         # Fallback: return original if OpenCV not available
         return image
-    
+
+    # Check if image is color
+    img_array = np.array(image.convert("RGB"))
+    is_color = False
+    if img_array.shape[2] == 3:
+        r, g, b = img_array[:, :, 0], img_array[:, :, 1], img_array[:, :, 2]
+        color_variance = np.std([np.mean(r), np.mean(g), np.mean(b)])
+        is_color = color_variance >= 5  # Same threshold as _is_bw_image
+
+    # Skip noise reduction for color images to preserve color information
+    if is_color:
+        return image
+
     try:
         import cv2
         # Convert PIL to OpenCV format (BGR)
-        img_array = np.array(image.convert("RGB"))
         img_cv = cv2.cvtColor(img_array, cv2.COLOR_RGB2BGR)
-        
+
         # Convert to grayscale for processing
         gray = cv2.cvtColor(img_cv, cv2.COLOR_BGR2GRAY)
         

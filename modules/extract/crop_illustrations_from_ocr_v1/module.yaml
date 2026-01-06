@@ -1,0 +1,41 @@
+module_id: crop_illustrations_from_ocr_v1
+stage: extract
+entrypoint: modules/extract/crop_illustrations_from_ocr_v1/main.py
+name: Crop Illustrations from OCR Bounding Boxes
+description: Crops illustrations from source images using bounding boxes detected during OCR
+schema_version: illustration_v1
+
+inputs:
+  - name: ocr_manifest
+    type: file
+    description: OCR JSONL manifest (page_html_v1 schema with illustrations field)
+    required: true
+
+outputs:
+  - name: illustration_manifest
+    type: file
+    description: Illustration manifest JSONL (illustration_v1 schema)
+    path: illustration_manifest.jsonl
+
+  - name: images
+    type: directory
+    description: Cropped illustration images
+    path: images/
+
+parameters:
+  - name: transparency
+    type: boolean
+    default: false
+    description: Generate alpha-channel PNG versions for B&W artwork
+
+  - name: threshold
+    type: integer
+    default: 230
+    description: White threshold for transparency processing (0-255)
+
+command: |
+  python modules/extract/crop_illustrations_from_ocr_v1/main.py \
+    --ocr-manifest {ocr_manifest} \
+    --output-dir {output_dir} \
+    --transparency={transparency} \
+    --threshold={threshold}

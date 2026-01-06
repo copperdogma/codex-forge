@@ -514,6 +514,12 @@ def inline_vision_escalate(image_path: str, model: str = "gpt-4.1",
         usage_obj = getattr(response, "usage", None)
         usage = None
         try:
+            if usage_obj:
+                usage = {
+                    "prompt_tokens": getattr(usage_obj, "prompt_tokens", 0),
+                    "completion_tokens": getattr(usage_obj, "completion_tokens", 0),
+                    "total_tokens": getattr(usage_obj, "total_tokens", 0),
+                }
         except Exception:
             usage = None
 

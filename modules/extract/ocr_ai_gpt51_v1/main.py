@@ -36,7 +36,7 @@ Allowed tags (only):
 - Tables: <table>, <thead>, <tbody>, <tr>, <th>, <td>, <caption>
 - Navigation: <a href="#123"> (use for explicit navigation choices like 'turn to 123')
 - Running head / page number: <p class="running-head">, <p class="page-number">
-- Images: <img alt="..."> (placeholder only, no src)
+- Images: <img alt="..." data-count="N"> (placeholder only, no src; N = number of distinct illustrations if multiple on page, default 1)
 - Metadata: <meta name="ocr-metadata" data-ocr-quality="0.0-1.0" data-ocr-integrity="0.0-1.0" data-continuation-risk="0.0-1.0">
 
 Rules:
@@ -48,7 +48,7 @@ Rules:
 - Use <h1> only for true page titles/headings.
 - Use <dl> with <dt>/<dd> for inline label/value blocks (e.g., creature name + SKILL/STAMINA).
 - Do not invent <section>, <div>, or <span>.
-- Use <img alt="..."> when an illustration appears (short, factual description).
+- Use <img alt="..."> when an illustration appears. Provide a short, factual description in alt. If there are multiple distinct illustrations on the page, add data-count="N" where N is the count (e.g., <img alt="..." data-count="2"> for 2 images). Omit data-count for single images.
 - Tables must be represented as a single <table> with headers/rows (no splitting).
 - If uncertain, default to <p> with plain text.
 
@@ -137,11 +137,16 @@ class TagSanitizer(HTMLParser):
             return
         if tag == "img":
             alt = ""
+            count = ""
             for k, v in attrs:
                 if k.lower() == "alt":
                     alt = v or ""
-                    break
-            self.out.append(f"<img alt=\"{alt}\">")
+                elif k.lower() == "data-count":
+                    count = v or ""
+            if count:
+                self.out.append(f"<img alt=\"{alt}\" data-count=\"{count}\">")
+            else:
+                self.out.append(f"<img alt=\"{alt}\">")
             return
         if tag == "a":
             href = ""
@@ -188,6 +193,42 @@ def sanitize_html(html: str) -> str:
     parser = TagSanitizer()
     parser.feed(html)
     return parser.get_html()
+
+
+def extract_image_metadata(html: str) -> List[dict]:
+    """Extract illustration metadata from HTML img tags.
+
+    Returns list of dicts with keys: alt, count (number of images, default 1).
+    """
+    images = []
+    # Match img tags with optional data-count
+    pattern_with_count = r'<img\s+alt="([^"]*)"\s+data-count="(\d+)">'
+    pattern_simple = r'<img\s+alt="([^"]*)">'
+
+    # First find all img tags with data-count
+    found_positions = set()
+    for match in re.finditer(pattern_with_count, html):
+        alt = match.group(1)
+        count = int(match.group(2))
+        images.append({
+            "alt": alt,
+            "count": count
+        })
+        found_positions.add(match.start())
+
+    # Then find simple img tags (without data-count)
+    for match in re.finditer(pattern_simple, html):
+        if match.start() not in found_positions:
+            # Check it's not part of a data-count tag we already found
+            full_match = html[match.start():match.start()+100]
+            if 'data-count=' not in full_match:
+                alt = match.group(1)
+                images.append({
+                    "alt": alt,
+                    "count": 1
+                })
+
+    return images
 
 
 def resolve_manifest_path(args) -> Path:
@@ -393,6 +434,12 @@ def main() -> None:
             if not meta_tag:
                 row["ocr_metadata_missing"] = True
             row["html"] = cleaned
+
+            # Extract image metadata from img tags (alt text and count)
+            images = extract_image_metadata(cleaned)
+            if images:
+                row["images"] = images
+
             if empty_msg:
                 row["ocr_empty"] = True
                 row["ocr_empty_reason"] = empty_msg

@@ -1,0 +1,78 @@
+module_id: crop_illustrations_guided_v1
+stage: extract
+entrypoint: modules/extract/crop_illustrations_guided_v1/main.py
+name: Guided Illustration Cropping (OCR + CV)
+description: |
+  Two-pass illustration extraction:
+  1. Uses OCR metadata to identify pages with images and expected count
+  2. Runs CV contour detection ONLY on those pages
+
+  This works because we KNOW which pages have images (from GPT-5.1),
+  so CV just needs to find the N largest non-text regions.
+category: extract
+schema_version: illustration_v1
+
+inputs:
+  - name: ocr_manifest
+    type: file
+    description: OCR JSONL manifest (page_html_v1 schema with images field)
+    required: true
+
+outputs:
+  - name: illustration_manifest
+    type: file
+    description: Illustration manifest JSONL (illustration_v1 schema)
+    path: illustration_manifest.jsonl
+
+  - name: images
+    type: directory
+    description: Cropped illustration images
+    path: images/
+
+parameters:
+  - name: transparency
+    type: boolean
+    default: false
+    description: Generate alpha-channel PNG versions for B&W artwork
+
+  - name: threshold
+    type: integer
+    default: 230
+    description: White threshold for transparency processing (0-255)
+
+  - name: blur
+    type: integer
+    default: 5
+    description: Gaussian blur kernel size for CV detection
+
+  - name: min_area_ratio
+    type: float
+    default: 0.01
+    description: Minimum contour area as fraction of page (default 0.01 = 1%)
+
+  - name: max_area_ratio
+    type: float
+    default: 0.99
+    description: Maximum contour area as fraction of page
+
+  - name: min_width
+    type: integer
+    default: 50
+    description: Minimum box width in pixels
+
+  - name: min_height
+    type: integer
+    default: 50
+    description: Minimum box height in pixels
+
+command: |
+  python modules/extract/crop_illustrations_guided_v1/main.py \
+    --ocr-manifest {ocr_manifest} \
+    --output-dir {output_dir} \
+    --transparency={transparency} \
+    --threshold={threshold} \
+    --blur={blur} \
+    --min-area-ratio={min_area_ratio} \
+    --max-area-ratio={max_area_ratio} \
+    --min-width={min_width} \
+    --min-height={min_height}

@@ -238,8 +238,8 @@ def _render_page_fallback(pdf_path: str, page_num: int, dpi: int) -> Optional[Im
         return None
 
 
-def _build_manifest_row(page: int, page_number: int, image_path: str, run_id: Optional[str], source_pdf: Optional[str]) -> Dict[str, Any]:
-    return {
+def _build_manifest_row(page: int, page_number: int, image_path: str, run_id: Optional[str], source_pdf: Optional[str], image_native: Optional[str] = None) -> Dict[str, Any]:
+    row = {
         "schema_version": "page_image_v1",
         "module_id": "extract_pdf_images_fast_v1",
         "run_id": run_id,
@@ -251,6 +251,9 @@ def _build_manifest_row(page: int, page_number: int, image_path: str, run_id: Op
         "image": os.path.abspath(image_path),
         "spread_side": None,
     }
+    if image_native:
+        row["image_native"] = os.path.abspath(image_native)
+    return row
 
 
 def main() -> None:
@@ -294,6 +297,12 @@ def main() -> None:
 
     images_dir = os.path.join(args.outdir, "images")
     ensure_dir(images_dir)
+
+    # Create native images directory when normalization is enabled
+    images_native_dir = None
+    if args.normalize:
+        images_native_dir = os.path.join(args.outdir, "images_native")
+        ensure_dir(images_native_dir)
 
     reader = _load_pdf_reader(args.pdf)
     if reader is None:
@@ -517,6 +526,12 @@ def main() -> None:
         extraction_method = metadata["extraction_method"]
         original_size = (img.width, img.height)
 
+        # Save native (original resolution) image before any processing
+        out_path_native = None
+        if images_native_dir and args.normalize and global_scale_factor != 1.0:
+            out_path_native = os.path.join(images_native_dir, f"page-{page_idx:03d}.jpg")
+            img.save(out_path_native, "JPEG", quality=95)
+
         # Apply global scaling
         if args.normalize and global_scale_factor != 1.0:
             # Record metadata
@@ -548,13 +563,13 @@ def main() -> None:
             metadata["scaled"] = False
 
         metadata["final_size"] = f"{img.width}x{img.height}"
-        
-        # Save image
+
+        # Save normalized image (for OCR)
         out_path = os.path.join(images_dir, f"page-{page_idx:03d}.jpg")
         img.save(out_path, "JPEG", quality=95)
 
         page_number += 1
-        manifest_rows.append(_build_manifest_row(page_idx, page_number, out_path, args.run_id, os.path.abspath(args.pdf)))
+        manifest_rows.append(_build_manifest_row(page_idx, page_number, out_path, args.run_id, os.path.abspath(args.pdf), out_path_native))
         report_rows.append({
             "page": page_idx,
             **metadata,

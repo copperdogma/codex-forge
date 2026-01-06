@@ -56,6 +56,12 @@
       margin: 0;
       font-size: 26px;
       letter-spacing: -0.01em;
+      cursor: pointer;
+      transition: opacity 0.2s ease;
+    }
+
+    h1:hover {
+      opacity: 0.7;
     }
 
     .pill {
@@ -712,7 +718,7 @@
 <body>
   <header>
     <div>
-      <h1>Pipeline Visibility</h1>
+      <h1 id="title-h1" title="Click to return to latest run">Pipeline Visibility</h1>
       <div class="pill">Live view of <strong>pipeline_state.json</strong> + events</div>
       <div class="pill" style="font-size:10px; opacity:0.5;">v12-debug</div>
     </div>
@@ -812,6 +818,7 @@
     const artifactPreview = document.getElementById("artifact-preview");
     const paneClose = document.getElementById("pane-close");
     const paneOpenTab = document.getElementById("pane-open-tab");
+    const titleH1 = document.getElementById("title-h1");
 
     let currentRun = null;
     let userSelectedRun = false;
@@ -976,11 +983,7 @@
 
     function formatRunLabel(entry) {
       const row = entry.row || {};
-      const status = entry.status || "unknown";
-      const percent = entry.percent != null ? `${entry.percent}%` : "—";
-      const ts = isValidTs(entry.ts) ? new Date(entry.ts).toLocaleString() : "unknown";
-      const input = row.input?.pdf || row.path || "unknown";
-      return `${row.run_id} — ${status} • ${percent} • ${ts} • ${input}`;
+      return row.run_id || "Select a run…";
     }
 
     function renderRunOptions(list) {
@@ -2058,6 +2061,21 @@
     };
     if (showExternal) {
       showExternal.onchange = () => loadManifest();
+    }
+
+    // Make H1 clickable to return to base URL (auto-select latest run)
+    if (titleH1) {
+      titleH1.onclick = () => {
+        userSelectedRun = false;
+        setRunInUrl(null, true); // Remove run param from URL
+        currentRun = null;
+        loadManifest().then(() => {
+          if (currentRun) {
+            loadRun(currentRun);
+          }
+          startAuto();
+        });
+      };
     }
 
     function getRunDurationHtml(state, events) {

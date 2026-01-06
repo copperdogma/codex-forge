@@ -111,7 +111,14 @@ def main() -> None:
     if not run_dir.exists():
         raise FileNotFoundError(f"Run dir not found: {run_dir}")
 
-    out_dir = Path(args.out) if args.out else run_dir / "output"
+    # Resolve output directory: if --out is provided and not absolute, resolve relative to run_dir
+    if args.out:
+        out_dir = Path(args.out)
+        if not out_dir.is_absolute():
+            # If relative, resolve relative to run_dir
+            out_dir = run_dir / out_dir
+    else:
+        out_dir = run_dir / "output"
     if args.outdir and not out_dir.is_absolute():
         out_dir = Path(args.outdir) / out_dir
     out_dir.mkdir(parents=True, exist_ok=True)
@@ -129,6 +136,26 @@ def main() -> None:
     # Copy validator folder (additive; does not delete extras)
     dest_validator = out_dir / "validator"
     shutil.copytree(validator_dir, dest_validator, dirs_exist_ok=True)
+
+    # Copy images folder if it exists (check root first, then module folders)
+    images_source = None
+    if (run_dir / "images").exists() and (run_dir / "images").is_dir():
+        images_source = run_dir / "images"
+    else:
+        # Look for images in associate_illustrations module folder
+        for module_dir in run_dir.glob("*associate_illustrations*"):
+            candidate = module_dir / "images"
+            if candidate.exists() and candidate.is_dir():
+                images_source = candidate
+                break
+    
+    if images_source:
+        images_dest = out_dir / "images"
+        if images_dest.exists():
+            # Remove existing images folder to avoid conflicts
+            shutil.rmtree(images_dest)
+        shutil.copytree(images_source, images_dest)
+        logger.log("package_game_ready", "running", message=f"Copied images from {images_source} to {images_dest}", module_id="package_game_ready_v1")
 
     # README
     _write_readme(out_dir / "README.md", validator_stage)

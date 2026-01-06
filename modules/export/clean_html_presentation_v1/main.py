@@ -132,7 +132,22 @@ def main():
              logger.log("clean_html_presentation", "running", current=idx, total=total_sections, 
                         message=f"Cleaned {idx}/{total_sections} sections", module_id="clean_html_presentation_v1")
              
-    save_json(args.out, gamebook)
+    # Reorder fields: metadata, provenance, frontmatterImages, sections
+    ordered_gamebook = {}
+    if "metadata" in gamebook:
+        ordered_gamebook["metadata"] = gamebook["metadata"]
+    if "provenance" in gamebook:
+        ordered_gamebook["provenance"] = gamebook["provenance"]
+    if "frontmatterImages" in gamebook:
+        ordered_gamebook["frontmatterImages"] = gamebook["frontmatterImages"]
+    if "sections" in gamebook:
+        ordered_gamebook["sections"] = gamebook["sections"]
+    # Include any other fields that might exist
+    for key, value in gamebook.items():
+        if key not in ordered_gamebook:
+            ordered_gamebook[key] = value
+    
+    save_json(args.out, ordered_gamebook)
     
     logger.log("clean_html_presentation", "done", current=total_sections, total=total_sections, 
                message=f"Cleaned {cleaned_count} sections -> {args.out}", artifact=args.out,

@@ -1,0 +1,45 @@
+module_id: associate_illustrations_to_sections_v1
+stage: transform
+entrypoint: modules/transform/associate_illustrations_to_sections_v1/main.py
+name: Associate Illustrations to Gamebook Sections
+description: |
+  Maps cropped illustrations to gamebook sections based on page numbers.
+
+  Uses page-based heuristics:
+  - Single section on page → associate with that section
+  - Multiple sections on page → associate with first section starting on that page
+  - Frontmatter (non-gameplay) sections → mark images as decorative
+
+  Populates images[] arrays in gamebook.json sections.
+category: transform
+schema_version: gamebook_v1
+
+inputs:
+  - name: gamebook
+    type: file
+    description: Input gamebook.json (with sections containing pageStart/pageEnd)
+    required: true
+
+  - name: illustrations
+    type: file
+    description: Illustration manifest JSONL (with source_page for each illustration)
+    required: true
+
+outputs:
+  - name: gamebook_with_images
+    type: file
+    description: Updated gamebook.json with images[] arrays populated
+    path: gamebook.json
+
+parameters:
+  - name: image_base_path
+    type: string
+    default: "images"
+    description: Base path for image references in gamebook.json
+
+command: |
+  python modules/transform/associate_illustrations_to_sections_v1/main.py \
+    --gamebook {gamebook} \
+    --illustrations {illustrations} \
+    --output {output_dir}/gamebook.json \
+    --image-base-path {image_base_path}

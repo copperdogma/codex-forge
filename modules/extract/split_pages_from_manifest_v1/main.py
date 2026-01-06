@@ -38,8 +38,9 @@ def _build_manifest_row(
     spread_side: str | None,
     run_id: str | None,
     source: Any | None,
+    image_native: str | None = None,
 ) -> Dict[str, Any]:
-    return {
+    row = {
         "schema_version": "page_image_v1",
         "module_id": "split_pages_from_manifest_v1",
         "run_id": run_id,
@@ -51,6 +52,9 @@ def _build_manifest_row(
         "image": os.path.abspath(image_path),
         "spread_side": spread_side,
     }
+    if image_native:
+        row["image_native"] = os.path.abspath(image_native)
+    return row
 
 
 def main() -> None:
@@ -71,7 +75,13 @@ def main() -> None:
     images_dir = os.path.join(args.outdir, "images")
     ensure_dir(images_dir)
 
+    # Create native images directory if any input rows have image_native
     rows = list(read_jsonl(args.pages))
+    has_native = any(row.get("image_native") for row in rows)
+    images_native_dir = None
+    if has_native:
+        images_native_dir = os.path.join(args.outdir, "images_native")
+        ensure_dir(images_native_dir)
     image_paths = [row["image"] for row in rows]
     row_by_path = {row["image"]: row for row in rows if row.get("image")}
 
@@ -139,7 +149,9 @@ def main() -> None:
         page_idx = row.get("page")
         original_page_number = row.get("original_page_number") or page_idx
         img_path = row["image"]
+        img_native_path = row.get("image_native")
         pil_img = Image.open(img_path)
+        pil_img_native = Image.open(img_native_path) if img_native_path and os.path.exists(img_native_path) else None
 
         group_key = _size_group_key(pil_img.size[0], pil_img.size[1], args.ratio_bucket, args.size_bucket)
         group_decision = group_decisions.get(group_key) or {"is_spread": False, "gutter_position": 0.5, "confidence": 0.0}
@@ -196,6 +208,23 @@ def main() -> None:
             left_img.save(left_path)
             right_img.save(right_path)
 
+            # Split native image if available
+            left_native_path = None
+            right_native_path = None
+            if pil_img_native and images_native_dir:
+                left_native, right_native = split_spread_at_gutter(pil_img_native, actual_gutter)
+                left_native = deskew_image(left_native)
+                right_native = deskew_image(right_native)
+                if should_apply_noise_reduction(left_native):
+                    left_native = reduce_noise(left_native, method="morphological", kernel_size=2)
+                if should_apply_noise_reduction(right_native):
+                    right_native = reduce_noise(right_native, method="morphological", kernel_size=2)
+
+                left_native_path = os.path.join(images_native_dir, f"page-{page_idx:03d}L.png")
+                right_native_path = os.path.join(images_native_dir, f"page-{page_idx:03d}R.png")
+                left_native.save(left_native_path)
+                right_native.save(right_native_path)
+
             output_page_number += 1
             manifest_rows.append(
                 _build_manifest_row(
@@ -206,6 +235,7 @@ def main() -> None:
                     spread_side="L",
                     run_id=args.run_id,
                     source=source,
+                    image_native=left_native_path,
                 )
             )
             output_page_number += 1
@@ -218,6 +248,7 @@ def main() -> None:
                     spread_side="R",
                     run_id=args.run_id,
                     source=source,
+                    image_native=right_native_path,
                 )
             )
         else:
@@ -226,6 +257,15 @@ def main() -> None:
                 pil_img = reduce_noise(pil_img, method="morphological", kernel_size=2)
             out_path = os.path.join(images_dir, f"page-{page_idx:03d}.png")
             pil_img.save(out_path)
+
+            # Process native image if available
+            out_native_path = None
+            if pil_img_native and images_native_dir:
+                pil_img_native = deskew_image(pil_img_native)
+                if should_apply_noise_reduction(pil_img_native):
+                    pil_img_native = reduce_noise(pil_img_native, method="morphological", kernel_size=2)
+                out_native_path = os.path.join(images_native_dir, f"page-{page_idx:03d}.png")
+                pil_img_native.save(out_native_path)
 
             output_page_number += 1
             manifest_rows.append(
@@ -237,6 +277,7 @@ def main() -> None:
                     spread_side=None,
                     run_id=args.run_id,
                     source=source,
+                    image_native=out_native_path,
                 )
             )
 

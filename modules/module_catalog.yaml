@@ -11,6 +11,18 @@ modules:
   - id: image_cropper_v1
     stage: extract
     capabilities: ["images"]
+  - id: extract_illustrations_v1
+    stage: extract
+    capabilities: ["images"]
+  - id: crop_illustrations_from_ocr_v1
+    stage: extract
+    capabilities: ["images"]
+  - id: crop_illustrations_guided_v1
+    stage: extract
+    capabilities: ["images"]
+  - id: associate_illustrations_to_sections_v1
+    stage: transform
+    capabilities: ["images"]
   - id: extract_ocr_ensemble_v1
     stage: extract
     capabilities: ["cyoa", "images"]
