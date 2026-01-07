@@ -1,10 +1,7 @@
 # Smoke test recipe for Fighting Fantasy AI pipeline
 # Uses pre-generated stubs to bypass expensive API calls.
 
-run_id: smoke-ff
-input:
-  pdf: testdata/tbotb-mini.pdf
-output_dir: output/runs/smoke-ff
+
 
 stages:
   - id: load_blocks

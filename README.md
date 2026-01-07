@@ -59,10 +59,12 @@ Running the pipeline via CLI flags can be error-prone. Use the simplified workfl
 ```bash
 python tools/run_manager.py create-run my-new-run
 ```
-This generates `runs/my-new-run.yaml` in the `runs/` directory.
+This generates `output/runs/my-new-run/config.yaml`.
 
 ### 2. Edit the configuration
-Customize `runs/my-new-run.yaml` with your recipe, input PDF, and options. The file is validated using Pydantic to ensure all parameters are correct.
+Customize `output/runs/my-new-run/config.yaml` with your recipe, input PDF, and options.
+
+**Key Concept**: The `recipe` defines the *logic* (stages), while this `config.yaml` defines the *context* (input PDF, Output Dir, Run ID).
 
 ### 3. Execute the run
 ```bash

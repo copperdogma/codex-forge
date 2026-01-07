@@ -1,8 +1,0 @@
-model: gpt-4.1-mini
-temperature: 0.2
-max_tokens: 300
-max_retries: 2
-portionize:
-  window: 8
-  stride: 1
-notes: "Speed preset for text recipe (no OCR); ~8s/page, ~$0.00013/page from bench-cost-perf-text-20251124e."

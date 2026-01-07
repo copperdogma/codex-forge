@@ -1,8 +1,0 @@
-model: gpt-5
-temperature: 0.4
-max_tokens: 600
-max_retries: 4
-portionize:
-  window: 8
-  stride: 1
-notes: "Quality OCR preset; ~70–100s/page, ~$0.015–0.020/page (bench-cost-perf-ocr-20251124c)."

@@ -12,14 +12,11 @@ from schemas import RunConfig, ExecutionConfig, OptionsConfig, InstrumentationCo
 
 def create_run(name: str):
     """Generates a template run config file."""
-    if not name.endswith(".yaml"):
-        name += ".yaml"
-    
-    runs_dir = "runs"
-    if not os.path.exists(runs_dir):
-        os.makedirs(runs_dir)
+    run_dir = os.path.join("output", "runs", name)
+    if not os.path.exists(run_dir):
+        os.makedirs(run_dir)
         
-    path = os.path.join(runs_dir, name)
+    path = os.path.join(run_dir, "config.yaml")
     if os.path.exists(path):
         print(f"Error: {path} already exists.")
         sys.exit(1)
@@ -27,8 +24,8 @@ def create_run(name: str):
     # Create a default RunConfig with some placeholders/examples
     config = RunConfig(
         run_id=os.path.splitext(name)[0],
-        recipe="configs/recipes/recipe-ff-smoke.yaml",
-        settings="settings.smoke.yaml",
+        output_dir=run_dir,
+        recipe="configs/recipes/recipe-ff.yaml",
         input_pdf="input/06 deathtrap dungeon.pdf",
         execution=ExecutionConfig(skip_done=True),
         options=OptionsConfig(allow_run_id_reuse=True),
@@ -49,15 +46,22 @@ def create_run(name: str):
 def execute_run(name: str, extra_args: Optional[list] = None):
     """Validates and executes a run configuration."""
     if not name.endswith(".yaml"):
-        name += ".yaml"
-        
-    path = os.path.join("runs", name)
-    if not os.path.exists(path):
-        # Also check direct path
-        if os.path.exists(name):
-            path = name
+        # Check if it's a directory in output/runs
+        folder_path = os.path.join("output", "runs", name)
+        if os.path.isdir(folder_path):
+            path = os.path.join(folder_path, "config.yaml")
         else:
-            print(f"Error: Config file {name} not found in runs/ or current dir.")
+            path = name # Fallback to direct path
+    else:
+        path = name
+
+    if not os.path.exists(path):
+        # Maybe they just gave the run name and we should look in output/runs/<name>/config.yaml
+        alt_path = os.path.join("output", "runs", name.replace(".yaml", ""), "config.yaml")
+        if os.path.exists(alt_path):
+            path = alt_path
+        else:
+            print(f"Error: Config file {path} (or {alt_path}) not found.")
             sys.exit(1)
             
     with open(path, "r", encoding="utf-8") as f:
