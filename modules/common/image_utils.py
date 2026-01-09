@@ -88,126 +88,153 @@ def deskew_image(image: Image.Image, max_angle: float = 1.5) -> Image.Image:
     angle = detect_skew_angle(image)
     if angle == 0.0 or abs(angle) > max_angle:
         return image
-    return image.rotate(angle, expand=True, fillcolor="white")
+    return image.rotate(angle, expand=True, fillcolor="white", resample=Image.Resampling.BICUBIC)
 
 
 def find_gutter_position(image: Image.Image, center_pct: float = 0.15,
-                         window: int = 25) -> Tuple[float, float, float]:
+                         window: int = 5) -> Tuple[float, float, float, float]:
     """
     Find the gutter (book binding/crease) near center of image.
 
-    Handles BOTH bright gutters (white paper gap) AND dark gutters (shadow/crease).
-    Uses vertical continuity to distinguish actual page binding (extends full height)
-    from illustration borders (only partial height).
+    Strategy: Find the most VERTICALLY CONSISTENT column that extends from
+    absolute top to absolute bottom of the page (including margins).
 
-    Returns (gutter_fraction, brightness_score, contrast_score, continuity_score).
+    The binding (whether dark shadow or bright gap) is the most "boring" vertical
+    stripe - it has low variance because it's uniform top-to-bottom. Text columns
+    and illustrations have high variance. Illustration borders are consistent but
+    don't extend into margins.
+
+    Returns (gutter_fraction, brightness_score, variance_score, continuity_score).
     - gutter_fraction: 0.0-1.0 position from left edge
     - brightness_score: average brightness at gutter (0-255)
-    - contrast_score: how strong the gutter signal is vs surroundings (0-1)
-      Higher contrast = more confident this is a real gutter
-    - continuity_score: fraction of image height with consistent signal (0-1)
-      Higher continuity = more likely to be full-height page binding vs illustration border
+    - variance_score: inverse of variance (higher = more consistent)
+    - continuity_score: 1.0 if passes margin checks, 0.0 otherwise
     """
     w, h = image.size
     gray = np.array(image.convert("L"))
 
     center = w // 2
-    search_start = int(center - center_pct * w)
-    search_end = int(center + center_pct * w)
+    # Search middle 10% of width (binding is very close to center in two-page spreads)
+    search_start = int(center - 0.05 * w)
+    search_end = int(center + 0.05 * w)
 
-    # Compute smoothed column brightness
-    col_means = gray.mean(axis=0)
-    kernel = np.ones(window) / window
-    smoothed = np.convolve(col_means, kernel, mode='same')
-
-    # Also compute gradient (edge strength) to find sharp transitions
-    gradient = np.abs(np.gradient(smoothed))
-
-    # Find the side brightness (typical page content brightness)
-    left_region = smoothed[int(0.10 * w):int(0.30 * w)]
-    right_region = smoothed[int(0.70 * w):int(0.90 * w)]
-
-    if len(left_region) > 0 and len(right_region) > 0:
-        side_brightness = (float(np.median(left_region)) + float(np.median(right_region))) / 2
-    else:
-        side_brightness = 128.0  # fallback to mid-gray
-
-    search_region = smoothed[search_start:search_end]
-    gradient_region = gradient[search_start:search_end]
-
-    if len(search_region) == 0:
+    if search_end <= search_start:
         return 0.5, 0.0, 0.0, 0.0
 
-    # Strategy: Find BOTH bright gutters (max) and dark creases (min)
-    # Then choose whichever has stronger contrast vs side brightness
-    # AND extends the full vertical height (not just illustration borders)
+    # Sample points along height: 0%, 5%, 10%, ..., 95%, 100%
+    sample_points = [int(h * i / 20) for i in range(21)]  # 21 points from 0 to 20/20
 
-    bright_idx = search_start + int(np.argmax(search_region))
-    dark_idx = search_start + int(np.argmin(search_region))
+    best_idx = center
+    best_score = -1.0
+    best_variance = float('inf')
+    best_continuity = 0.0
 
-    bright_val = float(smoothed[bright_idx])
-    dark_val = float(smoothed[dark_idx])
+    # Track all candidates for comparison
+    candidates = []
 
-    # Calculate contrast for both candidates
-    # Bright gutter: higher than sides
-    bright_contrast = max(0.0, (bright_val - side_brightness) / max(bright_val, 1.0))
+    for idx in range(search_start, search_end):
+        # Sample a narrow vertical band (binding is typically 3-8 pixels wide)
+        band_start = max(0, idx - 2)
+        band_end = min(w, idx + 3)
 
-    # Dark gutter: lower than sides (shadow/crease)
-    dark_contrast = max(0.0, (side_brightness - dark_val) / max(side_brightness, 1.0))
+        # Get brightness samples at each height point
+        # Sample horizontal bands (not single rows) to average out text
+        samples = []
+        band_height = max(5, h // 40)  # Sample bands ~2.5% of image height
 
-    # Also check edge strength (sharp transitions indicate binding)
-    bright_edge = float(gradient[bright_idx])
-    dark_edge = float(gradient[dark_idx])
+        for y in sample_points:
+            # Average a horizontal band of rows around this y position
+            y_start = max(0, y - band_height // 2)
+            y_end = min(h, y + band_height // 2)
+            band_brightness = float(np.mean(gray[y_start:y_end, band_start:band_end]))
+            samples.append(band_brightness)
 
-    # NEW: Check vertical continuity - the actual page binding extends top-to-bottom
-    # Illustration borders only extend partial height with margins
-    # This discriminates against locking onto illustration borders
+        # Compute variance (how much brightness varies top-to-bottom)
+        variance = float(np.var(samples))
 
-    def compute_vertical_continuity(col_idx: int, is_dark: bool) -> float:
-        """
-        Compute what fraction of the image HEIGHT shows consistent dark/bright signal.
-        Page bindings extend 100% of height; illustration borders only partial.
-        """
-        if col_idx < 0 or col_idx >= w:
-            return 0.0
+        # Check if this column actually extends into margins
+        # Margins are samples 0-1 (top 0-5%) and 19-20 (bottom 95-100%)
+        # Check if there's SOMETHING visible (not pure white) in margins
+        top_samples = samples[0:2]
+        bottom_samples = samples[-2:]
 
-        col_pixels = gray[:, col_idx]
+        # Average brightness of margins
+        top_brightness = np.mean(top_samples)
+        bottom_brightness = np.mean(bottom_samples)
 
-        # For dark gutters: count pixels significantly darker than side brightness
-        # For bright gutters: count pixels significantly brighter than side brightness
-        threshold = 20  # brightness difference threshold
-
-        if is_dark:
-            consistent_pixels = np.sum(col_pixels < (side_brightness - threshold))
+        # If both margins are very bright (>240), this column doesn't extend into margins
+        # (it's probably a text column within content area)
+        if top_brightness > 240 and bottom_brightness > 240:
+            extends_to_margins = False
         else:
-            consistent_pixels = np.sum(col_pixels > (side_brightness + threshold))
+            extends_to_margins = True
 
-        # Return fraction of height with consistent signal
-        return float(consistent_pixels) / float(h)
+        # Track candidate for later comparison
+        distance_from_center = abs(idx - center)
+        candidates.append((idx, variance, extends_to_margins, distance_from_center))
 
-    bright_continuity = compute_vertical_continuity(bright_idx, is_dark=False)
-    dark_continuity = compute_vertical_continuity(dark_idx, is_dark=True)
+    # Find minimum variance among candidates that extend to margins
+    margin_candidates = [(idx, var, dist) for idx, var, ext, dist in candidates if ext]
 
-    # Choose the candidate with stronger signal
-    # Weight vertical continuity heavily (5x) - it's the key discriminator
-    # Prefer dark creases slightly (1.2x) - more common in book scans
-    dark_score = (dark_contrast * 1.2) + (dark_edge / 10.0) + (dark_continuity * 5.0)
-    bright_score = bright_contrast + (bright_edge / 10.0) + (bright_continuity * 5.0)
+    if margin_candidates:
+        min_variance = min(var for _, var, _ in margin_candidates)
 
-    if dark_score > bright_score:
-        # Dark gutter (shadow/crease)
-        best_idx = dark_idx
-        gutter_brightness = dark_val
-        contrast = dark_contrast
-        continuity = dark_continuity
-    else:
-        # Bright gutter (white paper gap)
-        best_idx = bright_idx
-        gutter_brightness = bright_val
-        contrast = bright_contrast
-        continuity = bright_continuity
+        # If multiple columns have SIMILAR variance (within 10% of minimum),
+        # prefer the DARKEST one (binding is darker than white margins)
+        variance_threshold = min_variance * 1.10
+        close_candidates = [(idx, var, dist) for idx, var, dist in margin_candidates
+                           if var <= variance_threshold]
 
-    return best_idx / w, gutter_brightness, contrast, continuity
+        # Among close candidates, get brightness for each and pick the darkest
+        if close_candidates:
+            candidates_with_brightness = []
+            for idx, var, dist in close_candidates:
+                band_start = max(0, idx - 2)
+                band_end = min(w, idx + 3)
+                avg_brightness = float(np.mean(gray[:, band_start:band_end]))
+                candidates_with_brightness.append((idx, var, avg_brightness))
+
+            # Pick the darkest (lowest brightness) among similar-variance candidates
+            best_idx, best_variance, _ = min(candidates_with_brightness, key=lambda x: x[2])
+            best_continuity = 1.0
+            best_score = 1.0 / (best_variance + 1.0)
+
+    # If no column passed margin checks, fall back to lowest variance in search region
+    if best_score < 0:
+        band_height = max(5, h // 40)
+
+        for idx in range(search_start, search_end):
+            band_start = max(0, idx - 2)
+            band_end = min(w, idx + 3)
+
+            samples = []
+            for y in sample_points:
+                y_start = max(0, y - band_height // 2)
+                y_end = min(h, y + band_height // 2)
+                band_brightness = float(np.mean(gray[y_start:y_end, band_start:band_end]))
+                samples.append(band_brightness)
+
+            variance = float(np.var(samples))
+            score = 1.0 / (variance + 1.0)
+
+            distance_from_center = abs(idx - center) / (search_end - search_start)
+            score *= (1.0 - distance_from_center * 0.01)
+
+            if score > best_score:
+                best_score = score
+                best_idx = idx
+                best_variance = variance
+                best_continuity = 0.0  # Didn't pass margin checks
+
+    # Get average brightness at detected position
+    band_start = max(0, best_idx - 2)
+    band_end = min(w, best_idx + 3)
+    gutter_brightness = float(np.mean(gray[:, band_start:band_end]))
+
+    # Variance score: normalize to 0-1 range (lower variance = higher score)
+    variance_score = 1.0 / (best_variance + 1.0)
+
+    return best_idx / w, gutter_brightness, variance_score, best_continuity
 
 
 def sample_spread_decision(image_paths: List[str], sample_size: int = 5,
@@ -250,9 +277,26 @@ def sample_spread_decision(image_paths: List[str], sample_size: int = 5,
         ratio = w / h
         is_landscape = ratio > min_ratio
 
-        gutter_frac, brightness, contrast, continuity = find_gutter_position(img)
-        # Confident if: landscape AND contrast shows a visible gutter
-        is_confident = is_landscape and contrast >= min_contrast
+        gutter_frac, brightness, variance_score, continuity = find_gutter_position(img)
+
+        # Variance-based confidence:
+        # - continuity = 1.0 means column passed margin checks (extends top-to-bottom)
+        # - variance_score = how consistent the column is (higher = more consistent)
+        # - close to center is a good sign
+        distance_from_center = abs(gutter_frac - 0.5)
+
+        # Confident if:
+        # - Landscape page AND
+        # - Either: passed margin checks (continuity=1.0) OR very close to center
+        is_confident = bool(
+            is_landscape
+            and (
+                # Passed margin checks - extends into top/bottom margins
+                continuity >= 1.0
+                # OR very close to center (within 3%)
+                or distance_from_center <= 0.03
+            )
+        )
 
         sample_info = {
             "index": i,
@@ -260,10 +304,11 @@ def sample_spread_decision(image_paths: List[str], sample_size: int = 5,
             "width": w,
             "height": h,
             "ratio": round(ratio, 3),
-            "is_landscape": is_landscape,
+            "is_landscape": bool(is_landscape),
             "gutter_position": round(gutter_frac, 3),
             "gutter_brightness": round(brightness, 1),
-            "gutter_contrast": round(contrast, 3),
+            "gutter_variance": round(variance_score, 3),
+            "gutter_continuity": round(continuity, 1),
             "is_confident": is_confident,
         }
         samples.append(sample_info)

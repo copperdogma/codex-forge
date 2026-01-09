@@ -11,8 +11,8 @@ from modules.common.image_utils import (
     split_spread_at_gutter,
     find_gutter_position,
     deskew_image,
-    should_apply_noise_reduction,
-    reduce_noise,
+    # should_apply_noise_reduction,  # Unused - noise reduction disabled
+    # reduce_noise,  # Unused - noise reduction disabled
 )
 
 
@@ -163,21 +163,26 @@ def main() -> None:
 
         source = row_by_path.get(img_path, {}).get("source")
         if is_spread_group and is_landscape:
-            page_gutter_frac, _, page_contrast, page_continuity = find_gutter_position(pil_img)
-            min_contrast_threshold = 0.15
-            min_continuity_threshold = 0.7
-            has_strong_seam = (
-                page_contrast >= min_contrast_threshold
-                and page_continuity >= min_continuity_threshold
-            )
+            page_gutter_frac, _, page_variance, page_continuity = find_gutter_position(pil_img)
 
-            if has_strong_seam:
+            # Variance-based gutter selection:
+            # 1. If detection passed margin checks (continuity=1.0), trust it
+            # 2. If detection is very close to center (within 3%), trust it
+            # 3. Otherwise, use group gutter
+            distance_from_center = abs(page_gutter_frac - 0.5)
+
+            # Passed margin checks - binding extends top-to-bottom including margins
+            if page_continuity >= 1.0:
                 actual_gutter = page_gutter_frac
-                gutter_source = "per-page (strong seam)"
+                gutter_source = f"per-page (passed margin checks, var={page_variance:.3f})"
+            # Very close to center - trust it
+            elif distance_from_center <= 0.03:
+                actual_gutter = page_gutter_frac
+                gutter_source = f"per-page (near center, dist={distance_from_center:.3f})"
             else:
-                # Use group gutter when per-page signal is weak/ambiguous.
+                # Use group gutter
                 actual_gutter = gutter_position
-                gutter_source = "group (weak signal)"
+                gutter_source = f"group gutter (per-page={page_gutter_frac:.3f} rejected)"
 
             center_px = int(0.5 * w_px)
             actual_px = int(actual_gutter * w_px)
@@ -190,18 +195,20 @@ def main() -> None:
                 total=total_progress,
                 message=(
                     f"Page {page_idx} gutter: {actual_gutter:.3f} ({gutter_source}), "
-                    f"detected: {page_gutter_frac:.3f} (contrast: {page_contrast:.3f}, "
-                    f"continuity: {page_continuity:.3f}), center diff: {diff_from_center_px:+d}px"
+                    f"detected: {page_gutter_frac:.3f} (variance: {page_variance:.3f}, "
+                    f"continuity: {page_continuity:.1f}), center diff: {diff_from_center_px:+d}px"
                 ),
             )
 
             left_img, right_img = split_spread_at_gutter(pil_img, actual_gutter)
             left_img = deskew_image(left_img)
             right_img = deskew_image(right_img)
-            if should_apply_noise_reduction(left_img):
-                left_img = reduce_noise(left_img, method="morphological", kernel_size=2)
-            if should_apply_noise_reduction(right_img):
-                right_img = reduce_noise(right_img, method="morphological", kernel_size=2)
+            # Noise reduction disabled - was destroying text on low-contrast/mostly-blank pages
+            # The morphological operations eroded small text features
+            # if should_apply_noise_reduction(left_img):
+            #     left_img = reduce_noise(left_img, method="morphological", kernel_size=2)
+            # if should_apply_noise_reduction(right_img):
+            #     right_img = reduce_noise(right_img, method="morphological", kernel_size=2)
 
             left_path = os.path.join(images_dir, f"page-{page_idx:03d}L.png")
             right_path = os.path.join(images_dir, f"page-{page_idx:03d}R.png")
@@ -215,10 +222,11 @@ def main() -> None:
                 left_native, right_native = split_spread_at_gutter(pil_img_native, actual_gutter)
                 left_native = deskew_image(left_native)
                 right_native = deskew_image(right_native)
-                if should_apply_noise_reduction(left_native):
-                    left_native = reduce_noise(left_native, method="morphological", kernel_size=2)
-                if should_apply_noise_reduction(right_native):
-                    right_native = reduce_noise(right_native, method="morphological", kernel_size=2)
+                # Noise reduction disabled - see above comment
+                # if should_apply_noise_reduction(left_native):
+                #     left_native = reduce_noise(left_native, method="morphological", kernel_size=2)
+                # if should_apply_noise_reduction(right_native):
+                #     right_native = reduce_noise(right_native, method="morphological", kernel_size=2)
 
                 left_native_path = os.path.join(images_native_dir, f"page-{page_idx:03d}L.png")
                 right_native_path = os.path.join(images_native_dir, f"page-{page_idx:03d}R.png")
@@ -253,8 +261,9 @@ def main() -> None:
             )
         else:
             pil_img = deskew_image(pil_img)
-            if should_apply_noise_reduction(pil_img):
-                pil_img = reduce_noise(pil_img, method="morphological", kernel_size=2)
+            # Noise reduction disabled - see above comment
+            # if should_apply_noise_reduction(pil_img):
+            #     pil_img = reduce_noise(pil_img, method="morphological", kernel_size=2)
             out_path = os.path.join(images_dir, f"page-{page_idx:03d}.png")
             pil_img.save(out_path)
 
@@ -262,8 +271,9 @@ def main() -> None:
             out_native_path = None
             if pil_img_native and images_native_dir:
                 pil_img_native = deskew_image(pil_img_native)
-                if should_apply_noise_reduction(pil_img_native):
-                    pil_img_native = reduce_noise(pil_img_native, method="morphological", kernel_size=2)
+                # Noise reduction disabled - see above comment
+                # if should_apply_noise_reduction(pil_img_native):
+                #     pil_img_native = reduce_noise(pil_img_native, method="morphological", kernel_size=2)
                 out_native_path = os.path.join(images_native_dir, f"page-{page_idx:03d}.png")
                 pil_img_native.save(out_native_path)
 
