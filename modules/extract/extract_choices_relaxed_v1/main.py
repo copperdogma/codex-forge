@@ -74,6 +74,27 @@ def extract_choices_html(html: str) -> List[ChoiceCandidate]:
     return candidates
 
 
+def _looks_like_anchor_variant(candidate: int, anchors: Set[int]) -> bool:
+    if candidate in anchors:
+        return True
+    cand_str = str(candidate)
+    for anchor in anchors:
+        anchor_str = str(anchor)
+        if len(anchor_str) == len(cand_str):
+            diffs = sum(1 for a, b in zip(anchor_str, cand_str) if a != b)
+            if diffs == 1:
+                return True
+        if len(anchor_str) == len(cand_str) + 1:
+            for i in range(len(anchor_str)):
+                if anchor_str[:i] + anchor_str[i + 1:] == cand_str:
+                    return True
+        if len(cand_str) == len(anchor_str) + 1:
+            for i in range(len(cand_str)):
+                if cand_str[:i] + cand_str[i + 1:] == anchor_str:
+                    return True
+    return False
+
+
 def _normalize_section_ref_token(token: str) -> Optional[int]:
     """
     Normalize common OCR confusions in a numeric section reference token.
@@ -390,13 +411,23 @@ def main():
         section_id = portion.get('section_id', '')
         raw_html = portion.get('raw_html') or portion.get('html') or ''
         html_text = html_to_text(raw_html)
-        text = html_text
+        repair_hints = portion.get("repair_hints") or {}
+        reasons = repair_hints.get("escalation_reasons") or []
+        clean_text = portion.get("clean_text") or portion.get("raw_text") or ""
+        use_clean_text = bool(clean_text and "orphan_similar_target" in reasons)
+        text = clean_text if use_clean_text else html_text
         
         # 1. PRIMARY: Structural HTML links
         html_candidates = extract_choices_html(raw_html)
         
         # 2. SECONDARY: Regex pattern matching on text
         candidates = extract_choice_patterns(text, min_section, max_section)
+        if use_clean_text and html_candidates:
+            anchor_targets = {c.target for c in html_candidates}
+            candidates = [
+                c for c in candidates
+                if not _looks_like_anchor_variant(c.target, anchor_targets)
+            ]
         
         # Combine all candidates
         all_candidates = html_candidates + candidates
@@ -404,7 +435,7 @@ def main():
         # Deduplicate
         choices = deduplicate_choices(all_candidates, "pattern_match_hybrid")
 
-        relaxed_candidates = extract_choice_patterns_relaxed(html_text, min_section, max_section)
+        relaxed_candidates = extract_choice_patterns_relaxed(text, min_section, max_section)
         relaxed_choices = deduplicate_choices(relaxed_candidates, "pattern_match_relaxed")
         
         # Filter by confidence

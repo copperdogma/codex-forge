@@ -1,5 +1,13 @@
 # Pipeline Snapshot (2025-11-21) — Deathtrap Dungeon → Generic Book Processor
 
+## 2026-01-11 update (Fighting Fantasy bring-up)
+- Added pipeline support for new FF mechanics needed for **Robot Commando** and **Freeway Fighter** (Story 117):
+  - Early duplicate-page detection (`detect_duplicate_pages_v1`)
+  - Automatic section range detection (`detect_section_range_v1`)
+  - Combat style frontmatter extraction + assignment (`extract_combat_styles_frontmatter_v1`, `assign_combat_styles_v1`)
+  - Stateful navigation extraction (`extract_state_refs_v1`) and reachability support for templated/computed targets
+  - Node/Ajv validator schema extended for `conditional` + `combat_metric` and a small runtime helper `evaluateCondition`
+
 ## What we built
 - **Stages** (reusable for any CYOA / gamebook):
   1) PDF → images (`pages_dump.py` uses pdf2image)

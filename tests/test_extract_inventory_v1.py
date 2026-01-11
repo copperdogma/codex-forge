@@ -81,6 +81,24 @@ def test_split_item_list_and_quantity():
     assert "bone charm" in names
 
 
+def test_possessions_loss_state():
+    text = "All your Possessions are lost. If you try to escape now, turn to 315."
+    inv = extract_inventory_regex(text)
+    assert inv.inventory_states
+    assert inv.inventory_states[0].action == "lose_all"
+    assert inv.inventory_states[0].scope == "possessions"
+    assert [i.item for i in inv.items_lost if i.item.lower() == "possessions"] == []
+
+
+def test_possessions_restore_state():
+    text = "The rest of your Possessions are here! You hastily collect them all."
+    inv = extract_inventory_regex(text)
+    assert inv.inventory_states
+    assert inv.inventory_states[0].action == "restore_all"
+    assert inv.inventory_states[0].scope == "possessions"
+    assert [i.item for i in inv.items_gained if i.item.lower() == "possessions"] == []
+
+
 def test_truncate_list_on_action_verb():
     text = "You take two daggers and search the backpack."
     inv = extract_inventory_regex(text)

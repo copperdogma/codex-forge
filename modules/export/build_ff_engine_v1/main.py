@@ -1,10 +1,12 @@
 import argparse
 import json
+import json
 import os
 import re
 from typing import Any, Dict, List, Optional, Tuple
 
 from modules.common.utils import read_jsonl, save_json, ProgressLogger
+from modules.common.combat_styles import collect_combat_styles, resolve_combat_styles
 from modules.common.html_utils import html_to_text
 
 
@@ -64,6 +66,14 @@ def _is_bad_choice_item_name(name: str) -> bool:
     lower = name.lower()
     if len(lower) < 3:
         return True
+    # Reject pronouns/quantifiers and other non-item phrases that often appear in
+    # "collect/take ..." clauses but do not represent a concrete inventory item.
+    if re.search(r"\b(?:it|them|this|that|these|those)\b", lower):
+        return True
+    if re.search(r"\b(?:all|everything|anything|something|nothing)\b", lower):
+        return True
+    if "them all" in lower or lower.strip() in {"all", "them", "it"}:
+        return True
     for phrase in (
         "turn to", "left passage", "right passage", "corridor", "tunnel", "passage",
         "door", "stairs", "later", "shape", "nearby being", "room", "floor",
@@ -72,6 +82,9 @@ def _is_bad_choice_item_name(name: str) -> bool:
         "return",
         "gulp", "gulps", "gift",
     ):
+        if phrase in lower:
+            return True
+    for phrase in ("escape", "window"):
         if phrase in lower:
             return True
     if "fountain" in lower:
@@ -1018,6 +1031,8 @@ def main():
     parser = argparse.ArgumentParser(description="Build Fighting Fantasy Engine gamebook JSON from enriched portions.")
     parser.add_argument("--portions", required=True, help="Path to portions_enriched.jsonl")
     parser.add_argument("--out", required=True, help="Output gamebook JSON path")
+    parser.add_argument("--combat-styles", dest="combat_styles", help="Optional combat styles JSON (frontmatter-derived)")
+    parser.add_argument("--section-count", dest="section_count_file", help="Section range JSON (optional)")
     parser.add_argument("--title", required=True, help="Gamebook title")
     parser.add_argument("--author", help="Gamebook author")
     parser.add_argument("--start-section", "--start_section", default="1", dest="start_section", help="Starting section id")
@@ -1057,6 +1072,16 @@ def main():
     except Exception:
         min_expected, max_expected = 1, 400
 
+    section_count_override = None
+    if args.section_count_file:
+        try:
+            with open(args.section_count_file, "r", encoding="utf-8") as f:
+                section_data = json.load(f)
+            section_count_override = int(section_data["max_section"])
+            max_expected = min(max_expected, section_count_override)
+        except Exception:
+            section_count_override = None
+
     # Load unresolved-missing allowlist (explicit artifact). If present, we can allow stubs
     # for these missing IDs without requiring --allow-stubs.
     unresolved_allow: set[str] = set()
@@ -1079,6 +1104,9 @@ def main():
             continue
 
         section_id, section = build_section(portion, args.emit_text, args.emit_provenance_text)
+        if section_count_override is not None and str(section_id).isdigit():
+            if int(section_id) > section_count_override:
+                continue
         sections[section_id] = section
         if idx % 20 == 0:
             logger.log("build_ff_engine", "running", current=idx, total=len(portions),
@@ -1148,15 +1176,42 @@ def main():
     validator_version = args.validator_version or _read_validator_version()
     numeric_ids = [int(sid) for sid in sections.keys() if str(sid).isdigit()]
     section_count = max(numeric_ids) if numeric_ids else len(sections)
+    if args.section_count_file:
+        try:
+            with open(args.section_count_file, "r", encoding="utf-8") as f:
+                section_data = json.load(f)
+            if isinstance(section_data, dict) and isinstance(section_data.get("max_section"), int):
+                section_count = section_data["max_section"]
+        except Exception:
+            pass
+    combat_styles_input = None
+    if args.combat_styles:
+        try:
+            with open(args.combat_styles, "r", encoding="utf-8") as f:
+                combat_styles_input = json.load(f)
+        except Exception:
+            combat_styles_input = None
+    styles_in_use = collect_combat_styles(sections)
+    combat_styles = None
+    if combat_styles_input and isinstance(combat_styles_input, dict):
+        style_map = combat_styles_input.get("styles") if isinstance(combat_styles_input.get("styles"), dict) else None
+        if isinstance(style_map, dict):
+            combat_styles = {k: v for k, v in style_map.items() if k in styles_in_use or v.get("default")}
+    if not combat_styles:
+        combat_styles = resolve_combat_styles(styles_in_use)
+    metadata = {
+        "title": args.title,
+        "author": args.author,
+        "startSection": start_section,
+        "formatVersion": args.format_version,
+        "sectionCount": section_count,
+        **({"validatorVersion": validator_version} if validator_version else {}),
+    }
+    if combat_styles:
+        metadata["combatStyles"] = combat_styles
+
     gamebook = {
-        "metadata": {
-            "title": args.title,
-            "author": args.author,
-            "startSection": start_section,
-            "formatVersion": args.format_version,
-            "sectionCount": section_count,
-            **({"validatorVersion": validator_version} if validator_version else {}),
-        },
+        "metadata": metadata,
         "sections": sections,
         "provenance": {
             "stub_targets": stub_targets[:20],

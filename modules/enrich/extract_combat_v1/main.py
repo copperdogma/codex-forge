@@ -1,4 +1,5 @@
 import argparse
+import base64
 import json
 import re
 import os
@@ -13,8 +14,13 @@ from schemas import Combat, CombatEnemy, EnrichedPortion, TurnToLinkClaimInline
 # Common Fighting Fantasy combat patterns
 # Stat block pattern: NAME followed by SKILL and STAMINA (sometimes on new lines)
 STAT_BLOCK_PATTERN = re.compile(r"\b([A-Z][A-Z\s\-]{2,})\s+(?:SKILL|skill)\s*[:]?\s*(\d+)\s*(?:STAMINA|stamina)\s*[:]?\s*(\d+)", re.MULTILINE)
+# Vehicle/robot stat block pattern: NAME followed by FIREPOWER and ARMOUR
+VEHICLE_STAT_PATTERN = re.compile(r"\b([A-Z][A-Z\s\-]{2,})\s+(?:FIREPOWER|firepower)\s*[:]?\s*(\d+)\s*(?:ARMOUR|armour|armor)\s*[:]?\s*(\d+)", re.MULTILINE)
 # Table-like or separated pattern
 SEP_STAT_PATTERN = re.compile(r"(?:SKILL|skill)\s*[:]?\s*(\d+).*?(?:STAMINA|stamina)\s*[:]?\s*(\d+)", re.IGNORECASE | re.DOTALL)
+ARMOUR_PATTERN = re.compile(r"\bARMOUR\b\s*[: ]?\s*(\d+)", re.IGNORECASE)
+FIREPOWER_PATTERN = re.compile(r"\bFIREPOWER\b\s*[: ]?\s*(\d+)", re.IGNORECASE)
+SPEED_PATTERN = re.compile(r"\bSPEED\b\s*[: ]?\s*([A-Za-z]+)", re.IGNORECASE)
 WIN_PATTERNS = [
     re.compile(r"if\s+you\s+win,\s+turn\s+to\s+(\d+)", re.IGNORECASE),
     re.compile(r"as\s+soon\s+as\s+you\s+win(?:\s+your)?(?:\s+(?:first|second|third))?\s+attack\s+round,\s*turn\s+to\s+(\d+)", re.IGNORECASE),
@@ -24,6 +30,8 @@ LOSS_PATTERNS = [
     re.compile(r"if\s+you\s+lose\b.*?\bturn\s+to\s+(\d+)", re.IGNORECASE | re.DOTALL),
     re.compile(r"if\s+you\s+lose\s+the\s+(?:fight|combat|battle)\b.*?\bturn\s+to\s+(\d+)", re.IGNORECASE | re.DOTALL),
     re.compile(r"if\s+you\s+are\s+(?:defeated|killed)\b.*?\bturn\s+to\s+(\d+)", re.IGNORECASE | re.DOTALL),
+    re.compile(r"if\s+.*?(?:armour|armor|stamina)\s+.*?(?:reduced|reduction)\s+to\s+zero\b.*?\bturn\s+to\s+(\d+)", re.IGNORECASE | re.DOTALL),
+    re.compile(r"if\s+.*?(?:armour|armor|stamina)\s+.*?\bto\s+0\b.*?\bturn\s+to\s+(\d+)", re.IGNORECASE | re.DOTALL),
 ]
 ESCAPE_PATTERN = re.compile(r"if\s+you\s+wish\s+to\s+escape,\s+turn\s+to\s+(\d+)", re.IGNORECASE)
 ESCAPE_FLEX_PATTERN = re.compile(r"\bescape\b.{0,80}?\bturn\s+to\s+(\d+)", re.IGNORECASE | re.DOTALL)
@@ -46,10 +54,20 @@ ATTACK_STRENGTH_PENALTY_PATTERN = re.compile(
     r"reduc(?:e|ing)\s+your\s+(?:attack\s+strength|skill)\s+by\s+(\d+)",
     re.IGNORECASE,
 )
+FIREPOWER_PENALTY_PATTERN = re.compile(
+    r"reduc(?:e|ing)\s+your\s+firepower\s+by\s+(\d+)",
+    re.IGNORECASE,
+)
 FIGHT_SINGLY_PATTERN = re.compile(r"\b(one\s+at\s+a\s+time|fight\s+them\s+one\s+at\s+a\s+time)\b", re.IGNORECASE)
 BOTH_ATTACK_PATTERN = re.compile(r"\bboth\b.{0,80}?\battack\b.{0,80}?\beach(?:\s+attack)?\s+round\b", re.IGNORECASE | re.DOTALL)
-CHOOSE_TARGET_PATTERN = re.compile(r"\bchoose\b.{0,40}?\bfight\b", re.IGNORECASE | re.DOTALL)
-CANNOT_WOUND_PATTERN = re.compile(r"\b(cannot|can't|will\s+not)\s+(?:wound|harm|hurt)\b", re.IGNORECASE)
+CHOOSE_TARGET_PATTERN = re.compile(
+    r"\bchoose\b.{0,60}?\b(?:fight|fire|shoot|target)\b",
+    re.IGNORECASE | re.DOTALL,
+)
+CANNOT_WOUND_PATTERN = re.compile(
+    r"\b(cannot|can't|will\s+not)\s+(?:wound|harm|hurt|damage)\b",
+    re.IGNORECASE,
+)
 ATTACK_STRENGTH_TOTAL_PATTERN = re.compile(
     r"attack\s+strength\s+totals?\s+(\d+).{0,80}?\bturn\s+to\s+(\d+)",
     re.IGNORECASE | re.DOTALL,
@@ -107,12 +125,14 @@ def _coerce_turn_to_claims(claims: Iterable[Any]) -> List[TurnToLinkClaimInline]
 
 SYSTEM_PROMPT = """You are an expert at parsing Fighting Fantasy gamebook sections.
 Extract combat encounter information from the provided text into a JSON list of combat events.
-The text may contain multiple enemies, sometimes in a table-like format with columns for SKILL and STAMINA.
+The text may contain multiple enemies, sometimes in a table-like format with columns for SKILL and STAMINA,
+or vehicle/robot stats like ARMOUR, FIREPOWER, SPEED.
 
 Each combat object MUST have:
-- enemies: list of { enemy, skill, stamina }
+- enemies: list of enemy objects. Use fields as available: enemy, skill, stamina, armour, firepower, speed.
 
 Optional fields when present in text:
+- style: "standard" | "hand" | "shooting" | "robot" | "vehicle"
 - outcomes: { win, lose, escape } where each is { targetSection: "X" } or { terminal: { kind: "continue" } }
 - mode: "single" | "sequential" | "simultaneous" | "split-target"
 - rules: list of structured rules
@@ -123,6 +143,7 @@ Return a JSON object with a "combat" key containing the list:
 {
   "combat": [
     {
+      "style": "standard",
       "enemies": [{ "enemy": "SKELETON WARRIOR", "skill": 8, "stamina": 6 }],
       "outcomes": { "win": { "targetSection": "71" } }
     }
@@ -130,6 +151,8 @@ Return a JSON object with a "combat" key containing the list:
 }
 
 If no combat is found, return {"combat": []}."""
+
+VISION_HINT = "Use the image as ground truth when text appears incomplete or missing stats."
 
 def _infer_win_from_anchors(raw_html: Optional[str], loss_section: Optional[str], win_section: Optional[str]) -> Optional[str]:
     if win_section or not raw_html or not loss_section:
@@ -176,6 +199,48 @@ def _detect_outcomes(text: str) -> Tuple[Optional[str], Optional[str], Optional[
     return win_section, loss_section, escape_section
 
 
+def _ensure_win_outcome_from_triggers(outcomes: Optional[Dict[str, Any]], triggers: Optional[List[Dict[str, Any]]]) -> Optional[Dict[str, Any]]:
+    """
+    The engine schema requires a win outcome for combat events. Some FF combats instead express the
+    "win" as a trigger like "If you survive four Attack Rounds, turn to 334.".
+    If we have such a trigger and no explicit win outcome, promote it to outcomes.win.
+    """
+    triggers = triggers or []
+    existing = outcomes if isinstance(outcomes, dict) else {}
+    if existing.get("win"):
+        return existing
+    for trig in triggers:
+        if not isinstance(trig, dict):
+            continue
+        kind = str(trig.get("kind") or "").lower()
+        if kind not in {"survive_rounds", "player_round_win"}:
+            continue
+        outcome = trig.get("outcome")
+        normalized = _normalize_outcome_ref(outcome)
+        if normalized:
+            merged = dict(existing)
+            merged["win"] = normalized
+            return merged
+    # Fallback: if the book doesn't specify where to go on victory, treat it as
+    # "continue reading" in the same section after the combat.
+    merged = dict(existing)
+    merged["win"] = {"terminal": {"kind": "continue"}}
+    return merged
+
+
+def _infer_combat_style(text: str, enemies: List[CombatEnemy]) -> Optional[str]:
+    lower = (text or "").lower()
+    if any(e.firepower is not None for e in enemies) or "vehicle combat" in lower or "interceptor" in lower or "machine-gun" in lower:
+        return "vehicle"
+    if any(e.armour is not None for e in enemies) or "robot combat" in lower:
+        return "robot"
+    if any(term in lower for term in ("shooting", "rifle", "gun", "bullet", "bow", "arrow", "revolver")):
+        return "shooting"
+    if any(term in lower for term in ("hand fighting", "hand-to-hand")):
+        return "hand"
+    return "standard"
+
+
 def _build_outcomes(win_section: Optional[str], loss_section: Optional[str], escape_section: Optional[str]) -> Dict[str, Any]:
     outcomes: Dict[str, Any] = {}
     if win_section:
@@ -210,6 +275,16 @@ def _extract_combat_rules(text: str, enemy_count: int) -> Tuple[Optional[str], L
     if CANNOT_WOUND_PATTERN.search(text):
         rules.append({"kind": "secondary_target_no_damage"})
 
+    for match in FIREPOWER_PENALTY_PATTERN.finditer(text):
+        amount = int(match.group(1))
+        modifiers.append({
+            "kind": "stat_change",
+            "stat": "firepower",
+            "amount": -amount,
+            "scope": "combat",
+            "reason": "combat penalty",
+        })
+
     for match in ATTACK_STRENGTH_PENALTY_PATTERN.finditer(text):
         amount = int(match.group(1))
         modifiers.append({
@@ -226,6 +301,21 @@ def _extract_combat_rules(text: str, enemy_count: int) -> Tuple[Optional[str], L
 def _extract_combat_triggers(text: str) -> List[Dict[str, Any]]:
     triggers: List[Dict[str, Any]] = []
     seen = set()
+    survive_pattern = re.compile(
+        r"if\s+you\s+survive\s+([a-z0-9]+)\s+attack\s+rounds?.{0,60}?\bturn\s+to\s+(\d+)",
+        re.IGNORECASE | re.DOTALL,
+    )
+    for match in survive_pattern.finditer(text):
+        count = _parse_round_count(match.group(1))
+        outcome = {"targetSection": match.group(2)}
+        key = ("survive_rounds", count, match.group(2))
+        if key in seen:
+            continue
+        seen.add(key)
+        entry = {"kind": "survive_rounds", "outcome": outcome}
+        if count is not None:
+            entry["count"] = count
+        triggers.append(entry)
     for match in ATTACK_STRENGTH_TOTAL_PATTERN.finditer(text):
         value = int(match.group(1))
         target = match.group(2)
@@ -292,6 +382,10 @@ def _normalize_stat_name(raw: Optional[str]) -> Optional[str]:
         return "stamina"
     if "luck" in lower:
         return "luck"
+    if "firepower" in lower:
+        return "firepower"
+    if "armour" in lower or "armor" in lower:
+        return "armour"
     return None
 
 
@@ -300,7 +394,12 @@ def _normalize_outcome_ref(outcome: Optional[Any]) -> Optional[Dict[str, Any]]:
         return None
     if isinstance(outcome, dict):
         if outcome.get("terminal"):
-            return {"terminal": outcome.get("terminal")}
+            terminal = outcome.get("terminal")
+            if isinstance(terminal, dict):
+                kind = terminal.get("kind")
+                if isinstance(kind, str) and kind.lower() in {"death", "victory", "defeat", "end", "continue"}:
+                    return {"terminal": {"kind": kind.lower(), **{k: v for k, v in terminal.items() if k != "kind"}}}
+            return None
         target = outcome.get("targetSection")
         if isinstance(target, (int, float)):
             return {"targetSection": str(int(target))}
@@ -362,12 +461,30 @@ def _parse_round_count(token: Optional[str]) -> Optional[int]:
         "fourth": 4,
         "fifth": 5,
         "sixth": 6,
+        "seventh": 7,
+        "eighth": 8,
+        "ninth": 9,
+        "tenth": 10,
     }
     for key, value in ordinal_map.items():
         if key in lower:
             return value
     if lower in ordinal_map:
         return ordinal_map[lower]
+    word_map = {
+        "one": 1,
+        "two": 2,
+        "three": 3,
+        "four": 4,
+        "five": 5,
+        "six": 6,
+        "seven": 7,
+        "eight": 8,
+        "nine": 9,
+        "ten": 10,
+    }
+    if lower in word_map:
+        return word_map[lower]
     digits = re.sub(r"[^0-9]", "", lower)
     if digits.isdigit():
         return int(digits)
@@ -392,6 +509,8 @@ def _normalize_triggers(triggers: Optional[List[Dict[str, Any]]]) -> Optional[Li
             kind = "no_enemy_round_wins"
         elif kind_raw in ("player_round_win", "player_attack_round_win", "winfirstattackround", "winsecondattackround"):
             kind = "player_round_win"
+        elif kind_raw in ("survive_rounds", "player_survive_rounds", "survive_attack_rounds"):
+            kind = "survive_rounds"
         else:
             continue
         outcome = _normalize_outcome_ref(trig.get("outcome"))
@@ -419,7 +538,7 @@ def _normalize_triggers(triggers: Optional[List[Dict[str, Any]]]) -> Optional[Li
                 entry["value"] = int(value.strip())
             else:
                 continue
-        if kind == "player_round_win":
+        if kind in ("player_round_win", "survive_rounds"):
             count = trig.get("count") or _parse_round_count(trig.get("round") or trig.get("rounds"))
             if count is None and isinstance(trig.get("trigger"), str):
                 count = _parse_round_count(trig.get("trigger"))
@@ -479,6 +598,10 @@ def _merge_fallback_outcomes(outcomes: Optional[Dict[str, Any]], fallback: Optio
         return fallback or None
     if not fallback:
         return outcomes
+    # If LLM returned conditional outcomes, prefer deterministic fallback (schema doesn't support conditions here).
+    win_block = outcomes.get("win") if isinstance(outcomes, dict) else None
+    if isinstance(win_block, dict) and any(key in win_block for key in ("conditions", "condition")):
+        return fallback or None
     merged = dict(outcomes)
     fallback_win = fallback.get("win")
     if fallback_win:
@@ -491,6 +614,48 @@ def _merge_fallback_outcomes(outcomes: Optional[Dict[str, Any]], fallback: Optio
         if key in fallback:
             merged.setdefault(key, fallback[key])
     return merged or None
+
+
+def _coerce_conditional_outcomes(outcomes: Optional[Dict[str, Any]]) -> Optional[Dict[str, Any]]:
+    if not outcomes or not isinstance(outcomes, dict):
+        return outcomes
+    win_block = outcomes.get("win")
+    if not isinstance(win_block, dict):
+        return outcomes
+    conditional = win_block.get("conditional")
+    if not isinstance(conditional, list):
+        return outcomes
+    mapped: Dict[str, Any] = {}
+    for entry in conditional:
+        if not isinstance(entry, dict):
+            continue
+        condition = str(entry.get("condition") or "").lower()
+        target = entry.get("targetSection") or entry.get("target")
+        target_ref = _normalize_outcome_ref(target)
+        if not target_ref:
+            continue
+        if "escape" in condition:
+            mapped.setdefault("escape", target_ref)
+            continue
+        if "win" in condition or "defeat" in condition:
+            mapped.setdefault("win", target_ref)
+            continue
+        if "lose" in condition or "defeated" in condition:
+            mapped.setdefault("lose", target_ref)
+            continue
+        if any(tok in condition for tok in ("armour", "armor", "stamina")):
+            if "reduced to zero" in condition or "reduced to 0" in condition or "to zero" in condition:
+                mapped.setdefault("lose", target_ref)
+            elif "left" in condition or "remaining" in condition or "some" in condition:
+                mapped.setdefault("win", target_ref)
+    if mapped:
+        for key in ("win", "lose", "escape"):
+            if key in outcomes and key not in mapped and isinstance(outcomes.get(key), dict):
+                existing = _normalize_outcome_ref(outcomes.get(key))
+                if existing:
+                    mapped[key] = existing
+        return mapped
+    return outcomes
 
 
 def _merge_rules(existing: Optional[List[Dict[str, Any]]], fallback: Optional[List[Dict[str, Any]]]) -> Optional[List[Dict[str, Any]]]:
@@ -561,7 +726,12 @@ def _prune_redundant_rules(rules: Optional[List[Dict[str, Any]]], triggers: Opti
 def _strip_spurious_escape(outcomes: Optional[Dict[str, Any]], text: str) -> Optional[Dict[str, Any]]:
     if not outcomes or "escape" not in outcomes:
         return outcomes
-    if "escape" in text.lower():
+    lower = text.lower() if text else ""
+    if re.search(r"\b(?:cannot|may not|must not|can't)\s+escape\b", lower):
+        trimmed = dict(outcomes)
+        trimmed.pop("escape", None)
+        return trimmed
+    if "escape" in lower:
         return outcomes
     trimmed = dict(outcomes)
     trimmed.pop("escape", None)
@@ -664,7 +834,14 @@ def _expand_split_target_enemies(combat: Combat, text: str) -> None:
     base_name = base_enemy.enemy or "Enemy"
     label = (part or "Part").replace("-", " ").title()
     combat.enemies = [
-        CombatEnemy(enemy=f"{base_name} - {label} {idx + 1}", skill=base_enemy.skill, stamina=base_enemy.stamina)
+        CombatEnemy(
+            enemy=f"{base_name} - {label} {idx + 1}",
+            skill=base_enemy.skill,
+            stamina=base_enemy.stamina,
+            armour=base_enemy.armour,
+            firepower=base_enemy.firepower,
+            speed=base_enemy.speed,
+        )
         for idx in range(count)
     ]
 
@@ -688,6 +865,9 @@ def _prune_ally_assisted_combat(combat: Combat, text: str) -> None:
 
 
 def _normalize_mode(mode: Optional[str], rules: Optional[List[Dict[str, Any]]]) -> Optional[str]:
+    valid_modes = {"single", "sequential", "simultaneous", "split-target"}
+    if mode and mode not in valid_modes:
+        mode = None
     if not rules:
         return mode
     kinds = {r.get("kind") for r in rules if isinstance(r, dict)}
@@ -774,6 +954,18 @@ def extract_combat_regex(text: str, raw_html: Optional[str] = None) -> List[Comb
         })
 
     if not enemies:
+        vehicle_matches = VEHICLE_STAT_PATTERN.finditer(text)
+        for match in vehicle_matches:
+            enemy_name = match.group(1).strip()
+            firepower = int(match.group(2))
+            armour = int(match.group(3))
+            enemies.append({
+                "enemy": enemy_name,
+                "firepower": firepower,
+                "armour": armour,
+            })
+
+    if not enemies:
         # Second pass: look for separated stats
         sep_matches = SEP_STAT_PATTERN.finditer(text)
         for match in sep_matches:
@@ -797,11 +989,13 @@ def extract_combat_regex(text: str, raw_html: Optional[str] = None) -> List[Comb
     mode, rules, modifiers = _extract_combat_rules(text, len(enemies))
     modifiers = _normalize_modifiers(modifiers)
     triggers = _extract_combat_triggers(text)
+    outcomes = _ensure_win_outcome_from_triggers(outcomes, triggers)
 
     combat = Combat(
         enemies=enemies,
         outcomes=outcomes or None,
         mode=mode,
+        style=_infer_combat_style(text, [CombatEnemy(**e) for e in enemies]),
         rules=rules or None,
         modifiers=modifiers,
         triggers=triggers or None,
@@ -815,18 +1009,45 @@ def _coerce_enemies(raw_list: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
     for item in raw_list:
         if not isinstance(item, dict):
             continue
-        if "skill" in item and "stamina" in item:
-            try:
-                skill = int(item.get("skill"))
-                stamina = int(item.get("stamina"))
-            except (TypeError, ValueError):
-                continue
-            enemies.append({
-                "enemy": item.get("enemy") or item.get("name") or "Creature",
-                "skill": skill,
-                "stamina": stamina,
-            })
+        enemy_name = item.get("enemy") or item.get("name") or "Creature"
+        try:
+            skill = int(item.get("skill")) if item.get("skill") is not None else None
+        except (TypeError, ValueError):
+            skill = None
+        try:
+            stamina = int(item.get("stamina")) if item.get("stamina") is not None else None
+        except (TypeError, ValueError):
+            stamina = None
+        try:
+            armour = int(item.get("armour")) if item.get("armour") is not None else None
+        except (TypeError, ValueError):
+            armour = None
+        try:
+            firepower = int(item.get("firepower")) if item.get("firepower") is not None else None
+        except (TypeError, ValueError):
+            firepower = None
+        speed = item.get("speed")
+        if skill is None and stamina is None and armour is None and firepower is None:
+            continue
+        entry = {"enemy": enemy_name}
+        if skill is not None:
+            entry["skill"] = skill
+        if stamina is not None:
+            entry["stamina"] = stamina
+        if armour is not None:
+            entry["armour"] = armour
+        if firepower is not None:
+            entry["firepower"] = firepower
+        if speed:
+            entry["speed"] = speed
+        enemies.append(entry)
     return enemies
+
+
+def _encode_image(path: str) -> str:
+    with open(path, "rb") as f:
+        b64 = base64.b64encode(f.read()).decode("utf-8")
+    return f"data:image/png;base64,{b64}"
 
 
 def extract_combat_llm(text: str, model: str, client: OpenAI) -> Tuple[List[Combat], Dict[str, Any]]:
@@ -873,6 +1094,7 @@ def extract_combat_llm(text: str, model: str, client: OpenAI) -> Tuple[List[Comb
                     enemies=enemies,
                     outcomes=outcomes or None,
                     mode=item.get("mode"),
+                    style=item.get("style"),
                     rules=rules,
                     modifiers=_normalize_modifiers(item.get("modifiers")),
                     triggers=triggers,
@@ -883,6 +1105,7 @@ def extract_combat_llm(text: str, model: str, client: OpenAI) -> Tuple[List[Comb
             if enemies:
                 combats.append(Combat(
                     enemies=enemies,
+                    style=_infer_combat_style(text, [CombatEnemy(**e) for e in enemies]),
                     confidence=0.95,
                 ))
         return combats, usage
@@ -890,11 +1113,85 @@ def extract_combat_llm(text: str, model: str, client: OpenAI) -> Tuple[List[Comb
         print(f"LLM extraction error: {e}")
         return [], {}
 
+
+def extract_combat_llm_vision(
+    text: str,
+    images: List[str],
+    model: str,
+    client: OpenAI,
+) -> Tuple[List[Combat], Dict[str, Any]]:
+    try:
+        content: List[Dict[str, Any]] = [
+            {"type": "text", "text": f"{VISION_HINT}\n\n{text}"},
+        ]
+        for img in images:
+            content.append({"type": "image_url", "image_url": {"url": _encode_image(img)}})
+        response = client.chat.completions.create(
+            model=model,
+            messages=[
+                {"role": "system", "content": SYSTEM_PROMPT},
+                {"role": "user", "content": content},
+            ],
+            response_format={"type": "json_object"},
+        )
+        usage = {
+            "model": model,
+            "prompt_tokens": response.usage.prompt_tokens,
+            "completion_tokens": response.usage.completion_tokens,
+        }
+        content = response.choices[0].message.content
+        data = json.loads(content)
+        raw_list = data.get("combat") if isinstance(data, dict) and "combat" in data else data
+        if not isinstance(raw_list, list):
+            raw_list = []
+        combats: List[Combat] = []
+        if raw_list and isinstance(raw_list[0], dict) and any(k in raw_list[0] for k in ("enemies", "outcomes", "rules", "modifiers", "triggers", "mode", "style")):
+            for item in raw_list:
+                if not isinstance(item, dict):
+                    continue
+                enemies = _coerce_enemies(item.get("enemies") or [])
+                if not enemies:
+                    continue
+                outcomes = item.get("outcomes")
+                if not outcomes:
+                    outcomes = _build_outcomes(
+                        item.get("win_section"),
+                        item.get("loss_section"),
+                        item.get("escape_section"),
+                    )
+                rules, triggers = _normalize_rules(item.get("rules"), item.get("triggers"))
+                combats.append(Combat(
+                    enemies=enemies,
+                    outcomes=outcomes or None,
+                    mode=item.get("mode"),
+                    style=item.get("style"),
+                    rules=rules,
+                    modifiers=_normalize_modifiers(item.get("modifiers")),
+                    triggers=triggers,
+                    confidence=0.95,
+                ))
+        else:
+            enemies = _coerce_enemies(raw_list)
+            if enemies:
+                combats.append(Combat(
+                    enemies=enemies,
+                    style=_infer_combat_style(text, [CombatEnemy(**e) for e in enemies]),
+                    confidence=0.95,
+                ))
+        return combats, usage
+    except Exception as e:
+        print(f"LLM vision extraction error: {e}")
+        return [], {}
+
 # Normal ranges for Fighting Fantasy stats (generous to include bosses)
 MIN_SKILL = 1
 MAX_SKILL = 15
 MIN_STAMINA = 1
 MAX_STAMINA = 40
+MIN_ARMOUR = 1
+MAX_ARMOUR = 50
+MIN_FIREPOWER = 1
+MAX_FIREPOWER = 20
 
 def validate_combat(combats: List[Combat]) -> bool:
     """Returns True if all extracted combats look realistic."""
@@ -905,11 +1202,22 @@ def validate_combat(combats: List[Combat]) -> bool:
         if not c.enemies:
             return False
         for enemy in c.enemies:
-            if enemy.skill is None or enemy.stamina is None:
+            skill = enemy.skill
+            stamina = enemy.stamina
+            armour = enemy.armour
+            firepower = enemy.firepower
+            has_standard = skill is not None and stamina is not None
+            has_robot = skill is not None and armour is not None
+            has_vehicle = firepower is not None and armour is not None
+            if not (has_standard or has_robot or has_vehicle):
                 return False
-            if not (MIN_SKILL <= enemy.skill <= MAX_SKILL):
+            if skill is not None and not (MIN_SKILL <= skill <= MAX_SKILL):
                 return False
-            if not (MIN_STAMINA <= enemy.stamina <= MAX_STAMINA):
+            if stamina is not None and not (MIN_STAMINA <= stamina <= MAX_STAMINA):
+                return False
+            if armour is not None and not (MIN_ARMOUR <= armour <= MAX_ARMOUR):
+                return False
+            if firepower is not None and not (MIN_FIREPOWER <= firepower <= MAX_FIREPOWER):
                 return False
     return True
 
@@ -929,6 +1237,23 @@ def _has_special_cues(text: str) -> bool:
     )
     return any(cue in lower for cue in cues)
 
+
+def _is_combat_continuation(text: str) -> bool:
+    lower = text.lower()
+    if "combat" in lower and ("during this" in lower or "attack round" in lower):
+        return True
+    if "combat" in lower and "if you win" in lower:
+        return True
+    return False
+
+
+def _needs_combat_outcomes(combats: List[Combat]) -> bool:
+    for combat in combats:
+        outcomes = combat.outcomes if isinstance(combat, Combat) else getattr(combat, "outcomes", None)
+        if not isinstance(outcomes, dict) or not outcomes.get("win"):
+            return True
+    return False
+
 def main():
     parser = argparse.ArgumentParser(description="Extract combat encounters from enriched portions.")
     parser.add_argument("--portions", required=True, help="Input enriched_portion_v1 JSONL")
@@ -938,6 +1263,8 @@ def main():
     parser.add_argument("--use-ai", "--use_ai", action="store_true", default=True)
     parser.add_argument("--no-ai", "--no_ai", dest="use_ai", action="store_false")
     parser.add_argument("--max-ai-calls", "--max_ai_calls", type=int, default=50)
+    parser.add_argument("--vision-model", "--vision_model", default="gpt-5.2")
+    parser.add_argument("--vision-max-images", "--vision_max_images", type=int, default=1)
     parser.add_argument("--state-file")
     parser.add_argument("--progress-file")
     parser.add_argument("--run-id")
@@ -952,6 +1279,10 @@ def main():
     ai_calls = 0
     
     out_portions = []
+    pending_idx: Optional[int] = None
+    pending_section_id: Optional[int] = None
+    last_combat_idx: Optional[int] = None
+    last_combat_section_id: Optional[int] = None
     
     for idx, row in enumerate(portions):
         portion = EnrichedPortion(**row)
@@ -983,6 +1314,10 @@ def main():
             # Check if text mentions SKILL or STAMINA but regex missed the block
             upper_text = text.upper()
             if "SKILL" in upper_text and "STAMINA" in upper_text:
+                needs_ai = True
+            elif "FIREPOWER" in upper_text:
+                needs_ai = True
+            elif "ARMOUR" in upper_text and "SKILL" in upper_text:
                 needs_ai = True
         elif any(len(combat.enemies) > 1 for combat in combats) or "special" in text.lower() or "rules" in text.lower() or _has_special_cues(text):
             # Multiple enemies or mentions of rules might need LLM to parse correctly
@@ -1016,16 +1351,97 @@ def main():
                     combat.outcomes = _strip_spurious_escape(combat.outcomes, text)
                     combat.outcomes = _strip_spurious_loss(combat.outcomes, text, combat.triggers)
                     combat.mode = _normalize_mode(combat.mode, combat.rules)
+                    if not combat.style:
+                        combat.style = _infer_combat_style(text, combat.enemies)
+
+        if combats and not validate_combat(combats) and args.use_ai and ai_calls < args.max_ai_calls:
+            images = portion.source_images or []
+            if images:
+                combats_vision, usage = extract_combat_llm_vision(
+                    text,
+                    images[: args.vision_max_images],
+                    args.vision_model,
+                    client,
+                )
+                ai_calls += 1
+                if combats_vision:
+                    combats = combats_vision
         
         combats = _merge_sequential_combats(combats, text)
         for combat in combats:
             combat.rules = _prune_redundant_rules(combat.rules, combat.triggers)
             combat.outcomes = _strip_spurious_escape(combat.outcomes, text)
             combat.outcomes = _strip_spurious_loss(combat.outcomes, text, combat.triggers)
+            combat.outcomes = _coerce_conditional_outcomes(combat.outcomes)
+            combat.outcomes = _ensure_win_outcome_from_triggers(combat.outcomes, combat.triggers)
             combat.mode = _normalize_mode(combat.mode, combat.rules)
+            if not combat.style:
+                combat.style = _infer_combat_style(text, combat.enemies)
             _prune_split_target_enemies(combat, text)
             _expand_split_target_enemies(combat, text)
             _prune_ally_assisted_combat(combat, text)
+
+        # If the next section contains combat continuation outcomes, attach them to the prior combat.
+        if pending_idx is not None:
+            section_id = portion.section_id
+            if isinstance(section_id, str) and section_id.isdigit() and pending_section_id is not None:
+                if int(section_id) > pending_section_id + 1:
+                    pending_idx = None
+                    pending_section_id = None
+        if not combats and pending_idx is not None and _is_combat_continuation(text):
+            section_id = portion.section_id
+            if isinstance(section_id, str) and section_id.isdigit() and pending_section_id is not None:
+                if int(section_id) == pending_section_id + 1:
+                    win_section, loss_section, escape_section = _detect_outcomes(text)
+                    win_section = _infer_win_from_anchors(portion.raw_html, loss_section, win_section)
+                    fallback_outcomes = _build_outcomes(win_section, loss_section, escape_section)
+                    if fallback_outcomes:
+                        prev = out_portions[pending_idx]
+                        prev_combats = prev.get("combat") or []
+                        if prev_combats:
+                            prev_outcomes = prev_combats[0].get("outcomes")
+                            prev_combats[0]["outcomes"] = _merge_fallback_outcomes(prev_outcomes, fallback_outcomes)
+                            prev["combat"] = prev_combats
+                            pending_idx = None
+                            pending_section_id = None
+
+        # If this section is a continuation of the prior combat (often rules/mode/style without restating stats),
+        # merge rules/triggers/style/mode onto the previous combat event. This is common in FF books where the
+        # enemy stat block is in section N, and "During this X Combat..." rules are in section N+1.
+        if not combats and last_combat_idx is not None and _is_combat_continuation(text):
+            section_id = portion.section_id
+            if isinstance(section_id, str) and section_id.isdigit() and last_combat_section_id is not None:
+                if int(section_id) == last_combat_section_id + 1:
+                    prev = out_portions[last_combat_idx]
+                    prev_combats = prev.get("combat") or []
+                    if prev_combats:
+                        prev0 = prev_combats[0]
+                        enemies = prev0.get("enemies") or []
+                        # outcomes
+                        win_section, loss_section, escape_section = _detect_outcomes(text)
+                        win_section = _infer_win_from_anchors(portion.raw_html, loss_section, win_section)
+                        fallback_outcomes = _build_outcomes(win_section, loss_section, escape_section)
+                        if fallback_outcomes:
+                            prev0["outcomes"] = _merge_fallback_outcomes(prev0.get("outcomes"), fallback_outcomes)
+                        # mode/rules/modifiers/triggers
+                        fallback_mode, fallback_rules, fallback_mods = _extract_combat_rules(text, len(enemies) if isinstance(enemies, list) else 0)
+                        fallback_mods = _normalize_modifiers(fallback_mods)
+                        fallback_triggers = _normalize_triggers(_extract_combat_triggers(text))
+                        prev0["rules"] = _merge_rules(prev0.get("rules"), fallback_rules)
+                        prev0["modifiers"] = _merge_modifiers(prev0.get("modifiers"), fallback_mods)
+                        prev0["triggers"] = _merge_triggers(prev0.get("triggers"), fallback_triggers)
+                        # mode: only upgrade from missing/single -> specialized
+                        if not prev0.get("mode") and fallback_mode:
+                            prev0["mode"] = fallback_mode
+                        else:
+                            prev0["mode"] = _normalize_mode(prev0.get("mode"), prev0.get("rules"))
+                        # style: continuation text often carries the real style label ("Shooting Combat", etc)
+                        current_style = prev0.get("style")
+                        inferred_style = _infer_combat_style(text, [CombatEnemy(**e) for e in enemies] if isinstance(enemies, list) else [])
+                        if inferred_style and (not current_style or current_style == "standard"):
+                            prev0["style"] = inferred_style
+                        prev["combat"] = prev_combats
+
         portion.combat = combats
         portion.turn_to_claims = _coerce_turn_to_claims(
             merge_turn_to_claims(
@@ -1034,7 +1450,20 @@ def main():
             )
         )
         out_portions.append(portion.model_dump(exclude_none=True))
-        
+
+        # Track most recent combat-bearing section for continuation merges.
+        if combats:
+            section_id = portion.section_id
+            if isinstance(section_id, str) and section_id.isdigit():
+                last_combat_idx = len(out_portions) - 1
+                last_combat_section_id = int(section_id)
+
+        if combats and _needs_combat_outcomes(combats):
+            section_id = portion.section_id
+            if isinstance(section_id, str) and section_id.isdigit():
+                pending_idx = len(out_portions) - 1
+                pending_section_id = int(section_id)
+
         if (idx + 1) % 50 == 0:
             logger.log("extract_combat", "running", current=idx+1, total=total_portions, 
                        message=f"Processed {idx+1}/{total_portions} portions (AI calls: {ai_calls})")

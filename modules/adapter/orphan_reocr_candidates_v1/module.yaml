@@ -1,0 +1,23 @@
+module_id: orphan_reocr_candidates_v1
+stage: adapter
+description: "Flag source sections for re-OCR when orphans match near-number (OCR-shape) targets with high inbound counts."
+entrypoint: modules/adapter/orphan_reocr_candidates_v1/main.py
+input_schema: enriched_portion_v1
+output_schema: enriched_portion_v1
+default_params:
+  min_inbound: 2
+  max_candidates: 80
+param_schema:
+  properties:
+    min_inbound:
+      type: integer
+    max_candidates:
+      type: integer
+    min_target:
+      type: integer
+    max_target:
+      type: integer
+    confusions:
+      type: string
+      description: "Digit confusion map (e.g., 0:9,9:0,6:8,8:6|3)"
+  required: []

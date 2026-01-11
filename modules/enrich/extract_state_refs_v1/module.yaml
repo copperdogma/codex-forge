@@ -1,0 +1,18 @@
+module_id: extract_state_refs_v1
+stage: enrich
+description: "Extract state values and state-based navigation references (e.g., map references, template targets)."
+entrypoint: modules/enrich/extract_state_refs_v1/main.py
+input_schema: enriched_portion_v1
+output_schema: enriched_portion_v1
+default_params:
+  map_ref_escalate: false
+param_schema:
+  properties:
+    map_ref_escalate:
+      type: boolean
+    map_ref_escalation_model:
+      type: string
+    map_ref_max_images:
+      type: integer
+  required: []
+notes: "Code-first extraction of state values and templated navigation refs for engine-resolvable state checks."

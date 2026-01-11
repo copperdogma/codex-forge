@@ -34,6 +34,12 @@ from modules.portionize.detect_boundaries_html_v1.main import (
 )
 from modules.extract.ocr_ai_gpt51_v1.main import sanitize_html
 
+try:
+    from PIL import Image, ImageStat
+except Exception:  # pragma: no cover
+    Image = None
+    ImageStat = None
+
 
 SYSTEM_PROMPT = (
     "You are repairing HTML for a single book page. "
@@ -77,16 +83,66 @@ def _extract_html(text: str) -> str:
     return text.strip()
 
 
+def _is_blank_image(image_path: Optional[str], white_threshold: float) -> bool:
+    if not image_path or Image is None:
+        return False
+    try:
+        with Image.open(image_path) as img:
+            img = img.convert("L")
+            img.thumbnail((128, 128))
+            pixels = list(img.getdata())
+            if not pixels:
+                return False
+            white = sum(1 for p in pixels if p >= 245)
+            ratio = white / float(len(pixels))
+            if ratio >= white_threshold:
+                return True
+            if ImageStat is None:
+                return False
+            stat = ImageStat.Stat(img)
+            mean = stat.mean[0] if stat.mean else 0.0
+            stddev = stat.stddev[0] if stat.stddev else 0.0
+            return mean >= 235.0 and stddev <= 25.0
+    except Exception:
+        return False
+
+
+def _is_blank_page(page: Dict[str, Any], white_threshold: float) -> bool:
+    ocr_empty = bool(page.get("ocr_empty"))
+    raw_html = page.get("raw_html") or ""
+    html = page.get("html") or ""
+    is_empty_html = not (raw_html.strip() or html.strip())
+    if not (ocr_empty or is_empty_html):
+        return False
+    return _is_blank_image(page.get("image"), white_threshold)
+
+
 def _code_repair_html(html: str, expected_ids: List[int]) -> Tuple[str, bool]:
     repaired = html or ""
     changed = False
+    has_any_h2 = bool(re.search(r"<h2>\\s*\\d+\\s*</h2>", repaired, flags=re.IGNORECASE))
+    expected_set = {str(x) for x in expected_ids}
+    h2_numbers = re.findall(r"<h2>\\s*(\\d+)\\s*</h2>", repaired, flags=re.IGNORECASE)
+    if len(h2_numbers) == 1 and h2_numbers[0] not in expected_set:
+        for sec in expected_ids:
+            pattern = rf"<p class=\"page-number\">\\s*{sec}\\s*</p>"
+            if re.search(pattern, repaired, flags=re.IGNORECASE):
+                repl = f"<h2>{sec}</h2>"
+                repaired, count = re.subn(r"<h2>\\s*\\d+\\s*</h2>", repl, repaired, flags=re.IGNORECASE, count=1)
+                if count:
+                    changed = True
+                break
     for sec in expected_ids:
+        if re.search(rf"<h2>\\s*{sec}\\s*</h2>", repaired, flags=re.IGNORECASE):
+            continue
         for pattern in (
             rf"<p class=\"page-number\">\\s*{sec}\\s*</p>",
             rf"<p>\\s*{sec}\\s*</p>",
         ):
             repl = f"<h2>{sec}</h2>"
-            repaired, count = re.subn(pattern, repl, repaired, flags=re.IGNORECASE)
+            if "page-number" in pattern and has_any_h2:
+                continue
+            repaired, count = re.subn(pattern, repl, repaired, flags=re.IGNORECASE, count=1)
             if count:
                 changed = True
     return repaired, changed
@@ -101,8 +157,8 @@ def _prompt_for_expected(expected_ids: List[int]) -> str:
         f"{expected}. "
         "Only wrap numbers that appear as standalone numeric text (no other words). "
         "Do NOT wrap numbers inside tables, lists, or phrases like 'Turn to 16'. "
-        "If a standalone expected number appears in <p class=\"page-number\">, "
-        "it may actually be a section header; convert it to <h2>. "
+        "If a standalone expected number appears in <p class=\"page-number\"> and the page has no other "
+        "section headers (<h2>), it may actually be a section header; convert it to <h2>. "
         "Preserve running heads and page numbers otherwise "
         "(they are often marked as <p class=\"running-head\"> or <p class=\"page-number\">). "
         "Return the full corrected HTML for this page only."
@@ -225,6 +281,31 @@ def _extract_running_head(html: str) -> Optional[str]:
     return match.group(1).strip() if match else None
 
 
+def _expected_ids_from_html(html: str, min_section: int, max_section: int) -> List[int]:
+    if not html:
+        return []
+    expected: List[int] = []
+    for m in re.findall(r"<p class=\"page-number\">\\s*(\\d+)\\s*</p>", html):
+        try:
+            val = int(m)
+        except Exception:
+            continue
+        if min_section <= val <= max_section:
+            expected.append(val)
+    running = _extract_running_head(html)
+    if running:
+        range_match = re.search(r"(\\d+)\\s*[-–]\\s*(\\d+)", running)
+        if range_match:
+            start = _coerce_int(range_match.group(1))
+            end = _coerce_int(range_match.group(2))
+            if start is not None and end is not None:
+                lo, hi = sorted((start, end))
+                for val in range(lo, hi + 1):
+                    if min_section <= val <= max_section:
+                        expected.append(val)
+    return sorted(set(expected))
+
+
 def _doc_order_key(boundary: Dict[str, Any]) -> Tuple[int, int]:
     return (_coerce_int(boundary.get("start_page")) or 0, _coerce_int(boundary.get("start_line_idx")) or 0)
 
@@ -254,9 +335,11 @@ def _detect_ordering_conflicts(boundaries: List[Dict[str, Any]]) -> List[Dict[st
 
 
 def _write_ordering_report(out_dir: str, conflicts: List[Dict[str, Any]]) -> Optional[str]:
-    if not conflicts:
-        return None
     path = os.path.join(out_dir, "ordering_conflicts.json")
+    if not conflicts:
+        if os.path.exists(path):
+            os.remove(path)
+        return None
     with open(path, "w", encoding="utf-8") as f:
         json.dump({
             "schema_version": "boundary_order_conflicts_v1",
@@ -401,6 +484,13 @@ def main() -> None:
     parser.add_argument("--repair_cache_dir", dest="repair_cache_dir", default="html_repair_cache")
     parser.add_argument("--max-output-tokens", dest="max_output_tokens", type=int, default=2048)
     parser.add_argument("--max_output_tokens", dest="max_output_tokens", type=int, default=2048)
+    parser.add_argument("--skip-blank-ocr-pages", dest="skip_blank_ocr_pages", action="store_true")
+    parser.add_argument("--skip_blank_ocr_pages", dest="skip_blank_ocr_pages", action="store_true")
+    parser.add_argument("--no-skip-blank-ocr-pages", dest="skip_blank_ocr_pages", action="store_false")
+    parser.add_argument("--no_skip_blank_ocr_pages", dest="skip_blank_ocr_pages", action="store_false")
+    parser.set_defaults(skip_blank_ocr_pages=True)
+    parser.add_argument("--blank-image-white-threshold", dest="blank_image_white_threshold", type=float, default=0.985)
+    parser.add_argument("--blank_image_white_threshold", dest="blank_image_white_threshold", type=float, default=0.985)
     parser.add_argument("--progress-file")
     parser.add_argument("--state-file")
     parser.add_argument("--run-id")
@@ -432,6 +522,14 @@ def main() -> None:
         raise RuntimeError("openai package required") from _OPENAI_IMPORT_ERROR
     client = OpenAI()
 
+    blank_pages: Dict[int, bool] = {}
+    if args.skip_blank_ocr_pages:
+        for page in pages_html:
+            page_number = _coerce_int(page.get("page_number"))
+            if page_number is None:
+                continue
+            blank_pages[page_number] = _is_blank_page(page, args.blank_image_white_threshold)
+
     total_blocks_repaired = 0
     for attempt in range(args.max_retries + 1):
         logger.log(
@@ -447,6 +545,8 @@ def main() -> None:
 
         # Build blocks from current HTML
         blocks_rows = _build_blocks(pages_html, drop_empty=True)
+        if args.skip_blank_ocr_pages and blank_pages:
+            blocks_rows = [row for row in blocks_rows if not blank_pages.get(_coerce_int(row.get("page_number")), False)]
         pages_for_detection = filter_pages_to_gameplay(blocks_rows, coarse)
 
         candidates = build_candidates(
@@ -539,20 +639,20 @@ def main() -> None:
         page_numbers = [p.get("page_number") for p in pages_for_detection if p.get("page_number") is not None]
         page_map = _suspected_pages_for_missing(missing, section_pages, page_numbers, args.adjacent_window)
         if ordering_conflicts:
-            page_to_sections: Dict[int, List[int]] = {}
-            for b in deduped:
-                sid = _coerce_int(b.get("section_id"))
-                page = _coerce_int(b.get("start_page"))
-                if sid is None or page is None:
-                    continue
-                page_to_sections.setdefault(page, []).append(sid)
+            page_lookup = {(_coerce_int(p.get("page_number"))): p for p in pages_html}
+            missing_set = {int(m) for m in missing} if missing else set()
             for conflict in ordering_conflicts:
                 page = _coerce_int(conflict.get("page"))
-                if page is None:
+                sec = _coerce_int(conflict.get("section_id"))
+                if page is None or sec is None:
                     continue
-                expected_ids = page_to_sections.get(page, [])
-                if expected_ids:
-                    page_map.setdefault(page, []).extend(expected_ids)
+                if missing_set and sec not in missing_set:
+                    continue
+                html = (page_lookup.get(page) or {}).get("html") or ""
+                expected_ids = _expected_ids_from_html(html, args.min_section, args.max_section)
+                if not expected_ids:
+                    expected_ids = [sec]
+                page_map.setdefault(page, []).extend(expected_ids)
         if not page_map:
             raise SystemExit("Missing sections detected but no suspect pages identified")
 
@@ -562,6 +662,8 @@ def main() -> None:
         for page in pages_html:
             page_number = _coerce_int(page.get("page_number"))
             if page_number is None or page_number not in page_map:
+                continue
+            if args.skip_blank_ocr_pages and blank_pages.get(page_number, False):
                 continue
             expected_ids = sorted(set(page_map[page_number]))
             if not expected_ids:

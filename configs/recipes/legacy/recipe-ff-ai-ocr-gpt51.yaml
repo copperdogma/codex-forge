@@ -53,12 +53,29 @@ stages:
         - When options are presented in columns or rows, preserve the grid as a <table>.
         - Preserve row/column separation for repeated option lists and references.
 
-  - id: html_blocks_raw
+  - id: detect_duplicate_pages
     stage: adapter
-    module: html_to_blocks_v1
+    module: detect_duplicate_pages_v1
     needs: [table_rescue]
     inputs:
       pages: table_rescue
+    out: pages_html_deduped.jsonl
+    params:
+      similarity_threshold: 0.95
+      min_tokens: 80
+      max_lookback: 3
+      max_page_gap: 3
+      header_overlap_threshold: 0.88
+      require_header_overlap: true
+      allow_frontmatter_dedupe: false
+      frontmatter_max_page: 30
+
+  - id: html_blocks_raw
+    stage: adapter
+    module: html_to_blocks_v1
+    needs: [detect_duplicate_pages]
+    inputs:
+      pages: detect_duplicate_pages
     out: page_blocks.jsonl
 
   - id: coarse_segment_html
@@ -72,9 +89,9 @@ stages:
   - id: html_repair_loop
     stage: portionize
     module: detect_boundaries_html_loop_v1
-    needs: [table_rescue, coarse_segment_html]
+    needs: [detect_duplicate_pages, coarse_segment_html]
     inputs:
-      pages: table_rescue
+      pages: detect_duplicate_pages
       coarse_segments: coarse_segment_html
     out: pages_html_repaired.jsonl
     params:

@@ -8,7 +8,7 @@ from modules.common.openai_client import OpenAI
 from modules.common.utils import read_jsonl, save_jsonl, ProgressLogger
 from modules.common.html_utils import html_to_text
 from modules.common.turn_to_claims import merge_turn_to_claims
-from schemas import EnrichedPortion, InventoryItem, InventoryCheck, InventoryEnrichment, TurnToLinkClaimInline
+from schemas import EnrichedPortion, InventoryItem, InventoryCheck, InventoryEnrichment, InventoryState, TurnToLinkClaimInline
 
 # --- Patterns ---
 
@@ -50,6 +50,22 @@ NUM_MAP = {
     "six": 6, "seven": 7, "eight": 8, "nine": 9, "ten": 10
 }
 
+POSSESSIONS_LOSE_PATTERNS = [
+    re.compile(r"\ball\s+your\s+possessions\s+(?:are\s+)?lost\b", re.IGNORECASE),
+    re.compile(r"\byour\s+possessions\s+(?:are\s+)?lost\b", re.IGNORECASE),
+    re.compile(r"\bstripped\s+of\s+(?:all\s+)?your\s+possessions\b", re.IGNORECASE),
+    re.compile(r"\bdeprived\s+of\s+(?:all\s+)?your\s+possessions\b", re.IGNORECASE),
+    re.compile(r"\b(?:all\s+)?your\s+possessions\s+(?:have\s+been\s+)?(?:taken|confiscated)\b", re.IGNORECASE),
+]
+
+POSSESSIONS_RESTORE_PATTERNS = [
+    re.compile(r"\bthe\s+rest\s+of\s+your\s+possessions\s+are\s+here\b", re.IGNORECASE),
+    re.compile(r"\ball\s+your\s+possessions\s+are\s+here\b", re.IGNORECASE),
+    re.compile(r"\byour\s+possessions\s+are\s+here\b", re.IGNORECASE),
+    re.compile(r"\byou\s+(?:recover|retrieve|regain|find|collect|gather|get\s+back)\s+(?:the\s+rest\s+of\s+|all\s+of\s+)?your\s+possessions\b", re.IGNORECASE),
+    re.compile(r"\byour\s+possessions\s+(?:are\s+)?returned\b", re.IGNORECASE),
+]
+
 
 def _coerce_turn_to_claims(raw_claims: Optional[List[Any]]) -> List[TurnToLinkClaimInline]:
     if not raw_claims:
@@ -58,6 +74,33 @@ def _coerce_turn_to_claims(raw_claims: Optional[List[Any]]) -> List[TurnToLinkCl
         TurnToLinkClaimInline(**c) if isinstance(c, dict) else c
         for c in raw_claims
     ]
+
+
+def _extract_possessions_states(text: str) -> List[InventoryState]:
+    if not text:
+        return []
+    lower = text.lower()
+    if "possessions" not in lower:
+        return []
+    states: List[InventoryState] = []
+    if any(p.search(text) for p in POSSESSIONS_LOSE_PATTERNS):
+        states.append(InventoryState(action="lose_all", scope="possessions", confidence=0.8))
+    if any(p.search(text) for p in POSSESSIONS_RESTORE_PATTERNS):
+        states.append(InventoryState(action="restore_all", scope="possessions", confidence=0.8))
+    return states
+
+
+def _inventory_state_from_item(action: str, item_name: Optional[str], confidence: float = 0.7) -> Optional[InventoryState]:
+    if not item_name:
+        return None
+    name = _clean_item_name(item_name).lower().strip()
+    if name != "possessions":
+        return None
+    if action == "add":
+        return InventoryState(action="restore_all", scope="possessions", confidence=confidence)
+    if action == "remove":
+        return InventoryState(action="lose_all", scope="possessions", confidence=confidence)
+    return None
 
 ADD_VERBS = [
     "find", "found", "take", "took", "pick up", "picked up", "pick", "grab", "grabbed", "seize", "seized",
@@ -75,6 +118,7 @@ Detect:
 - items_lost: Items the player loses, drops, or has taken away.
 - items_used: Items the player uses or consumes (potions, keys).
 - inventory_checks: Conditional checks on item possession.
+- inventory_states: Whole-inventory events such as losing or restoring all Possessions.
 
 IMPORTANT RULES:
 - Only extract PHYSICAL objects (keys, potions, gold, weapons, etc.).
@@ -83,6 +127,7 @@ IMPORTANT RULES:
 - DO NOT extract phrases like "you find yourself in a chamber" or "you take a deep breath".
 - Item names should be clean and concise (e.g., "Silver Key", not "the rusty silver key you found").
 - quantity should be an integer or the string "all".
+- Do NOT treat "Possessions" as a literal item. Instead, emit inventory_states with action "lose_all" or "restore_all".
 
 Example output:
 {
@@ -90,7 +135,8 @@ Example output:
     "items_gained": [{"item": "Gold Pieces", "quantity": 10}],
     "items_lost": [{"item": "Rope", "quantity": 1}],
     "items_used": [{"item": "Potion of Strength", "quantity": 1}],
-    "inventory_checks": [{"item": "Lantern", "condition": "if you have", "target_section": "43"}]
+    "inventory_checks": [{"item": "Lantern", "condition": "if you have", "target_section": "43"}],
+    "inventory_states": [{"action": "lose_all", "scope": "possessions"}]
   }
 }
 
@@ -213,6 +259,8 @@ def _is_bad_item_name(name: Optional[str], action: Optional[str] = None) -> bool
     if any(word in lower for word in ("stamina", "skill", "luck", "points")):
         return True
     if action == "add" and lower.startswith("broken "):
+        return True
+    if lower == "possessions":
         return True
     if any(phrase in lower for phrase in ("find yourself", "yourself in", "deep breath", "take a look", "quick look",
                                           "do not see", "see anybody", "tumble", "throw", "dive", "hurl", "aim",
@@ -396,7 +444,8 @@ def _parse_item_text(text: str) -> Tuple[Optional[str], int]:
     text_lower = text.lower()
     if text_lower in {
         "it", "them", "him", "her", "some", "none", "your", "his", "their", "my", 
-        "yourself", "himself", "herself", "not", "not done so already", "already", "one"
+        "yourself", "himself", "herself", "not", "not done so already", "already", "one",
+        "possessions"
     }:
         return None, 1
 
@@ -429,6 +478,7 @@ def extract_inventory_regex(text: str) -> InventoryEnrichment:
     lost = []
     used = []
     checks = []
+    inventory_states: List[InventoryState] = []
 
     STRICT_ITEMS = ["gold pieces", "provisions", "potion", "key", "rope", "spike", "mallet", "shield", "sword"]
     BAD_ITEM_WORDS = {"other", "message", "note"}
@@ -442,6 +492,8 @@ def extract_inventory_regex(text: str) -> InventoryEnrichment:
     if not any(k in lower_text for k in KEYWORDS):
         if not any(k in lower_text for k in STRICT_ITEMS):
             return InventoryEnrichment()
+
+    inventory_states = _extract_possessions_states(text)
 
     for pattern in GAIN_PATTERNS:
         for match in pattern.finditer(text):
@@ -628,7 +680,18 @@ def extract_inventory_regex(text: str) -> InventoryEnrichment:
             if candidate and not _is_bad_item_name(candidate, "add"):
                 gained.append(InventoryItem(item=candidate, quantity=1, confidence=0.6))
     
-    return InventoryEnrichment(items_gained=gained, items_lost=lost, items_used=used, inventory_checks=checks)
+    if inventory_states:
+        gained = [g for g in gained if g.item.lower().strip() != "possessions"]
+        lost = [l for l in lost if l.item.lower().strip() != "possessions"]
+        used = [u for u in used if u.item.lower().strip() != "possessions"]
+
+    return InventoryEnrichment(
+        items_gained=gained,
+        items_lost=lost,
+        items_used=used,
+        inventory_checks=checks,
+        inventory_states=inventory_states,
+    )
 
 def validate_inventory(inv: InventoryEnrichment) -> bool:
     """Returns True if the inventory data looks sane."""
@@ -649,6 +712,8 @@ def validate_inventory(inv: InventoryEnrichment) -> bool:
             return False
         if "turn to" in name_lower or "?" in name_lower:
             return False
+        if name_lower == "possessions":
+            return False
         if len(name_lower) > 50:
             return False
             
@@ -661,6 +726,8 @@ def validate_inventory(inv: InventoryEnrichment) -> bool:
         if any(word in name_lower for word in ("stamina", "skill", "luck", "points")):
             return False
         if "turn to" in name_lower or "?" in name_lower:
+            return False
+        if name_lower == "possessions":
             return False
             
     return True
@@ -690,6 +757,19 @@ def extract_inventory_llm(text: str, model: str, client: OpenAI) -> Tuple[Invent
             if str(q).isdigit(): return int(q)
             if str(q).lower() == "all": return "all"
             return 1
+        def _maybe_possessions_state(item_name: Optional[str], action: str) -> Optional[InventoryState]:
+            if not item_name:
+                return None
+            name = _clean_item_name(item_name).lower().strip()
+            if name != "possessions":
+                return None
+            if action == "add":
+                return InventoryState(action="restore_all", scope="possessions", confidence=0.95)
+            if action == "remove":
+                return InventoryState(action="lose_all", scope="possessions", confidence=0.95)
+            return None
+
+        inventory_states: List[InventoryState] = []
 
         gained = [
             InventoryItem(item=_clean_item_name(item.get("item")), quantity=parse_qty(item.get("quantity")), confidence=0.95)
@@ -734,12 +814,34 @@ def extract_inventory_llm(text: str, model: str, client: OpenAI) -> Tuple[Invent
             and _item_has_explicit_if(text, item.get("item"))
             and _is_allowed_check_condition(item.get("condition"))
         ]
-        
+
+        for state in inv_data.get("inventory_states", []):
+            if not isinstance(state, dict):
+                continue
+            action = state.get("action")
+            scope = state.get("scope") or "possessions"
+            if action in {"lose_all", "restore_all"}:
+                inventory_states.append(InventoryState(action=action, scope=scope, confidence=0.95))
+
+        for item in inv_data.get("items_gained", []):
+            state = _maybe_possessions_state(item.get("item"), "add")
+            if state:
+                inventory_states.append(state)
+        for item in inv_data.get("items_lost", []):
+            state = _maybe_possessions_state(item.get("item"), "remove")
+            if state:
+                inventory_states.append(state)
+
+        gained = [g for g in gained if g.item.lower().strip() != "possessions"]
+        lost = [l for l in lost if l.item.lower().strip() != "possessions"]
+        used = [u for u in used if u.item.lower().strip() != "possessions"]
+
         return InventoryEnrichment(
             items_gained=gained,
             items_lost=lost,
             items_used=used,
-            inventory_checks=checks
+            inventory_checks=checks,
+            inventory_states=inventory_states,
         ), usage
     except Exception as e:
         print(f"LLM inventory extraction error: {e}")
@@ -887,7 +989,11 @@ def main():
                     if key in corrections_map:
                         data = corrections_map.get(key)
                         if isinstance(data, dict) and data.get("item") and _item_mentioned(text_by_section.get(sid, ""), data.get("item")):
-                            new_gained.append(InventoryItem(**data))
+                            state = _inventory_state_from_item("add", data.get("item"), confidence=data.get("confidence", 0.7))
+                            if state:
+                                p.inventory.inventory_states.append(state)
+                            else:
+                                new_gained.append(InventoryItem(**data))
                         elif key not in removals_set:
                             new_gained.append(item)
                     elif key in removals_set:
@@ -910,7 +1016,11 @@ def main():
                             and _item_mentioned(text, data.get("item"))
                             and _item_near_verbs(text, data.get("item"), LOSE_VERBS)
                         ):
-                            new_lost.append(InventoryItem(**data))
+                            state = _inventory_state_from_item("remove", data.get("item"), confidence=data.get("confidence", 0.7))
+                            if state:
+                                p.inventory.inventory_states.append(state)
+                            else:
+                                new_lost.append(InventoryItem(**data))
                         elif key not in removals_set:
                             new_lost.append(item)
                     elif key in removals_set:
@@ -972,6 +1082,10 @@ def main():
                         if not _item_mentioned(text, a_data.get("item")):
                             continue
                         action = a_data.pop("action", "add")
+                        state = _inventory_state_from_item(action, a_data.get("item"), confidence=a_data.get("confidence", 0.7))
+                        if state:
+                            p.inventory.inventory_states.append(state)
+                            continue
                         if _is_bad_item_name(a_data.get("item"), action):
                             continue
                         if action == "add":

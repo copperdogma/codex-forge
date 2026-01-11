@@ -9,14 +9,18 @@ class Choice(BaseModel):
 
 class CombatEnemy(BaseModel):
     enemy: Optional[str] = None
-    skill: int
-    stamina: int
+    skill: Optional[int] = None
+    stamina: Optional[int] = None
+    armour: Optional[int] = None
+    firepower: Optional[int] = None
+    speed: Optional[str] = None
 
 
 class Combat(BaseModel):
     enemies: List[CombatEnemy] = Field(default_factory=list)
     outcomes: Optional[Dict[str, Any]] = None
     mode: Optional[str] = None
+    style: Optional[str] = None
     rules: Optional[List[Dict[str, Any]]] = None
     modifiers: Optional[List[Dict[str, Any]]] = None
     triggers: Optional[List[Dict[str, Any]]] = None
@@ -49,6 +53,31 @@ class InventoryItem(BaseModel):
     confidence: float = 1.0
 
 
+class InventoryState(BaseModel):
+    action: Literal["lose_all", "restore_all"]
+    scope: str = "possessions"
+    confidence: float = 1.0
+
+
+class StateValue(BaseModel):
+    key: str
+    value: str
+    confidence: float = 1.0
+    source_text: Optional[str] = None
+
+
+class StateCheck(BaseModel):
+    key: Optional[str] = None
+    condition_text: Optional[str] = None
+    template_target: Optional[str] = None
+    template_op: Optional[str] = None
+    template_value: Optional[str] = None
+    choice_text: Optional[str] = None
+    has_target: Optional[str] = None
+    missing_target: Optional[str] = None
+    confidence: float = 1.0
+
+
 class InventoryCheck(BaseModel):
     item: str
     condition: str = "if you have"  # "if you have", "if you possess", etc.
@@ -61,6 +90,7 @@ class InventoryEnrichment(BaseModel):
     items_lost: List[InventoryItem] = Field(default_factory=list)
     items_used: List[InventoryItem] = Field(default_factory=list)
     inventory_checks: List[InventoryCheck] = Field(default_factory=list)
+    inventory_states: List[InventoryState] = Field(default_factory=list)
 
 
 class StatCheck(BaseModel):
@@ -439,6 +469,8 @@ class EnrichedPortion(BaseModel):
     confidence: float = 0.0
     source_images: List[str] = Field(default_factory=list)
     raw_text: Optional[str] = None
+    raw_text_original: Optional[str] = None
+    clean_text: Optional[str] = None
     raw_html: Optional[str] = None
     continuation_of: Optional[str] = None
     continuation_confidence: Optional[float] = None
@@ -449,6 +481,8 @@ class EnrichedPortion(BaseModel):
     stat_modifications: List[StatModification] = Field(default_factory=list)
     item_effects: List[ItemEffect] = Field(default_factory=list)
     inventory: Optional[InventoryEnrichment] = None
+    state_values: List[StateValue] = Field(default_factory=list)
+    state_checks: List[StateCheck] = Field(default_factory=list)
     targets: List[str] = Field(default_factory=list)
     turn_to_links: List[str] = Field(default_factory=list)
     turn_to_claims: List[TurnToLinkClaimInline] = Field(default_factory=list)

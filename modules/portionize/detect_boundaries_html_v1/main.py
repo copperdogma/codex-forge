@@ -11,11 +11,15 @@ Legacy review notes (carry-overs from detect_boundaries_code_first_v1):
 import argparse
 import json
 import os
+import re
 from collections import defaultdict
 from typing import Any, Dict, List, Optional, Tuple
 
 from modules.common.utils import read_jsonl, save_jsonl, ProgressLogger
 from modules.common.macro_section import macro_section_for_page
+
+
+_DUPLICATE_SIMILARITY_THRESHOLD = 0.9
 
 
 def _coerce_int(val: Any) -> Optional[int]:
@@ -47,6 +51,41 @@ def _block_is_body_text(block: Dict[str, Any]) -> bool:
         text = (block.get("text") or "").strip()
         return len(text) >= 10 and _alpha_ratio(text) >= 0.3
     return False
+
+
+def _normalize_body_text(text: str) -> str:
+    if not text:
+        return ""
+    text = re.sub(r"\s+", " ", text)
+    return text.strip().lower()
+
+
+def _body_text_from_blocks(blocks: List[Dict[str, Any]]) -> str:
+    if not blocks:
+        return ""
+    parts: List[str] = []
+    for block in blocks:
+        if _block_is_body_text(block):
+            parts.append(block.get("text") or "")
+    body = _normalize_body_text(" ".join(parts))
+    if len(body) > 800:
+        body = body[:800]
+    return body
+
+
+def _text_similarity(a: str, b: str) -> float:
+    if not a or not b:
+        return 0.0
+    if a == b:
+        return 1.0
+    # Lightweight similarity: token overlap ratio (Jaccard).
+    a_tokens = set(a.split())
+    b_tokens = set(b.split())
+    if not a_tokens or not b_tokens:
+        return 0.0
+    inter = len(a_tokens & b_tokens)
+    union = len(a_tokens | b_tokens)
+    return inter / max(1, union)
 
 
 def load_coarse_segments(path: Optional[str]) -> Optional[Dict[str, Any]]:
@@ -120,8 +159,9 @@ def build_candidates(pages: List[Dict[str, Any]], min_section: int, max_section:
                 })
                 break
 
-        # Build local list of numeric header indices for this page
+        # Build local list of numeric header indices for this page (dedupe same-number repeats per page)
         header_indices = []
+        seen_section_nums = set()
         for idx, block in enumerate(blocks):
             if block.get("block_type") != "h2":
                 continue
@@ -131,6 +171,9 @@ def build_candidates(pages: List[Dict[str, Any]], min_section: int, max_section:
             section_num = int(text)
             if not (min_section <= section_num <= max_section):
                 continue
+            if section_num in seen_section_nums:
+                continue
+            seen_section_nums.add(section_num)
             header_indices.append((idx, section_num))
 
         for pos, section_num in header_indices:
@@ -152,6 +195,7 @@ def build_candidates(pages: List[Dict[str, Any]], min_section: int, max_section:
             if require_text_between and not has_body_text:
                 continue
 
+            body_text = _body_text_from_blocks(span_blocks)
             element_id = f"p{page_number:03d}-b{blocks[pos].get('order')}"
             candidates.append({
                 "section_id": str(section_num),
@@ -166,6 +210,7 @@ def build_candidates(pages: List[Dict[str, Any]], min_section: int, max_section:
                 "method": "code_filter",
                 "source": "html_h2",
                 "follow_text_score": follow_text_score,
+                "body_text": body_text,
             })
 
     return candidates
@@ -216,6 +261,17 @@ def _build_duplicate_report(candidates: List[Dict[str, Any]], deduped: List[Dict
                 chosen_idx = idx
                 break
         max_score = max(i.get("follow_text_score", 0) for i in items)
+        similarity = None
+        chosen_body = _normalize_body_text(chosen.get("body_text") or "") if chosen else ""
+        if chosen_body:
+            scores = []
+            for item in items_sorted:
+                other_body = _normalize_body_text(item.get("body_text") or "")
+                if other_body:
+                    scores.append(_text_similarity(chosen_body, other_body))
+            if scores:
+                similarity = max(scores)
+        likely_duplicate_scan = bool(similarity is not None and similarity >= _DUPLICATE_SIMILARITY_THRESHOLD)
         duplicates.append({
             "section_id": section_id,
             "candidate_count": len(items),
@@ -224,12 +280,15 @@ def _build_duplicate_report(candidates: List[Dict[str, Any]], deduped: List[Dict
             "chosen_follow_text_score": chosen.get("follow_text_score") if chosen else None,
             "chosen_index_in_sorted": chosen_idx,
             "max_follow_text_score": max_score,
+            "text_similarity": similarity,
+            "likely_duplicate_scan": likely_duplicate_scan,
             "candidates": [
                 {
                     "start_page": i.get("start_page"),
                     "start_line_idx": i.get("start_line_idx"),
                     "start_element_id": i.get("start_element_id"),
                     "follow_text_score": i.get("follow_text_score"),
+                    "body_text_len": len(_normalize_body_text(i.get("body_text") or "")),
                 }
                 for i in items_sorted
             ],
@@ -238,10 +297,12 @@ def _build_duplicate_report(candidates: List[Dict[str, Any]], deduped: List[Dict
 
 
 def _write_duplicate_report(out_path: str, duplicates: List[Dict[str, Any]]) -> Optional[str]:
-    if not duplicates:
-        return None
     out_dir = os.path.dirname(out_path)
     report_path = os.path.join(out_dir, "duplicate_headers.json")
+    if not duplicates:
+        if os.path.exists(report_path):
+            os.remove(report_path)
+        return None
     with open(report_path, "w", encoding="utf-8") as f:
         json.dump({
             "schema_version": "duplicate_header_report_v1",

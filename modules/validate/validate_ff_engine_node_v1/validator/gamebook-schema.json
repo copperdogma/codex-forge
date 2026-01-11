@@ -205,36 +205,42 @@
       ]
     },
     "SequenceEvent": {
-      "oneOf": [
-        {
-          "$ref": "#/definitions/ChoiceEvent"
-        },
-        {
-          "$ref": "#/definitions/StatChangeEvent"
-        },
-        {
-          "$ref": "#/definitions/StatCheckEvent"
-        },
-        {
-          "$ref": "#/definitions/TestLuckEvent"
-        },
-        {
-          "$ref": "#/definitions/ItemEvent"
-        },
-        {
-          "$ref": "#/definitions/ItemCheckEvent"
-        },
-        {
-          "$ref": "#/definitions/StateCheckEvent"
-        },
-        {
-          "$ref": "#/definitions/ConditionalEvent"
-        },
-        {
-          "$ref": "#/definitions/CombatEvent"
-        },
+        "oneOf": [
+          {
+            "$ref": "#/definitions/ChoiceEvent"
+          },
+          {
+            "$ref": "#/definitions/StatChangeEvent"
+          },
+          {
+            "$ref": "#/definitions/StatCheckEvent"
+          },
+          {
+            "$ref": "#/definitions/TestLuckEvent"
+          },
+          {
+            "$ref": "#/definitions/ItemEvent"
+          },
+          {
+            "$ref": "#/definitions/ItemCheckEvent"
+          },
+          {
+            "$ref": "#/definitions/StateCheckEvent"
+          },
+          {
+            "$ref": "#/definitions/StateSetEvent"
+          },
+          {
+            "$ref": "#/definitions/ConditionalEvent"
+          },
+          {
+            "$ref": "#/definitions/CombatEvent"
+          },
         {
           "$ref": "#/definitions/DeathEvent"
+        },
+        {
+          "$ref": "#/definitions/InventoryStateEvent"
         },
         {
           "$ref": "#/definitions/CustomEvent"
@@ -245,8 +251,45 @@
       "oneOf": [
         {
           "$ref": "#/definitions/ItemCondition"
+        },
+        {
+          "$ref": "#/definitions/CombatMetricCondition"
         }
       ]
+    },
+    "CombatMetricCondition": {
+      "type": "object",
+      "required": [
+        "kind",
+        "metric",
+        "operator",
+        "value"
+      ],
+      "properties": {
+        "kind": {
+          "const": "combat_metric"
+        },
+        "metric": {
+          "type": "string",
+          "enum": [
+            "enemy_round_wins"
+          ]
+        },
+        "operator": {
+          "type": "string",
+          "enum": [
+            "gt",
+            "gte",
+            "lt",
+            "lte",
+            "eq"
+          ]
+        },
+        "value": {
+          "type": "number"
+        }
+      },
+      "additionalProperties": false
     },
     "ItemCondition": {
       "type": "object",
@@ -505,14 +548,17 @@
         "enemies",
         "outcomes"
       ],
-      "properties": {
-        "kind": {
-          "const": "combat"
-        },
-        "mode": {
-          "type": "string",
-          "enum": [
-            "single",
+        "properties": {
+          "kind": {
+            "const": "combat"
+          },
+          "style": {
+            "type": "string"
+          },
+          "mode": {
+            "type": "string",
+            "enum": [
+              "single",
             "sequential",
             "simultaneous",
             "split-target"
@@ -619,28 +665,58 @@
         }
       }
     },
-    "CombatEncounter": {
-      "type": "object",
-      "required": [
-        "enemy",
-        "skill",
-        "stamina"
-      ],
-      "properties": {
-        "enemy": {
-          "type": "string",
-          "description": "Creature name"
+      "CombatEncounter": {
+        "type": "object",
+        "required": [
+          "enemy"
+        ],
+        "properties": {
+          "enemy": {
+            "type": "string",
+            "description": "Creature name"
+          },
+          "skill": {
+            "type": "number",
+            "description": "Combat Skill value"
+          },
+          "stamina": {
+            "type": "number",
+            "description": "Stamina (hit points)"
+          },
+          "armour": {
+            "type": "number",
+            "description": "Armour (robot/vehicle durability)"
+          },
+          "firepower": {
+            "type": "number",
+            "description": "Firepower (vehicle attack)"
+          },
+          "speed": {
+            "type": "string",
+            "description": "Speed category (e.g., Slow, Medium, Fast)"
+          }
         },
-        "skill": {
-          "type": "number",
-          "description": "Combat Skill value"
-        },
-        "stamina": {
-          "type": "number",
-          "description": "Stamina (hit points)"
-        }
-      }
-    },
+        "anyOf": [
+          {
+            "required": [
+              "skill",
+              "stamina"
+            ]
+          },
+          {
+            "required": [
+              "skill",
+              "armour"
+            ]
+          },
+          {
+            "required": [
+              "firepower",
+              "armour"
+            ]
+          }
+        ]
+      },
     "CombatRule": {
       "type": "object",
       "required": [
@@ -677,7 +753,8 @@
             "enemy_round_win",
             "no_enemy_round_wins",
             "enemy_attack_strength_total",
-            "player_round_win"
+            "player_round_win",
+            "survive_rounds"
           ]
         },
         "value": {
@@ -810,23 +887,87 @@
         }
       }
     },
-    "StateCheckEvent": {
-      "type": "object",
-      "required": [
-        "kind"
-      ],
-      "properties": {
-        "kind": {
-          "const": "state_check"
-        },
-        "conditionText": {
-          "type": "string"
-        },
-        "has": {
-          "$ref": "#/definitions/OutcomeRef"
+      "StateCheckEvent": {
+        "type": "object",
+        "required": [
+          "kind"
+        ],
+        "properties": {
+          "kind": {
+            "const": "state_check"
+          },
+          "conditionText": {
+            "type": "string"
+          },
+          "key": {
+            "type": "string"
+          },
+          "templateTarget": {
+            "type": "string"
+          },
+          "templateOp": {
+            "type": "string"
+          },
+          "templateValue": {
+            "type": "string"
+          },
+          "choiceText": {
+            "type": "string"
+          },
+          "has": {
+            "$ref": "#/definitions/OutcomeRef"
         },
         "missing": {
           "$ref": "#/definitions/OutcomeRef"
+        }
+      }
+    },
+    "StateSetEvent": {
+      "type": "object",
+      "required": [
+        "kind",
+        "key",
+        "value"
+      ],
+      "properties": {
+        "kind": {
+          "const": "state_set"
+        },
+        "key": {
+          "type": "string"
+        },
+        "value": {
+          "type": "string"
+        },
+        "sourceText": {
+          "type": "string"
+        }
+      }
+    },
+    "InventoryStateEvent": {
+      "type": "object",
+      "required": [
+        "kind",
+        "action",
+        "scope"
+      ],
+      "properties": {
+        "kind": {
+          "const": "inventory_state"
+        },
+        "action": {
+          "type": "string",
+          "enum": [
+            "lose_all",
+            "restore_all"
+          ]
+        },
+        "scope": {
+          "type": "string",
+          "enum": [
+            "possessions",
+            "inventory"
+          ]
         }
       }
     }

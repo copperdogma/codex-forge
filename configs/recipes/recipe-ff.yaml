@@ -66,12 +66,29 @@ stages:
         - When options are presented in columns or rows, preserve the grid as a <table>.
         - Preserve row/column separation for repeated option lists and references.
 
-  - id: html_blocks_raw
+  - id: detect_duplicate_pages
     stage: adapter
-    module: html_to_blocks_v1
+    module: detect_duplicate_pages_v1
     needs: [table_rescue]
     inputs:
       pages: table_rescue
+    out: pages_html_deduped.jsonl
+    params:
+      similarity_threshold: 0.95
+      min_tokens: 80
+      max_lookback: 3
+      max_page_gap: 3
+      header_overlap_threshold: 0.88
+      require_header_overlap: true
+      allow_frontmatter_dedupe: false
+      frontmatter_max_page: 30
+
+  - id: html_blocks_raw
+    stage: adapter
+    module: html_to_blocks_v1
+    needs: [detect_duplicate_pages]
+    inputs:
+      pages: detect_duplicate_pages
     out: page_blocks.jsonl
 
   - id: coarse_segment_html
@@ -85,9 +102,9 @@ stages:
   - id: html_repair_loop
     stage: portionize
     module: detect_boundaries_html_loop_v1
-    needs: [table_rescue, coarse_segment_html]
+    needs: [detect_duplicate_pages, coarse_segment_html]
     inputs:
-      pages: table_rescue
+      pages: detect_duplicate_pages
       coarse_segments: coarse_segment_html
     out: pages_html_repaired.jsonl
     params:
@@ -125,6 +142,27 @@ stages:
     params:
       drop_raw_text: true
 
+  - id: detect_section_range
+    stage: transform
+    module: detect_section_range_v1
+    needs: [portionize_html, detect_duplicate_pages]
+    inputs:
+      portions: portionize_html
+      pages: detect_duplicate_pages
+    out: section_range.json
+
+  - id: extract_combat_styles_frontmatter
+    stage: transform
+    module: extract_combat_styles_frontmatter_v1
+    needs: [portionize_html, detect_duplicate_pages]
+    inputs:
+      pages: detect_duplicate_pages
+      portions: portionize_html
+    out: combat_styles.json
+    params:
+      model: gpt-5.1
+      max_pages: 40
+
   - id: extract_combat
     stage: enrich
     module: extract_combat_v1
@@ -138,12 +176,21 @@ stages:
       use_ai: true
       max_ai_calls: 50
 
+  - id: assign_combat_styles
+    stage: transform
+    module: assign_combat_styles_v1
+    needs: [extract_combat, extract_combat_styles_frontmatter]
+    inputs:
+      input: extract_combat
+      styles: extract_combat_styles_frontmatter
+    out: portions_with_combat_styles.jsonl
+
   - id: extract_inventory
     stage: enrich
     module: extract_inventory_v1
-    needs: [extract_combat, html_blocks_repaired]
+    needs: [assign_combat_styles, html_blocks_repaired]
     inputs:
-      portions: extract_combat
+      portions: assign_combat_styles
       pages: html_blocks_repaired
     out: portions_with_inventory.jsonl
     params:
@@ -229,21 +276,113 @@ stages:
       alignment_report: validate_choice_text_alignment
       orphan_trace_report: trace_orphans_text
 
-  - id: validate_reachability
-    stage: validate
-    module: validate_holistic_reachability_v1
+  - id: orphan_reocr_candidates
+    stage: adapter
+    module: orphan_reocr_candidates_v1
     needs: [validate_choice_links]
     inputs:
       portions: validate_choice_links
+    out: portions_orphan_reocr_candidates.jsonl
+    params:
+      min_inbound: 2
+      max_candidates: 80
+
+  - id: repair_portions_orphan
+    stage: clean
+    module: repair_portions_v1
+    needs: [orphan_reocr_candidates]
+    inputs:
+      portions: orphan_reocr_candidates
+    out: portions_orphan_repaired.jsonl
+    params:
+      model: gpt-5.1
+      max_repairs: 40
+      max_images: 2
+      require_hints: true
+      strict_orphan_targets: true
+      strict_orphan_model: gpt-5.2
+
+  - id: extract_choices_repaired
+    stage: extract
+    module: extract_choices_relaxed_v1
+    needs: [repair_portions_orphan]
+    inputs:
+      pages: repair_portions_orphan
+    out: portions_with_choices.jsonl
+
+  - id: repair_choices_repaired
+    stage: enrich
+    module: choices_repair_relaxed_v1
+    needs: [extract_choices_repaired]
+    inputs:
+      pages: html_blocks_repaired
+      inputs: extract_choices_repaired
+    out: portions_with_choices_repaired_llm.jsonl
+    params:
+      model: gpt-5.1
+      max_sources: 50
+      max_calls: 50
+
+  - id: validate_choice_text_alignment_repaired
+    stage: validate
+    module: validate_choice_text_alignment_v1
+    needs: [repair_choices_repaired]
+    inputs:
+      portions: repair_choices_repaired
+    out: choice_text_alignment_report_repaired.json
+
+  - id: trace_orphans_text_repaired
+    stage: validate
+    module: trace_orphans_text_v1
+    needs: [repair_choices_repaired]
+    inputs:
+      portions: repair_choices_repaired
+    out: orphan_trace_report_repaired.json
+
+  - id: validate_choice_links_repaired
+    stage: enrich
+    module: validate_choice_links_v1
+    needs: [repair_choices_repaired, validate_choice_text_alignment_repaired, trace_orphans_text_repaired]
+    inputs:
+      pages: html_blocks_repaired
+      input: repair_choices_repaired
+    out: portions_with_choices_validated_repaired.jsonl
+    params:
+      model: gpt-4.1-mini
+      max_ai_calls: 50
+      check_multi_links: true
+      alignment_report: validate_choice_text_alignment_repaired
+      orphan_trace_report: trace_orphans_text_repaired
+
+  - id: extract_state_refs
+    stage: enrich
+    module: extract_state_refs_v1
+    needs: [validate_choice_links_repaired]
+    inputs:
+      pages: html_blocks_repaired
+      portions: validate_choice_links_repaired
+    out: portions_with_state_refs.jsonl
+    params:
+      map_ref_escalate: true
+      map_ref_escalation_model: gpt-5.2
+      map_ref_max_images: 2
+
+  - id: validate_reachability
+    stage: validate
+    module: validate_holistic_reachability_v1
+    needs: [extract_state_refs]
+    inputs:
+      portions: extract_state_refs
+      section_count: detect_section_range
     out: reachability_report.json
 
   - id: detect_endings
     stage: enrich
     module: ending_guard_v1
-    needs: [validate_choice_links]
+    needs: [extract_state_refs]
     inputs:
       pages: html_blocks_repaired
-      inputs: validate_choice_links
+      inputs: extract_state_refs
     out: portions_with_endings.jsonl
     params:
       model: gpt-5.1
@@ -272,6 +411,8 @@ stages:
     inputs:
       portions: order_sequence
       issues_report: report_pipeline_issues
+      combat_styles: extract_combat_styles_frontmatter
+      section_count: detect_section_range
     out: gamebook_raw.json
     params:
       title: Deathtrap Dungeon

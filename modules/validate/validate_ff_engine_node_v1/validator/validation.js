@@ -53,6 +53,7 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.validateGamebook = validateGamebook;
 exports.validateGamebookJSON = validateGamebookJSON;
+exports.evaluateCondition = evaluateCondition;
 const ajv_1 = __importDefault(require("ajv"));
 const fs = __importStar(require("fs"));
 const path = __importStar(require("path"));
@@ -121,6 +122,70 @@ function stripHtmlToText(html) {
         .replace(/<[^>]+>/g, ' ')
         .replace(/\s+/g, ' ')
         .trim();
+}
+
+/**
+ * Runtime helper: evaluate a ConditionalEvent condition against a runtime context.
+ * This is intentionally lightweight and conservative (unknown conditions => false).
+ *
+ * Supported conditions:
+ * - { kind: 'item', itemName, operator?: 'has'|'missing' }
+ * - { kind: 'combat_metric', metric: 'enemy_round_wins', operator: 'gt'|'gte'|'lt'|'lte'|'eq', value: number }
+ */
+function evaluateCondition(condition, context) {
+    if (!condition || typeof condition !== 'object') {
+        return false;
+    }
+    const kind = String(condition.kind || '').toLowerCase();
+    if (kind === 'item') {
+        const itemName = String(condition.itemName || '').trim();
+        if (!itemName) {
+            return false;
+        }
+        const op = String(condition.operator || 'has').toLowerCase();
+        const items = context?.items;
+        const needle = itemName.toLowerCase();
+        let has = false;
+        if (Array.isArray(items)) {
+            has = items.some((x) => String(x || '').toLowerCase() === needle);
+        }
+        else if (items && typeof items.has === 'function') {
+            // Set<string>
+            has = items.has(itemName) || items.has(needle);
+        }
+        if (op === 'missing') {
+            return !has;
+        }
+        return has;
+    }
+    if (kind === 'combat_metric') {
+        const metric = String(condition.metric || '').trim();
+        const op = String(condition.operator || '').toLowerCase();
+        const value = Number(condition.value);
+        if (!metric || !Number.isFinite(value)) {
+            return false;
+        }
+        const metrics = context?.combatMetrics || {};
+        const observed = Number(metrics[metric]);
+        if (!Number.isFinite(observed)) {
+            return false;
+        }
+        switch (op) {
+            case 'gt':
+                return observed > value;
+            case 'gte':
+                return observed >= value;
+            case 'lt':
+                return observed < value;
+            case 'lte':
+                return observed <= value;
+            case 'eq':
+                return observed === value;
+            default:
+                return false;
+        }
+    }
+    return false;
 }
 function parseExpectedRange(gamebook) {
     const metaCount = gamebook?.metadata?.sectionCount;

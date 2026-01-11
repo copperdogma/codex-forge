@@ -1,0 +1,57 @@
+module_id: extract_combat_styles_frontmatter_v1
+stage: transform
+entrypoint: modules/transform/extract_combat_styles_frontmatter_v1/main.py
+name: Extract Combat Styles From Frontmatter
+description: |
+  Extracts combat style definitions from frontmatter text (pages before section 1).
+  Produces combat_styles.json for downstream style assignment and engine metadata.
+category: transform
+schema_version: null
+
+inputs:
+  - name: pages
+    type: file
+    description: OCR pages HTML JSONL
+    required: true
+  - name: portions
+    type: file
+    description: Portions JSONL (unused, kept for pipeline consistency)
+    required: true
+
+outputs:
+  - name: combat_styles
+    type: file
+    description: Combat styles JSON
+    path: combat_styles.json
+
+parameters:
+  - name: model
+    type: string
+    default: gpt-5.1
+    description: Model to use for frontmatter parsing
+  - name: styles
+    type: string
+    default: ""
+    description: Comma-separated style ids to emit (static)
+  - name: styles_file
+    type: string
+    default: ""
+    description: Static combat styles JSON file (if set, skips AI)
+  - name: use_ai
+    type: bool
+    default: true
+    description: Use LLM to parse combat styles
+  - name: max_pages
+    type: int
+    default: 40
+    description: Maximum number of frontmatter pages to scan
+
+command: |
+  python modules/transform/extract_combat_styles_frontmatter_v1/main.py \
+    --pages {pages} \
+    --portions {portions} \
+    --out {output_dir}/combat_styles.json \
+    --model {model} \
+    --styles {styles} \
+    --styles-file {styles_file} \
+    --max-pages {max_pages}

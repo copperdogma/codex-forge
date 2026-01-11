@@ -1,4 +1,5 @@
 from modules.enrich.extract_combat_v1.main import extract_combat_regex
+from modules.enrich.extract_combat_v1.main import _is_combat_continuation
 from modules.enrich.extract_combat_v1.main import _normalize_rules
 from modules.enrich.extract_combat_v1.main import _merge_fallback_outcomes
 from modules.enrich.extract_combat_v1.main import _merge_sequential_combats
@@ -63,6 +64,59 @@ def test_combat_win_continues_in_section():
     combats = extract_combat_regex(text)
     assert len(combats) == 1
     assert combats[0].outcomes["win"] == {"terminal": {"kind": "continue"}}
+
+
+def test_combat_survive_rounds_turn_to():
+    text = (
+        "BANDIT SKILL 7 STAMINA 8. "
+        "If you survive four Attack Rounds, turn to 334."
+    )
+    combats = extract_combat_regex(text)
+    assert len(combats) == 1
+    assert combats[0].triggers == [{
+        "kind": "survive_rounds",
+        "count": 4,
+        "outcome": {"targetSection": "334"},
+    }]
+
+
+def test_combat_survive_rounds_vehicle_combat_turn_to():
+    text = (
+        "RAIDER SKILL 7 STAMINA 8. "
+        "If you survive three Attack Rounds of Vehicle Combat, turn to 67."
+    )
+    combats = extract_combat_regex(text)
+    assert len(combats) == 1
+    assert combats[0].triggers == [{
+        "kind": "survive_rounds",
+        "count": 3,
+        "outcome": {"targetSection": "67"},
+    }]
+
+
+def test_combat_shooting_style_inference():
+    text = "OUTLAW SKILL 6 STAMINA 7. During this Shooting Combat, roll two dice."
+    combats = extract_combat_regex(text)
+    assert len(combats) == 1
+    assert combats[0].style == "shooting"
+
+
+def test_combat_firepower_penalty_modifier():
+    text = "DRONE FIREPOWER 8 ARMOUR 10. Reduce your FIREPOWER by 2 during this combat."
+    combats = extract_combat_regex(text)
+    assert len(combats) == 1
+    assert combats[0].modifiers == [{
+        "kind": "stat_change",
+        "stat": "firepower",
+        "amount": -2,
+        "scope": "combat",
+        "reason": "combat penalty",
+    }]
+
+
+def test_combat_continuation_detected():
+    text = "During this Shooting Combat, both enemies attack. If you win, turn to 97."
+    assert _is_combat_continuation(text) is True
 
 
 def test_combat_special_loss_condition_attack_strength():

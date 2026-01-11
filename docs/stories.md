@@ -133,6 +133,7 @@ This index tracks stories in `/docs/stories/` for the codex-forge pipeline.
 |||| 114 | Decouple Execution Context from Recipes | High | Done | /docs/stories/story-114-decouple-recipes.md |
 |||| 115 | Configuration Cleanup and Standardization | High | Done | /docs/stories/story-115-config-cleanup.md |
 |||| 116 | Fighting Fantasy Split Pages Quality Issues | High | Done | /docs/stories/story-116-ff-split-pages-quality-issues.md |
+|| 117 | FF Robot Commando + Freeway Fighter Pipeline Bring-Up | High | Done | /docs/stories/story-117-ff-robot-commando-freeway-fighter-pipeline.md |
 
 ## Notes
 - Status "Done" reflects current working state in codex-forge. "To Do" items are planned next steps aligned with `docs/requirements.md` and `snapshot.md`.

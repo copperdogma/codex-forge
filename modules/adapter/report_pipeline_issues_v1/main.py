@@ -24,8 +24,37 @@ def _run_dir_from_out(out_path: str) -> str:
     return str(Path(out_path).resolve().parents[1])
 
 
+def _latest_module_file(run_dir: str, module_suffix: str, filename: str) -> Optional[str]:
+    candidates: List[str] = []
+    for root, dirs, files in os.walk(run_dir):
+        if not os.path.basename(root).endswith(module_suffix):
+            continue
+        if filename in files:
+            candidates.append(os.path.join(root, filename))
+    if not candidates:
+        return None
+
+    def _ordinal_key(path: str) -> int:
+        parent = os.path.basename(os.path.dirname(path))
+        try:
+            return int(parent.split("_", 1)[0])
+        except Exception:
+            return -1
+
+    candidates.sort(key=_ordinal_key, reverse=True)
+    return candidates[0]
+
+
 def _collect_missing_bundles(run_dir: str) -> List[Dict]:
     issues = []
+    missing_sections_path = _latest_module_file(run_dir, "detect_boundaries_html_loop_v1", "missing_sections.json")
+    if missing_sections_path:
+        try:
+            content = Path(missing_sections_path).read_text(encoding="utf-8").strip()
+        except Exception:
+            content = ""
+        if not content:
+            return issues
     for root, dirs, files in os.walk(run_dir):
         if os.path.basename(root) != "missing_bundles":
             continue
@@ -47,55 +76,68 @@ def _collect_missing_bundles(run_dir: str) -> List[Dict]:
     return issues
 
 
+def _load_section_range_max(run_dir: str) -> Optional[int]:
+    path = _latest_module_file(run_dir, "detect_section_range_v1", "section_range.json")
+    if not path:
+        return None
+    try:
+        data = json.loads(Path(path).read_text(encoding="utf-8"))
+    except Exception:
+        return None
+    max_section = data.get("max_section") if isinstance(data, dict) else None
+    try:
+        return int(max_section)
+    except Exception:
+        return None
+
+
 def _collect_ordering_conflicts(run_dir: str) -> List[Dict]:
     issues: List[Dict] = []
-    for root, dirs, files in os.walk(run_dir):
-        for name in files:
-            if name != "ordering_conflicts.json":
-                continue
-            path = os.path.join(root, name)
-            try:
-                data = json.loads(Path(path).read_text(encoding="utf-8"))
-            except Exception:
-                data = None
-            conflicts = data.get("ordering_conflicts") if isinstance(data, dict) else None
-            if not isinstance(conflicts, list):
-                continue
-            for conflict in conflicts:
-                issues.append({
-                    "type": "boundary_ordering_conflict",
-                    "severity": "error",
-                    "section_id": str(conflict.get("section_id")) if conflict.get("section_id") is not None else None,
-                    "note": "Section ordering conflict detected; boundary spans may be inverted.",
-                    "details": conflict,
-                    "evidence_path": path,
-                })
+    path = _latest_module_file(run_dir, "detect_boundaries_html_loop_v1", "ordering_conflicts.json")
+    if not path:
+        return issues
+    try:
+        data = json.loads(Path(path).read_text(encoding="utf-8"))
+    except Exception:
+        data = None
+    conflicts = data.get("ordering_conflicts") if isinstance(data, dict) else None
+    if not isinstance(conflicts, list):
+        return issues
+    for conflict in conflicts:
+        issues.append({
+            "type": "boundary_ordering_conflict",
+            "severity": "error",
+            "section_id": str(conflict.get("section_id")) if conflict.get("section_id") is not None else None,
+            "note": "Section ordering conflict detected; boundary spans may be inverted.",
+            "details": conflict,
+            "evidence_path": path,
+        })
     return issues
 
 
 def _collect_duplicate_headers(run_dir: str) -> List[Dict]:
     issues: List[Dict] = []
-    for root, dirs, files in os.walk(run_dir):
-        for name in files:
-            if name != "duplicate_headers.json":
-                continue
-            path = os.path.join(root, name)
-            try:
-                data = json.loads(Path(path).read_text(encoding="utf-8"))
-            except Exception:
-                data = None
-            duplicates = data.get("duplicate_headers") if isinstance(data, dict) else None
-            if not isinstance(duplicates, list):
-                continue
-            for dup in duplicates:
-                issues.append({
-                    "type": "boundary_duplicate_header",
-                    "severity": "error",
-                    "section_id": str(dup.get("section_id")) if dup.get("section_id") is not None else None,
-                    "note": "Multiple candidate headers detected for same section id; dedupe may be wrong.",
-                    "details": dup,
-                    "evidence_path": path,
-                })
+    path = _latest_module_file(run_dir, "detect_boundaries_html_v1", "duplicate_headers.json")
+    if not path:
+        return issues
+    try:
+        data = json.loads(Path(path).read_text(encoding="utf-8"))
+    except Exception:
+        data = None
+    duplicates = data.get("duplicate_headers") if isinstance(data, dict) else None
+    if not isinstance(duplicates, list):
+        return issues
+    for dup in duplicates:
+        if dup.get("likely_duplicate_scan") is True:
+            continue
+        issues.append({
+            "type": "boundary_duplicate_header",
+            "severity": "error",
+            "section_id": str(dup.get("section_id")) if dup.get("section_id") is not None else None,
+            "note": "Multiple candidate headers detected for same section id; dedupe may be wrong.",
+            "details": dup,
+            "evidence_path": path,
+        })
     return issues
 
 
@@ -117,10 +159,33 @@ def _select_choice_stats_files(run_dir: str) -> List[str]:
     return relaxed or stats_files
 
 
+def _reachability_reports(run_dir: str) -> List[str]:
+    reports: List[str] = []
+    for root, dirs, files in os.walk(run_dir):
+        if not root.endswith("validate_holistic_reachability_v1"):
+            continue
+        if "reachability_report.json" not in files:
+            continue
+        reports.append(os.path.join(root, "reachability_report.json"))
+    if not reports:
+        return []
+
+    def _ordinal_key(path: str) -> int:
+        parent = os.path.basename(os.path.dirname(path))
+        try:
+            return int(parent.split("_", 1)[0])
+        except Exception:
+            return -1
+
+    reports.sort(key=_ordinal_key, reverse=True)
+    return reports
+
+
 def _load_reachability_orphans(run_dir: str) -> Optional[List[str]]:
-    report_path = os.path.join(run_dir, "18_validate_holistic_reachability_v1", "reachability_report.json")
-    if not os.path.exists(report_path):
+    reports = _reachability_reports(run_dir)
+    if not reports:
         return None
+    report_path = reports[0]
     try:
         data = json.loads(Path(report_path).read_text(encoding="utf-8"))
     except Exception:
@@ -203,6 +268,23 @@ def main() -> None:
     issues.extend(_collect_ordering_conflicts(run_dir))
     issues.extend(_collect_duplicate_headers(run_dir))
     issues.extend(_collect_choice_orphans(run_dir))
+
+    max_section = _load_section_range_max(run_dir)
+    if max_section is not None:
+        filtered: List[Dict] = []
+        for issue in issues:
+            if issue.get("type") != "missing_section":
+                filtered.append(issue)
+                continue
+            sec = issue.get("section_id")
+            try:
+                sec_int = int(str(sec))
+            except Exception:
+                filtered.append(issue)
+                continue
+            if sec_int <= max_section:
+                filtered.append(issue)
+        issues = filtered
 
     summary = {
         "issue_count": len(issues),

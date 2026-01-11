@@ -176,6 +176,14 @@ def extract_stat_modifications_regex(text: str) -> List[StatModification]:
         end = min(end_candidates) if end_candidates else len(text)
         return text[start + 1:end]
 
+    def _is_conditional(sentence: str) -> bool:
+        """
+        Stat mods that are conditional ("if you are shot... reduce SKILL") cannot be represented
+        as unconditional events. Prefer dropping them rather than emitting incorrect unconditional changes.
+        """
+        lower = (sentence or "").strip().lower()
+        return lower.startswith("if ") or " if " in lower or " unless " in lower
+
 
     roll_each_pattern = re.compile(
         r"roll\s+(one|two|three|four|five|six|\d+)\s+(?:die|dice)"
@@ -297,42 +305,56 @@ def extract_stat_modifications_regex(text: str) -> List[StatModification]:
     for match in REDUCE_PATTERN.finditer(text):
         if _in_dice_span(match.start(), match.end()):
             continue
-        if _is_combat_modifier(_sentence_for(match.start(), match.end())):
+        sentence = _sentence_for(match.start(), match.end())
+        if _is_combat_modifier(sentence):
+            continue
+        if _is_conditional(sentence):
             continue
         stat = normalize_stat(match.group(1))
         amount = _to_int(match.group(2))
         if stat and amount is not None:
-            _append(stat, -amount, _sentence_for(match.start(), match.end()))
+            _append(stat, -amount, sentence)
 
     for match in LOSE_PATTERN.finditer(text):
         if _in_dice_span(match.start(), match.end()):
             continue
-        if _is_combat_modifier(_sentence_for(match.start(), match.end())):
+        sentence = _sentence_for(match.start(), match.end())
+        if _is_combat_modifier(sentence):
+            continue
+        if _is_conditional(sentence):
             continue
         stat = normalize_stat(match.group(2))
         if stat:
-            _append(stat, -int(match.group(1)), _sentence_for(match.start(), match.end()))
+            _append(stat, -int(match.group(1)), sentence)
 
     for match in GAIN_PATTERN.finditer(text):
-        if _is_combat_modifier(_sentence_for(match.start(), match.end())):
+        sentence = _sentence_for(match.start(), match.end())
+        if _is_combat_modifier(sentence):
+            continue
+        if _is_conditional(sentence):
             continue
         stat = normalize_stat(match.group(1))
         amount = _to_int(match.group(2))
         if stat and amount is not None:
-            _append(stat, amount, _sentence_for(match.start(), match.end()))
+            _append(stat, amount, sentence)
 
     for match in GAIN_VAL_PATTERN.finditer(text):
-        if _is_combat_modifier(_sentence_for(match.start(), match.end())):
+        sentence = _sentence_for(match.start(), match.end())
+        if _is_combat_modifier(sentence):
+            continue
+        if _is_conditional(sentence):
             continue
         stat = normalize_stat(match.group(2))
         if stat:
-            _append(stat, int(match.group(1)), _sentence_for(match.start(), match.end()))
+            _append(stat, int(match.group(1)), sentence)
 
     for sentence in re.split(r"[.!?]", text):
         sentence = sentence.strip()
         if not sentence:
             continue
         if _is_combat_modifier(sentence):
+            continue
+        if _is_conditional(sentence):
             continue
         current_sign: Optional[int] = None
         for match in SENTENCE_MOD_PATTERN.finditer(sentence):
@@ -344,14 +366,12 @@ def extract_stat_modifications_regex(text: str) -> List[StatModification]:
                     current_sign = -1
                 else:
                     current_sign = 1
-                sentence = _sentence_for(match.start(), match.end())
                 _append(stat, current_sign * amount, sentence)
             else:
                 amount = int(match.group(4))
                 stat = normalize_stat(match.group(5))
                 if current_sign is None:
                     continue
-                sentence = _sentence_for(match.start(), match.end())
                 _append(stat, current_sign * amount, sentence)
             
     lower_text = text.lower()

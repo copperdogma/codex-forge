@@ -31,7 +31,7 @@ export interface OutcomeRef {
 /**
  * Sequence events define ordered gameplay flow
  */
-export type SequenceEvent = ChoiceEvent | StatChangeEvent | StatCheckEvent | TestLuckEvent | ItemEvent | ItemCheckEvent | StateCheckEvent | ConditionalEvent | CombatEvent | DeathEvent | CustomEvent;
+export type SequenceEvent = ChoiceEvent | StatChangeEvent | StatCheckEvent | TestLuckEvent | ItemEvent | ItemCheckEvent | StateCheckEvent | StateSetEvent | InventoryStateEvent | ConditionalEvent | CombatEvent | DeathEvent | CustomEvent;
 export interface ChoiceEvent {
     kind: 'choice';
     targetSection: SectionId;
@@ -74,15 +74,37 @@ export interface ItemCheckEvent {
 export interface StateCheckEvent {
     kind: 'state_check';
     conditionText?: string;
+    key?: string;
+    templateTarget?: string;
+    templateOp?: string;
+    templateValue?: string;
+    choiceText?: string;
     has?: OutcomeRef;
     missing?: OutcomeRef;
+}
+export interface StateSetEvent {
+    kind: 'state_set';
+    key: string;
+    value: string;
+    sourceText?: string;
+}
+export interface InventoryStateEvent {
+    kind: 'inventory_state';
+    action: 'lose_all' | 'restore_all';
+    scope: 'possessions' | 'inventory';
 }
 export interface ItemCondition {
     kind: 'item';
     itemName: string;
     operator?: 'has' | 'missing';
 }
-export type Condition = ItemCondition;
+export interface CombatMetricCondition {
+    kind: 'combat_metric';
+    metric: 'enemy_round_wins' | string;
+    operator: 'gt' | 'gte' | 'lt' | 'lte' | 'eq';
+    value: number;
+}
+export type Condition = ItemCondition | CombatMetricCondition;
 export interface ConditionalEvent {
     kind: 'conditional';
     condition: Condition;
@@ -91,6 +113,7 @@ export interface ConditionalEvent {
 }
 export interface CombatEvent {
     kind: 'combat';
+    style?: string;
     mode?: 'single' | 'sequential' | 'simultaneous' | 'split-target';
     enemies: CombatEncounter[];
     rules?: CombatRule[];
@@ -118,16 +141,22 @@ export interface CombatEncounter {
     /** Creature name */
     enemy: string;
     /** Combat Skill value */
-    skill: number;
+    skill?: number;
     /** Stamina (hit points) */
-    stamina: number;
+    stamina?: number;
+    /** Armour (robot/vehicle durability) */
+    armour?: number;
+    /** Firepower (vehicle attack) */
+    firepower?: number;
+    /** Speed category (e.g., Slow, Medium, Fast) */
+    speed?: string;
 }
 export interface CombatRule {
     kind: 'fight_singly' | 'both_attack_each_round' | 'choose_target_each_round' | 'secondary_target_no_damage' | 'secondary_enemy_defense_only' | 'note';
     text?: string;
 }
 export interface CombatTrigger {
-    kind: 'enemy_round_win' | 'no_enemy_round_wins' | 'enemy_attack_strength_total' | 'player_round_win';
+    kind: 'enemy_round_win' | 'no_enemy_round_wins' | 'enemy_attack_strength_total' | 'player_round_win' | 'survive_rounds';
     value?: number;
     count?: number;
     outcome: OutcomeRef;

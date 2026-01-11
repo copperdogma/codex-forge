@@ -114,6 +114,50 @@ def _preload_artifacts_from_state(state_path: str) -> Dict[str, Dict[str, str]]:
     return artifacts
 
 
+def _invalidate_downstream_outputs(run_dir: str, plan: Dict[str, Any], start_from: str,
+                                   keep_downstream: bool, state_path: str,
+                                   logger: "ProgressLogger") -> None:
+    if not start_from or keep_downstream:
+        return
+    topo = plan.get("topo") or []
+    if start_from not in topo:
+        return
+    start_idx = topo.index(start_from)
+    if start_idx >= len(topo) - 1:
+        return
+    stage_ordinal_map = {sid: idx + 1 for idx, sid in enumerate(topo)}
+    removed = []
+    for stage_id in topo[start_idx + 1:]:
+        node = plan["nodes"].get(stage_id, {})
+        module_id = node.get("module")
+        if module_id and stage_id in stage_ordinal_map:
+            module_dir = os.path.join(run_dir, f"{stage_ordinal_map[stage_id]:02d}_{module_id}")
+            if os.path.isdir(module_dir):
+                shutil.rmtree(module_dir)
+                removed.append(module_dir)
+        artifact_name = node.get("artifact_name") or _artifact_name_for_stage(stage_id, node.get("stage"), {}, node)
+        if artifact_name in ("gamebook.json", "validation_report.json"):
+            artifact_path = os.path.join(run_dir, artifact_name)
+            if os.path.exists(artifact_path):
+                os.remove(artifact_path)
+                removed.append(artifact_path)
+    if os.path.exists(state_path):
+        try:
+            with open(state_path, "r", encoding="utf-8") as f:
+                state = json.load(f)
+            stages = state.get("stages", {})
+            for stage_id in topo[start_idx + 1:]:
+                stages.pop(stage_id, None)
+            state["stages"] = stages
+            with open(state_path, "w", encoding="utf-8") as f:
+                json.dump(state, f, indent=2)
+        except Exception:
+            pass
+    if removed:
+        logger.log("resume_invalidate", "warning", artifact=None, module_id=None,
+                   message=f"Invalidated downstream outputs after {start_from}: removed {len(removed)} artifacts/dirs")
+
+
 def _calc_cost(model: str, prompt_tokens: int, completion_tokens: int, pricing: Dict[str, Any]) -> float:
     if not pricing:
         return 0.0
@@ -1263,6 +1307,8 @@ def main():
     parser.add_argument("--output-dir", dest="output_dir_override", help="Override output_dir from recipe (useful for smoke runs / temp dirs)")
     parser.add_argument("--input-pdf", dest="input_pdf_override", help="Override input.pdf from recipe (useful for smoke fixtures)")
     parser.add_argument("--start-from", dest="start_from", help="Start executing at this stage id (requires upstream artifacts present in state)")
+    parser.add_argument("--keep-downstream", action="store_true",
+                        help="When resuming with --start-from, keep downstream artifacts instead of invalidating them (not recommended)")
     parser.add_argument("--end-at", dest="end_at", help="Stop after executing this stage id (inclusive)")
     args = parser.parse_args()
 
@@ -1418,7 +1464,6 @@ def main():
             sys.exit(1)
         elif args.force:
             # Delete and recreate directory
-            import shutil
             norm_run_dir = os.path.normpath(run_dir)
             norm_root = os.path.normpath(os.path.join("output", "runs"))
             if norm_run_dir == norm_root:
@@ -1440,6 +1485,8 @@ def main():
     state_path = os.path.join(run_dir, "pipeline_state.json")
     progress_path = os.path.join(run_dir, "pipeline_events.jsonl")
     logger = ProgressLogger(state_path=state_path, progress_path=progress_path, run_id=run_id)
+
+    _invalidate_downstream_outputs(run_dir, plan, args.start_from, args.keep_downstream, state_path, logger)
 
     settings_path = args.settings or recipe.get("settings") or recipe.get("settings_path")
     snapshots = snapshot_run_config(

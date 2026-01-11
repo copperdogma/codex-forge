@@ -44,7 +44,7 @@ Critical rules:
 - If the schema cannot represent the fix (e.g., stat-based survival gates), return no patches.
 
 Allowed sequence event kinds: choice, stat_change, stat_check, test_luck, item, item_check, state_check,
-conditional (item-only condition), combat, death, custom.
+state_set, inventory_state, conditional (item-only condition), combat, death, custom.
 
 Schema constraints:
 - Events MUST use "kind" (not "type").

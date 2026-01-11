@@ -158,6 +158,20 @@ def _extract_test_luck_positions(raw_html: str) -> List[int]:
     return [m.start() for m in re.finditer(r"\btest\s+your\s+luck\b", lower)]
 
 
+def _extract_possessions_positions(raw_html: str) -> List[int]:
+    if not raw_html:
+        return []
+    lower = raw_html.lower()
+    return [m.start() for m in re.finditer(r"\bpossessions\b", lower)]
+
+
+def _extract_state_positions(raw_html: str) -> List[int]:
+    if not raw_html:
+        return []
+    lower = raw_html.lower()
+    return [m.start() for m in re.finditer(r"\bmap reference\b", lower)]
+
+
 def _extract_conditional_item_stat_events(raw_html: str, sequence: List[Dict[str, Any]]) -> Tuple[List[Tuple[int, Dict[str, Any]]], set, set]:
     if not raw_html or not sequence:
         return [], set(), set()
@@ -288,6 +302,8 @@ def _reorder_stat_and_choice_by_html(sequence: List[Dict[str, Any]], raw_html: s
     item_positions = _extract_item_positions(raw_html, sequence)
     luck_positions = _extract_test_luck_positions(raw_html)
     combat_positions = _extract_combat_positions(raw_html, sequence)
+    possessions_positions = _extract_possessions_positions(raw_html)
+    state_positions = _extract_state_positions(raw_html)
 
     indices: List[int] = []
     decorated: List[Tuple[int, Dict[str, Any]]] = []
@@ -314,6 +330,12 @@ def _reorder_stat_and_choice_by_html(sequence: List[Dict[str, Any]], raw_html: s
         elif kind == "test_luck" and luck_positions:
             indices.append(idx)
             decorated.append((luck_positions.pop(0), event))
+        elif kind == "inventory_state" and possessions_positions:
+            indices.append(idx)
+            decorated.append((possessions_positions.pop(0), event))
+        elif kind == "state_set" and state_positions:
+            indices.append(idx)
+            decorated.append((state_positions.pop(0), event))
         elif kind in {"item", "item_check", "state_check"} and idx in item_positions:
             indices.append(idx)
             decorated.append((item_positions[idx], event))
@@ -369,7 +391,10 @@ def _normalize_outcome_ref(outcome: Optional[Dict[str, Any]]) -> Optional[Dict[s
     if not isinstance(outcome, dict):
         return None
     if outcome.get("terminal"):
-        return {"terminal": outcome.get("terminal")}
+        terminal = outcome.get("terminal") or {}
+        if isinstance(terminal, dict) and terminal.get("kind") == "impossible":
+            return None
+        return {"terminal": terminal}
     target_raw = outcome.get("targetSection")
     if isinstance(target_raw, str) and not re.search(r"\d", target_raw):
         if not re.search(r"\bcontinue\b", target_raw.lower()):
@@ -386,6 +411,8 @@ def _outcome_ref(target: Optional[str], terminal: Optional[Dict[str, Any]]) -> O
     if target is not None:
         return {"targetSection": str(target)}
     if terminal is not None:
+        if isinstance(terminal, dict) and terminal.get("kind") == "impossible":
+            return None
         return {"terminal": terminal}
     return None
 
@@ -415,6 +442,7 @@ def _should_prepend_mechanics(raw_html: str, mechanics_events: List[Dict[str, An
         "skill",
         "luck",
         "find",
+        "possessions",
     ):
         idx = lower.find(pattern)
         if idx != -1:
@@ -543,13 +571,31 @@ def build_sequence_from_portion(portion: Dict[str, Any], section_id: str) -> Lis
 
     inv = portion.get("inventory")
     if inv and isinstance(inv, dict):
+        for state in inv.get("inventory_states", []):
+            if not isinstance(state, dict):
+                continue
+            action = state.get("action")
+            if action not in {"lose_all", "restore_all"}:
+                continue
+            mechanics_events.append({
+                "kind": "inventory_state",
+                "action": action,
+                "scope": state.get("scope") or "possessions",
+            })
+
         for item in inv.get("items_gained", []):
             if not isinstance(item, dict) or not item.get("item"):
                 continue
+            qty = item.get("quantity", 1)
+            qty_num = None
+            if isinstance(qty, int):
+                qty_num = qty
+            elif isinstance(qty, str) and qty.isdigit():
+                qty_num = int(qty)
             mechanics_events.append({
                 "kind": "item",
                 "action": "add",
-                "name": f"{item.get('quantity', 1)} {item.get('item')}" if item.get("quantity", 1) > 1 else item.get("item"),
+                "name": f"{qty_num} {item.get('item')}" if qty_num and qty_num > 1 else item.get("item"),
             })
         for item in inv.get("items_lost", []):
             if not isinstance(item, dict) or not item.get("item"):
@@ -604,6 +650,49 @@ def build_sequence_from_portion(portion: Dict[str, Any], section_id: str) -> Lis
                 check_map[key]["has"] = outcome
         for key in check_order:
             mechanics_events.append(check_map[key])
+
+    for state in portion.get("state_values") or []:
+        if not isinstance(state, dict):
+            continue
+        key = state.get("key")
+        value = state.get("value")
+        if not key or value is None:
+            continue
+        event: Dict[str, Any] = {
+            "kind": "state_set",
+            "key": key,
+            "value": str(value),
+        }
+        if state.get("source_text"):
+            event["sourceText"] = state.get("source_text")
+        mechanics_events.append(event)
+
+    for check in portion.get("state_checks") or []:
+        if not isinstance(check, dict):
+            continue
+        event: Dict[str, Any] = {"kind": "state_check"}
+        if check.get("condition_text"):
+            event["conditionText"] = check.get("condition_text")
+        if check.get("key"):
+            event["key"] = check.get("key")
+        if check.get("template_target"):
+            event["templateTarget"] = check.get("template_target")
+        if check.get("template_op"):
+            event["templateOp"] = check.get("template_op")
+        if check.get("template_value"):
+            event["templateValue"] = check.get("template_value")
+        if check.get("choice_text"):
+            event["choiceText"] = check.get("choice_text")
+        has_target, has_terminal = _normalize_target(check.get("has_target"))
+        missing_target, missing_terminal = _normalize_target(check.get("missing_target"))
+        has_ref = _outcome_ref(has_target, has_terminal)
+        missing_ref = _outcome_ref(missing_target, missing_terminal)
+        if has_ref:
+            event["has"] = has_ref
+        if missing_ref:
+            event["missing"] = missing_ref
+        if event.keys() != {"kind"}:
+            mechanics_events.append(event)
 
     for item in portion.get("items") or []:
         if not isinstance(item, dict):
@@ -667,7 +756,18 @@ def build_sequence_from_portion(portion: Dict[str, Any], section_id: str) -> Lis
         enemies = c.get("enemies") or []
         if not isinstance(enemies, list) or not enemies:
             continue
-        combat_event: Dict[str, Any] = {"kind": "combat", "enemies": enemies}
+        cleaned_enemies = []
+        for enemy in enemies:
+            if not isinstance(enemy, dict):
+                continue
+            cleaned = {k: v for k, v in enemy.items() if v is not None}
+            if cleaned:
+                cleaned_enemies.append(cleaned)
+        if not cleaned_enemies:
+            continue
+        combat_event: Dict[str, Any] = {"kind": "combat", "enemies": cleaned_enemies}
+        if c.get("style"):
+            combat_event["style"] = c.get("style")
         for field in ("mode", "rules", "modifiers", "triggers"):
             value = c.get(field)
             if not value:
@@ -743,6 +843,66 @@ def build_sequence_from_portion(portion: Dict[str, Any], section_id: str) -> Lis
     return _reorder_stat_and_choice_by_html(ordered, portion.get("raw_html", ""))
 
 
+_SHOT_MORE_THAN_ONCE_PATTERN = re.compile(
+    r"\bif\s+you\s+are\s+shot\s+more\s+than\s+once\b",
+    re.IGNORECASE,
+)
+
+
+def _has_shot_more_than_once_clause(raw_html: str) -> bool:
+    if not raw_html:
+        return False
+    text = re.sub(r"<[^>]+>", " ", raw_html)
+    text = re.sub(r"\s+", " ", text).strip()
+    return bool(_SHOT_MORE_THAN_ONCE_PATTERN.search(text))
+
+
+def _inject_post_combat_shot_penalty(prev_row: Dict[str, Any], *, reason_html: str) -> bool:
+    """
+    Some books express a combat-specific conditional penalty in the *next* section,
+    e.g. "reduce your SKILL permanently by 1 point if you are shot more than once in the battle."
+    We attach this as a ConditionalEvent to the section that contains the combat event so the engine
+    can evaluate it after combat resolution.
+    """
+    seq = prev_row.get("sequence")
+    if not isinstance(seq, list) or not seq:
+        return False
+    combat_idx = None
+    combat = None
+    for idx, ev in enumerate(seq):
+        if isinstance(ev, dict) and ev.get("kind") == "combat":
+            combat_idx = idx
+            combat = ev
+            break
+    if combat_idx is None or not isinstance(combat, dict):
+        return False
+    # Only apply to shooting combats; otherwise risk false positives.
+    if str(combat.get("style") or "").lower() != "shooting":
+        return False
+    conditional = {
+        "kind": "conditional",
+        "condition": {
+            "kind": "combat_metric",
+            "metric": "enemy_round_wins",
+            "operator": "gte",
+            "value": 2,
+        },
+        "then": [
+            {
+                "kind": "stat_change",
+                "stat": "skill",
+                "amount": -1,
+                "scope": "permanent",
+                "reason": "shot more than once in battle",
+            }
+        ],
+    }
+    # Insert immediately after the combat event.
+    seq.insert(combat_idx + 1, conditional)
+    prev_row["sequence"] = seq
+    return True
+
+
 def main() -> None:
     parser = argparse.ArgumentParser(description="Order gameplay sequence events for enriched portions.")
     parser.add_argument("--portions", required=True, help="Input portions (jsonl).")
@@ -755,16 +915,30 @@ def main() -> None:
 
     rows = list(read_jsonl(args.portions))
     out_rows: List[Dict[str, Any]] = []
+    prev_row: Optional[Dict[str, Any]] = None
+    prev_sid_int: Optional[int] = None
     for row in rows:
         if not isinstance(row, dict):
             out_rows.append(row)
+            prev_row = None
+            prev_sid_int = None
             continue
         sid = str(row.get("section_id") or row.get("portion_id"))
+        sid_int = int(sid) if sid.isdigit() else None
+
         if row.get("is_gameplay") is False:
             row["sequence"] = []
         else:
             row["sequence"] = build_sequence_from_portion(row, sid)
+
+        # Cross-section conditional combat penalties (N+1 contains clause; N contains combat)
+        if prev_row is not None and prev_sid_int is not None and sid_int is not None:
+            if sid_int == prev_sid_int + 1 and _has_shot_more_than_once_clause(row.get("raw_html", "") or ""):
+                _inject_post_combat_shot_penalty(prev_row, reason_html=row.get("raw_html", "") or "")
+
         out_rows.append(row)
+        prev_row = row
+        prev_sid_int = sid_int
 
     save_jsonl(args.out, out_rows)
     print(f"Wrote ordered sequences -> {args.out}")

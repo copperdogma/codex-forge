@@ -1,0 +1,30 @@
+module_id: detect_section_range_v1
+stage: transform
+entrypoint: modules/transform/detect_section_range_v1/main.py
+name: Detect Section Range
+description: |
+  Detects the numeric section range from portions and emits max/min section info.
+category: transform
+schema_version: null
+
+inputs:
+  - name: portions
+    type: file
+    description: Portions JSONL (enriched_portion_v1)
+    required: true
+  - name: pages
+    type: file
+    description: Optional pages HTML JSONL
+    required: false
+
+outputs:
+  - name: section_range
+    type: file
+    description: Section range JSON
+    path: section_range.json
+
+command: |
+  python modules/transform/detect_section_range_v1/main.py \
+    --portions {portions} \
+    --pages {pages} \
+    --out {output_dir}/section_range.json

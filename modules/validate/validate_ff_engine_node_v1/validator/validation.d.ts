@@ -70,6 +70,23 @@ export interface ValidationResult {
     /** Whether the validator version mismatched gamebook metadata */
     versionMismatch?: boolean;
 }
+
+export interface EvaluationContext {
+    /**
+     * Inventory item names (case-insensitive). If provided, item conditions can be evaluated.
+     */
+    items?: string[] | Set<string>;
+    /**
+     * Combat metrics captured during combat resolution.
+     */
+    combatMetrics?: Record<string, number>;
+}
+
+/**
+ * Evaluate a ConditionalEvent condition against a runtime context.
+ * This is intended for engine/runtime use (not validation).
+ */
+export declare function evaluateCondition(condition: any, context: EvaluationContext): boolean;
 /**
  * Comprehensive gamebook validation
  *

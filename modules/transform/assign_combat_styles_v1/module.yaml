@@ -1,0 +1,31 @@
+module_id: assign_combat_styles_v1
+stage: transform
+entrypoint: modules/transform/assign_combat_styles_v1/main.py
+name: Assign Combat Styles From Frontmatter
+description: |
+  Assigns combat.style on portions using frontmatter-derived style definitions.
+category: transform
+input_schema: enriched_portion_v1
+output_schema: enriched_portion_v1
+
+inputs:
+  - name: input
+    type: file
+    description: Portions with combat extracted
+    required: true
+  - name: styles
+    type: file
+    description: Combat styles JSON from frontmatter extraction
+    required: true
+
+outputs:
+  - name: portions_with_styles
+    type: file
+    description: Portions JSONL with combat styles assigned
+    path: portions_with_combat_styles.jsonl
+
+command: |
+  python modules/transform/assign_combat_styles_v1/main.py \
+    --input {input} \
+    --styles {styles} \
+    --out {output_dir}/portions_with_combat_styles.jsonl

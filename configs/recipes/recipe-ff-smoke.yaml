@@ -41,6 +41,27 @@ stages:
     params:
       emit_raw_text: true
 
+  - id: detect_section_range
+    stage: transform
+    module: detect_section_range_v1
+    needs: [portionize_html]
+    inputs:
+      portions: portionize_html
+      pages: convert_to_blocks
+    out: section_range.json
+
+  - id: extract_combat_styles_frontmatter
+    stage: transform
+    module: extract_combat_styles_frontmatter_v1
+    needs: [portionize_html, convert_to_blocks]
+    inputs:
+      pages: convert_to_blocks
+      portions: portionize_html
+    out: combat_styles.json
+    params:
+      model: gpt-5.1
+      max_pages: 10
+
   - id: extract_combat
     stage: enrich
     module: extract_combat_v1
@@ -54,12 +75,21 @@ stages:
       use_ai: false # skip AI in smoke
       max_ai_calls: 0
 
+  - id: assign_combat_styles
+    stage: transform
+    module: assign_combat_styles_v1
+    needs: [extract_combat, extract_combat_styles_frontmatter]
+    inputs:
+      input: extract_combat
+      styles: extract_combat_styles_frontmatter
+    out: portions_with_combat_styles.jsonl
+
   - id: extract_inventory
     stage: enrich
     module: extract_inventory_v1
-    needs: [extract_combat, convert_to_blocks]
+    needs: [assign_combat_styles, convert_to_blocks]
     inputs:
-      portions: extract_combat
+      portions: assign_combat_styles
       pages: convert_to_blocks
     out: portions_with_inventory.jsonl
     params:
@@ -120,6 +150,7 @@ stages:
     needs: [validate_choice_links]
     inputs:
       portions: validate_choice_links
+      section_count: detect_section_range
     out: reachability_report.json
 
   - id: detect_endings
@@ -147,6 +178,8 @@ stages:
     inputs:
       portions: detect_endings
       issues_report: report_pipeline_issues
+      combat_styles: extract_combat_styles_frontmatter
+      section_count: detect_section_range
     out: gamebook_raw.json
     params:
       title: Smoke Test Book

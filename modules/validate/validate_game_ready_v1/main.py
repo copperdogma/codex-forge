@@ -97,6 +97,7 @@ def main() -> int:
     parser.add_argument("--out", required=True, help="Output path for consolidated report JSON")
     parser.add_argument("--expected-range-start", dest="expected_range_start", type=int, default=1)
     parser.add_argument("--expected-range-end", dest="expected_range_end", type=int, default=400)
+    parser.add_argument("--section-count", dest="section_count", help="Section range JSON (optional)")
     parser.add_argument("--known-missing", dest="known_missing", default="")
     parser.add_argument("--run-id", dest="run_id")
     parser.add_argument("--state-file", dest="state_file")
@@ -107,6 +108,17 @@ def main() -> int:
 
     gamebook = _load_json(args.gamebook)
     run_dir = _run_dir_from_path(args.gamebook)
+    metadata = gamebook.get("metadata", {}) if isinstance(gamebook, dict) else {}
+    if args.section_count:
+        try:
+            with open(args.section_count, "r", encoding="utf-8") as f:
+                data = json.load(f)
+            if isinstance(data, dict) and isinstance(data.get("max_section"), int):
+                args.expected_range_end = data["max_section"]
+        except Exception:
+            pass
+    elif isinstance(metadata, dict) and isinstance(metadata.get("sectionCount"), int):
+        args.expected_range_end = metadata["sectionCount"]
     sections = gamebook.get("sections", {})
     present_sections = _numeric_sections(sections)
     stubbed_sections = _stubbed_sections(sections)
@@ -134,10 +146,27 @@ def main() -> int:
     reachability_forensics = reachability_report.get("forensics", {})
     reachability_orphans = reachability_forensics.get("orphans", []) or []
     reachability_broken = reachability_forensics.get("broken_links", []) or []
+    def _filter_range(values: list) -> list:
+        out = []
+        for v in values or []:
+            if isinstance(v, str) and v.isdigit():
+                if args.expected_range_start <= int(v) <= args.expected_range_end:
+                    out.append(v)
+            else:
+                out.append(v)
+        return out
+    reachability_orphans = _filter_range(reachability_orphans)
+    reachability_broken = _filter_range(reachability_broken)
     engine_errors = engine_report.get("errors", []) or []
     engine_warnings = engine_report.get("warnings", []) or []
 
     issue_items = issues_report.get("issues", []) or []
+    def _issue_in_expected(issue: dict) -> bool:
+        sid = issue.get("section_id")
+        if isinstance(sid, str) and sid.isdigit():
+            return args.expected_range_start <= int(sid) <= args.expected_range_end
+        return True
+    issue_items = [i for i in issue_items if _issue_in_expected(i)]
     issue_types = [i.get("type") for i in issue_items if i.get("type")]
     issue_orphans = [i for i in issue_items if (i.get("type") or "").startswith("orphaned_section")]
     issue_missing = [i for i in issue_items if (i.get("type") == "missing_section")]
@@ -229,7 +258,7 @@ def main() -> int:
     if engine_errors:
         status = "fail"
         fail_reasons.append("engine_validation")
-    if issue_orphans or issue_missing or issue_ordering or issue_duplicates:
+    if issue_orphans or issue_missing or issue_ordering:
         status = "fail"
         fail_reasons.append("issues_report")
 

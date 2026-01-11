@@ -127,6 +127,31 @@ def _patch_anchor_target(html: str, old: str, new: str) -> str:
     return pattern.sub(repl, html, count=1)
 
 
+def _extract_anchor_targets(html: str) -> List[str]:
+    if not html:
+        return []
+    targets = []
+    seen = set()
+    for match in re.finditer(r'href=["\']#\s*(\d+)\s*["\']', html, re.IGNORECASE):
+        target = match.group(1)
+        if target in seen:
+            continue
+        seen.add(target)
+        targets.append(target)
+    return targets
+
+
+def _has_placeholder_targets(html: str) -> bool:
+    if not html:
+        return False
+    text = html_to_text(html)
+    if not text:
+        return False
+    return bool(re.search(r"\b\d[ Xx]{2}\b", text))
+
+
+
+
 def find_orphans(portions: List[Dict], expected_range: Tuple[int, int] = (1, 400)) -> Set[str]:
     referenced = set()
     existing = set()
@@ -146,6 +171,16 @@ def find_orphans(portions: List[Dict], expected_range: Tuple[int, int] = (1, 400
     
     # Filter by expected range if needed, but string IDs are safer
     return orphans
+
+
+def _incoming_counts(portions: List[Dict]) -> Dict[str, int]:
+    counts: Dict[str, int] = defaultdict(int)
+    for p in portions:
+        for choice in p.get('choices', []):
+            target = choice.get('target')
+            if target:
+                counts[str(target)] += 1
+    return counts
 
 
 def _load_report(path: Optional[str]) -> Dict:
@@ -451,12 +486,8 @@ def main():
                 orphan_p = section_map.get(suspect['orphan_id'])
                 orphan_text = html_to_text(orphan_p.get('raw_html', '')) if orphan_p else ""
                 if _explicit_target_in_html(html, suspect['target_id']):
-                    # Explicit numeric reference in source; only consider overrides if a truncation is likely
-                    # and the source/orphan share meaningful content hints (prevents over-aggressive rewrites).
-                    if not _suspect_truncated_target(suspect['orphan_id'], suspect['target_id']):
-                        continue
-                    if not _content_overlap_hint(text, orphan_text):
-                        continue
+                    # Explicit anchors/phrases are strong evidence; do not override with orphan repair.
+                    continue
                 
                 conf, reason, usage = validate_link_with_ai(
                     client, args.model, text, suspect['source_id'], suspect['target_id'], suspect['orphan_id'], orphan_text
@@ -483,6 +514,7 @@ def main():
                                 str(suspect['target_id']),
                                 str(suspect['orphan_id']),
                             )
+                            src_p['turn_to_links'] = _extract_anchor_targets(src_p.get('raw_html', ''))
                             if 'raw_text' in src_p:
                                 src_p['raw_text'] = html_to_text(src_p.get('raw_html', ''))
                             modifications += 1

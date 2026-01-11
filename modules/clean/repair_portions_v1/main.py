@@ -1,5 +1,6 @@
 import argparse
 import json
+import re
 from base64 import b64encode
 from pathlib import Path
 from typing import Dict, List, Tuple, Union
@@ -21,6 +22,18 @@ Rules:
 - Output only section {section_id} (ignore other section numbers on the page).
 - Preserve wording, punctuation, dice stats, and choice targets exactly; do NOT invent or summarize.
 - If unreadable, return an empty string and confidence 0.
+- Keep natural paragraph breaks; remove stray page numbers/headers."""
+
+
+STRICT_ORPHAN_PROMPT = """You are restoring the exact wording for one Fighting Fantasy section.
+Section ID: {section_id}
+Return JSON: {{ "clean_text": "<string>", "confidence": <0-1 float> }}.
+Rules:
+- Use the supplied page image(s) as ground truth; do NOT trust OCR text if it conflicts.
+- Output only section {section_id} (ignore other section numbers on the page).
+- Pay special attention to any "turn to <number>" targets; the exact digits must match the image.
+- If the digits are unclear, return an empty string and confidence 0 (do not guess).
+- Preserve wording, punctuation, dice stats, and choice targets exactly; do NOT invent or summarize.
 - Keep natural paragraph breaks; remove stray page numbers/headers."""
 
 
@@ -88,13 +101,19 @@ def call_llm(
     model: str,
     reasons: List[str],
     max_images: int,
+    *,
+    system_prompt: str = SYSTEM_PROMPT,
+    extra_text: str = "",
 ) -> Tuple[str, float, Dict]:
     content: List[Dict[str, Union[str, Dict]]] = []
     raw_text = portion.get("raw_text") or portion.get("text") or ""
     reasons_str = ", ".join(reasons)
+    prompt_text = f"Section ID: {section_id}\nReasons for repair: {reasons_str}\nCurrent OCR text:\n{raw_text}"
+    if extra_text:
+        prompt_text = f"{prompt_text}\n\n{extra_text.strip()}"
     content.append({
         "type": "text",
-        "text": f"Section ID: {section_id}\nReasons for repair: {reasons_str}\nCurrent OCR text:\n{raw_text}",
+        "text": prompt_text,
     })
 
     images = portion.get("source_images") or []
@@ -109,7 +128,7 @@ def call_llm(
     completion = client.chat.completions.create(
         model=model,
         messages=[
-            {"role": "system", "content": SYSTEM_PROMPT.format(section_id=section_id)},
+            {"role": "system", "content": system_prompt.format(section_id=section_id)},
             {"role": "user", "content": content},
         ],
         response_format={"type": "json_object"},
@@ -119,6 +138,28 @@ def call_llm(
     confidence = float(data.get("confidence", 0.0))
     meta = {"reason": reasons, "model": model, "llm_response": bool(clean_text)}
     return clean_text, confidence, meta
+
+
+def _patch_html_target(html: str, old: str, new: str) -> str:
+    if not html or not old or not new:
+        return html
+    out = html
+    out = out.replace(f'href="#{old}"', f'href="#{new}"')
+    out = out.replace(f"Turn to {old}", f"Turn to {new}")
+    out = out.replace(f"turn to {old}", f"turn to {new}")
+    # Patch anchor inner text if it still shows the old target
+    pattern = re.compile(
+        rf'(<a\s+[^>]*href=["\']#{re.escape(new)}["\'][^>]*>\s*){re.escape(old)}(\s*</a>)',
+        flags=re.IGNORECASE,
+    )
+    out = pattern.sub(lambda m: f"{m.group(1)}{new}{m.group(2)}", out)
+    return out
+
+
+def _extract_turn_to_links(html: str) -> List[str]:
+    if not html:
+        return []
+    return list({m.group(1) for m in re.finditer(r'href=["\']#\s*(\d+)\s*["\']', html)})
 
 
 def save_portions(rows: List[Dict], fmt: str, path: str):
@@ -143,6 +184,12 @@ def main():
     parser.add_argument("--max-repairs", "--max_repairs", type=int, default=40, help="Cap the number of sections to repair (to control cost).")
     parser.add_argument("--max-images", "--max_images", type=int, default=2, help="Max images to send per section.")
     parser.add_argument("--force-ids", type=str, default="", help="Comma-separated portion IDs to force repair.")
+    parser.add_argument("--require-hints", "--require_hints", action="store_true",
+                        help="Only repair when repair_hints/forced IDs provide reasons (skip heuristic garble scan).")
+    parser.add_argument("--strict-orphan-targets", "--strict_orphan_targets", action="store_true",
+                        help="For orphan-similar-target cases, re-run with a strict digit-focused prompt if needed.")
+    parser.add_argument("--strict-orphan-model", "--strict_orphan_model", default=None,
+                        help="Optional model override for strict orphan target reread.")
     parser.add_argument("--progress-file")
     parser.add_argument("--state-file")
     parser.add_argument("--run-id")
@@ -167,7 +214,7 @@ def main():
         flagged_pages = hints.get("flagged_pages") or []
         if flagged_pages and not reasons:
             reasons = ["char_confusion"]
-        if not reasons:
+        if not reasons and not args.require_hints:
             reasons = detect_garble(text, min_chars=args.min_chars,
                                     alpha_thresh=args.alpha_threshold,
                                     max_digit_ratio=args.max_digit_ratio)
@@ -184,9 +231,40 @@ def main():
                 if conf < args.min_confidence and args.boost_model:
                     clean_text, conf, meta = call_llm(client, row, section_id, args.boost_model, reasons, args.max_images)
                     meta["boosted"] = True
+                if args.strict_orphan_targets and "orphan_similar_target" in reasons:
+                    hints = row.get("repair_hints") or {}
+                    details = hints.get("orphan_similar_target") or []
+                    suspect = details[0] if details else {}
+                    orphan_id = str(suspect.get("orphan_id") or "")
+                    suspect_target = str(suspect.get("suspect_target") or "")
+                    if clean_text and suspect_target and suspect_target in clean_text and orphan_id not in clean_text:
+                        extra = f"Suspected OCR confusion: orphan_id={orphan_id}, suspect_target={suspect_target}. Re-read from the image and verify the digits."
+                        strict_model = args.strict_orphan_model or args.model
+                        clean_text, conf, meta = call_llm(
+                            client,
+                            row,
+                            section_id,
+                            strict_model,
+                            reasons,
+                            args.max_images,
+                            system_prompt=STRICT_ORPHAN_PROMPT,
+                            extra_text=extra,
+                        )
+                        meta["strict_retry"] = True
                 row["raw_text_original"] = text
                 row["raw_text"] = clean_text or text
                 row["clean_text"] = row["raw_text"]
+                if "orphan_similar_target" in reasons:
+                    hints = row.get("repair_hints") or {}
+                    details = hints.get("orphan_similar_target") or []
+                    suspect = details[0] if details else {}
+                    orphan_id = str(suspect.get("orphan_id") or "")
+                    suspect_target = str(suspect.get("suspect_target") or "")
+                    if orphan_id and suspect_target and row.get("raw_html"):
+                        # Only patch if the re-read text supports the orphan target
+                        if clean_text and (orphan_id in clean_text) and (suspect_target not in clean_text):
+                            row["raw_html"] = _patch_html_target(row["raw_html"], suspect_target, orphan_id)
+                            row["turn_to_links"] = _extract_turn_to_links(row["raw_html"])
                 row["repair"] = {
                     "attempted": True,
                     "applied": bool(clean_text),
