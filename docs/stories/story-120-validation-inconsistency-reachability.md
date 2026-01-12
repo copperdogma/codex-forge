@@ -111,3 +111,22 @@ This is a critical inconsistency that undermines trust in validation results and
   - Validation issues now clearly visible in HTML report
   - Quality score provides actionable metric (78/100 for Robot Commando)
   - Users can immediately see validation status and quality level
+
+### 2026-01-11 — Integration Tests and Caching (Enhancements)
+- **Result**: Added integration tests and performance optimizations for Node validator delegation
+- **Changes**:
+  1. Created `tests/test_validate_ff_engine_v2_node_integration.py` with 5 integration tests:
+     - Python validator matches Node validator output exactly
+     - Real gamebook integration test (Robot Commando)
+     - Validation report includes unreachable sections
+     - Error handling for missing files/invalid paths
+     - Caching verification
+  2. Implemented in-memory caching for Node validator results:
+     - Cache key based on gamebook path + validator directory
+     - Cache invalidation based on file mtime
+     - Optional caching (can be disabled with `use_cache=False`)
+     - Graceful fallback if mtime cannot be read
+- **Impact**:
+  - Integration tests verify consistency between Python and Node validators
+  - Caching reduces redundant subprocess calls when validating same gamebook multiple times
+  - All 5 integration tests pass, confirming correct implementation

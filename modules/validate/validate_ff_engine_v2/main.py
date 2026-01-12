@@ -1,4 +1,5 @@
 import argparse
+import hashlib
 import json
 import os
 import re
@@ -56,14 +57,37 @@ def load_gamebook(path: str) -> Dict[str, Any]:
         return json.load(f)
 
 
+# Cache for Node validator results (key: gamebook_path hash, value: (mtime, unreachable_sections))
+_node_validator_cache: Dict[str, tuple[float, List[str]]] = {}
+
+
+def _get_cache_key(gamebook_path: str, validator_dir: str) -> str:
+    """Generate cache key from gamebook path and validator directory."""
+    # Use absolute paths for consistent keys
+    gamebook_abs = os.path.abspath(gamebook_path)
+    validator_dir_abs = os.path.abspath(validator_dir)
+    # Create hash from paths (not content, for speed)
+    key_str = f"{gamebook_abs}:{validator_dir_abs}"
+    return hashlib.md5(key_str.encode()).hexdigest()
+
+
 def _get_unreachable_sections_from_node_validator(
-    gamebook_path: str, validator_dir: str, node_bin: str = "node"
+    gamebook_path: str, validator_dir: str, node_bin: str = "node", use_cache: bool = True
 ) -> List[str]:
     """
     Call the Node validator to get unreachable sections.
     
     This uses the canonical Node validator (validate_ff_engine_node_v1) which
     performs reachability analysis using BFS from the start section.
+    
+    Results are cached based on gamebook file mtime to avoid redundant subprocess calls
+    when the same gamebook is validated multiple times in the same process.
+    
+    Args:
+        gamebook_path: Path to gamebook.json file
+        validator_dir: Path to Node validator directory
+        node_bin: Node executable to use (default: "node")
+        use_cache: Whether to use in-memory cache (default: True)
     
     Returns list of unreachable section IDs.
     """
@@ -75,6 +99,21 @@ def _get_unreachable_sections_from_node_validator(
     if not os.path.exists(cli_path):
         raise FileNotFoundError(f"Node validator cli-validator.js not found at {validator_dir_abs}")
     
+    # Check cache if enabled
+    if use_cache:
+        cache_key = _get_cache_key(gamebook_abs, validator_dir_abs)
+        try:
+            # Get file mtime for cache invalidation
+            gamebook_mtime = os.path.getmtime(gamebook_abs)
+            cached_mtime, cached_result = _node_validator_cache.get(cache_key, (None, None))
+            
+            # If cache hit and file hasn't changed, return cached result
+            if cached_mtime is not None and cached_mtime == gamebook_mtime:
+                return cached_result
+        except OSError:
+            # If we can't get mtime, skip cache
+            pass
+    
     # Run Node validator - don't set cwd, use absolute paths (matches validate_ff_engine_node_v1/main.py)
     cmd = [node_bin, cli_path, gamebook_abs, "--json"]
     proc = subprocess.run(cmd, capture_output=True, text=True)
@@ -84,25 +123,37 @@ def _get_unreachable_sections_from_node_validator(
         # Check stderr for actual errors
         if proc.stderr:
             raise RuntimeError(f"Node validator failed: {proc.stderr[:500]}")
-        return []
+        result = []
+    else:
+        try:
+            data = json.loads(proc.stdout.strip() if proc.stdout else "{}")
+        except json.JSONDecodeError as e:
+            raise RuntimeError(f"Failed to parse Node validator JSON output: {e}\nstdout: {proc.stdout[:500]}")
+        
+        # Extract unreachable sections from warnings
+        unreachable = []
+        warnings = data.get("warnings", [])
+        for warning in warnings:
+            message = warning.get("message", "")
+            if "unreachable from startSection" in message:
+                # Extract section ID from message like: 'Gameplay section "7" is unreachable from startSection "background"'
+                match = re.search(r'Gameplay section "([^"]+)" is unreachable', message)
+                if match:
+                    unreachable.append(match.group(1))
+        
+        result = sorted(unreachable, key=lambda x: int(x) if x.isdigit() else 9999)
     
-    try:
-        data = json.loads(proc.stdout.strip() if proc.stdout else "{}")
-    except json.JSONDecodeError as e:
-        raise RuntimeError(f"Failed to parse Node validator JSON output: {e}\nstdout: {proc.stdout[:500]}")
+    # Cache result if enabled
+    if use_cache:
+        try:
+            gamebook_mtime = os.path.getmtime(gamebook_abs)
+            cache_key = _get_cache_key(gamebook_abs, validator_dir_abs)
+            _node_validator_cache[cache_key] = (gamebook_mtime, result)
+        except OSError:
+            # If we can't get mtime, skip caching
+            pass
     
-    # Extract unreachable sections from warnings
-    unreachable = []
-    warnings = data.get("warnings", [])
-    for warning in warnings:
-        message = warning.get("message", "")
-        if "unreachable from startSection" in message:
-            # Extract section ID from message like: 'Gameplay section "7" is unreachable from startSection "background"'
-            match = re.search(r'Gameplay section "([^"]+)" is unreachable', message)
-            if match:
-                unreachable.append(match.group(1))
-    
-    return sorted(unreachable, key=lambda x: int(x) if x.isdigit() else 9999)
+    return result
 
 
 def validate_gamebook(
