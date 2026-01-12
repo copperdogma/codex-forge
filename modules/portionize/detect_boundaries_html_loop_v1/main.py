@@ -118,6 +118,19 @@ def _is_blank_page(page: Dict[str, Any], white_threshold: float) -> bool:
 
 
 def _code_repair_html(html: str, expected_ids: List[int]) -> Tuple[str, bool]:
+    """
+    Repair HTML by converting section numbers in <p> tags to <h2> headers.
+    
+    **Critical Fix (Story 119)**: Page-number markers (`<p class="page-number">`) are 
+    NEVER converted to h2 headers. They are page numbers, not section headers, and 
+    converting them creates duplicate h2 headers that cause boundary detection to 
+    pick the wrong boundary (e.g., section 167 bug where page-number marker at p112-b1 
+    was converted to h2, causing boundary to end prematurely instead of at the real 
+    h2 header at p112-b7).
+    
+    Only plain <p> tags (without page-number class) are converted when no existing 
+    h2 header exists for that section number.
+    """
     repaired = html or ""
     changed = False
     has_any_h2 = bool(re.search(r"<h2>\\s*\\d+\\s*</h2>", repaired, flags=re.IGNORECASE))
@@ -133,14 +146,18 @@ def _code_repair_html(html: str, expected_ids: List[int]) -> Tuple[str, bool]:
                     changed = True
                 break
     for sec in expected_ids:
-        if re.search(rf"<h2>\\s*{sec}\\s*</h2>", repaired, flags=re.IGNORECASE):
+        # Check if there's already an h2 with this section number
+        has_h2_for_sec = bool(re.search(rf"<h2>\\s*{sec}\\s*</h2>", repaired, flags=re.IGNORECASE))
+        if has_h2_for_sec:
             continue
         for pattern in (
-            rf"<p class=\"page-number\">\\s*{sec}\\s*</p>",
-            rf"<p>\\s*{sec}\\s*</p>",
+            rf"<p class=\"page-number\">\s*{sec}\s*</p>",
+            rf"<p>\s*{sec}\s*</p>",
         ):
             repl = f"<h2>{sec}</h2>"
-            if "page-number" in pattern and has_any_h2:
+            # Don't convert page-number markers if there's already an h2 with this number
+            # (page-number markers are just page numbers, not section headers)
+            if "page-number" in pattern:
                 continue
             repaired, count = re.subn(pattern, repl, repaired, flags=re.IGNORECASE, count=1)
             if count:

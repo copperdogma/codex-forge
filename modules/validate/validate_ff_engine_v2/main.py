@@ -98,6 +98,55 @@ def validate_gamebook(
             sections_with_no_text.append(sid)
 
     # Check for sections with no choices (potential dead ends)
+    # Navigation can be via direct choices OR conditional events (stat_check, test_luck, etc.) with targetSection outcomes
+    def has_navigation(sequence: List[Dict[str, Any]]) -> bool:
+        """Check if sequence has any navigation (choices or conditional events with targets)."""
+        for event in sequence:
+            kind = event.get("kind")
+            if kind == "choice":
+                if event.get("targetSection"):
+                    return True
+            elif kind == "stat_check":
+                # Check pass/fail outcomes
+                for outcome_key in ("pass", "fail"):
+                    outcome = event.get(outcome_key) or {}
+                    if outcome.get("targetSection"):
+                        return True
+            elif kind == "stat_change":
+                # Check else outcome
+                outcome = event.get("else") or {}
+                if outcome.get("targetSection"):
+                    return True
+            elif kind == "test_luck":
+                # Check lucky/unlucky outcomes
+                for outcome_key in ("lucky", "unlucky"):
+                    outcome = event.get(outcome_key) or {}
+                    if outcome.get("targetSection"):
+                        return True
+            elif kind in {"item_check", "state_check"}:
+                # Check has/missing outcomes
+                for outcome_key in ("has", "missing"):
+                    outcome = event.get(outcome_key) or {}
+                    if outcome.get("targetSection"):
+                        return True
+            elif kind == "combat":
+                # Check combat outcomes
+                outcomes = event.get("outcomes") or {}
+                for outcome_key in ("win", "lose", "escape"):
+                    outcome = outcomes.get(outcome_key) or {}
+                    if outcome.get("targetSection"):
+                        return True
+            elif kind == "death":
+                # Check death outcome
+                outcome = event.get("outcome") or {}
+                if outcome.get("targetSection"):
+                    return True
+            else:
+                # Generic event with targetSection
+                if event.get("targetSection"):
+                    return True
+        return False
+
     sections_with_no_choices = []
     for sid, section in sections.items():
         if section.get("provenance", {}).get("stub"):
@@ -108,8 +157,7 @@ def validate_gamebook(
             continue
 
         sequence = section.get("sequence", []) or []
-        has_choice = any(e.get("kind") == "choice" for e in sequence)
-        if not has_choice:
+        if not has_navigation(sequence):
             sections_with_no_choices.append(sid)
 
     # Build warnings and errors

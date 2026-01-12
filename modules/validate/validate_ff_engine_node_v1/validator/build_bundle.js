@@ -271,13 +271,73 @@ function validateEmptyText(gamebook) {
 
 function validateNoChoices(gamebook) {
   const warnings = [];
+  
+  /**
+   * Check if sequence has any navigation (choices or conditional events with targets).
+   * Navigation can be via:
+   * - Direct choices (kind === 'choice')
+   * - Conditional events (stat_check, test_luck, item_check, etc.) with targetSection outcomes
+   */
+  function hasNavigation(sequence) {
+    if (!Array.isArray(sequence)) return false;
+    for (const event of sequence) {
+      if (!event) continue;
+      const kind = event.kind;
+      
+      if (kind === 'choice') {
+        if (event.targetSection) return true;
+      } else if (kind === 'stat_check') {
+        // Check pass/fail outcomes
+        if ((event.pass && event.pass.targetSection) || 
+            (event.fail && event.fail.targetSection)) {
+          return true;
+        }
+      } else if (kind === 'stat_change') {
+        // Check else outcome
+        if (event.else && event.else.targetSection) {
+          return true;
+        }
+      } else if (kind === 'test_luck') {
+        // Check lucky/unlucky outcomes
+        if ((event.lucky && event.lucky.targetSection) || 
+            (event.unlucky && event.unlucky.targetSection)) {
+          return true;
+        }
+      } else if (kind === 'item_check' || kind === 'state_check') {
+        // Check has/missing outcomes
+        if ((event.has && event.has.targetSection) || 
+            (event.missing && event.missing.targetSection)) {
+          return true;
+        }
+      } else if (kind === 'combat') {
+        // Check combat outcomes
+        const outcomes = event.outcomes || {};
+        if ((outcomes.win && outcomes.win.targetSection) ||
+            (outcomes.lose && outcomes.lose.targetSection) ||
+            (outcomes.escape && outcomes.escape.targetSection)) {
+          return true;
+        }
+      } else if (kind === 'death') {
+        // Check death outcome
+        if (event.outcome && event.outcome.targetSection) {
+          return true;
+        }
+      } else {
+        // Generic event with targetSection
+        if (event.targetSection) {
+          return true;
+        }
+      }
+    }
+    return false;
+  }
+  
   for (const [key, section] of Object.entries(gamebook.sections || {})) {
     if (!section?.isGameplaySection) continue;
     if (section?.end_game) continue;
     if (section?.provenance?.stub) continue;
     const sequence = section?.sequence || [];
-    const hasChoice = sequence.some(event => event && event.kind === 'choice');
-    if (!hasChoice) {
+    if (!hasNavigation(sequence)) {
       warnings.push({
         path: \`/sections/\${key}/sequence\`,
         message: \`Gameplay section "\${key}" has no choices (potential dead end)\`,

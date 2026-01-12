@@ -1393,9 +1393,15 @@ def main():
 
     # 2. Output Directory
     if args.output_dir_override:
-        run_dir = args.output_dir_override
+        # output_dir_override is the parent directory (e.g., "output/runs"), append run_id
+        run_dir = os.path.join(args.output_dir_override, run_id)
     elif recipe.get("output_dir"):
-        run_dir = recipe.get("output_dir")
+        # Recipe output_dir can be either parent or full path - check if it ends with run_id
+        recipe_output_dir = recipe.get("output_dir")
+        if recipe_output_dir.endswith(run_id):
+            run_dir = recipe_output_dir
+        else:
+            run_dir = os.path.join(recipe_output_dir, run_id)
     else:
         # Default behavior: output/runs/<run_id>
         run_dir = os.path.join("output", "runs", run_id)
