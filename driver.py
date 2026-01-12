@@ -1762,7 +1762,9 @@ def main():
                 pass
 
         # Skip if already done and skip-done requested (state + artifact exists)
-        if args.skip_done and os.path.exists(state_path):
+        # Exception: package_game_ready_v1 should always run to ensure output folder is up to date
+        always_run_modules = {"package_game_ready_v1"}
+        if args.skip_done and os.path.exists(state_path) and module_id not in always_run_modules:
             try:
                 with open(state_path, "r", encoding="utf-8") as f:
                     state = json.load(f)

@@ -134,6 +134,7 @@ This index tracks stories in `/docs/stories/` for the codex-forge pipeline.
 |||| 115 | Configuration Cleanup and Standardization | High | Done | /docs/stories/story-115-config-cleanup.md |
 |||| 116 | Fighting Fantasy Split Pages Quality Issues | High | Done | /docs/stories/story-116-ff-split-pages-quality-issues.md |
 || 117 | FF Robot Commando + Freeway Fighter Pipeline Bring-Up | High | Done | /docs/stories/story-117-ff-robot-commando-freeway-fighter-pipeline.md |
+|| 118 | Fix Hardcoded Book Title Bug | High | Done | /docs/stories/story-118-fix-hardcoded-book-title.md |
 
 ## Notes
 - Status "Done" reflects current working state in codex-forge. "To Do" items are planned next steps aligned with `docs/requirements.md` and `snapshot.md`.

@@ -1,8 +1,8 @@
 import argparse
 import json
-import json
 import os
 import re
+import sys
 from typing import Any, Dict, List, Optional, Tuple
 
 from modules.common.utils import read_jsonl, save_json, ProgressLogger
@@ -1144,8 +1144,9 @@ def main():
     parser.add_argument("--out", required=True, help="Output gamebook JSON path")
     parser.add_argument("--combat-styles", dest="combat_styles", help="Optional combat styles JSON (frontmatter-derived)")
     parser.add_argument("--section-count", dest="section_count_file", help="Section range JSON (optional)")
-    parser.add_argument("--title", required=True, help="Gamebook title")
+    parser.add_argument("--title", help="Gamebook title (required if --metadata not provided)")
     parser.add_argument("--author", help="Gamebook author")
+    parser.add_argument("--metadata", dest="metadata_file", help="Book metadata JSON (title, author). Overrides --title/--author if provided.")
     parser.add_argument("--start-section", "--start_section", default="1", dest="start_section", help="Starting section id")
     parser.add_argument("--format-version", "--format_version", default="1.0.0", dest="format_version", help="Format version string")
     parser.add_argument("--allow-stubs", "--allow_stubs", action="store_true", dest="allow_stubs",
@@ -1312,9 +1313,26 @@ def main():
             combat_styles = {k: v for k, v in style_map.items() if k in styles_in_use or v.get("default")}
     if not combat_styles:
         combat_styles = resolve_combat_styles(styles_in_use)
+    
+    # Load metadata from file if provided, otherwise use command-line args
+    title = args.title
+    author = args.author
+    if args.metadata_file:
+        try:
+            with open(args.metadata_file, "r", encoding="utf-8") as f:
+                metadata_data = json.load(f)
+            if isinstance(metadata_data, dict):
+                title = metadata_data.get("title") or title
+                author = metadata_data.get("author") or author
+        except Exception as e:
+            print(f"Warning: Failed to load metadata from {args.metadata_file}: {e}", file=sys.stderr)
+    
+    if not title:
+        raise ValueError("Title is required. Provide --title or --metadata with a title field.")
+    
     metadata = {
-        "title": args.title,
-        "author": args.author,
+        "title": title,
+        "author": author,
         "startSection": start_section,
         "formatVersion": args.format_version,
         "sectionCount": section_count,

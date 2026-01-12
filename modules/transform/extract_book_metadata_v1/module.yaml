@@ -1,0 +1,38 @@
+module_id: extract_book_metadata_v1
+stage: transform
+entrypoint: modules/transform/extract_book_metadata_v1/main.py
+name: Extract Book Metadata
+description: |
+  Extracts book title (and optionally author) from early pages using code-first heuristics.
+  Analyzes <h1> tags from pages 1-5, filters common patterns (series names, publishers),
+  and applies scoring heuristics to identify the book title.
+category: transform
+schema_version: null
+
+inputs:
+  - name: pages
+    type: file
+    description: Pages HTML JSONL (pages_html_repaired.jsonl or similar)
+    required: true
+
+outputs:
+  - name: book_metadata
+    type: file
+    description: Book metadata JSON (title, optional author)
+    path: book_metadata.json
+
+parameters:
+  - name: max_pages
+    type: int
+    default: 5
+    description: Maximum number of pages to scan for title
+  - name: use_ai_fallback
+    type: bool
+    default: false
+    description: Use AI extraction if code extraction fails (not implemented yet)
+
+command: |
+  python modules/transform/extract_book_metadata_v1/main.py \
+    --pages {pages} \
+    --out {output_dir}/book_metadata.json \
+    --max-pages {max_pages}
