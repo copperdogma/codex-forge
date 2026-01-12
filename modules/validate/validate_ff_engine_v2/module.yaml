@@ -18,5 +18,15 @@ param_schema:
       type: integer
     forensics:
       type: boolean
+    node_validator_dir:
+      type: string
+    node_bin:
+      type: string
   required: []
-notes: "Forensics-only validator for gamebook.json (missing sections, duplicates, empty sections, structural issues). Does not gate pipeline success."
+notes: >
+  Forensics-only validator for gamebook.json (missing sections, duplicates, empty sections, structural issues).
+  Does not gate pipeline success.
+  
+  **Reachability Analysis**: This validator delegates reachability analysis to the canonical Node validator
+  (validate_ff_engine_node_v1) when `node_validator_dir` is provided. The Node validator is the authoritative
+  source for unreachable section detection and ships with the gamebook in the output package.

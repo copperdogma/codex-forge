@@ -482,6 +482,7 @@ stages:
     out: validation_report.json
     params:
       forensics: true
+      node_validator_dir: modules/validate/validate_ff_engine_node_v1/validator
 
   - id: validate_gamebook_node
     stage: export

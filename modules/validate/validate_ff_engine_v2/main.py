@@ -2,6 +2,8 @@ import argparse
 import json
 import os
 import re
+import subprocess
+import sys
 from typing import Dict, List, Any, Optional
 
 from modules.common.utils import save_json, ensure_dir, ProgressLogger, read_jsonl
@@ -52,6 +54,55 @@ def load_gamebook(path: str) -> Dict[str, Any]:
     """Load gamebook.json."""
     with open(path, "r", encoding="utf-8") as f:
         return json.load(f)
+
+
+def _get_unreachable_sections_from_node_validator(
+    gamebook_path: str, validator_dir: str, node_bin: str = "node"
+) -> List[str]:
+    """
+    Call the Node validator to get unreachable sections.
+    
+    This uses the canonical Node validator (validate_ff_engine_node_v1) which
+    performs reachability analysis using BFS from the start section.
+    
+    Returns list of unreachable section IDs.
+    """
+    # Use absolute paths to avoid path resolution issues
+    gamebook_abs = os.path.abspath(gamebook_path)
+    validator_dir_abs = os.path.abspath(validator_dir)
+    cli_path = os.path.join(validator_dir_abs, "cli-validator.js")
+    
+    if not os.path.exists(cli_path):
+        raise FileNotFoundError(f"Node validator cli-validator.js not found at {validator_dir_abs}")
+    
+    # Run Node validator - don't set cwd, use absolute paths (matches validate_ff_engine_node_v1/main.py)
+    cmd = [node_bin, cli_path, gamebook_abs, "--json"]
+    proc = subprocess.run(cmd, capture_output=True, text=True)
+    
+    if proc.returncode != 0 and not proc.stdout:
+        # If validator fails but produces no output, skip reachability analysis
+        # Check stderr for actual errors
+        if proc.stderr:
+            raise RuntimeError(f"Node validator failed: {proc.stderr[:500]}")
+        return []
+    
+    try:
+        data = json.loads(proc.stdout.strip() if proc.stdout else "{}")
+    except json.JSONDecodeError as e:
+        raise RuntimeError(f"Failed to parse Node validator JSON output: {e}\nstdout: {proc.stdout[:500]}")
+    
+    # Extract unreachable sections from warnings
+    unreachable = []
+    warnings = data.get("warnings", [])
+    for warning in warnings:
+        message = warning.get("message", "")
+        if "unreachable from startSection" in message:
+            # Extract section ID from message like: 'Gameplay section "7" is unreachable from startSection "background"'
+            match = re.search(r'Gameplay section "([^"]+)" is unreachable', message)
+            if match:
+                unreachable.append(match.group(1))
+    
+    return sorted(unreachable, key=lambda x: int(x) if x.isdigit() else 9999)
 
 
 def validate_gamebook(
@@ -193,12 +244,17 @@ def validate_gamebook(
 
     is_valid = len(errors) == 0
 
+    # Reachability analysis is performed by the canonical Node validator
+    # We'll merge it in main() if available
+    unreachable_sections = []
+
     return ValidationReport(
         total_sections=len(sections),
         missing_sections=missing_sections,
         duplicate_sections=duplicate_sections,
         sections_with_no_text=sections_with_no_text,
         sections_with_no_choices=sections_with_no_choices,
+        unreachable_sections=unreachable_sections,
         is_valid=is_valid,
         warnings=warnings,
         errors=errors,
@@ -222,6 +278,8 @@ def main():
     parser.add_argument("--elements-core", dest="elements_core", help="Optional path to elements_core.jsonl for tracing")
     parser.add_argument("--portions", help="Optional path to portions_enriched.jsonl for tracing")
     parser.add_argument("--reachability-report", dest="reachability_report", help="Optional path to reachability_report.json to include broken links and orphans.")
+    parser.add_argument("--node-validator-dir", dest="node_validator_dir", help="Optional path to Node validator directory for reachability analysis")
+    parser.add_argument("--node-bin", dest="node_bin", default="node", help="Node executable to use for reachability analysis")
     args = parser.parse_args()
 
     logger = ProgressLogger(state_path=args.state_file, progress_path=args.progress_file, run_id=args.run_id)
@@ -235,6 +293,26 @@ def main():
                message="Validating gamebook", artifact=args.out, module_id="validate_ff_engine_v2")
 
     report = validate_gamebook(gamebook, args.expected_range_start, args.expected_range_end)
+    
+    # Merge reachability analysis from Node validator (canonical validator)
+    unreachable_sections = []
+    if args.node_validator_dir:
+        try:
+            unreachable_sections = _get_unreachable_sections_from_node_validator(
+                args.gamebook, args.node_validator_dir, args.node_bin
+            )
+            if unreachable_sections:
+                report = report.model_copy(update={"unreachable_sections": unreachable_sections})
+                # Add warning about unreachable sections
+                count = len(unreachable_sections)
+                sample = unreachable_sections[:10]
+                msg = f"{count} gameplay sections are unreachable from startSection: {sample}"
+                if count > 10:
+                    msg += f" (and {count - 10} more)"
+                report.warnings.append(msg)
+        except Exception as e:
+            # Don't fail validation if Node validator isn't available, just log warning
+            print(f"Warning: Could not get reachability analysis from Node validator: {e}", file=sys.stderr)
 
     if args.forensics:
         base_dir = os.path.dirname(os.path.abspath(args.gamebook))

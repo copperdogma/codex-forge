@@ -15,7 +15,13 @@ HTML_TEMPLATE = """<!DOCTYPE html>
         h1, h2, h3 {{ color: #1d1d1f; }}
         .card {{ background: #fff; border-radius: 12px; padding: 20px; margin-bottom: 20px; box-shadow: 0 4px 6px rgba(0,0,0,0.1); }}
         .status-valid {{ color: #28a745; font-weight: bold; }}
+        .status-valid-warnings {{ color: #ffc107; font-weight: bold; }}
         .status-invalid {{ color: #dc3545; font-weight: bold; }}
+        .quality-score {{ font-size: 18px; margin-top: 8px; }}
+        .quality-score-value {{ font-weight: bold; }}
+        .quality-score-good {{ color: #28a745; }}
+        .quality-score-warning {{ color: #ffc107; }}
+        .quality-score-poor {{ color: #dc3545; }}
         .stats {{ display: flex; gap: 20px; margin-bottom: 20px; }}
         .stat-item {{ flex: 1; text-align: center; padding: 15px; background: #f0f0f5; border-radius: 8px; text-decoration: none; color: inherit; transition: background 0.2s; }}
         .stat-item:hover {{ background: #e0e0eb; }}
@@ -47,6 +53,7 @@ HTML_TEMPLATE = """<!DOCTYPE html>
             <div class="stat-item">
                 <span class="stat-label">Status</span>
                 <span class="stat-value {status_class}">{status_text}</span>
+                {quality_score_html}
             </div>
             <div class="stat-item">
                 <span class="stat-label">Total Sections</span>
@@ -71,6 +78,10 @@ HTML_TEMPLATE = """<!DOCTYPE html>
             <a href="#orphans" class="stat-item">
                 <span class="stat-label">Orphans</span>
                 <span class="stat-value">{orphans_count}</span>
+            </a>
+            <a href="#unreachable" class="stat-item">
+                <span class="stat-label">Unreachable</span>
+                <span class="stat-value">{unreachable_count}</span>
             </a>
         </div>
         <div>
@@ -98,16 +109,89 @@ HTML_TEMPLATE = """<!DOCTYPE html>
 </html>
 """
 
+def calculate_quality_score(report: dict) -> tuple[float, str]:
+    """
+    Calculate quality score (0-100) based on validation issues.
+    Returns (score, class_name) where class_name is 'good', 'warning', or 'poor'.
+    
+    Scoring:
+    - Start with 100 points
+    - Deduct points based on issue severity and percentage of sections affected
+    - Errors: -5 points each (critical)
+    - Missing sections: -2 points each (severe)
+    - Unreachable sections: -1 point each (significant, but may be intentional)
+    - No text/choices: -0.5 points each (moderate)
+    - Broken links/orphans: -0.5 points each (moderate)
+    """
+    total_sections = report.get("total_sections", 1)
+    if total_sections == 0:
+        return 0.0, "poor"
+    
+    # Count issues
+    missing = len(report.get("missing_sections", []))
+    no_text = len(report.get("sections_with_no_text", []))
+    no_choices = len(report.get("sections_with_no_choices", []))
+    unreachable = len(report.get("unreachable_sections", []))
+    errors = len(report.get("errors", []))
+    
+    forensics = report.get("forensics", {})
+    broken_links = len(forensics.get("broken_links", {}))
+    orphans = len(forensics.get("orphans", {}))
+    
+    # Calculate penalty (weighted by severity)
+    penalty = (
+        errors * 5.0 +           # Critical: -5 each
+        missing * 2.0 +          # Severe: -2 each
+        unreachable * 1.0 +      # Significant: -1 each (may be intentional dead ends)
+        (no_text + no_choices) * 0.5 +  # Moderate: -0.5 each
+        (broken_links + orphans) * 0.5   # Moderate: -0.5 each
+    )
+    
+    # Calculate score (100 - penalty, clamped to 0-100)
+    score = max(0, min(100, 100 - penalty))
+    
+    # Determine quality class
+    if score >= 90:
+        quality_class = "good"
+    elif score >= 70:
+        quality_class = "warning"
+    else:
+        quality_class = "poor"
+    
+    return round(score, 1), quality_class
+
+
 def generate_html(report_path: str, out_path: str):
     with open(report_path, 'r', encoding='utf-8') as f:
         report = json.load(f)
 
-    status_text = "VALID" if report.get("is_valid") else "INVALID"
-    status_class = "status-valid" if report.get("is_valid") else "status-invalid"
+    is_valid = report.get("is_valid", False)
+    has_warnings = (
+        len(report.get("warnings", [])) > 0 or
+        len(report.get("unreachable_sections", [])) > 0 or
+        len(report.get("sections_with_no_choices", [])) > 0 or
+        len(report.get("sections_with_no_text", [])) > 0
+    )
+    
+    # Determine status text and class
+    if not is_valid:
+        status_text = "INVALID"
+        status_class = "status-invalid"
+    elif has_warnings:
+        status_text = "VALID (with warnings)"
+        status_class = "status-valid-warnings"
+    else:
+        status_text = "VALID"
+        status_class = "status-valid"
+    
+    # Calculate quality score
+    quality_score, quality_class = calculate_quality_score(report)
+    quality_score_html = f'<div class="quality-score"><span class="quality-score-value quality-score-{quality_class}">Quality: {quality_score}/100</span></div>'
     
     missing_sections = report.get("missing_sections", [])
     no_text = report.get("sections_with_no_text", [])
     no_choices = report.get("sections_with_no_choices", [])
+    unreachable_sections = report.get("unreachable_sections", [])
     forensics = report.get("forensics", {})
     
     broken_links = forensics.get("broken_links", {}).keys()
@@ -191,6 +275,7 @@ def generate_html(report_path: str, out_path: str):
     content_parts.append(render_trace_table("Missing Sections", missing_sections, "missing_sections"))
     content_parts.append(render_trace_table("Sections with No Text", no_text, "no_text"))
     content_parts.append(render_trace_table("Gameplay Sections with No Choices", no_choices, "no_choices"))
+    content_parts.append(render_trace_table("Unreachable Sections (from startSection)", unreachable_sections, "unreachable"))
     content_parts.append(render_trace_table("Broken Links (Missing Targets)", broken_links, "broken_links"))
     content_parts.append(render_trace_table("Orphaned Sections (Unreachable)", orphans, "orphans"))
 
@@ -207,10 +292,12 @@ def generate_html(report_path: str, out_path: str):
     final_html = HTML_TEMPLATE.format(
         status_text=status_text,
         status_class=status_class,
+        quality_score_html=quality_score_html,
         total_sections=report.get("total_sections", 0),
         missing_count=len(missing_sections),
         no_text_count=len(no_text),
         no_choices_count=len(no_choices),
+        unreachable_count=len(unreachable_sections),
         broken_links_count=len(broken_links),
         orphans_count=len(orphans),
         run_id=report.get("run_id", "N/A"),

@@ -136,6 +136,8 @@ This index tracks stories in `/docs/stories/` for the codex-forge pipeline.
 || 117 | FF Robot Commando + Freeway Fighter Pipeline Bring-Up | High | Done | /docs/stories/story-117-ff-robot-commando-freeway-fighter-pipeline.md |
 || 118 | Fix Hardcoded Book Title Bug | High | Done | /docs/stories/story-118-fix-hardcoded-book-title.md |
 ||| 119 | Robot Commando Missing Choices Investigation | High | Done | /docs/stories/story-119-robot-commando-missing-choices-investigation.md |
+||| 120 | Validation Inconsistency — Reachability Analysis | High | Done | /docs/stories/story-120-validation-inconsistency-reachability.md |
+|||| 121 | Robot Commando Unreachable Sections Investigation | High | To Do | /docs/stories/story-121-robot-commando-unreachable-sections-investigation.md |
 
 ## Notes
 - Status "Done" reflects current working state in codex-forge. "To Do" items are planned next steps aligned with `docs/requirements.md` and `snapshot.md`.

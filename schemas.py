@@ -782,6 +782,10 @@ class ValidationReport(BaseModel):
 
     This schema captures quality checks on the final gamebook.json output,
     including missing sections, duplicates, and structural issues.
+    
+    Note: Reachability analysis (unreachable_sections) is performed by the
+    canonical Node validator (validate_ff_engine_node_v1) and merged into
+    this report for consistency.
     """
     schema_version: str = "validation_report_v1"
     run_id: Optional[str] = None
@@ -792,6 +796,7 @@ class ValidationReport(BaseModel):
     duplicate_sections: List[str] = Field(default_factory=list)  # Section IDs appearing multiple times
     sections_with_no_text: List[str] = Field(default_factory=list)
     sections_with_no_choices: List[str] = Field(default_factory=list)
+    unreachable_sections: List[str] = Field(default_factory=list)  # Sections unreachable from startSection (from Node validator)
 
     is_valid: bool  # True if no critical errors
     warnings: List[str] = Field(default_factory=list)

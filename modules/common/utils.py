@@ -24,7 +24,7 @@ PROGRESS_EVENT_SCHEMA: Dict[str, Tuple[type, ...]] = {
 }
 # Note: `warning` is an event-level status used to surface non-fatal issues while a stage is still running.
 # Pipeline state should still reflect the stage lifecycle (running/done/failed/skipped/queued).
-PROGRESS_STATUS_VALUES = {"running", "done", "failed", "skipped", "queued", "warning"}
+PROGRESS_STATUS_VALUES = {"running", "done", "failed", "skipped", "queued", "warning", "error"}
 
 
 def load_settings(path: str) -> Dict[str, Any]:
