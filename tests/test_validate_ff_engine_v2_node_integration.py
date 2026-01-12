@@ -13,7 +13,7 @@ from pathlib import Path
 
 from modules.validate.validate_ff_engine_v2.main import (
     validate_gamebook,
-    _get_unreachable_sections_from_node_validator,
+    _call_node_validator,
 )
 
 
@@ -112,33 +112,34 @@ def test_python_validator_matches_node_validator_unreachable_sections(sample_gam
     with tempfile.NamedTemporaryFile(mode='w', suffix='.json', delete=False) as f:
         json.dump(sample_gamebook, f)
         gamebook_path = f.name
-    
+
     try:
         # Run Node validator directly
         node_result = _run_node_validator_directly(gamebook_path)
         node_unreachable = _extract_unreachable_from_node_warnings(node_result)
-        
+
         # Run Python validator with Node delegation
-        python_unreachable = _get_unreachable_sections_from_node_validator(
+        python_result = _call_node_validator(
             gamebook_path,
             str(NODE_VALIDATOR_DIR),
             "node"
         )
-        
+        python_unreachable = _extract_unreachable_from_node_warnings(python_result)
+
         # Compare results
         assert set(python_unreachable) == set(node_unreachable), (
             f"Unreachable sections mismatch:\n"
             f"  Python: {python_unreachable}\n"
             f"  Node:   {node_unreachable}"
         )
-        
+
         # Also verify order (should be sorted)
         assert python_unreachable == node_unreachable, (
             f"Unreachable sections order mismatch:\n"
             f"  Python: {python_unreachable}\n"
             f"  Node:   {node_unreachable}"
         )
-        
+
     finally:
         os.unlink(gamebook_path)
 
@@ -146,28 +147,29 @@ def test_python_validator_matches_node_validator_unreachable_sections(sample_gam
 def test_integration_with_real_gamebook():
     """Test integration with real Robot Commando gamebook if available."""
     gamebook_path = REPO_ROOT / "output" / "runs" / "ff-robot-commando" / "output" / "gamebook.json"
-    
+
     if not gamebook_path.exists():
         pytest.skip(f"Real gamebook not found at {gamebook_path}")
-    
+
     # Run Node validator directly
     node_result = _run_node_validator_directly(str(gamebook_path))
     node_unreachable = _extract_unreachable_from_node_warnings(node_result)
-    
+
     # Run Python validator with Node delegation
-    python_unreachable = _get_unreachable_sections_from_node_validator(
+    python_result = _call_node_validator(
         str(gamebook_path),
         str(NODE_VALIDATOR_DIR),
         "node"
     )
-    
+    python_unreachable = _extract_unreachable_from_node_warnings(python_result)
+
     # Compare results - should match exactly
     assert set(python_unreachable) == set(node_unreachable), (
         f"Unreachable sections mismatch for Robot Commando:\n"
         f"  Python: {len(python_unreachable)} sections {python_unreachable[:10]}\n"
         f"  Node:   {len(node_unreachable)} sections {node_unreachable[:10]}"
     )
-    
+
     # Verify we got the expected 21 unreachable sections
     assert len(python_unreachable) == 21, (
         f"Expected 21 unreachable sections, got {len(python_unreachable)}"
@@ -180,26 +182,29 @@ def test_validation_report_includes_unreachable_sections(sample_gamebook):
     with tempfile.NamedTemporaryFile(mode='w', suffix='.json', delete=False) as f:
         json.dump(sample_gamebook, f)
         gamebook_path = f.name
-    
+
     try:
         # Run Python validator (without Node delegation - should have empty unreachable)
         report_without_node = validate_gamebook(sample_gamebook, 1, 10)
         assert len(report_without_node.unreachable_sections) == 0
-        
+
         # Now test with Node validator delegation
-        unreachable = _get_unreachable_sections_from_node_validator(
+        node_result = _call_node_validator(
             gamebook_path,
             str(NODE_VALIDATOR_DIR),
             "node"
         )
-        
+
+        # Build report with Node validator results
+        report_with_node = validate_gamebook(sample_gamebook, 1, 10, node_validator_result=node_result)
+
         # Verify we got unreachable sections
-        assert len(unreachable) > 0, "Expected at least one unreachable section in test gamebook"
-        
+        assert len(report_with_node.unreachable_sections) > 0, "Expected at least one unreachable section in test gamebook"
+
         # Verify sections 7 and 8 are unreachable (not connected to startSection "1")
-        assert "7" in unreachable, "Section 7 should be unreachable"
-        assert "8" in unreachable, "Section 8 should be unreachable"
-        
+        assert "7" in report_with_node.unreachable_sections, "Section 7 should be unreachable"
+        assert "8" in report_with_node.unreachable_sections, "Section 8 should be unreachable"
+
     finally:
         os.unlink(gamebook_path)
 
@@ -208,15 +213,15 @@ def test_node_validator_error_handling():
     """Test that Python validator handles Node validator errors gracefully."""
     # Test with non-existent gamebook
     with pytest.raises((FileNotFoundError, RuntimeError)):
-        _get_unreachable_sections_from_node_validator(
+        _call_node_validator(
             "/nonexistent/gamebook.json",
             str(NODE_VALIDATOR_DIR),
             "node"
         )
-    
+
     # Test with invalid Node validator directory
     with pytest.raises(FileNotFoundError):
-        _get_unreachable_sections_from_node_validator(
+        _call_node_validator(
             "/tmp/test.json",
             "/nonexistent/validator",
             "node"
@@ -229,36 +234,36 @@ def test_caching_works(sample_gamebook):
     with tempfile.NamedTemporaryFile(mode='w', suffix='.json', delete=False) as f:
         json.dump(sample_gamebook, f)
         gamebook_path = f.name
-    
+
     try:
         # First call - should hit subprocess
-        result1 = _get_unreachable_sections_from_node_validator(
+        result1 = _call_node_validator(
             gamebook_path,
             str(NODE_VALIDATOR_DIR),
             "node",
             use_cache=True
         )
-        
+
         # Second call with same file - should use cache (no subprocess)
         # We can't directly verify cache hit, but we can verify results are identical
-        result2 = _get_unreachable_sections_from_node_validator(
+        result2 = _call_node_validator(
             gamebook_path,
             str(NODE_VALIDATOR_DIR),
             "node",
             use_cache=True
         )
-        
+
         assert result1 == result2, "Cached result should match first call"
-        
+
         # Third call with cache disabled - should hit subprocess again
-        result3 = _get_unreachable_sections_from_node_validator(
+        result3 = _call_node_validator(
             gamebook_path,
             str(NODE_VALIDATOR_DIR),
             "node",
             use_cache=False
         )
-        
+
         assert result1 == result3, "Result with cache disabled should match"
-        
+
     finally:
         os.unlink(gamebook_path)

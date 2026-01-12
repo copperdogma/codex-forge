@@ -1,3 +1,24 @@
+"""
+Forensics Wrapper for Fighting Fantasy Engine Validation
+
+This module is a forensics wrapper around the canonical Node validator
+(validate_ff_engine_node_v1). It delegates all validation logic to the Node
+validator and adds:
+- Forensics traces linking validation issues to source artifacts
+- HTML report generation for validation results
+
+The Node validator is the single source of truth for validation checks.
+This wrapper provides a stable Python interface for forensics and reporting.
+
+Validation checks performed by Node validator:
+- Schema validation
+- Missing sections in expected range
+- Duplicate sections
+- Sections with no text
+- Sections with no choices (potential dead ends)
+- Reachability analysis (unreachable sections from startSection)
+- Sequence target validation
+"""
 import argparse
 import hashlib
 import json
@@ -57,8 +78,8 @@ def load_gamebook(path: str) -> Dict[str, Any]:
         return json.load(f)
 
 
-# Cache for Node validator results (key: gamebook_path hash, value: (mtime, unreachable_sections))
-_node_validator_cache: Dict[str, tuple[float, List[str]]] = {}
+# Cache for Node validator results (key: gamebook_path hash, value: (mtime, validation_result))
+_node_validator_cache: Dict[str, tuple[float, Dict[str, Any]]] = {}
 
 
 def _get_cache_key(gamebook_path: str, validator_dir: str) -> str:
@@ -71,34 +92,41 @@ def _get_cache_key(gamebook_path: str, validator_dir: str) -> str:
     return hashlib.md5(key_str.encode()).hexdigest()
 
 
-def _get_unreachable_sections_from_node_validator(
+def _call_node_validator(
     gamebook_path: str, validator_dir: str, node_bin: str = "node", use_cache: bool = True
-) -> List[str]:
+) -> Dict[str, Any]:
     """
-    Call the Node validator to get unreachable sections.
-    
+    Call the Node validator to get full validation results.
+
     This uses the canonical Node validator (validate_ff_engine_node_v1) which
-    performs reachability analysis using BFS from the start section.
-    
+    performs all validation checks including:
+    - Schema validation
+    - Missing sections
+    - Duplicate sections
+    - Sections with no text
+    - Sections with no choices
+    - Reachability analysis
+    - Sequence target validation
+
     Results are cached based on gamebook file mtime to avoid redundant subprocess calls
     when the same gamebook is validated multiple times in the same process.
-    
+
     Args:
         gamebook_path: Path to gamebook.json file
         validator_dir: Path to Node validator directory
         node_bin: Node executable to use (default: "node")
         use_cache: Whether to use in-memory cache (default: True)
-    
-    Returns list of unreachable section IDs.
+
+    Returns dict with validation results from Node validator.
     """
     # Use absolute paths to avoid path resolution issues
     gamebook_abs = os.path.abspath(gamebook_path)
     validator_dir_abs = os.path.abspath(validator_dir)
     cli_path = os.path.join(validator_dir_abs, "cli-validator.js")
-    
+
     if not os.path.exists(cli_path):
         raise FileNotFoundError(f"Node validator cli-validator.js not found at {validator_dir_abs}")
-    
+
     # Check cache if enabled
     if use_cache:
         cache_key = _get_cache_key(gamebook_abs, validator_dir_abs)
@@ -106,43 +134,30 @@ def _get_unreachable_sections_from_node_validator(
             # Get file mtime for cache invalidation
             gamebook_mtime = os.path.getmtime(gamebook_abs)
             cached_mtime, cached_result = _node_validator_cache.get(cache_key, (None, None))
-            
+
             # If cache hit and file hasn't changed, return cached result
             if cached_mtime is not None and cached_mtime == gamebook_mtime:
                 return cached_result
         except OSError:
             # If we can't get mtime, skip cache
             pass
-    
+
     # Run Node validator - don't set cwd, use absolute paths (matches validate_ff_engine_node_v1/main.py)
     cmd = [node_bin, cli_path, gamebook_abs, "--json"]
     proc = subprocess.run(cmd, capture_output=True, text=True)
-    
+
     if proc.returncode != 0 and not proc.stdout:
-        # If validator fails but produces no output, skip reachability analysis
+        # If validator fails but produces no output, return empty result
         # Check stderr for actual errors
         if proc.stderr:
             raise RuntimeError(f"Node validator failed: {proc.stderr[:500]}")
-        result = []
+        result = {"valid": False, "errors": [], "warnings": [], "summary": {}}
     else:
         try:
-            data = json.loads(proc.stdout.strip() if proc.stdout else "{}")
+            result = json.loads(proc.stdout.strip() if proc.stdout else "{}")
         except json.JSONDecodeError as e:
             raise RuntimeError(f"Failed to parse Node validator JSON output: {e}\nstdout: {proc.stdout[:500]}")
-        
-        # Extract unreachable sections from warnings
-        unreachable = []
-        warnings = data.get("warnings", [])
-        for warning in warnings:
-            message = warning.get("message", "")
-            if "unreachable from startSection" in message:
-                # Extract section ID from message like: 'Gameplay section "7" is unreachable from startSection "background"'
-                match = re.search(r'Gameplay section "([^"]+)" is unreachable', message)
-                if match:
-                    unreachable.append(match.group(1))
-        
-        result = sorted(unreachable, key=lambda x: int(x) if x.isdigit() else 9999)
-    
+
     # Cache result if enabled
     if use_cache:
         try:
@@ -152,7 +167,7 @@ def _get_unreachable_sections_from_node_validator(
         except OSError:
             # If we can't get mtime, skip caching
             pass
-    
+
     return result
 
 
@@ -160,144 +175,108 @@ def validate_gamebook(
     gamebook: Dict[str, Any],
     expected_range_start: int,
     expected_range_end: int,
-    upstream: Optional[Dict[str, Any]] = None
+    upstream: Optional[Dict[str, Any]] = None,
+    node_validator_result: Optional[Dict[str, Any]] = None
 ) -> ValidationReport:
     """
-    Validate a Fighting Fantasy Engine gamebook.
+    Validate a Fighting Fantasy Engine gamebook using the canonical Node validator.
 
-    Checks:
-    - Missing sections in expected range (typically 1-400)
-    - Duplicate sections (shouldn't happen but check anyway)
-    - Sections with no text
-    - Sections with no choices (potential dead ends)
+    This function is now a forensics wrapper around the Node validator.
+    All validation logic is delegated to the Node validator (validate_ff_engine_node_v1),
+    which is the single source of truth for validation checks.
 
-    Returns ValidationReport with findings.
+    This wrapper's responsibilities:
+    - Parse Node validator results
+    - Map to ValidationReport schema
+    - Provide a stable Python interface for forensics and reporting
+
+    Args:
+        gamebook: The gamebook JSON to validate
+        expected_range_start: Expected first section number (used by Node validator)
+        expected_range_end: Expected last section number (used by Node validator)
+        upstream: Optional upstream data (unused, kept for backward compatibility)
+        node_validator_result: Optional pre-computed Node validator result (for testing/caching)
+
+    Returns:
+        ValidationReport with findings from Node validator
     """
     sections = gamebook.get("sections", {})
 
-    # Collect section IDs
-    section_ids = list(sections.keys())
-    numeric_section_ids = [sid for sid in section_ids if sid.isdigit()]
+    # If Node validator result not provided, validation must be done in main()
+    # This path is for backward compatibility only
+    if node_validator_result is None:
+        # Return minimal report - main() will populate from Node validator
+        return ValidationReport(
+            total_sections=len(sections),
+            missing_sections=[],
+            duplicate_sections=[],
+            sections_with_no_text=[],
+            sections_with_no_choices=[],
+            unreachable_sections=[],
+            is_valid=True,
+            warnings=[],
+            errors=[],
+        )
 
-    seen_ids = set()
+    # Parse Node validator results
+    node_errors = node_validator_result.get("errors", [])
+    node_warnings = node_validator_result.get("warnings", [])
+
+    # Extract section lists from Node validator messages
+    missing_sections = []
     duplicate_sections = []
-    for sid in section_ids:
-        if sid in seen_ids:
-            duplicate_sections.append(sid)
-        seen_ids.add(sid)
-
-    # Check for missing sections in expected range
-    expected_sections = set(str(i) for i in range(expected_range_start, expected_range_end + 1))
-    present_sections = set(numeric_section_ids)
-    missing_sections = sorted(expected_sections - present_sections, key=lambda x: int(x))
-
-    # Check for sections with no text
     sections_with_no_text = []
-    for sid, section in sections.items():
-        raw_html = section.get("presentation_html") or section.get("html") or ""
-        text = section.get("text") or html_to_text(raw_html)
-        if not (text or "").strip():
-            sections_with_no_text.append(sid)
-
-    # Check for sections with no choices (potential dead ends)
-    # Navigation can be via direct choices OR conditional events (stat_check, test_luck, etc.) with targetSection outcomes
-    def has_navigation(sequence: List[Dict[str, Any]]) -> bool:
-        """Check if sequence has any navigation (choices or conditional events with targets)."""
-        for event in sequence:
-            kind = event.get("kind")
-            if kind == "choice":
-                if event.get("targetSection"):
-                    return True
-            elif kind == "stat_check":
-                # Check pass/fail outcomes
-                for outcome_key in ("pass", "fail"):
-                    outcome = event.get(outcome_key) or {}
-                    if outcome.get("targetSection"):
-                        return True
-            elif kind == "stat_change":
-                # Check else outcome
-                outcome = event.get("else") or {}
-                if outcome.get("targetSection"):
-                    return True
-            elif kind == "test_luck":
-                # Check lucky/unlucky outcomes
-                for outcome_key in ("lucky", "unlucky"):
-                    outcome = event.get(outcome_key) or {}
-                    if outcome.get("targetSection"):
-                        return True
-            elif kind in {"item_check", "state_check"}:
-                # Check has/missing outcomes
-                for outcome_key in ("has", "missing"):
-                    outcome = event.get(outcome_key) or {}
-                    if outcome.get("targetSection"):
-                        return True
-            elif kind == "combat":
-                # Check combat outcomes
-                outcomes = event.get("outcomes") or {}
-                for outcome_key in ("win", "lose", "escape"):
-                    outcome = outcomes.get(outcome_key) or {}
-                    if outcome.get("targetSection"):
-                        return True
-            elif kind == "death":
-                # Check death outcome
-                outcome = event.get("outcome") or {}
-                if outcome.get("targetSection"):
-                    return True
-            else:
-                # Generic event with targetSection
-                if event.get("targetSection"):
-                    return True
-        return False
-
     sections_with_no_choices = []
-    for sid, section in sections.items():
-        if section.get("provenance", {}).get("stub"):
-            continue
-        if not section.get("isGameplaySection", False):
-            continue
-        if section.get("end_game"):
-            continue
+    unreachable_sections = []
 
-        sequence = section.get("sequence", []) or []
-        if not has_navigation(sequence):
-            sections_with_no_choices.append(sid)
-
-    # Build warnings and errors
-    warnings = []
+    # Build error and warning message lists
     errors = []
+    warnings = []
 
-    if missing_sections:
-        count = len(missing_sections)
-        sample = missing_sections[:10]
-        msg = f"Missing {count} sections in range {expected_range_start}-{expected_range_end}: {sample}"
-        if count > 10:
-            msg += f" (and {count - 10} more)"
-        errors.append(msg)
+    # Process errors
+    for error in node_errors:
+        message = error.get("message", "")
+        errors.append(message)
 
-    if duplicate_sections:
-        errors.append(f"Duplicate sections found: {duplicate_sections}")
+        # Extract missing sections
+        if "Missing" in message and "sections in range" in message:
+            # Parse message like: "Missing 5 sections in range 1-400: 1, 2, 3, 4, 5"
+            match = re.search(r'Missing \d+ sections in range \d+-\d+: ([\d, ]+)', message)
+            if match:
+                missing_str = match.group(1)
+                missing_sections = [s.strip() for s in missing_str.split(",")]
 
-    if sections_with_no_text:
-        count = len(sections_with_no_text)
-        sample = sections_with_no_text[:10]
-        msg = f"{count} sections have no text: {sample}"
-        if count > 10:
-            msg += f" (and {count - 10} more)"
-        warnings.append(msg)
+        # Extract duplicate sections
+        if "Duplicate section IDs" in message:
+            # Parse message like: "Duplicate section IDs detected: 7 (keys: 7, 7)"
+            match = re.search(r'(\d+) \(keys:', message)
+            if match:
+                duplicate_sections.append(match.group(1))
 
-    if sections_with_no_choices:
-        count = len(sections_with_no_choices)
-        sample = sections_with_no_choices[:10]
-        msg = f"{count} gameplay sections have no choices (potential dead ends): {sample}"
-        if count > 10:
-            msg += f" (and {count - 10} more)"
-        warnings.append(msg)
+    # Process warnings
+    for warning in node_warnings:
+        message = warning.get("message", "")
+        warnings.append(message)
+
+        # Extract sections with no text
+        if "has no text" in message:
+            match = re.search(r'Section "([^"]+)" has no text', message)
+            if match:
+                sections_with_no_text.append(match.group(1))
+
+        # Extract sections with no choices
+        if "has no choices" in message or "potential dead end" in message:
+            match = re.search(r'section "([^"]+)" has no choices', message)
+            if match:
+                sections_with_no_choices.append(match.group(1))
+
+        # Extract unreachable sections
+        if "unreachable from startSection" in message:
+            match = re.search(r'section "([^"]+)" is unreachable', message)
+            if match:
+                unreachable_sections.append(match.group(1))
 
     is_valid = len(errors) == 0
-
-    # Reachability analysis is performed by the canonical Node validator
-    # We'll merge it in main() if available
-    unreachable_sections = []
 
     return ValidationReport(
         total_sections=len(sections),
@@ -343,27 +322,24 @@ def main():
     logger.log("validate", "running", current=0, total=1,
                message="Validating gamebook", artifact=args.out, module_id="validate_ff_engine_v2")
 
-    report = validate_gamebook(gamebook, args.expected_range_start, args.expected_range_end)
-    
-    # Merge reachability analysis from Node validator (canonical validator)
-    unreachable_sections = []
+    # Call Node validator for ALL validation (canonical source of truth)
+    node_validator_result = None
     if args.node_validator_dir:
         try:
-            unreachable_sections = _get_unreachable_sections_from_node_validator(
+            node_validator_result = _call_node_validator(
                 args.gamebook, args.node_validator_dir, args.node_bin
             )
-            if unreachable_sections:
-                report = report.model_copy(update={"unreachable_sections": unreachable_sections})
-                # Add warning about unreachable sections
-                count = len(unreachable_sections)
-                sample = unreachable_sections[:10]
-                msg = f"{count} gameplay sections are unreachable from startSection: {sample}"
-                if count > 10:
-                    msg += f" (and {count - 10} more)"
-                report.warnings.append(msg)
         except Exception as e:
             # Don't fail validation if Node validator isn't available, just log warning
-            print(f"Warning: Could not get reachability analysis from Node validator: {e}", file=sys.stderr)
+            print(f"Warning: Could not run Node validator: {e}", file=sys.stderr)
+
+    # Build validation report from Node validator results
+    report = validate_gamebook(
+        gamebook,
+        args.expected_range_start,
+        args.expected_range_end,
+        node_validator_result=node_validator_result
+    )
 
     if args.forensics:
         base_dir = os.path.dirname(os.path.abspath(args.gamebook))

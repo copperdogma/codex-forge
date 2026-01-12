@@ -138,7 +138,7 @@ This index tracks stories in `/docs/stories/` for the codex-forge pipeline.
 ||| 119 | Robot Commando Missing Choices Investigation | High | Done | /docs/stories/story-119-robot-commando-missing-choices-investigation.md |
 ||| 120 | Validation Inconsistency — Reachability Analysis | High | Done | /docs/stories/story-120-validation-inconsistency-reachability.md |
 |||| 121 | Robot Commando Unreachable Sections Investigation | High | To Do | /docs/stories/story-121-robot-commando-unreachable-sections-investigation.md |
-|||| 122 | Refactor Python Validator into Forensics Wrapper | Medium | To Do | /docs/stories/story-122-refactor-python-validator-forensics-wrapper.md |
+|||| 122 | Refactor Python Validator into Forensics Wrapper | Medium | Done | /docs/stories/story-122-refactor-python-validator-forensics-wrapper.md |
 
 ## Notes
 - Status "Done" reflects current working state in codex-forge. "To Do" items are planned next steps aligned with `docs/requirements.md` and `snapshot.md`.
