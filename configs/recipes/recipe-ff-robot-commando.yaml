@@ -455,12 +455,23 @@ stages:
       remove_page_numbers: true
       remove_images: true
 
+  - id: resolve_calculation_puzzles
+    stage: enrich
+    module: resolve_calculation_puzzles_v1
+    needs: [clean_presentation]
+    inputs:
+      gamebook: clean_presentation
+    out: gamebook_with_puzzles.json
+    params:
+      model: gpt-4o-mini
+      confidence_threshold: 0.8
+
   - id: apply_edgecase_patches
     stage: export
     module: apply_edgecase_patches_v1
-    needs: [clean_presentation]
+    needs: [resolve_calculation_puzzles]
     inputs:
-      input: clean_presentation
+      input: resolve_calculation_puzzles
     out: gamebook_patched.json
     params:
       patches: edgecase_patches.jsonl

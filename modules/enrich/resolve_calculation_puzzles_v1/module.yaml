@@ -1,0 +1,17 @@
+module_id: resolve_calculation_puzzles_v1
+stage: enrich
+description: >
+  Detects sections with calculation/puzzle instructions and uses AI to resolve
+  them by reasoning with game context (items, state values). Creates conditional
+  links to target sections, making calculation puzzles navigable.
+entrypoint: modules/enrich/resolve_calculation_puzzles_v1/main.py
+input_schema: gamebook_v1
+output_schema: gamebook_v1
+params:
+  gamebook: Input gamebook.json path.
+  out: Output gamebook.json path (enhanced with calculated links).
+  model: LLM to use (default gpt-4o-mini).
+  confidence_threshold: Minimum confidence to add links (default 0.8).
+  progress_file: Optional pipeline_events.jsonl path.
+  state_file: Optional pipeline_state.json path.
+  run_id: Optional run identifier for logging.

@@ -579,21 +579,146 @@ function findReachableSections(gamebook) {
     return reachable;
 }
 /**
- * Identify unreachable gameplay sections
+ * Identify unreachable gameplay sections and entry points
+ *
+ * Entry points are unreachable sections that are not referenced by other unreachable sections.
+ * This helps distinguish root causes (e.g., 8 orphaned sections) from descendants (e.g., 13 sections in chains).
  */
 function findUnreachableSections(gamebook) {
     const warnings = [];
     const reachable = findReachableSections(gamebook);
+    const unreachableSections = [];
+
+    // Find all unreachable sections
     for (const [sectionKey, section] of Object.entries(gamebook.sections)) {
-        // Only warn about unreachable gameplay sections
         if (section.isGameplaySection && !reachable.has(sectionKey)) {
+            unreachableSections.push(sectionKey);
             warnings.push({
                 path: `/sections/${sectionKey}`,
                 message: `Gameplay section "${sectionKey}" is unreachable from startSection "${gamebook.metadata.startSection}"`,
             });
         }
     }
+
+    // Build a map of which unreachable sections reference other unreachable sections
+    const unreachableReferences = new Set();
+    for (const sectionKey of unreachableSections) {
+        const section = gamebook.sections[sectionKey];
+        const sequence = section.sequence || [];
+
+        // Extract all target sections from sequence events
+        for (const event of sequence) {
+            const targets = extractTargetsFromEvent(event);
+            for (const target of targets) {
+                if (unreachableSections.includes(target)) {
+                    unreachableReferences.add(target);
+                }
+            }
+        }
+    }
+
+    // Entry points are unreachable sections NOT referenced by other unreachable sections
+    const entryPoints = unreachableSections.filter(id => !unreachableReferences.has(id));
+
+    // Detect manual conditional navigation sections (unreachable via code but reachable via manual instructions)
+    const manualNavigationSections = detectManualNavigationSections(gamebook, entryPoints);
+
+    // Add metadata to first warning (if any)
+    if (warnings.length > 0 && entryPoints.length > 0) {
+        warnings[0].entryPoints = entryPoints;
+        warnings[0].manualNavigationSections = manualNavigationSections;
+    }
+
     return warnings;
+}
+
+/**
+ * Detect sections that are reachable via manual conditional navigation
+ *
+ * These are sections that appear unreachable via extracted choices, but are actually
+ * reachable through "turn to X" instructions in the text (not code-extractable).
+ *
+ * Detection patterns:
+ * 1. Section text contains password/countersign usage (e.g., "You give the proper countersign")
+ * 2. Numeric section IDs that might be password references (e.g., section 7 for "seven")
+ * 3. Sections with conditional access language (e.g., "You use the code-words")
+ */
+function detectManualNavigationSections(gamebook, entryPoints) {
+    const manualNavigation = [];
+
+    for (const sectionId of entryPoints) {
+        const section = gamebook.sections[sectionId];
+        if (!section) continue;
+
+        const html = section.presentation_html || '';
+        const text = html.toLowerCase();
+
+        // Pattern 1: Password/countersign usage (player is already using something they learned)
+        const hasPasswordUsage = /\b(you give|you use|you show|you present)\b.*\b(password|countersign|code-?word|map reference)\b/i.test(text);
+
+        // Pattern 2: Conditional access language at the start
+        const hasConditionalStart = /^<[^>]*>\s*(you give|you use|you have|what will you do)/i.test(html);
+
+        // Pattern 3: Numeric section ID that could be a password (small numbers or round numbers)
+        const numericId = parseInt(sectionId);
+        const isPotentialPasswordNumber = !isNaN(numericId) && (
+            (numericId >= 1 && numericId <= 20) ||  // Small numbers (one, two, ..., twenty)
+            (numericId % 100 === 0)  // Round numbers (100, 200, 300)
+        );
+
+        // Pattern 4: Text mentions challenge or encounter by name (e.g., "Challenge Minos")
+        const hasNamedChallenge = /\b(challenge|meet|confront|face)\b.*\b[A-Z][a-z]+\b/i.test(text);
+
+        if (hasPasswordUsage || (hasConditionalStart && isPotentialPasswordNumber) || hasNamedChallenge) {
+            manualNavigation.push(sectionId);
+        }
+    }
+
+    return manualNavigation;
+}
+
+/**
+ * Extract target sections from a sequence event
+ */
+function extractTargetsFromEvent(event) {
+    const targets = [];
+    const kind = event.kind;
+
+    if (kind === 'choice' && event.targetSection) {
+        targets.push(event.targetSection);
+    } else if (kind === 'stat_check' || kind === 'test_luck') {
+        for (const key of ['pass', 'fail', 'lucky', 'unlucky']) {
+            const outcome = event[key];
+            if (outcome && outcome.targetSection) {
+                targets.push(outcome.targetSection);
+            }
+        }
+    } else if (kind === 'item_check' || kind === 'state_check') {
+        for (const key of ['has', 'missing']) {
+            const outcome = event[key];
+            if (outcome && outcome.targetSection) {
+                targets.push(outcome.targetSection);
+            }
+        }
+    } else if (kind === 'combat') {
+        const outcomes = event.outcomes || {};
+        for (const key of ['win', 'lose', 'escape']) {
+            const outcome = outcomes[key];
+            if (outcome && outcome.targetSection) {
+                targets.push(outcome.targetSection);
+            }
+        }
+    } else if (kind === 'death') {
+        const outcome = event.outcome;
+        if (outcome && outcome.targetSection) {
+            targets.push(outcome.targetSection);
+        }
+    } else if (event.targetSection) {
+        // Generic fallback for events with targetSection
+        targets.push(event.targetSection);
+    }
+
+    return targets;
 }
 /**
  * Validate stat modifications have valid stat names
@@ -712,16 +837,29 @@ function validateGamebook(gamebook) {
         const gameplaySections = Object.values(gamebook.sections).filter(s => s.isGameplaySection).length;
         let reachableSections = 0;
         let unreachableSections = 0;
+        let unreachableEntryPoints = 0;
+        let manualNavigationSections = 0;
         if (gamebook.metadata.startSection && gamebook.sections[gamebook.metadata.startSection]) {
             const reachable = findReachableSections(gamebook);
             reachableSections = reachable.size;
             unreachableSections = warnings.filter(w => w.message.includes('unreachable')).length;
+
+            // Extract entry points and manual navigation counts from warnings metadata
+            const firstUnreachableWarning = warnings.find(w => w.message.includes('unreachable'));
+            if (firstUnreachableWarning && firstUnreachableWarning.entryPoints) {
+                unreachableEntryPoints = firstUnreachableWarning.entryPoints.length;
+            }
+            if (firstUnreachableWarning && firstUnreachableWarning.manualNavigationSections) {
+                manualNavigationSections = firstUnreachableWarning.manualNavigationSections.length;
+            }
         }
         summary = {
             totalSections,
             gameplaySections,
             reachableSections,
             unreachableSections,
+            unreachableEntryPoints,
+            manualNavigationSections,
             totalErrors: errors.length,
             totalWarnings: warnings.length,
         };

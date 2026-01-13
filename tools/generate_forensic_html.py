@@ -113,43 +113,52 @@ def calculate_quality_score(report: dict) -> tuple[float, str]:
     """
     Calculate quality score (0-100) based on validation issues.
     Returns (score, class_name) where class_name is 'good', 'warning', or 'poor'.
-    
+
     Scoring:
     - Start with 100 points
     - Deduct points based on issue severity and percentage of sections affected
     - Errors: -5 points each (critical)
     - Missing sections: -2 points each (severe)
-    - Unreachable sections: -1 point each (significant, but may be intentional)
+    - Unreachable entry points: -1 point each (root causes)
+    - Unreachable descendants: -0.2 points each (cascade from entry points)
     - No text/choices: -0.5 points each (moderate)
     - Broken links/orphans: -0.5 points each (moderate)
     """
     total_sections = report.get("total_sections", 1)
     if total_sections == 0:
         return 0.0, "poor"
-    
+
     # Count issues
     missing = len(report.get("missing_sections", []))
     no_text = len(report.get("sections_with_no_text", []))
     no_choices = len(report.get("sections_with_no_choices", []))
     unreachable = len(report.get("unreachable_sections", []))
+    unreachable_entry_points = len(report.get("unreachable_entry_points", []))
+    manual_navigation = len(report.get("manual_navigation_sections", []))
+    unreachable_descendants = unreachable - unreachable_entry_points  # Sections in chains from entry points
     errors = len(report.get("errors", []))
-    
-    forensics = report.get("forensics", {})
+
+    # Manual navigation sections are NOT broken - they're reachable via text instructions
+    # Only penalize true orphan entry points (entry points that are not manual navigation)
+    true_orphan_entry_points = unreachable_entry_points - manual_navigation
+
+    forensics = report.get("forensics") or {}
     broken_links = len(forensics.get("broken_links", {}))
     orphans = len(forensics.get("orphans", {}))
-    
+
     # Calculate penalty (weighted by severity)
     penalty = (
-        errors * 5.0 +           # Critical: -5 each
-        missing * 2.0 +          # Severe: -2 each
-        unreachable * 1.0 +      # Significant: -1 each (may be intentional dead ends)
-        (no_text + no_choices) * 0.5 +  # Moderate: -0.5 each
-        (broken_links + orphans) * 0.5   # Moderate: -0.5 each
+        errors * 5.0 +                      # Critical: -5 each
+        missing * 2.0 +                     # Severe: -2 each
+        true_orphan_entry_points * 1.0 +    # Significant: -1 each (true orphans only, not manual navigation)
+        unreachable_descendants * 0.2 +     # Minor: -0.2 each (cascade from entry points)
+        (no_text + no_choices) * 0.5 +      # Moderate: -0.5 each
+        (broken_links + orphans) * 0.5       # Moderate: -0.5 each
     )
-    
+
     # Calculate score (100 - penalty, clamped to 0-100)
     score = max(0, min(100, 100 - penalty))
-    
+
     # Determine quality class
     if score >= 90:
         quality_class = "good"
@@ -157,7 +166,7 @@ def calculate_quality_score(report: dict) -> tuple[float, str]:
         quality_class = "warning"
     else:
         quality_class = "poor"
-    
+
     return round(score, 1), quality_class
 
 
@@ -192,8 +201,8 @@ def generate_html(report_path: str, out_path: str):
     no_text = report.get("sections_with_no_text", [])
     no_choices = report.get("sections_with_no_choices", [])
     unreachable_sections = report.get("unreachable_sections", [])
-    forensics = report.get("forensics", {})
-    
+    forensics = report.get("forensics") or {}
+
     broken_links = forensics.get("broken_links", {}).keys()
     orphans = forensics.get("orphans", {}).keys()
 
@@ -289,6 +298,24 @@ def generate_html(report_path: str, out_path: str):
         parts.append("</div>")
         content_parts.append("".join(parts))
 
+    # Build unreachable count display with entry points and manual navigation info
+    unreachable_entry_points_list = report.get("unreachable_entry_points", [])
+    manual_navigation_list = report.get("manual_navigation_sections", [])
+
+    if len(unreachable_entry_points_list) > 0 and len(unreachable_entry_points_list) < len(unreachable_sections):
+        entry_points_count = len(unreachable_entry_points_list)
+        manual_nav_count = len(manual_navigation_list)
+        true_orphans_count = entry_points_count - manual_nav_count
+
+        if manual_nav_count > 0:
+            # Show breakdown: total (entry points: X manual navigation, Y true orphans)
+            unreachable_display = f"{len(unreachable_sections)} ({entry_points_count} entry points: {manual_nav_count} manual navigation, {true_orphans_count} true orphans)"
+        else:
+            # No manual navigation, just show entry points
+            unreachable_display = f"{len(unreachable_sections)} ({entry_points_count} entry points)"
+    else:
+        unreachable_display = str(len(unreachable_sections))
+
     final_html = HTML_TEMPLATE.format(
         status_text=status_text,
         status_class=status_class,
@@ -297,7 +324,7 @@ def generate_html(report_path: str, out_path: str):
         missing_count=len(missing_sections),
         no_text_count=len(no_text),
         no_choices_count=len(no_choices),
-        unreachable_count=len(unreachable_sections),
+        unreachable_count=unreachable_display,
         broken_links_count=len(broken_links),
         orphans_count=len(orphans),
         run_id=report.get("run_id", "N/A"),

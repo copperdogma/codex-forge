@@ -228,6 +228,8 @@ def validate_gamebook(
     sections_with_no_text = []
     sections_with_no_choices = []
     unreachable_sections = []
+    unreachable_entry_points = []
+    manual_navigation_sections = []
 
     # Build error and warning message lists
     errors = []
@@ -276,6 +278,14 @@ def validate_gamebook(
             if match:
                 unreachable_sections.append(match.group(1))
 
+            # Extract entry points from first unreachable warning metadata
+            if not unreachable_entry_points and "entryPoints" in warning:
+                unreachable_entry_points = warning["entryPoints"]
+
+            # Extract manual navigation sections from first unreachable warning metadata
+            if not manual_navigation_sections and "manualNavigationSections" in warning:
+                manual_navigation_sections = warning["manualNavigationSections"]
+
     is_valid = len(errors) == 0
 
     return ValidationReport(
@@ -285,6 +295,8 @@ def validate_gamebook(
         sections_with_no_text=sections_with_no_text,
         sections_with_no_choices=sections_with_no_choices,
         unreachable_sections=unreachable_sections,
+        unreachable_entry_points=unreachable_entry_points,
+        manual_navigation_sections=manual_navigation_sections,
         is_valid=is_valid,
         warnings=warnings,
         errors=errors,

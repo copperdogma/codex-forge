@@ -797,6 +797,8 @@ class ValidationReport(BaseModel):
     sections_with_no_text: List[str] = Field(default_factory=list)
     sections_with_no_choices: List[str] = Field(default_factory=list)
     unreachable_sections: List[str] = Field(default_factory=list)  # Sections unreachable from startSection (from Node validator)
+    unreachable_entry_points: List[str] = Field(default_factory=list)  # Entry points: unreachable sections not referenced by other unreachable sections
+    manual_navigation_sections: List[str] = Field(default_factory=list)  # Sections reachable via manual "turn to X" instructions (not code-extractable)
 
     is_valid: bool  # True if no critical errors
     warnings: List[str] = Field(default_factory=list)
