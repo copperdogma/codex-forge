@@ -17,6 +17,10 @@ except ImportError:  # pragma: no cover - resource not on Windows
 import yaml
 
 from modules.common.utils import ensure_dir, ProgressLogger, append_jsonl, read_jsonl, save_json
+from modules.common.patch_handler import (
+    discover_patch_file, copy_patch_file_to_run, load_patches, apply_patch,
+    get_suppressed_warnings, should_suppress_warning
+)
 from validate_artifact import SCHEMA_MAP
 from modules.common.utils import save_jsonl
 from schemas import RunConfig
@@ -1020,6 +1024,12 @@ def build_command(entrypoint: str, params: Dict[str, Any], stage_conf: Dict[str,
         # Legacy special-case for forensics in ff_engine_v2
         if stage_conf["module"] == "validate_ff_engine_v2" and "--forensics" not in flags_added:
             cmd += ["--forensics"]; flags_added.add("--forensics")
+        
+        # Pass patch file to validation modules for warning suppression
+        patch_file_path = os.path.join(run_dir, "patch.json")
+        if os.path.exists(patch_file_path) and "--patch-file" not in flags_added:
+            cmd += ["--patch-file", patch_file_path]
+            flags_added.add("--patch-file")
             
         cmd += ["--out", artifact_path]
         flags_added.add("--out")
@@ -1520,6 +1530,24 @@ def main():
             print(f"Warning: Failed to snapshot run config: {e}", file=sys.stderr)
 
     register_run(run_id, run_dir, recipe, instrumentation=instrumentation_paths, snapshots=snapshots)
+
+    # Discover and copy patch file if it exists
+    patch_file_path = None
+    input_pdf = input_conf.get("pdf")
+    input_images = input_conf.get("images")
+    discovered_patch = discover_patch_file(input_pdf=input_pdf, input_images=input_images)
+    if discovered_patch:
+        try:
+            patch_file_path = copy_patch_file_to_run(discovered_patch, run_dir)
+            logger.log("patch_discovery", "done", artifact=patch_file_path,
+                       message=f"Discovered and copied patch file from {discovered_patch}",
+                       module_id="driver", stage_description="patch file discovery")
+            print(f"ℹ️  Patch file discovered and copied: {patch_file_path}", file=sys.stderr)
+        except ValueError as e:
+            print(f"❌ Patch file validation failed: {e}", file=sys.stderr)
+            sys.exit(1)
+    else:
+        patch_file_path = os.path.join(run_dir, "patch.json")
 
     run_started_at = datetime.utcnow().isoformat() + "Z"
     run_wall_start = time.perf_counter()
@@ -2151,6 +2179,34 @@ def main():
                         record_stage_instrumentation(stage_id, module_id, "failed", artifact_path, out_schema,
                                                      stage_started_at, stage_wall_start, stage_cpu_start)
                         raise SystemExit(f"Validation failed for {artifact_path}: {errors} errors")
+        
+        # Apply patches that should run after this module
+        if patch_file_path and os.path.exists(patch_file_path):
+            try:
+                patches_data = load_patches(patch_file_path)
+                for patch in patches_data.get("patches", []):
+                    if patch.get("apply_after") == module_id:
+                        result = apply_patch(patch, run_dir, module_id)
+                        if result.get("success"):
+                            logger.log("patch_apply", "done", artifact=patch_file_path,
+                                      message=f"Applied patch {patch.get('id')}: {result.get('message')}",
+                                      module_id="driver", stage_description=f"patch application after {module_id}",
+                                      extra={"patch_id": patch.get("id"), "operation": patch.get("operation")})
+                            print(f"✓ Applied patch {patch.get('id')}: {result.get('message')}", file=sys.stderr)
+                        else:
+                            logger.log("patch_apply", "warning", artifact=patch_file_path,
+                                      message=f"Failed to apply patch {patch.get('id')}: {result.get('error')}",
+                                      module_id="driver", stage_description=f"patch application after {module_id}",
+                                      extra={"patch_id": patch.get("id"), "error": result.get("error")})
+                            print(f"⚠️  Patch {patch.get('id')} failed: {result.get('error')}", file=sys.stderr)
+            except Exception as e:
+                # Don't fail the pipeline if patch application fails
+                logger.log("patch_apply", "error", artifact=patch_file_path,
+                          message=f"Error loading/applying patches: {e}",
+                          module_id="driver", stage_description="patch application",
+                          extra={"error": str(e)})
+                print(f"⚠️  Error applying patches: {e}", file=sys.stderr)
+        
         update_state(state_path, progress_path, stage_id, "done", artifact_path, run_id, module_id, out_schema,
                      stage_description=stage_description)
         artifact_index[stage_id] = {"path": artifact_path, "schema": out_schema}

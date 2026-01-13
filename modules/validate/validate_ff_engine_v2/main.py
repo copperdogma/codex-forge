@@ -31,6 +31,7 @@ from typing import Dict, List, Any, Optional
 from modules.common.utils import save_json, ensure_dir, ProgressLogger, read_jsonl
 from modules.common.html_utils import html_to_text
 from modules.common.page_numbers import validate_sequential_page_numbers
+from modules.common.patch_handler import get_suppressed_warnings, should_suppress_warning
 from schemas import ValidationReport
 
 
@@ -176,7 +177,8 @@ def validate_gamebook(
     expected_range_start: int,
     expected_range_end: int,
     upstream: Optional[Dict[str, Any]] = None,
-    node_validator_result: Optional[Dict[str, Any]] = None
+    node_validator_result: Optional[Dict[str, Any]] = None,
+    patch_file: Optional[str] = None
 ) -> ValidationReport:
     """
     Validate a Fighting Fantasy Engine gamebook using the canonical Node validator.
@@ -255,10 +257,26 @@ def validate_gamebook(
             if match:
                 duplicate_sections.append(match.group(1))
 
-    # Process warnings
+    # Load suppressed warnings from patch file if provided
+    suppressed_patches = []
+    if patch_file and os.path.exists(patch_file):
+        suppressed_patches = get_suppressed_warnings(patch_file)
+
+    # Process warnings and filter suppressed ones
+    suppressed_warnings = []
+    effective_warnings = []
+    suppressed_unreachable = []
+    effective_unreachable = []
+    
     for warning in node_warnings:
         message = warning.get("message", "")
-        warnings.append(message)
+        
+        # Check if this warning should be suppressed
+        if should_suppress_warning(message, suppressed_patches):
+            suppressed_warnings.append(message)
+        else:
+            effective_warnings.append(message)
+            warnings.append(message)  # Keep in main warnings list for backward compatibility
 
         # Extract sections with no text
         if "has no text" in message:
@@ -276,7 +294,13 @@ def validate_gamebook(
         if "unreachable from startSection" in message:
             match = re.search(r'section "([^"]+)" is unreachable', message)
             if match:
-                unreachable_sections.append(match.group(1))
+                section_id = match.group(1)
+                unreachable_sections.append(section_id)
+                # Track suppressed vs effective unreachable sections
+                if should_suppress_warning(message, suppressed_patches):
+                    suppressed_unreachable.append(section_id)
+                else:
+                    effective_unreachable.append(section_id)
 
             # Extract entry points from first unreachable warning metadata
             if not unreachable_entry_points and "entryPoints" in warning:
@@ -288,7 +312,8 @@ def validate_gamebook(
 
     is_valid = len(errors) == 0
 
-    return ValidationReport(
+    # Build ValidationReport
+    validation_report = ValidationReport(
         total_sections=len(sections),
         missing_sections=missing_sections,
         duplicate_sections=duplicate_sections,
@@ -301,6 +326,14 @@ def validate_gamebook(
         warnings=warnings,
         errors=errors,
     )
+    
+    # Store suppression metadata as attributes (will be extracted in main() and added to JSON)
+    validation_report._suppressed_warnings = suppressed_warnings
+    validation_report._effective_warnings = effective_warnings
+    validation_report._suppressed_unreachable = suppressed_unreachable
+    validation_report._effective_unreachable = effective_unreachable
+    
+    return validation_report
 
 
 def main():
@@ -322,6 +355,7 @@ def main():
     parser.add_argument("--reachability-report", dest="reachability_report", help="Optional path to reachability_report.json to include broken links and orphans.")
     parser.add_argument("--node-validator-dir", dest="node_validator_dir", help="Optional path to Node validator directory for reachability analysis")
     parser.add_argument("--node-bin", dest="node_bin", default="node", help="Node executable to use for reachability analysis")
+    parser.add_argument("--patch-file", dest="patch_file", help="Optional path to patch.json for warning suppression")
     args = parser.parse_args()
 
     logger = ProgressLogger(state_path=args.state_file, progress_path=args.progress_file, run_id=args.run_id)
@@ -350,7 +384,8 @@ def main():
         gamebook,
         args.expected_range_start,
         args.expected_range_end,
-        node_validator_result=node_validator_result
+        node_validator_result=node_validator_result,
+        patch_file=args.patch_file
     )
 
     if args.forensics:
@@ -473,8 +508,16 @@ def main():
 
         report = report.model_copy(update={"forensics": traces})
 
+    # Add suppression metadata to report dict before saving
+    report_dict = report.model_dump(by_alias=True) if hasattr(report, 'model_dump') else report.dict()
+    if hasattr(report, '_suppressed_warnings'):
+        report_dict["suppressed_warnings"] = report._suppressed_warnings
+        report_dict["effective_warnings"] = report._effective_warnings
+        report_dict["suppressed_unreachable"] = report._suppressed_unreachable
+        report_dict["effective_unreachable"] = report._effective_unreachable
+
     ensure_dir(os.path.dirname(args.out) or ".")
-    save_json(args.out, report.model_dump(by_alias=True))
+    save_json(args.out, report_dict)
 
     if args.forensics:
         try:
