@@ -117,10 +117,15 @@ def main() -> None:
         if not out_dir.is_absolute():
             # If relative, resolve relative to run_dir
             out_dir = run_dir / out_dir
+    elif args.outdir:
+        # --outdir is an alternative to --out (for compatibility with other modules)
+        # If provided, it should be the full output directory path
+        out_dir = Path(args.outdir)
+        if not out_dir.is_absolute():
+            # If relative, resolve relative to run_dir
+            out_dir = run_dir / out_dir
     else:
         out_dir = run_dir / "output"
-    if args.outdir and not out_dir.is_absolute():
-        out_dir = Path(args.outdir) / out_dir
     out_dir.mkdir(parents=True, exist_ok=True)
 
     recipe_path = _resolve_recipe_path(run_dir, args.recipe)
