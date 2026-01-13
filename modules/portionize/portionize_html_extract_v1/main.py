@@ -354,13 +354,55 @@ def main() -> None:
         end_idx = id_to_index.get(end_id, len(elements)) if end_id else len(elements)
 
         # Guard against stray headers inside a span (e.g., duplicate headers on a page).
+        # In FF books, if a section number appears as the FIRST element on a page, it's likely
+        # a page header (showing what section you're currently reading), not a section start.
+        # This is especially important when sections span multiple pages - the continuation
+        # page will have the section number as a header, but the section doesn't restart there.
         if section_id and str(section_id).isdigit():
+            # First check if end_idx itself is a different section's header
+            if end_idx < len(elements):
+                end_block = elements[end_idx]
+                if end_block.get("block_type") == "h2":
+                    header_text = (end_block.get("text") or "").strip()
+                    if header_text.isdigit() and header_text != str(section_id):
+                        # Check if this is the first element on its page (page header, not section start)
+                        end_page = end_block.get("page_number")
+                        if end_page is not None:
+                            # Find all elements on this page
+                            page_elements = [e for e in elements if e.get("page_number") == end_page]
+                            if page_elements:
+                                # Sort by order to find first element
+                                page_elements.sort(key=lambda e: (e.get("order") or 0, e.get("id", "")))
+                                first_on_page = page_elements[0] if page_elements else None
+                                if first_on_page and first_on_page.get("id") == end_block.get("id"):
+                                    # This header is the first element on its page - it's a page header, not a section start
+                                    # Keep end_idx as is - slicing will exclude this header
+                                    pass
+                                else:
+                                    # This is not the first element, so it's a real section start
+                                    # (end_idx is already correct for Python slicing)
+                                    pass
+            # Then scan for any other stray headers in the span
             for scan_idx in range(start_idx + 1, end_idx):
                 block = elements[scan_idx]
                 if block.get("block_type") != "h2":
                     continue
                 header_text = (block.get("text") or "").strip()
                 if header_text.isdigit() and header_text != str(section_id):
+                    # Check if this is the first element on its page (page header, not section start)
+                    block_page = block.get("page_number")
+                    if block_page is not None:
+                        # Find all elements on this page
+                        page_elements = [e for e in elements if e.get("page_number") == block_page]
+                        if page_elements:
+                            # Sort by order to find first element
+                            page_elements.sort(key=lambda e: (e.get("order") or 0, e.get("id", "")))
+                            first_on_page = page_elements[0] if page_elements else None
+                            if first_on_page and first_on_page.get("id") == block.get("id"):
+                                # This header is the first element on its page - it's a page header, not a section start
+                                # Skip it and continue including content on this page
+                                continue
+                    # This is a real section start (not first on page, or first on page but we've reached boundary end) - stop before it
                     end_idx = scan_idx
                     break
 

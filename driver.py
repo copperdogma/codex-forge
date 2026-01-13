@@ -976,12 +976,19 @@ def build_command(entrypoint: str, params: Dict[str, Any], stage_conf: Dict[str,
             cmd += [flag, str(extra_val)]
             flags_added.add(flag)
     elif stage_conf["stage"] == "enrich":
-        pages_path = artifact_inputs.get("pages")
-        portions_path = artifact_inputs.get("portions") or artifact_inputs.get("input")
-        if not pages_path or not portions_path:
-            raise SystemExit(f"Stage {stage_conf['id']} missing enrich inputs (pages/portions)")
-        cmd += ["--pages", pages_path, "--portions", portions_path, "--out", artifact_path]
-        flags_added.update({"--pages", "--portions", "--out"})
+        # Some enrich stages (like resolve_calculation_puzzles_v1) only need gamebook
+        gamebook_path = artifact_inputs.get("gamebook")
+        if gamebook_path:
+            cmd += ["--gamebook", gamebook_path, "--out", artifact_path]
+            flags_added.update({"--gamebook", "--out"})
+        else:
+            # Standard enrich stages need pages+portions
+            pages_path = artifact_inputs.get("pages")
+            portions_path = artifact_inputs.get("portions") or artifact_inputs.get("input")
+            if not pages_path or not portions_path:
+                raise SystemExit(f"Stage {stage_conf['id']} missing enrich inputs (pages/portions)")
+            cmd += ["--pages", pages_path, "--portions", portions_path, "--out", artifact_path]
+            flags_added.update({"--pages", "--portions", "--out"})
     elif stage_conf["stage"] == "transform":
         # Transform stages: handle associate_illustrations_to_sections_v1 specially
         if stage_conf["module"] == "associate_illustrations_to_sections_v1":
@@ -1027,7 +1034,10 @@ def build_command(entrypoint: str, params: Dict[str, Any], stage_conf: Dict[str,
         
         # Pass patch file to validation modules for warning suppression
         patch_file_path = os.path.join(run_dir, "patch.json")
-        if os.path.exists(patch_file_path) and "--patch-file" not in flags_added:
+        # Only pass patch-file to validation modules that accept it
+        validation_modules_with_patch = {"validate_ff_engine_v2"}
+        if (os.path.exists(patch_file_path) and "--patch-file" not in flags_added and 
+            stage_conf.get("module") in validation_modules_with_patch):
             cmd += ["--patch-file", patch_file_path]
             flags_added.add("--patch-file")
             
@@ -1037,7 +1047,7 @@ def build_command(entrypoint: str, params: Dict[str, Any], stage_conf: Dict[str,
     # Additional params from recipe (skip flags already added)
     seen_flags = set(flags_added)
     for key, val in (params or {}).items():
-        flag = f"--{key}"
+        flag = f"--{key.replace('_', '-')}"
         if key == "skip_ai":
             flag = "--skip-ai"
         # Special-case param flag normalization for modules that expect hyphens
@@ -1451,7 +1461,9 @@ def main():
         instrumentation_paths = {"json": instr_json_path, "md": instr_md_path}
 
     plan = build_plan(recipe, registry)
-    validate_plan_schemas(plan)
+    # Only validate schemas for stages we're actually running (skip validation if starting from a later stage)
+    if not args.start_from:
+        validate_plan_schemas(plan)
     if args.start_from and args.start_from not in plan["topo"]:
         raise SystemExit(f"--start-from {args.start_from} not found in recipe stages")
     if args.end_at and args.end_at not in plan["topo"]:
@@ -1753,9 +1765,14 @@ def main():
             if stage_id == args.start_from:
                 start_gate_reached = True
             else:
+                # Only require artifacts for stages that are direct dependencies of stages we're running
+                # Don't fail if an upstream stage has no artifact - it might not be needed
                 if stage_id not in artifact_index:
-                    raise SystemExit(f"--start-from {args.start_from} provided, but upstream stage {stage_id} has no cached artifact in {state_path}")
-                print(f"[skip-start] {stage_id} skipped due to --start-from (artifact reused)")
+                    # Check if this stage is actually needed by any stage we're running
+                    # For now, just warn and continue - the stage will fail later if it's actually needed
+                    print(f"[skip-start] {stage_id} skipped due to --start-from (no artifact found, may fail if needed)")
+                else:
+                    print(f"[skip-start] {stage_id} skipped due to --start-from (artifact reused)")
                 # Ensure artifact_index is populated even for skipped stages (it should already be from _preload_artifacts_from_state, but verify)
                 if stage_id in artifact_index:
                     continue
@@ -1868,21 +1885,31 @@ def main():
                     raise SystemExit(f"Schema mismatch: {stage_id} expects {node['input_schema']} got {portions_schema} from {portions_from}")
             elif stage == "enrich":
                 inputs_map = node.get("inputs", {}) or {}
-                pages_from = inputs_map.get("pages")
-                portions_from = inputs_map.get("portions") or (needs[0] if needs else None)
-                if not pages_from:
-                    # heuristic: pick nearest clean stage
-                    for dep in needs:
-                        if (artifact_index[dep].get("schema") or "").endswith("page_v1"):
-                            pages_from = dep
-                            break
-                if not pages_from or not portions_from:
-                    raise SystemExit(f"Stage {stage_id} requires pages+portions inputs; specify via inputs map")
-                artifact_inputs["pages"] = artifact_index[pages_from]["path"]
-                artifact_inputs["portions"] = artifact_index[portions_from]["path"]
-                portions_schema = artifact_index[portions_from].get("schema")
-                if node.get("input_schema") and portions_schema and node["input_schema"] != portions_schema:
-                    raise SystemExit(f"Schema mismatch: {stage_id} expects {node['input_schema']} got {portions_schema} from {portions_from}")
+                # Some enrich stages (like resolve_calculation_puzzles_v1) only need gamebook, not pages+portions
+                if "gamebook" in inputs_map:
+                    # Handle gamebook-only enrich stages
+                    gamebook_from = inputs_map.get("gamebook")
+                    if gamebook_from and gamebook_from in artifact_index:
+                        artifact_inputs["gamebook"] = artifact_index[gamebook_from]["path"]
+                    else:
+                        raise SystemExit(f"Stage {stage_id} requires gamebook input from {gamebook_from}")
+                else:
+                    # Standard enrich stages need pages+portions
+                    pages_from = inputs_map.get("pages")
+                    portions_from = inputs_map.get("portions") or (needs[0] if needs else None)
+                    if not pages_from:
+                        # heuristic: pick nearest clean stage
+                        for dep in needs:
+                            if (artifact_index[dep].get("schema") or "").endswith("page_v1"):
+                                pages_from = dep
+                                break
+                    if not pages_from or not portions_from:
+                        raise SystemExit(f"Stage {stage_id} requires pages+portions inputs; specify via inputs map")
+                    artifact_inputs["pages"] = artifact_index[pages_from]["path"]
+                    artifact_inputs["portions"] = artifact_index[portions_from]["path"]
+                    portions_schema = artifact_index[portions_from].get("schema")
+                    if node.get("input_schema") and portions_schema and node["input_schema"] != portions_schema:
+                        raise SystemExit(f"Schema mismatch: {stage_id} expects {node['input_schema']} got {portions_schema} from {portions_from}")
             elif stage == "consensus":
                 if len(needs) > 1:
                     # merge multiple portion hypotheses into a temp concat

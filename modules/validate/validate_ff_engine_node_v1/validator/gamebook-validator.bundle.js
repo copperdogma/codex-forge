@@ -307,64 +307,115 @@ function validateNoChoices(gamebook) {
 }
 
 function findReachableSections(gamebook) {
-  const reachable = new Set();
-  const queue = [gamebook.metadata.startSection];
-  const visited = new Set();
-  while (queue.length > 0) {
-    const currentId = queue.shift();
-    if (visited.has(currentId)) continue;
-    visited.add(currentId);
-    const section = gamebook.sections[currentId];
-    if (!section || !section.isGameplaySection) continue;
-    reachable.add(currentId);
-    const sequence = section.sequence || [];
-    sequence.forEach(event => {
-      const kind = event.kind;
-      const pushTarget = (outcome) => {
-        if (outcome && outcome.targetSection && !visited.has(outcome.targetSection)) {
-          queue.push(outcome.targetSection);
-        }
-      };
-      if (kind === 'choice' && event.targetSection) {
-        pushTarget({ targetSection: event.targetSection });
-      } else if (kind === 'stat_check') {
-        pushTarget(event.pass);
-        pushTarget(event.fail);
-      } else if (kind === 'stat_change') {
-        pushTarget(event.else);
-      } else if (kind === 'test_luck') {
-        pushTarget(event.lucky);
-        pushTarget(event.unlucky);
-      } else if (kind === 'item_check') {
-        pushTarget(event.has);
-        pushTarget(event.missing);
-      } else if (kind === 'combat') {
-        const outcomes = event.outcomes || {};
-        pushTarget(outcomes.win);
-        pushTarget(outcomes.lose);
-        pushTarget(outcomes.escape);
-      } else if (kind === 'death') {
-        pushTarget(event.outcome);
-      } else if (event.targetSection) {
-        pushTarget({ targetSection: event.targetSection });
-      }
-    });
-  }
-  return reachable;
+    const reachable = new Set();
+    const queue = [gamebook.metadata.startSection];
+    const visited = new Set();
+    while (queue.length > 0) {
+        const currentId = queue.shift();
+        if (visited.has(currentId))
+            continue;
+        visited.add(currentId);
+        const section = gamebook.sections[currentId];
+        if (!section || !section.isGameplaySection)
+            continue;
+        reachable.add(currentId);
+        const pushTargetsFromEvents = (events) => {
+            if (!Array.isArray(events))
+                return;
+            events.forEach(event => {
+                const kind = event.kind;
+                const pushTarget = (outcome) => {
+                    if (outcome && outcome.targetSection && !visited.has(outcome.targetSection)) {
+                        queue.push(outcome.targetSection);
+                    }
+                };
+                if (kind === 'choice' && event.targetSection) {
+                    pushTarget({ targetSection: event.targetSection });
+                }
+                else if (kind === 'stat_check') {
+                    pushTarget(event.pass);
+                    pushTarget(event.fail);
+                }
+                else if (kind === 'stat_change') {
+                    pushTarget(event.else);
+                }
+                else if (kind === 'test_luck') {
+                    pushTarget(event.lucky);
+                    pushTarget(event.unlucky);
+                }
+                else if (kind === 'item_check' || kind === 'state_check') {
+                    pushTarget(event.has);
+                    pushTarget(event.missing);
+                }
+                else if (kind === 'conditional') {
+                    pushTargetsFromEvents(event.then || []);
+                    pushTargetsFromEvents(event.else || []);
+                }
+                else if (kind === 'combat') {
+                    const outcomes = event.outcomes || {};
+                    pushTarget(outcomes.win);
+                    pushTarget(outcomes.lose);
+                    pushTarget(outcomes.escape);
+                }
+                else if (kind === 'death') {
+                    pushTarget(event.outcome);
+                }
+                else if (event.targetSection) {
+                    pushTarget({ targetSection: event.targetSection });
+                }
+            });
+        };
+        pushTargetsFromEvents(section.sequence || []);
+    }
+    return reachable;
 }
 
 function findUnreachableSections(gamebook) {
-  const warnings = [];
-  const reachable = findReachableSections(gamebook);
-  for (const [sectionKey, section] of Object.entries(gamebook.sections || {})) {
-    if (section.isGameplaySection && !reachable.has(sectionKey)) {
-      warnings.push({
-        path: `/sections/${sectionKey}`,
-        message: `Gameplay section "${sectionKey}" is unreachable from startSection "${gamebook.metadata.startSection}"`,
-      });
+    const warnings = [];
+    const reachable = findReachableSections(gamebook);
+    const unreachableSections = [];
+
+    // Find all unreachable sections
+    for (const [sectionKey, section] of Object.entries(gamebook.sections)) {
+        if (section.isGameplaySection && !reachable.has(sectionKey)) {
+            unreachableSections.push(sectionKey);
+            warnings.push({
+                path: `/sections/${sectionKey}`,
+                message: `Gameplay section "${sectionKey}" is unreachable from startSection "${gamebook.metadata.startSection}"`,
+            });
+        }
     }
-  }
-  return warnings;
+
+    // Build a map of which unreachable sections reference other unreachable sections
+    const unreachableReferences = new Set();
+    for (const sectionKey of unreachableSections) {
+        const section = gamebook.sections[sectionKey];
+        const sequence = section.sequence || [];
+
+        // Extract all target sections from sequence events
+        for (const event of sequence) {
+            const targets = extractTargetsFromEvent(event);
+            for (const target of targets) {
+                if (unreachableSections.includes(target)) {
+                    unreachableReferences.add(target);
+                }
+            }
+        }
+    }
+
+    // Entry points are unreachable sections NOT referenced by other unreachable sections
+    const entryPoints = unreachableSections.filter(id => !unreachableReferences.has(id));
+
+    // Detect manual conditional navigation sections (unreachable via code but reachable via manual instructions)
+    const manualNavigationSections = detectManualNavigationSections(gamebook, entryPoints);
+
+    // Add metadata to first warning (if any)
+    if (warnings.length > 0 && entryPoints.length > 0) {
+        warnings[0].entryPoints = entryPoints;
+        warnings[0].manualNavigationSections = manualNavigationSections;
+    }
+
+    return warnings;
 }
 
 function validateGamebook(gamebook) {

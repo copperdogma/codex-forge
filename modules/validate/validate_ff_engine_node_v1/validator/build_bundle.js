@@ -8,16 +8,70 @@ const standaloneCode = require("ajv/dist/standalone").default;
 
 const validatorDir = __dirname;
 const schemaPath = path.join(validatorDir, "gamebook-schema.json");
+const validationPath = path.join(validatorDir, "validation.js");
 const pkgPath = path.join(validatorDir, "package.json");
 const outPath = path.join(validatorDir, "gamebook-validator.bundle.js");
 
 if (!fs.existsSync(schemaPath)) {
   throw new Error(`Schema not found at ${schemaPath}`);
 }
+if (!fs.existsSync(validationPath)) {
+  throw new Error(`Validation source not found at ${validationPath}`);
+}
 
 const schema = JSON.parse(fs.readFileSync(schemaPath, "utf-8"));
+const validationSource = fs.readFileSync(validationPath, "utf-8");
 const pkg = fs.existsSync(pkgPath) ? JSON.parse(fs.readFileSync(pkgPath, "utf-8")) : {};
 const validatorVersion = pkg.name && pkg.version ? `${pkg.name}@${pkg.version}` : (pkg.version || "");
+
+// Extract findReachableSections and findUnreachableSections from validation.js
+// This ensures the bundle always uses the same logic as the source
+function extractFunction(source, functionName, nextFunctionName) {
+  // Find the start of the function
+  const startPattern = new RegExp(`function\\s+${functionName}\\s*\\([^)]*\\)\\s*\\{`, "m");
+  const startMatch = source.match(startPattern);
+  if (!startMatch) {
+    throw new Error(`Could not find function ${functionName} in validation.js`);
+  }
+  const startIndex = startMatch.index;
+  
+  // Find the end - either the next function or end of file
+  let endIndex = source.length;
+  if (nextFunctionName) {
+    const nextPattern = new RegExp(`function\\s+${nextFunctionName}\\s*\\([^)]*\\)\\s*\\{`, "m");
+    const nextMatch = source.substring(startIndex).match(nextPattern);
+    if (nextMatch) {
+      endIndex = startIndex + nextMatch.index;
+    }
+  }
+  
+  // Extract the function with proper brace matching
+  let braceCount = 0;
+  let inFunction = false;
+  let functionEnd = startIndex;
+  
+  for (let i = startIndex; i < endIndex; i++) {
+    if (source[i] === '{') {
+      braceCount++;
+      inFunction = true;
+    } else if (source[i] === '}') {
+      braceCount--;
+      if (inFunction && braceCount === 0) {
+        functionEnd = i + 1;
+        break;
+      }
+    }
+  }
+  
+  if (!inFunction || braceCount !== 0) {
+    throw new Error(`Could not properly extract function ${functionName} from validation.js (unmatched braces)`);
+  }
+  
+  return source.substring(startIndex, functionEnd);
+}
+
+const findReachableSectionsSource = extractFunction(validationSource, "findReachableSections", "findUnreachableSections");
+const findUnreachableSectionsSource = extractFunction(validationSource, "findUnreachableSections", null);
 
 const ajv = new Ajv({
   allErrors: true,
@@ -347,66 +401,9 @@ function validateNoChoices(gamebook) {
   return warnings;
 }
 
-function findReachableSections(gamebook) {
-  const reachable = new Set();
-  const queue = [gamebook.metadata.startSection];
-  const visited = new Set();
-  while (queue.length > 0) {
-    const currentId = queue.shift();
-    if (visited.has(currentId)) continue;
-    visited.add(currentId);
-    const section = gamebook.sections[currentId];
-    if (!section || !section.isGameplaySection) continue;
-    reachable.add(currentId);
-    const sequence = section.sequence || [];
-    sequence.forEach(event => {
-      const kind = event.kind;
-      const pushTarget = (outcome) => {
-        if (outcome && outcome.targetSection && !visited.has(outcome.targetSection)) {
-          queue.push(outcome.targetSection);
-        }
-      };
-      if (kind === 'choice' && event.targetSection) {
-        pushTarget({ targetSection: event.targetSection });
-      } else if (kind === 'stat_check') {
-        pushTarget(event.pass);
-        pushTarget(event.fail);
-      } else if (kind === 'stat_change') {
-        pushTarget(event.else);
-      } else if (kind === 'test_luck') {
-        pushTarget(event.lucky);
-        pushTarget(event.unlucky);
-      } else if (kind === 'item_check') {
-        pushTarget(event.has);
-        pushTarget(event.missing);
-      } else if (kind === 'combat') {
-        const outcomes = event.outcomes || {};
-        pushTarget(outcomes.win);
-        pushTarget(outcomes.lose);
-        pushTarget(outcomes.escape);
-      } else if (kind === 'death') {
-        pushTarget(event.outcome);
-      } else if (event.targetSection) {
-        pushTarget({ targetSection: event.targetSection });
-      }
-    });
-  }
-  return reachable;
-}
+${findReachableSectionsSource}
 
-function findUnreachableSections(gamebook) {
-  const warnings = [];
-  const reachable = findReachableSections(gamebook);
-  for (const [sectionKey, section] of Object.entries(gamebook.sections || {})) {
-    if (section.isGameplaySection && !reachable.has(sectionKey)) {
-      warnings.push({
-        path: \`/sections/\${sectionKey}\`,
-        message: \`Gameplay section "\${sectionKey}" is unreachable from startSection "\${gamebook.metadata.startSection}"\`,
-      });
-    }
-  }
-  return warnings;
-}
+${findUnreachableSectionsSource}
 
 function validateGamebook(gamebook) {
   const errors = [];

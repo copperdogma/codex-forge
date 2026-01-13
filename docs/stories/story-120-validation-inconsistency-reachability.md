@@ -130,3 +130,41 @@ This is a critical inconsistency that undermines trust in validation results and
   - Integration tests verify consistency between Python and Node validators
   - Caching reduces redundant subprocess calls when validating same gamebook multiple times
   - All 5 integration tests pass, confirming correct implementation
+
+### 2026-01-13 — CRITICAL: Bundle Out of Sync with Source
+- **Result**: Discovered that `gamebook-validator.bundle.js` was missing `state_check` handling in `findReachableSections`
+- **Root Cause**: The bundle template in `build_bundle.js` had hardcoded `findReachableSections` function that only handled `item_check`, not `state_check`
+- **Impact**: 
+  - Patches using `state_check` events were applied correctly but validator didn't recognize them
+  - Sections 7, 22, 111, 200 remained unreachable despite patches
+  - Sections 53, 100, 140, 338 were reachable (used `item_check` or `choice`)
+- **Fix**: Updated `build_bundle.js` line 379 to include `state_check`: `} else if (kind === 'item_check' || kind === 'state_check') {`
+- **Action Required**: 
+  - Bundle must be rebuilt whenever `validation.js` changes
+  - Need to ensure bundle template stays in sync with source
+  - Consider reading `findReachableSections` from `validation.js` instead of hardcoding
+- **Verification**: 
+  - Rebuilt bundle and re-validated gamebook
+  - All 8 patched sections (7, 22, 53, 100, 111, 140, 200, 338) are now reachable
+  - 100% reachability achieved (401/401 sections)
+- **Prevention**: 
+  - ✅ **FIXED**: `build_bundle.js` now extracts `findReachableSections` and `findUnreachableSections` directly from `validation.js` source
+  - ✅ Bundle automatically stays in sync with source - no more hardcoding
+  - ✅ `validate_ff_engine_node_v1` module auto-rebuilds bundle on run
+  - ✅ Future changes to `validation.js` will automatically be included in bundle
+  - ✅ Unit tests added for `extractFunction()` to prevent regressions
+
+### 2026-01-13 — Final Fix Complete
+- **Result**: Bundle hardcoding issue permanently resolved with function extraction
+- **Changes**:
+  1. Implemented `extractFunction()` in `build_bundle.js` to dynamically extract functions from `validation.js`
+  2. Removed hardcoded `findReachableSections` and `findUnreachableSections` from bundle template
+  3. Bundle now automatically includes latest source code changes
+  4. Added unit tests (`build_bundle.test.js`) for `extractFunction()` with 8 test cases covering edge cases
+- **Verification**:
+  - ✅ All unit tests pass (8/8) - `build_bundle.test.js` covers all edge cases
+  - ✅ Bundle builds successfully with extracted functions
+  - ✅ Bundle matches source (state_check handling confirmed)
+  - ✅ 100% reachability maintained (401/401 sections)
+  - ✅ All 8 patched sections reachable
+- **Status**: Story complete - bundle sync issue permanently resolved with automated function extraction and comprehensive test coverage
