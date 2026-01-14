@@ -705,7 +705,11 @@ def make_sequence(portion: Dict[str, Any], section_id: str) -> List[Dict[str, An
     choice_seen: set = set()
 
     # Choices
-    for choice in portion.get("choices") or []:
+    choices = portion.get("choices") or []
+    # If no choices found, also check choices_relaxed (from relaxed extractor)
+    if not choices:
+        choices = portion.get("choices_relaxed") or []
+    for choice in choices:
         if not isinstance(choice, dict):
             continue
         effect_text = _choice_effect_text(
@@ -1271,7 +1275,7 @@ def main():
         stub_section = {
             "id": mid,
             "html": "",
-            "isGameplaySection": True,
+            "isGameplaySection": False,  # Stubs are not gameplay sections (no content, no sequence)
             "type": "section",
             "provenance": {"stub": True, "reason": reason},
         }

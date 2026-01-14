@@ -599,12 +599,14 @@ def build_command(entrypoint: str, params: Dict[str, Any], stage_conf: Dict[str,
     if not artifact_name:
          artifact_name = _artifact_name_for_stage(stage_id, stage_type, {}, stage_conf)
     
-    # Determine if this is a final output (stays in root)
+    # Determine if this is a final output (goes to output/ directory)
     is_final_output = (artifact_name in ("gamebook.json", "validation_report.json"))
     
     if is_final_output:
-        # Final outputs stay in root
-        artifact_path = os.path.join(run_dir, artifact_name)
+        # Final outputs go to output/ directory
+        output_dir = os.path.join(run_dir, "output")
+        ensure_dir(output_dir)
+        artifact_path = os.path.join(output_dir, artifact_name)
     else:
         # Intermediate artifacts go into module-specific folders (directly in run_dir)
         if stage_ordinal_map and stage_id and stage_id in stage_ordinal_map:
@@ -630,8 +632,20 @@ def build_command(entrypoint: str, params: Dict[str, Any], stage_conf: Dict[str,
 
     # Standard parameter conveniences by stage
     if stage_conf["stage"] in ("intake", "extract"):
+        # initialize_output_v1 is a special intake stage that sets up output directory structure
+        if stage_conf.get("module") == "initialize_output_v1":
+            # It only needs --run-dir (and optionally --recipe)
+            cmd += ["--run-dir", run_dir]
+            flags_added.add("--run-dir")
+            # Recipe is optional (defaults to snapshots/recipe.yaml in run_dir)
+            if params.get("recipe"):
+                cmd += ["--recipe", str(params["recipe"])]
+                flags_added.add("--recipe")
+                # Remove from params so it's not added again
+                params = dict(params or {})
+                del params["recipe"]
         # Some extract stages are NOT PDF/image ingestors (e.g., extract_choices_v1 consumes JSONL portions).
-        if stage_conf["module"] == "extract_choices_v1":
+        elif stage_conf["module"] == "extract_choices_v1":
             in_path = artifact_inputs.get("inputs") or artifact_inputs.get("input")
             if not in_path:
                 raise SystemExit(f"Stage {stage_conf['id']} missing inputs")
@@ -644,7 +658,8 @@ def build_command(entrypoint: str, params: Dict[str, Any], stage_conf: Dict[str,
             ocr_manifest_path = artifact_inputs.get("ocr_manifest")
             if not ocr_manifest_path:
                 raise SystemExit(f"Stage {stage_conf['id']} missing ocr_manifest input")
-            module_outdir = os.path.dirname(artifact_path) if not is_final_output else run_dir
+            # For final outputs, use the output/ directory; otherwise use module folder
+            module_outdir = os.path.dirname(artifact_path) if not is_final_output else os.path.join(run_dir, "output")
             cmd += ["--output-dir", module_outdir]; flags_added.add("--output-dir")
             cmd += ["--ocr-manifest", ocr_manifest_path]
             flags_added.add("--ocr-manifest")
@@ -655,7 +670,8 @@ def build_command(entrypoint: str, params: Dict[str, Any], stage_conf: Dict[str,
                 cmd += ["--images", recipe_input["images"]]; flags_added.add("--images")
             # Use module folder as outdir for intake/extract stages so artifacts go to module folder
             # (module subdirectories like images/, ocr_ensemble/ will be created in module folder)
-            module_outdir = os.path.dirname(artifact_path) if not is_final_output else run_dir
+            # For final outputs, use the output/ directory; otherwise use module folder
+            module_outdir = os.path.dirname(artifact_path) if not is_final_output else os.path.join(run_dir, "output")
             cmd += ["--outdir", module_outdir]; flags_added.add("--outdir")
             # Handle inputs for intake stages (e.g., pagelines_to_elements_v1)
             # Note: params.inputs might contain stage IDs - don't pass those, use resolved artifact_inputs instead
@@ -930,15 +946,8 @@ def build_command(entrypoint: str, params: Dict[str, Any], stage_conf: Dict[str,
         in_path = artifact_inputs.get("input") or artifact_inputs.get("gamebook")
         if not in_path:
             raise SystemExit(f"Stage {stage_conf['id']} missing input")
-        # package_game_ready_v1 expects --out to be relative to run_dir, not the full artifact_path
-        if stage_conf.get("module") == "package_game_ready_v1":
-            # Use the "out" from recipe (should be "output") or fallback
-            out_arg = stage_conf.get("out") or "output"
-            cmd += ["--input", in_path, "--out", out_arg, "--run-dir", run_dir]
-            flags_added.update({"--input", "--out", "--run-dir"})
-        else:
-            cmd += ["--input", in_path, "--out", artifact_path]
-            flags_added.update({"--input", "--out"})
+        cmd += ["--input", in_path, "--out", artifact_path]
+        flags_added.update({"--input", "--out"})
     elif stage_conf["stage"] == "dedupe":
         in_path = artifact_inputs.get("input")
         if not in_path:
@@ -1514,6 +1523,10 @@ def main():
                     os.remove(item_path)
 
     ensure_dir(run_dir)
+    # Create output/ directory early for final outputs (gamebook.json, validation_report.json)
+    output_dir = os.path.join(run_dir, "output")
+    ensure_dir(output_dir)
+    
     state_path = os.path.join(run_dir, "pipeline_state.json")
     progress_path = os.path.join(run_dir, "pipeline_events.jsonl")
     logger = ProgressLogger(state_path=state_path, progress_path=progress_path, run_id=run_id)
@@ -1817,8 +1830,8 @@ def main():
                 pass
 
         # Skip if already done and skip-done requested (state + artifact exists)
-        # Exception: package_game_ready_v1 should always run to ensure output folder is up to date
-        always_run_modules = {"package_game_ready_v1"}
+        # Exception: initialize_output_v1 should always run to ensure output folder is up to date
+        always_run_modules = {"initialize_output_v1"}
         if args.skip_done and os.path.exists(state_path) and module_id not in always_run_modules:
             try:
                 with open(state_path, "r", encoding="utf-8") as f:
@@ -2028,7 +2041,9 @@ def main():
             artifact_name = node.get("artifact_name") or _artifact_name_for_stage(stage_id, stage, {}, node)
             is_final_output = (artifact_name in ("gamebook.json", "validation_report.json"))
             if is_final_output:
-                artifact_path = os.path.join(run_dir, artifact_name)
+                # Final outputs go to output/ directory
+                output_dir = os.path.join(run_dir, "output")
+                artifact_path = os.path.join(output_dir, artifact_name)
             else:
                 if stage_ordinal_map and stage_id and stage_id in stage_ordinal_map:
                     ordinal = stage_ordinal_map[stage_id]
@@ -2096,6 +2111,50 @@ def main():
                                          stage_started_at, stage_wall_start, stage_cpu_start)
             continue
 
+        # Apply patches that should run before this module
+        if patch_file_path and os.path.exists(patch_file_path):
+            try:
+                patches_data = load_patches(patch_file_path)
+                for patch in patches_data.get("patches", []):
+                    if patch.get("apply_before") == module_id:
+                        # For apply_before, we need to apply to the INPUT artifacts
+                        # Find the input artifact that matches the patch's target_file
+                        target_file = patch.get("target_file", "gamebook.json")
+                        input_artifact_path = None
+                        # Check if any input artifact matches
+                        for input_key, input_path in artifact_inputs.items():
+                            if os.path.basename(input_path) == target_file or input_path.endswith(target_file):
+                                input_artifact_path = input_path
+                                break
+                        # If no input matches, try to find in artifact_index
+                        if not input_artifact_path:
+                            for stage_id_key, artifact_info in artifact_index.items():
+                                artifact_path_check = artifact_info.get("path", "")
+                                if os.path.basename(artifact_path_check) == target_file or artifact_path_check.endswith(target_file):
+                                    input_artifact_path = artifact_path_check
+                                    break
+                        if input_artifact_path and os.path.exists(input_artifact_path):
+                            result = apply_patch(patch, run_dir, module_id, input_artifact_path)
+                            if result.get("success"):
+                                logger.log("patch_apply", "done", artifact=patch_file_path,
+                                          message=f"Applied patch {patch.get('id')} (before {module_id}): {result.get('message')}",
+                                          module_id="driver", stage_description=f"patch application before {module_id}",
+                                          extra={"patch_id": patch.get("id"), "operation": patch.get("operation")})
+                                print(f"✓ Applied patch {patch.get('id')} (before {module_id}): {result.get('message')}", file=sys.stderr)
+                            else:
+                                logger.log("patch_apply", "warning", artifact=patch_file_path,
+                                          message=f"Failed to apply patch {patch.get('id')} (before {module_id}): {result.get('error')}",
+                                          module_id="driver", stage_description=f"patch application before {module_id}",
+                                          extra={"patch_id": patch.get("id"), "error": result.get("error")})
+                                print(f"⚠️  Patch {patch.get('id')} (before {module_id}) failed: {result.get('error')}", file=sys.stderr)
+            except Exception as e:
+                # Don't fail the pipeline if patch application fails
+                logger.log("patch_apply", "error", artifact=patch_file_path,
+                          message=f"Error loading/applying patches (before {module_id}): {e}",
+                          module_id="driver", stage_description="patch application before",
+                          extra={"error": str(e)})
+                print(f"⚠️  Error applying patches (before {module_id}): {e}", file=sys.stderr)
+
         print(f"[run] {stage_id} ({module_id})")
         env = os.environ.copy()
         if instrument_enabled:
@@ -2141,6 +2200,21 @@ def main():
                                                  stage_started_at, stage_wall_start, stage_cpu_start)
                     logger.log(stage_id, "warning", artifact=artifact_path, module_id=module_id,
                                message="Game-ready validation failed (report generated).", extra={"exit_code": 1})
+                except Exception:
+                    pass
+                # Continue pipeline but mark run as failed at end.
+                run_validation_failed = True
+                continue
+            # Allow validate_gamebook_node to fail without stopping pipeline (report still generated)
+            # The validator is already copied to output/ by initialize_output_v1 at the start of the run
+            if module_id == "validate_ff_engine_node_v1" and result.returncode == 1:
+                try:
+                    update_state(state_path, progress_path, stage_id, "done", artifact_path, run_id, module_id, out_schema,
+                                 stage_description=stage_description)
+                    record_stage_instrumentation(stage_id, module_id, "done", artifact_path, out_schema,
+                                                 stage_started_at, stage_wall_start, stage_cpu_start)
+                    logger.log(stage_id, "warning", artifact=artifact_path, module_id=module_id,
+                               message="Node validation found errors (report generated).", extra={"exit_code": 1})
                 except Exception:
                     pass
                 # Continue pipeline but mark run as failed at end.
@@ -2213,7 +2287,9 @@ def main():
                 patches_data = load_patches(patch_file_path)
                 for patch in patches_data.get("patches", []):
                     if patch.get("apply_after") == module_id:
-                        result = apply_patch(patch, run_dir, module_id)
+                        # Apply patches to the artifact that was just created by this module
+                        # This ensures patches are applied to the correct file that downstream stages will read
+                        result = apply_patch(patch, run_dir, module_id, artifact_path)
                         if result.get("success"):
                             logger.log("patch_apply", "done", artifact=patch_file_path,
                                       message=f"Applied patch {patch.get('id')}: {result.get('message')}",

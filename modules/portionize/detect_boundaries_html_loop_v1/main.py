@@ -495,8 +495,9 @@ def main() -> None:
     parser.add_argument("--adjacent_scan_window", dest="adjacent_window", type=int, default=1)
     parser.add_argument("--allow-missing", dest="allow_missing", action="store_true")
     parser.add_argument("--allow_missing", dest="allow_missing", action="store_true")
-    parser.add_argument("--repair-model", dest="repair_model", default="gpt-5.1")
-    parser.add_argument("--repair_model", dest="repair_model", default="gpt-5.1")
+    # Default to gpt-5.2 for HTML repair; callers can override via --repair-model/--repair_model
+    parser.add_argument("--repair-model", dest="repair_model", default="gpt-5.2")
+    parser.add_argument("--repair_model", dest="repair_model", default="gpt-5.2")
     parser.add_argument("--repair-cache-dir", dest="repair_cache_dir", default="html_repair_cache")
     parser.add_argument("--repair_cache_dir", dest="repair_cache_dir", default="html_repair_cache")
     parser.add_argument("--max-output-tokens", dest="max_output_tokens", type=int, default=2048)

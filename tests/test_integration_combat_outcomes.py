@@ -9,7 +9,7 @@ def _load_gamebook():
         with open(explicit) as f:
             return json.load(f)
     run_id = os.getenv("CF_RUN_ID", "ff-ai-ocr-gpt51-pristine-fast-full-vnext-20260101f")
-    candidate = os.path.join("output", "runs", run_id, "gamebook.json")
+    candidate = os.path.join("output", "runs", run_id, "output", "gamebook.json")
     if not os.path.exists(candidate):
         pytest.skip(f"gamebook.json not found at {candidate}; set CF_GAMEBOOK_PATH or CF_RUN_ID to run integration checks")
     with open(candidate) as f:

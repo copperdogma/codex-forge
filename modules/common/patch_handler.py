@@ -231,13 +231,14 @@ def load_patches(patch_file: str) -> Dict[str, Any]:
             raise ValueError("Each patch must have an 'id' field")
         if "operation" not in patch:
             raise ValueError("Each patch must have an 'operation' field")
-        if "apply_after" not in patch:
-            raise ValueError("Each patch must have an 'apply_after' field")
+        # Patches must have either apply_before or apply_after (or both)
+        if "apply_before" not in patch and "apply_after" not in patch:
+            raise ValueError("Each patch must have either an 'apply_before' or 'apply_after' field (or both)")
     
     return data
 
 
-def apply_patch(patch: Dict[str, Any], run_dir: str, module_id: str) -> Dict[str, Any]:
+def apply_patch(patch: Dict[str, Any], run_dir: str, module_id: str, artifact_path: Optional[str] = None) -> Dict[str, Any]:
     """
     Apply a single patch operation.
     
@@ -245,6 +246,8 @@ def apply_patch(patch: Dict[str, Any], run_dir: str, module_id: str) -> Dict[str
         patch: Patch dictionary
         run_dir: Run directory containing artifacts
         module_id: Current module ID (for logging)
+        artifact_path: Optional path to the artifact file that was just created by the module.
+                      If provided, patches will be applied to this file instead of the default target_file.
         
     Returns:
         Result dictionary with 'success', 'message', and optional 'error'
@@ -254,13 +257,13 @@ def apply_patch(patch: Dict[str, Any], run_dir: str, module_id: str) -> Dict[str
     
     try:
         if operation == "add_link":
-            return _apply_add_link(patch, run_dir)
+            return _apply_add_link(patch, run_dir, artifact_path)
         elif operation == "remove_link":
-            return _apply_remove_link(patch, run_dir)
+            return _apply_remove_link(patch, run_dir, artifact_path)
         elif operation == "override_field":
-            return _apply_override_field(patch, run_dir)
+            return _apply_override_field(patch, run_dir, artifact_path)
         elif operation == "add_section":
-            return _apply_add_section(patch, run_dir)
+            return _apply_add_section(patch, run_dir, artifact_path)
         elif operation == "suppress_warning":
             # suppress_warning is metadata-only, handled during validation
             return {"success": True, "message": f"Warning suppression registered for patch {patch_id}"}
@@ -270,9 +273,15 @@ def apply_patch(patch: Dict[str, Any], run_dir: str, module_id: str) -> Dict[str
         return {"success": False, "error": str(e), "patch_id": patch_id}
 
 
-def _apply_add_link(patch: Dict[str, Any], run_dir: str) -> Dict[str, Any]:
+def _apply_add_link(patch: Dict[str, Any], run_dir: str, artifact_path: Optional[str] = None) -> Dict[str, Any]:
     """Apply add_link operation: add a choice/item_check to a section's sequence."""
-    target_file = patch.get("target_file", "gamebook.json")
+    # If artifact_path is provided, use it; otherwise use target_file from patch
+    if artifact_path and os.path.exists(artifact_path):
+        gamebook_path = artifact_path
+    else:
+        target_file = patch.get("target_file", "gamebook.json")
+        gamebook_path = os.path.join(run_dir, target_file)
+    
     section_id = patch.get("section")
     link = patch.get("link")
     
@@ -281,7 +290,6 @@ def _apply_add_link(patch: Dict[str, Any], run_dir: str) -> Dict[str, Any]:
     if not link:
         return {"success": False, "error": "add_link requires 'link' field"}
     
-    gamebook_path = os.path.join(run_dir, target_file)
     if not os.path.exists(gamebook_path):
         return {"success": False, "error": f"Target file not found: {gamebook_path}"}
     
@@ -313,9 +321,15 @@ def _apply_add_link(patch: Dict[str, Any], run_dir: str) -> Dict[str, Any]:
     return {"success": True, "message": f"Added link to section {section_id}"}
 
 
-def _apply_remove_link(patch: Dict[str, Any], run_dir: str) -> Dict[str, Any]:
+def _apply_remove_link(patch: Dict[str, Any], run_dir: str, artifact_path: Optional[str] = None) -> Dict[str, Any]:
     """Apply remove_link operation: remove a link from a section's sequence."""
-    target_file = patch.get("target_file", "gamebook.json")
+    # If artifact_path is provided, use it; otherwise use target_file from patch
+    if artifact_path and os.path.exists(artifact_path):
+        gamebook_path = artifact_path
+    else:
+        target_file = patch.get("target_file", "gamebook.json")
+        gamebook_path = os.path.join(run_dir, target_file)
+    
     section_id = patch.get("section")
     link_match = patch.get("link_match")  # Criteria to match link to remove
     
@@ -324,7 +338,6 @@ def _apply_remove_link(patch: Dict[str, Any], run_dir: str) -> Dict[str, Any]:
     if not link_match:
         return {"success": False, "error": "remove_link requires 'link_match' field"}
     
-    gamebook_path = os.path.join(run_dir, target_file)
     if not os.path.exists(gamebook_path):
         return {"success": False, "error": f"Target file not found: {gamebook_path}"}
     
@@ -358,9 +371,15 @@ def _apply_remove_link(patch: Dict[str, Any], run_dir: str) -> Dict[str, Any]:
     return {"success": True, "message": f"Removed {removed_count} link(s) from section {section_id}"}
 
 
-def _apply_override_field(patch: Dict[str, Any], run_dir: str) -> Dict[str, Any]:
+def _apply_override_field(patch: Dict[str, Any], run_dir: str, artifact_path: Optional[str] = None) -> Dict[str, Any]:
     """Apply override_field operation: override a specific field in a section."""
-    target_file = patch.get("target_file", "gamebook.json")
+    # If artifact_path is provided, use it; otherwise use target_file from patch
+    if artifact_path and os.path.exists(artifact_path):
+        gamebook_path = artifact_path
+    else:
+        target_file = patch.get("target_file", "gamebook.json")
+        gamebook_path = os.path.join(run_dir, target_file)
+    
     section_id = patch.get("section")
     field_path = patch.get("field_path")  # e.g., "text" or "metadata.title"
     value = patch.get("value")
@@ -372,7 +391,6 @@ def _apply_override_field(patch: Dict[str, Any], run_dir: str) -> Dict[str, Any]
     if "value" not in patch:
         return {"success": False, "error": "override_field requires 'value' field"}
     
-    gamebook_path = os.path.join(run_dir, target_file)
     if not os.path.exists(gamebook_path):
         return {"success": False, "error": f"Target file not found: {gamebook_path}"}
     
@@ -414,9 +432,15 @@ def _apply_override_field(patch: Dict[str, Any], run_dir: str) -> Dict[str, Any]
     return {"success": True, "message": f"Overrode {field_path} in section {section_id}"}
 
 
-def _apply_add_section(patch: Dict[str, Any], run_dir: str) -> Dict[str, Any]:
+def _apply_add_section(patch: Dict[str, Any], run_dir: str, artifact_path: Optional[str] = None) -> Dict[str, Any]:
     """Apply add_section operation: add an entirely new section."""
-    target_file = patch.get("target_file", "gamebook.json")
+    # If artifact_path is provided, use it; otherwise use target_file from patch
+    if artifact_path and os.path.exists(artifact_path):
+        gamebook_path = artifact_path
+    else:
+        target_file = patch.get("target_file", "gamebook.json")
+        gamebook_path = os.path.join(run_dir, target_file)
+    
     section_id = patch.get("section")
     section_data = patch.get("section_data")
     
@@ -425,7 +449,6 @@ def _apply_add_section(patch: Dict[str, Any], run_dir: str) -> Dict[str, Any]:
     if not section_data:
         return {"success": False, "error": "add_section requires 'section_data' field"}
     
-    gamebook_path = os.path.join(run_dir, target_file)
     if not os.path.exists(gamebook_path):
         return {"success": False, "error": f"Target file not found: {gamebook_path}"}
     

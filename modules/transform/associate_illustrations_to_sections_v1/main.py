@@ -515,8 +515,7 @@ def associate_illustrations(
     with open(output_path, 'w', encoding='utf-8') as f:
         json.dump(gamebook, f, indent=2, ensure_ascii=False)
 
-    # Copy image files to root-level images directory in run folder
-    # (not in module folder, so they're accessible from final gamebook.json)
+    # Copy image files to output/images/ directory (canonical location for final gamebook.json)
     if copy_images:
         # Find run directory root by walking up from output_path until we find pipeline_state.json
         # or until we're at a reasonable depth (max 3 levels up)
@@ -533,7 +532,9 @@ def associate_illustrations(
         if not os.path.exists(os.path.join(run_dir, "pipeline_state.json")):
             run_dir = os.path.dirname(os.path.dirname(output_path))
         
-        images_output_dir = os.path.join(run_dir, image_base_path)
+        # Copy images to output/images/ directory (canonical location)
+        output_dir = os.path.join(run_dir, "output")
+        images_output_dir = os.path.join(output_dir, image_base_path)
         ensure_dir(images_output_dir)
 
         # Get source images directory from manifest

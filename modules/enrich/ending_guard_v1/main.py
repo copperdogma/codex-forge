@@ -14,6 +14,65 @@ Rules:
 - If the text instructs to turn to another section or otherwise continue, set ending_type="open".
 - Do NOT invent targets; only classify the ending state."""
 
+# Code-first patterns for ending detection
+# These patterns are checked before AI classification to catch common ending phrases
+ENDING_PATTERNS = [
+    re.compile(r"\b(?:your\s+)?adventure\s+(?:is\s+)?over\b", re.IGNORECASE),
+    re.compile(r"\badventure\s+ends\s+(?:here\s+)?(?:\.|!)?\s*$", re.IGNORECASE | re.MULTILINE),
+    re.compile(r"\badventure\s+ends\b", re.IGNORECASE),
+]
+
+DEATH_PATTERNS = [
+    re.compile(r"\b(?:you\s+)?(?:are|is)\s+(?:dead|killed|slain|defeated)\b", re.IGNORECASE),
+    re.compile(r"\b(?:you\s+)?(?:have|has)\s+died\b", re.IGNORECASE),
+    re.compile(r"\b(?:the\s+)?effect\s+is\s+fatal\b", re.IGNORECASE),
+    re.compile(r"\bfatal\b", re.IGNORECASE),
+    re.compile(r"\byou\s+die\b", re.IGNORECASE),
+]
+
+VICTORY_PATTERNS = [
+    re.compile(r"\b(?:you\s+)?(?:have|has)\s+won\b", re.IGNORECASE),
+    re.compile(r"\b(?:you\s+)?(?:are|is)\s+successful\b", re.IGNORECASE),
+    re.compile(r"\b(?:you\s+)?(?:have|has)\s+completed\b", re.IGNORECASE),
+    re.compile(r"\bvictory\b", re.IGNORECASE),
+]
+
+
+def classify_ending_code_first(text: str) -> Optional[Dict]:
+    """
+    Code-first classification of endings using pattern matching.
+    Returns None if no patterns match (should fall back to AI).
+    """
+    text_lower = text.lower()
+    
+    # Check if it's an ending at all
+    is_ending = any(pattern.search(text) for pattern in ENDING_PATTERNS)
+    if not is_ending:
+        return None
+    
+    # Check for death patterns
+    is_death = any(pattern.search(text) for pattern in DEATH_PATTERNS)
+    if is_death:
+        return {
+            "ending_type": "death",
+            "reason": "Code-first: detected ending phrase with death indicators"
+        }
+    
+    # Check for victory patterns
+    is_victory = any(pattern.search(text) for pattern in VICTORY_PATTERNS)
+    if is_victory:
+        return {
+            "ending_type": "victory",
+            "reason": "Code-first: detected ending phrase with victory indicators"
+        }
+    
+    # Has ending phrase but unclear death/victory - let AI decide
+    # But we know it's an ending, so we should still mark it
+    return {
+        "ending_type": "death",  # Default to death for ambiguous endings (most common)
+        "reason": "Code-first: detected ending phrase ('adventure is over' etc.) but unclear death/victory"
+    }
+
 
 def load_portions(path: str) -> Tuple[List[Dict], str]:
     if path.endswith(".jsonl"):
@@ -107,7 +166,16 @@ def main():
         if not text:
             print(f"Warning: section {sid} has no text, skipping")
             continue
-        result = classify_ending(client, args.model, sid, text)
+        
+        # Try code-first classification
+        result = classify_ending_code_first(text)
+        if result:
+            print(f"Section {sid}: {result.get('ending_type')} (code-first) - {result.get('reason', '')[:50]}")
+        else:
+            # Fall back to AI classification
+            result = classify_ending(client, args.model, sid, text)
+            print(f"Section {sid}: {result.get('ending_type')} (AI) - {result.get('reason', '')[:50] if result.get('reason') else 'no reason'}")
+        
         if "repair" not in r or r["repair"] is None:
             r["repair"] = {}
         r["repair"]["ending_guard"] = result
@@ -118,7 +186,6 @@ def main():
             r["end_game"] = True  # Used by build stage to mark terminal sections
             r["is_gameplay"] = True
             print(f"DEBUG: Section {sid} SET ending={r.get('ending')}, end_game={r.get('end_game')}")
-        print(f"Section {sid}: {ending_type} - {result.get('reason')[:50] if result.get('reason') else 'no reason'}")
 
     save_portions(list(by_id.values()), fmt, args.out)
     print(f"Saved ending-marked portions → {args.out}")

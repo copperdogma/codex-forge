@@ -185,12 +185,17 @@ The validation report should distinguish between:
 - [x] Create patch for Section 103/205 → 22 (map reference)
 - [x] Create patch for Section 197 → 111 (book reference)
 - [ ] Document patch file format and usage examples (deferred - low priority, code is self-documenting)
-- [x] Investigate and create patches for remaining orphan entry points (sections 22 and 111)
+  - [x] Investigate and create patches for remaining orphan entry points (sections 22 and 111)
   - [x] Find upstream section that gives code-words with reference number 22 (Section 256)
   - [x] Find upstream sections that link to map reference 22 (Sections 103, 205)
   - [x] Find upstream section that links to book reference number 111 (Section 197)
   - [x] Create patches for sections 22 and 111 once upstream sections are identified
   - [x] Verify narrative plausibility by reading source, linking, and target sections
+  - [x] **CLEANUP: Remove apply_edgecase_patches_v1 module** (redundant dummy module that does nothing)
+  - [x] **UPGRADE: Add apply_before support to driver.py** (currently only supports apply_after)
+  - [x] **EVALUATE: Review all patches in patch.json** and determine correct apply_before/apply_after targets
+  - [x] **UPDATE: Fix patch.json** to use correct module targets (currently all set to apply_edgecase_patches_v1)
+  - [x] **TEST: Verify patches are applied correctly** and manually inspect artifacts
 
 ## Future Considerations
 
@@ -485,6 +490,30 @@ The validation report should distinguish between:
 - **Status:** 🎉 **PERFECT** - Zero effective unreachable sections!
 - **Note:** Section 338 was initially marked as "cut content" but investigation revealed it should be linked from section 159. The link was lost due to a boundary conflict during portionization (section 159 has wrong text - Tripod fight instead of Borer Robot content). Patch restores the missing link.
 
+### 2026-01-14 — CRITICAL: Patch System Cleanup and Upgrade
+- **Problem Identified:**
+  - `apply_edgecase_patches_v1` is a dummy module that does nothing (expects `edgecase_patches.jsonl` which doesn't exist)
+  - All patches in `patch.json` are incorrectly set to `apply_after: "apply_edgecase_patches_v1"`
+  - `driver.py` only supports `apply_after`, not `apply_before` (despite story requirements)
+  - This creates a circular/redundant system where patches are applied to the wrong module
+- **Solution Implemented:**
+  1. ✅ Removed `apply_edgecase_patches_v1` from `recipe-ff-robot-commando.yaml`
+  2. ✅ Upgraded `driver.py` to support both `apply_before` and `apply_after` (implementation complete)
+  3. ✅ Updated `modules/common/patch_handler.py` to validate `apply_before` or `apply_after` (or both)
+  4. ✅ Evaluated all 9 patches - determined they should apply after `build_ff_engine_with_issues_v1` (when gamebook first exists, before expensive orphan repair attempts)
+  5. ✅ Updated all patches in `input/FF22 Robot Commando.patch.json` to use `apply_after: "build_ff_engine_with_issues_v1"`
+  6. ✅ Updated all downstream validation stages to read from `resolve_calculation_puzzles` instead of `apply_edgecase_patches`
+- **Changes Made:**
+  - `configs/recipes/recipe-ff-robot-commando.yaml`: Removed `apply_edgecase_patches` stage, updated 4 downstream stages
+  - `driver.py`: Added `apply_before` support (lines 2114-2156)
+  - `modules/common/patch_handler.py`: Updated validation to allow `apply_before` or `apply_after` (or both)
+  - `input/FF22 Robot Commando.patch.json`: Updated all 9 patches to use `build_ff_engine_with_issues_v1` (earliest possible timing)
+- **Timing Rationale:**
+  - Patches are applied AFTER `build_gamebook` (when gamebook first exists)
+  - This is BEFORE `resolve_calculation_puzzles` and BEFORE any gamebook-based validation
+  - **Note:** `repair_portions_orphan` runs on portions BEFORE gamebook exists, so patches can't prevent those expensive repairs. However, patches ensure the final gamebook has correct links for the authoritative Node validator.
+- **Next:** Test patch application and manually verify artifacts
+
 ### 20250127-1715 — All Orphan Entry Points Patched
 - **Result:** Successfully created patches for all remaining orphan entry points
 - **Final Patch Count:** 6 patches total
@@ -501,3 +530,17 @@ The validation report should distinguish between:
   - 11 descendant sections should become reachable (158, 173, 214, 242, 253, 297, 314, 330, 355, 377, 388)
   - Total unreachable sections should drop from 16 effective to ~0-1 (only section 338 suppressed)
 - **Narrative Verification:** ✓ All patches verified by reading source, linking, and target sections to confirm narrative plausibility
+
+### 2026-01-14 — Story Completion: Automated Tests and Validation
+- **Result:** Story marked as Done - all acceptance criteria met, automated tests added
+- **Completion Summary:**
+  - ✅ All acceptance criteria met
+  - ✅ All critical tasks complete (documentation task deferred as low priority - code is self-documenting)
+  - ✅ Patch application verified through manual artifact inspection
+  - ✅ Automated test suite created: `tests/test_patch_handler_integration.py` (5 tests, all passing)
+  - ✅ Tests cover: `add_link`, `remove_link`, `override_field` operations, patch file loading, validation
+- **Test Coverage:**
+  - Patch handler integration tests verify all patch operations work correctly
+  - Tests validate `apply_before`/`apply_after` requirement enforcement
+  - All 23 new tests pass (patch handler + output directory + ending detection)
+- **Status:** Story complete - ready for production use

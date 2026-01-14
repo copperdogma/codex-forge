@@ -12,6 +12,8 @@ description: |
 
   Populates images[] arrays in gamebook.json sections.
 category: transform
+input_schema: ff_engine_gamebook_v1
+output_schema: gamebook_v1
 schema_version: gamebook_v1
 
 inputs:

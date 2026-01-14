@@ -1,0 +1,23 @@
+module_id: initialize_output_v1
+stage: intake
+description: |
+  Initialize output directory structure at the start of the pipeline run.
+  Creates output/, output/images/, copies validator/, and creates README.md.
+  This ensures all stages can rely on output/ existing and having the correct structure.
+entrypoint: modules/export/initialize_output_v1/main.py
+input_schema: null
+output_schema: null
+schema_version: null
+
+params:
+  - name: run_dir
+    desc: Run directory path
+    required: true
+  - name: recipe
+    desc: Optional path to recipe yaml; defaults to snapshots/recipe.yaml in run dir
+    required: false
+
+notes: |
+  This module should run at the VERY beginning of the pipeline (before any other stages).
+  It has no dependencies (needs: []) and creates the output/ directory structure that
+  all subsequent stages rely on.

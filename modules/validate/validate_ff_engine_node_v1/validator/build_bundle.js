@@ -71,7 +71,9 @@ function extractFunction(source, functionName, nextFunctionName) {
 }
 
 const findReachableSectionsSource = extractFunction(validationSource, "findReachableSections", "findUnreachableSections");
-const findUnreachableSectionsSource = extractFunction(validationSource, "findUnreachableSections", null);
+const findUnreachableSectionsSource = extractFunction(validationSource, "findUnreachableSections", "extractTargetsFromEvent");
+const extractTargetsFromEventSource = extractFunction(validationSource, "extractTargetsFromEvent", "detectManualNavigationSections");
+const detectManualNavigationSectionsSource = extractFunction(validationSource, "detectManualNavigationSections", null);
 
 const ajv = new Ajv({
   allErrors: true,
@@ -402,6 +404,10 @@ function validateNoChoices(gamebook) {
 }
 
 ${findReachableSectionsSource}
+
+${extractTargetsFromEventSource}
+
+${detectManualNavigationSectionsSource}
 
 ${findUnreachableSectionsSource}
 

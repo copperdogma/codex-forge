@@ -456,6 +456,12 @@ def main():
         # For now, include all choices
         all_choices = high_confidence_choices + low_confidence_choices
         
+        # If no choices found in primary extraction, also include relaxed choices
+        # This ensures "Return to X" and similar patterns are captured
+        if not all_choices and relaxed_choices:
+            # Merge relaxed choices into main choices (they're already deduplicated)
+            all_choices = relaxed_choices
+        
         # Update portion
         portion['choices'] = all_choices
         claims = []

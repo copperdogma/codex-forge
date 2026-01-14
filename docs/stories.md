@@ -129,7 +129,7 @@ This index tracks stories in `/docs/stories/` for the codex-forge pipeline.
 |||| 110 | Edge-Case Scanner + Patch Module (Post-Extraction) | Medium | Done | /docs/stories/story-110-edgecase-scanner-and-patch-module.md |
 |||| 111 | Edge-Case Scanner — Special-Case Detection Patterns | Medium | To Do | /docs/stories/story-111-edgecase-scanner-special-cases.md |
 |||| 112 | Run Configuration Simplification | High | Done | /docs/stories/story-112-run-configuration-simplification.md |
-|||| 113 | Make output/ Canonical Location for gamebook.json | Medium | To Do | /docs/stories/story-113-gamebook-canonical-output-location.md |
+|||| 113 | Make output/ Canonical Location for gamebook.json | Medium | Done | /docs/stories/story-113-gamebook-canonical-output-location.md |
 |||| 114 | Decouple Execution Context from Recipes | High | Done | /docs/stories/story-114-decouple-recipes.md |
 |||| 115 | Configuration Cleanup and Standardization | High | Done | /docs/stories/story-115-config-cleanup.md |
 |||| 116 | Fighting Fantasy Split Pages Quality Issues | High | Done | /docs/stories/story-116-ff-split-pages-quality-issues.md |

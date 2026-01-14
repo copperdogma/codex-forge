@@ -144,7 +144,8 @@ def main() -> None:
         gamebook = json.load(f)
     if not isinstance(gamebook, dict) or "sections" not in gamebook:
         run_dir = os.path.abspath(os.path.join(os.path.dirname(args.out), ".."))
-        fallback = os.path.join(run_dir, "gamebook.json")
+        # Check output/ directory (canonical location - NO backward compatibility)
+        fallback = os.path.join(run_dir, "output", "gamebook.json")
         if os.path.exists(fallback):
             with open(fallback, "r", encoding="utf-8") as f:
                 gamebook = json.load(f)

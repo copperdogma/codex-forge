@@ -6,6 +6,13 @@
 
 
 stages:
+  - id: initialize_output
+    stage: intake
+    module: initialize_output_v1
+    needs: []
+    params:
+      run_dir: output/runs/{run_id}
+
   - id: extract_pdf_images_capped
     stage: extract
     module: extract_pdf_images_fast_v1
@@ -107,6 +114,8 @@ stages:
       pages: detect_duplicate_pages
       coarse_segments: coarse_segment_html
     out: pages_html_repaired.jsonl
+    params:
+      repair_model: gpt-5.2
     params:
       min_section: 1
       max_section: 400
@@ -466,24 +475,12 @@ stages:
       model: gpt-4o-mini
       confidence_threshold: 0.8
 
-  - id: apply_edgecase_patches
-    stage: export
-    module: apply_edgecase_patches_v1
-    needs: [resolve_calculation_puzzles]
-    inputs:
-      input: resolve_calculation_puzzles
-    out: gamebook_patched.json
-    params:
-      patches: edgecase_patches.jsonl
-      allow-missing: true
-      report-out: edgecase_patch_report.jsonl
-
   - id: forensics_gamebook
     stage: validate
     module: validate_ff_engine_v2
-    needs: [apply_edgecase_patches, report_pipeline_issues, detect_endings, detect_boundaries_html, html_blocks_repaired, validate_reachability]
+    needs: [resolve_calculation_puzzles, report_pipeline_issues, detect_endings, detect_boundaries_html, html_blocks_repaired, validate_reachability]
     inputs:
-      gamebook: apply_edgecase_patches
+      gamebook: resolve_calculation_puzzles
       portions: detect_endings
       boundaries: detect_boundaries_html
       elements_core: html_blocks_repaired
@@ -496,17 +493,17 @@ stages:
   - id: validate_gamebook_node
     stage: export
     module: validate_ff_engine_node_v1
-    needs: [apply_edgecase_patches]
+    needs: [resolve_calculation_puzzles]
     inputs:
-      input: apply_edgecase_patches
+      input: resolve_calculation_puzzles
     out: gamebook_validation_node.json
 
   - id: validate_choice_completeness
     stage: validate
     module: validate_choice_completeness_v1
-    needs: [apply_edgecase_patches]
+    needs: [resolve_calculation_puzzles]
     inputs:
-      gamebook: apply_edgecase_patches
+      gamebook: resolve_calculation_puzzles
     out: choice_completeness_report.json
     params:
       max_discrepancy: 0
@@ -515,9 +512,9 @@ stages:
   - id: validate_game_ready
     stage: validate
     module: validate_game_ready_v1
-    needs: [validate_gamebook_node, validate_choice_completeness, report_pipeline_issues, validate_reachability, apply_edgecase_patches]
+    needs: [validate_gamebook_node, validate_choice_completeness, report_pipeline_issues, validate_reachability, resolve_calculation_puzzles]
     inputs:
-      gamebook: apply_edgecase_patches
+      gamebook: resolve_calculation_puzzles
       choice_report: validate_choice_completeness
       reachability_report: validate_reachability
       engine_report: validate_gamebook_node
@@ -526,10 +523,3 @@ stages:
     params:
       known_missing: "169,170"
 
-  - id: package_game_ready
-    stage: export
-    module: package_game_ready_v1
-    needs: [apply_edgecase_patches]
-    inputs:
-      gamebook: apply_edgecase_patches
-    out: output

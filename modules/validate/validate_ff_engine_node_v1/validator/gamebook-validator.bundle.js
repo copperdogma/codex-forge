@@ -370,6 +370,81 @@ function findReachableSections(gamebook) {
     return reachable;
 }
 
+function extractTargetsFromEvent(event) {
+    const targets = [];
+    const kind = event.kind;
+
+    if (kind === 'choice' && event.targetSection) {
+        targets.push(event.targetSection);
+    } else if (kind === 'stat_check' || kind === 'test_luck') {
+        for (const key of ['pass', 'fail', 'lucky', 'unlucky']) {
+            const outcome = event[key];
+            if (outcome && outcome.targetSection) {
+                targets.push(outcome.targetSection);
+            }
+        }
+    } else if (kind === 'item_check' || kind === 'state_check') {
+        for (const key of ['has', 'missing']) {
+            const outcome = event[key];
+            if (outcome && outcome.targetSection) {
+                targets.push(outcome.targetSection);
+            }
+        }
+    } else if (kind === 'combat') {
+        const outcomes = event.outcomes || {};
+        for (const key of ['win', 'lose', 'escape']) {
+            const outcome = outcomes[key];
+            if (outcome && outcome.targetSection) {
+                targets.push(outcome.targetSection);
+            }
+        }
+    } else if (kind === 'death') {
+        const outcome = event.outcome;
+        if (outcome && outcome.targetSection) {
+            targets.push(outcome.targetSection);
+        }
+    } else if (event.targetSection) {
+        // Generic fallback for events with targetSection
+        targets.push(event.targetSection);
+    }
+
+    return targets;
+}
+
+function detectManualNavigationSections(gamebook, entryPoints) {
+    const manualNavigation = [];
+
+    for (const sectionId of entryPoints) {
+        const section = gamebook.sections[sectionId];
+        if (!section) continue;
+
+        const html = section.presentation_html || '';
+        const text = html.toLowerCase();
+
+        // Pattern 1: Password/countersign usage (player is already using something they learned)
+        const hasPasswordUsage = /\b(you give|you use|you show|you present)\b.*\b(password|countersign|code-?word|map reference)\b/i.test(text);
+
+        // Pattern 2: Conditional access language at the start
+        const hasConditionalStart = /^<[^>]*>\s*(you give|you use|you have|what will you do)/i.test(html);
+
+        // Pattern 3: Numeric section ID that could be a password (small numbers or round numbers)
+        const numericId = parseInt(sectionId);
+        const isPotentialPasswordNumber = !isNaN(numericId) && (
+            (numericId >= 1 && numericId <= 20) ||  // Small numbers (one, two, ..., twenty)
+            (numericId % 100 === 0)  // Round numbers (100, 200, 300)
+        );
+
+        // Pattern 4: Text mentions challenge or encounter by name (e.g., "Challenge Minos")
+        const hasNamedChallenge = /\b(challenge|meet|confront|face)\b.*\b[A-Z][a-z]+\b/i.test(text);
+
+        if (hasPasswordUsage || (hasConditionalStart && isPotentialPasswordNumber) || hasNamedChallenge) {
+            manualNavigation.push(sectionId);
+        }
+    }
+
+    return manualNavigation;
+}
+
 function findUnreachableSections(gamebook) {
     const warnings = [];
     const reachable = findReachableSections(gamebook);

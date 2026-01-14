@@ -522,7 +522,27 @@ def main():
     if args.forensics:
         try:
             import subprocess
-            html_out = args.out.replace(".json", ".html")
+            # HTML forensic report is for debugging - write to module folder, not output/
+            # If args.out is in output/, write HTML to the module folder instead
+            json_dir = os.path.dirname(args.out)
+            if json_dir.endswith("/output") or json_dir.endswith("\\output"):
+                # Find the module folder by looking for the run directory
+                run_dir = os.path.dirname(json_dir)
+                # Find the validate_ff_engine_v2 module folder
+                module_folder = None
+                for item in os.listdir(run_dir):
+                    if "validate_ff_engine_v2" in item and os.path.isdir(os.path.join(run_dir, item)):
+                        module_folder = os.path.join(run_dir, item)
+                        break
+                if module_folder:
+                    html_out = os.path.join(module_folder, "validation_report.html")
+                else:
+                    # Fallback: write next to JSON but warn
+                    html_out = args.out.replace(".json", ".html")
+                    print(f"Warning: Could not find module folder, writing HTML to {html_out}")
+            else:
+                # JSON is in module folder, write HTML there too
+                html_out = args.out.replace(".json", ".html")
             subprocess.run(["python3", "tools/generate_forensic_html.py", args.out, "--out", html_out], check=False)
         except Exception as e:
             print(f"Warning: Failed to generate HTML forensic report: {e}")
