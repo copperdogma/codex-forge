@@ -136,6 +136,10 @@
               "description": "Section title if available"
             }
           }
+        },
+        "vehicle": {
+          "$ref": "#/definitions/Vehicle",
+          "description": "Player vehicle/robot with secondary stats (optional)"
         }
       },
       "allOf": [
@@ -716,6 +720,63 @@
             ]
           }
         ]
+      },
+      "Vehicle": {
+        "type": "object",
+        "required": [
+          "name"
+        ],
+        "properties": {
+          "name": {
+            "type": "string",
+            "description": "Vehicle/robot name (e.g., 'COWBOY ROBOT', 'WASP FIGHTER')"
+          },
+          "type": {
+            "type": "string",
+            "description": "Vehicle type (e.g., 'robot', 'vehicle', 'mech')"
+          },
+          "armour": {
+            "type": "number",
+            "description": "Armour value (durability)"
+          },
+          "firepower": {
+            "type": "number",
+            "description": "Firepower value (attack strength)"
+          },
+          "speed": {
+            "type": "string",
+            "description": "Speed rating (e.g., 'Slow', 'Medium', 'Fast', 'Very Fast')"
+          },
+          "combat_bonus": {
+            "type": "number",
+            "description": "Combat bonus (may be positive or negative)"
+          },
+          "special_abilities": {
+            "type": "string",
+            "description": "Full text description of special abilities"
+          },
+          "rules": {
+            "type": "array",
+            "description": "Parsed structured rules from special abilities (similar to combat.rules)",
+            "items": {
+              "type": "object"
+            }
+          },
+          "modifiers": {
+            "type": "array",
+            "description": "Parsed stat modifiers from special abilities (similar to combat.modifiers)",
+            "items": {
+              "type": "object"
+            }
+          },
+          "confidence": {
+            "type": "number",
+            "minimum": 0,
+            "maximum": 1,
+            "description": "Extraction confidence score"
+          }
+        },
+        "additionalProperties": false
       },
     "CombatRule": {
       "type": "object",

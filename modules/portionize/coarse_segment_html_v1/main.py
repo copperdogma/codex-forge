@@ -113,15 +113,23 @@ TASK: Identify three contiguous page ranges:
 2. gameplay_sections: The numbered gameplay content starting with "BACKGROUND" or section "1" (typically pages 16-400+)
 3. endmatter: Appendices, ads, previews, author bios (typically last 5-20 pages, may be null)
 
-RULES:
+RULES FOR IDENTIFYING GAMEPLAY START:
 - Frontmatter always starts at page 1
-- Gameplay begins at the first page with "BACKGROUND", "INTRODUCTION", or numbered section headers (typically 1-400)
+- **CRITICAL**: Gameplay ALWAYS begins at the page containing "BACKGROUND" as a header followed by narrative story text
+  * "BACKGROUND" header (H1/H2/first P) + narrative story text (e.g., "You are...", "Early one morning...", "Your people...") = gameplay starts HERE, even if no numbered sections appear yet
+  * IGNORE "BACKGROUND" in running-heads, instructions ("with the Background and entry 1"), TOC, or table cells - these are frontmatter
+  * If you find "BACKGROUND" as a header with story narrative, gameplay starts on THAT PAGE regardless of whether numbered sections have appeared
+- If "BACKGROUND" header with narrative is not found, gameplay begins at the first page with numbered section headers (H2: "1", "2", etc.)
 - Gameplay ends at the LAST page containing numbered sections (1-400), even if ads/previews also appear on that page
 - Endmatter starts at the first page that contains ONLY ads/previews/appendices with NO numbered sections
 - IMPORTANT: If a page has BOTH numbered sections AND ads, it is GAMEPLAY (the numbered sections take precedence)
 - All three ranges must be contiguous (no gaps)
 - If endmatter is absent, set it to null
 - Use page_number values from the input (do not invent page numbers)
+
+KEY DISTINCTION: 
+- Frontmatter "BACKGROUND": appears in instructions ("with the Background and entry 1"), TOC entries, or table cells
+- Gameplay "BACKGROUND": appears as a header (H1/H2/first P) followed immediately by narrative story text ("You are a rancher...", "Early one morning...")
 
 OUTPUT JSON (exactly this format):
 {

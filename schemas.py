@@ -16,6 +16,20 @@ class CombatEnemy(BaseModel):
     speed: Optional[str] = None
 
 
+class Vehicle(BaseModel):
+    """Player vehicle/robot with secondary stats (ARMOUR, FIREPOWER, SPEED, COMBAT BONUS)"""
+    name: str
+    type: Optional[str] = None  # "robot", "vehicle", "mech", etc.
+    armour: Optional[int] = None
+    firepower: Optional[int] = None
+    speed: Optional[str] = None  # "Slow", "Medium", "Fast", "Very Fast", etc.
+    combat_bonus: Optional[int] = None  # May be positive or negative
+    special_abilities: Optional[str] = None  # Full text description
+    rules: Optional[List[Dict[str, Any]]] = None  # Parsed structured rules (similar to combat.rules)
+    modifiers: Optional[List[Dict[str, Any]]] = None  # Parsed stat modifiers (similar to combat.modifiers)
+    confidence: float = 1.0
+
+
 class Combat(BaseModel):
     enemies: List[CombatEnemy] = Field(default_factory=list)
     outcomes: Optional[Dict[str, Any]] = None
@@ -476,6 +490,7 @@ class EnrichedPortion(BaseModel):
     continuation_confidence: Optional[float] = None
     choices: List[Choice] = Field(default_factory=list)
     combat: List[Combat] = Field(default_factory=list)
+    vehicle: Optional[Vehicle] = None
     test_luck: List[TestLuck] = Field(default_factory=list)
     stat_checks: List[StatCheck] = Field(default_factory=list)
     stat_modifications: List[StatModification] = Field(default_factory=list)

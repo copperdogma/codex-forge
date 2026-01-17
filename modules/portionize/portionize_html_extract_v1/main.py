@@ -431,6 +431,23 @@ def main() -> None:
                 source_images.append(img)
 
         raw_html = _assemble_html(span, False, False, args.skip_endmatter)
+        
+        # Special handling for BACKGROUND section: convert "NOW TURN OVER" (or similar phrases) to href link to section 1
+        if section_id and str(section_id).lower() == "background":
+            # Pattern for "NOW TURN OVER" and similar non-numeric navigation phrases
+            now_turn_pattern = re.compile(
+                r'(?:NOW\s+TURN\s+(?:OVER|THE\s+PAGE)|TURN\s+THE\s+PAGE)',
+                re.IGNORECASE
+            )
+            # Check if the HTML contains this phrase but doesn't already have a link to section 1
+            if now_turn_pattern.search(raw_html) and 'href="#1"' not in raw_html:
+                # Replace "NOW TURN OVER" (or similar) with a link to section 1
+                def replace_with_link(match):
+                    phrase = match.group(0)
+                    # Preserve original case/style
+                    return f'<a href="#1">{phrase}</a>'
+                raw_html = now_turn_pattern.sub(replace_with_link, raw_html)
+        
         turn_to_links = _extract_turn_to_links(raw_html)
         out_rows.append({
             "schema_version": "enriched_portion_v1",

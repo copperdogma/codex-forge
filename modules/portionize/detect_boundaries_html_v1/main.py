@@ -125,11 +125,28 @@ def build_candidates(pages: List[Dict[str, Any]], min_section: int, max_section:
         # Optional: detect BACKGROUND as a special, unnumbered gameplay header
         if include_background:
             for idx, block in enumerate(blocks):
-                if block.get("block_type") != "h1":
-                    continue
+                block_type = block.get("block_type")
                 text = (block.get("text") or "").strip()
-                if text.lower() != "background":
+                
+                # Check if this is BACKGROUND header
+                # The actual BACKGROUND on page 27 appears as a p block with class="running-head" (OCR artifact)
+                # Since pages are already filtered to gameplay pages (27+), any "BACKGROUND" here is the real header
+                is_background_header = False
+                if text.lower() == "background":
+                    # Accept h1 or h2 headers
+                    if block_type == "h1" or block_type == "h2":
+                        is_background_header = True
+                    # Also accept p blocks if they're early in page (first 5 blocks)
+                    # Even if they have running-head class - on gameplay pages, this is the actual section header
+                    elif block_type == "p" and idx < 5:  # Early in page
+                        # Exclude if it's part of a TOC entry (TOC entries have page numbers like "BACKGROUND24")
+                        # Standalone "BACKGROUND" (1-2 words) on gameplay pages is the real header
+                        if len(text.split()) <= 2 and not text.isdigit():
+                            is_background_header = True
+                
+                if not is_background_header:
                     continue
+                
                 # score body text until next header
                 span_blocks = blocks[idx + 1:]
                 follow_text_score = 0
@@ -150,14 +167,18 @@ def build_candidates(pages: List[Dict[str, Any]], min_section: int, max_section:
                     "start_line_idx": blocks[idx].get("order"),
                     "start_element_metadata": {
                         "spread_side": spread_side,
-                        "block_type": "h1",
+                        "block_type": block_type,
                     },
                     "confidence": 0.9,
                     "method": "code_filter",
-                    "source": "html_h1_background",
+                    "source": f"html_{block_type}_background",
                     "follow_text_score": follow_text_score,
                 })
                 break
+
+        # If BACKGROUND is missing and this page is early, check for narrative content
+        # We'll defer BACKGROUND creation until after we've seen all pages,
+        # so we can ensure it comes before the first numeric section
 
         # Build local list of numeric header indices for this page (dedupe same-number repeats per page)
         header_indices = []
@@ -379,6 +400,12 @@ def main() -> None:
     coarse = load_coarse_segments(args.coarse_segments)
     pages = list(read_jsonl(pages_path))
 
+    # If BACKGROUND is requested but missing, try to infer it from narrative content before section 1
+    if args.include_background:
+        # First, check if BACKGROUND already exists in candidates
+        # If not, we'll create it from narrative content before the first numeric section
+        pass  # Logic moved to build_candidates to check during page iteration
+
     logger = ProgressLogger(state_path=args.state_file, progress_path=args.progress_file, run_id=args.run_id)
     logger.log(
         "portionize",
@@ -393,6 +420,73 @@ def main() -> None:
 
     pages = filter_pages_to_gameplay(pages, coarse)
     candidates = build_candidates(pages, args.min_section, args.max_section, args.require_text_between, args.include_background)
+    
+    # If BACKGROUND is requested but missing, try to find it by looking for the explicit "BACKGROUND" header
+    # on the first gameplay page (coarse segmentation should have filtered to gameplay pages only)
+    if args.include_background:
+        background_candidates = [c for c in candidates if str(c.get("section_id", "")).lower() == "background"]
+        if not background_candidates and pages:
+            # Find the first gameplay page and look for explicit "BACKGROUND" header (h1 or h2)
+            first_gameplay_page = None
+            for page in pages:
+                page_num = _coerce_int(page.get("page_number"))
+                if page_num is not None:
+                    first_gameplay_page = page
+                    break
+            
+            if first_gameplay_page:
+                page_number = _coerce_int(first_gameplay_page.get("page_number"))
+                blocks = first_gameplay_page.get("blocks", [])
+                
+                # Look for explicit "BACKGROUND" header (h1, h2, or p block early in page)
+                # On gameplay pages, even p blocks with running-head class are valid (OCR artifact)
+                for idx, block in enumerate(blocks[:10]):  # Check first 10 blocks
+                    block_type = block.get("block_type")
+                    text = (block.get("text") or "").strip()
+                    
+                    # Accept h1, h2, or p blocks (early in page) with exact text "BACKGROUND"
+                    if text.lower() == "background":
+                        if block_type == "h1" or block_type == "h2":
+                            # Found explicit BACKGROUND header - create candidate
+                            spread_side = first_gameplay_page.get("spread_side")
+                            element_id = f"p{page_number:03d}-b{block.get('order')}"
+                            candidates.insert(0, {  # Insert at beginning so it comes before section 1
+                                "section_id": "background",
+                                "start_element_id": element_id,
+                                "start_page": page_number,
+                                "start_line_idx": block.get("order"),
+                                "start_element_metadata": {
+                                    "spread_side": spread_side,
+                                    "block_type": block_type,
+                                },
+                                "confidence": 0.9,
+                                "method": "code_filter",
+                                "source": f"html_{block_type}_background",
+                                "follow_text_score": 0,  # Will be calculated in build_boundaries
+                            })
+                            break
+                        elif block_type == "p" and idx < 5:  # Early p block on gameplay page
+                            # On gameplay pages, standalone "BACKGROUND" p block is the header
+                            # (even if it has running-head class - that's an OCR artifact)
+                            if len(text.split()) <= 2:  # Standalone, not part of TOC entry
+                                spread_side = first_gameplay_page.get("spread_side")
+                                element_id = f"p{page_number:03d}-b{block.get('order')}"
+                                candidates.insert(0, {  # Insert at beginning so it comes before section 1
+                                    "section_id": "background",
+                                    "start_element_id": element_id,
+                                    "start_page": page_number,
+                                    "start_line_idx": block.get("order"),
+                                    "start_element_metadata": {
+                                        "spread_side": spread_side,
+                                        "block_type": block_type,
+                                    },
+                                    "confidence": 0.9,
+                                    "method": "code_filter",
+                                    "source": f"html_{block_type}_background",
+                                    "follow_text_score": 0,  # Will be calculated in build_boundaries
+                                })
+                                break
+    
     deduped = dedupe_candidates(candidates)
     boundaries = build_boundaries(deduped)
     duplicates = _build_duplicate_report(candidates, deduped)

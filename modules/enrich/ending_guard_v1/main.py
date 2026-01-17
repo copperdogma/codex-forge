@@ -1,7 +1,7 @@
 import argparse
 import json
 import re
-from typing import Dict, List, Tuple
+from typing import Dict, List, Optional, Tuple
 
 from modules.common.openai_client import OpenAI
 from modules.common.utils import read_jsonl, save_jsonl, save_json

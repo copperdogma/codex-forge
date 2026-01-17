@@ -1076,6 +1076,22 @@ def build_section(portion: Dict[str, Any], emit_text: bool, emit_provenance_text
     if ending_status in ("death", "victory", "defeat"):
         section["status"] = ending_status
 
+    # Add vehicle/robot data if present
+    vehicle_data = portion.get("vehicle")
+    if vehicle_data:
+        # Convert Vehicle model to dict if needed
+        if hasattr(vehicle_data, "model_dump"):
+            vehicle_dict = vehicle_data.model_dump(exclude_none=True)
+        elif hasattr(vehicle_data, "dict"):
+            vehicle_dict = vehicle_data.dict(exclude_none=True)
+        elif isinstance(vehicle_data, dict):
+            vehicle_dict = {k: v for k, v in vehicle_data.items() if v is not None}
+        else:
+            vehicle_dict = None
+        
+        if vehicle_dict:
+            section["vehicle"] = vehicle_dict
+
     # Sequence is the canonical gameplay representation; legacy mechanic fields are omitted.
 
     provenance = {
