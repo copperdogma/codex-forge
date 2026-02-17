@@ -1,0 +1,109 @@
+description: "Image crop extraction — specialized layout models (Florence-2, Surya)"
+
+defaultTest:
+  options:
+    provider: anthropic:messages:claude-opus-4-6
+
+# Layout models use a dummy prompt (inference is fixed, no text prompt needed)
+prompts:
+  - id: "file://../prompts/crop-layout-model.js"
+    label: "layout-detect"
+
+providers:
+  - id: "python:../providers/florence2_provider.py"
+    label: "Florence-2-large"
+  - id: "python:../providers/surya_provider.py"
+    label: "Surya Layout"
+
+# Same test cases as the VLM eval
+tests:
+  - vars:
+      image: file://../input/source-pages-b64/Image000.b64.txt
+      golden_key: "Image000"
+    assert:
+      - type: python
+        value: file://../scorers/image_crop_scorer.py
+
+  - vars:
+      image: file://../input/source-pages-b64/Image001.b64.txt
+      golden_key: "Image001"
+    assert:
+      - type: python
+        value: file://../scorers/image_crop_scorer.py
+
+  - vars:
+      image: file://../input/source-pages-b64/Image003.b64.txt
+      golden_key: "Image003"
+    assert:
+      - type: python
+        value: file://../scorers/image_crop_scorer.py
+
+  - vars:
+      image: file://../input/source-pages-b64/Image008.b64.txt
+      golden_key: "Image008"
+    assert:
+      - type: python
+        value: file://../scorers/image_crop_scorer.py
+
+  - vars:
+      image: file://../input/source-pages-b64/Image011.b64.txt
+      golden_key: "Image011"
+    assert:
+      - type: python
+        value: file://../scorers/image_crop_scorer.py
+
+  - vars:
+      image: file://../input/source-pages-b64/Image013.b64.txt
+      golden_key: "Image013"
+    assert:
+      - type: python
+        value: file://../scorers/image_crop_scorer.py
+
+  - vars:
+      image: file://../input/source-pages-b64/Image020.b64.txt
+      golden_key: "Image020"
+    assert:
+      - type: python
+        value: file://../scorers/image_crop_scorer.py
+
+  - vars:
+      image: file://../input/source-pages-b64/Image021.b64.txt
+      golden_key: "Image021"
+    assert:
+      - type: python
+        value: file://../scorers/image_crop_scorer.py
+
+  - vars:
+      image: file://../input/source-pages-b64/Image037.b64.txt
+      golden_key: "Image037"
+    assert:
+      - type: python
+        value: file://../scorers/image_crop_scorer.py
+
+  - vars:
+      image: file://../input/source-pages-b64/Image059.b64.txt
+      golden_key: "Image059"
+    assert:
+      - type: python
+        value: file://../scorers/image_crop_scorer.py
+
+  - vars:
+      image: file://../input/source-pages-b64/Image121.b64.txt
+      golden_key: "Image121"
+    assert:
+      - type: python
+        value: file://../scorers/image_crop_scorer.py
+
+  - vars:
+      image: file://../input/source-pages-b64/Image124.b64.txt
+      golden_key: "Image124"
+    assert:
+      - type: python
+        value: file://../scorers/image_crop_scorer.py
+
+  - vars:
+      image: file://../input/source-pages-b64/Image126.b64.txt
+      golden_key: "Image126"
+    assert:
+      - type: python
+        value: file://../scorers/image_crop_scorer.py

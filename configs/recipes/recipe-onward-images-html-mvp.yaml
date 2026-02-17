@@ -1,0 +1,161 @@
+# Onward-specific MVP: image-directory OCR to chapter HTML with Onward table escalation
+
+input:
+  images: input/onward-to-the-unknown-images  # override via run config
+
+stages:
+  - id: images_to_manifest
+    stage: extract
+    module: images_dir_to_manifest_v1
+    out: pages_images_manifest.jsonl
+    params:
+      input_dir: input/onward-to-the-unknown-images  # override via run config
+
+  - id: ocr_ai
+    stage: extract
+    module: ocr_ai_gpt51_v1
+    needs: [images_to_manifest]
+    inputs:
+      pages: images_to_manifest
+    out: pages_html.jsonl
+    params:
+      model: gpt-5.1
+      ocr_hints: |
+        - Preserve text exactly as printed; do not correct spelling or normalize punctuation.
+        - Preserve line breaks and paragraph structure as seen in the image.
+        - When tables are present, preserve the grid as <table> with correct rows/columns.
+        - Do not infer missing cells or merge columns unless explicitly visible.
+
+  - id: crop_illustrations
+    stage: extract
+    module: crop_illustrations_guided_v1
+    needs: [ocr_ai]
+    inputs:
+      ocr_manifest: ocr_ai
+    out: illustration_manifest.jsonl
+    params:
+      transparency: false
+      output_format: jpeg
+      jpeg_quality: 92
+      highres_images_dir: input/onward-to-the-unknown-images
+      detection_mode: layout
+      white_threshold: 252
+      close_kernel: 31
+      close_iterations: 3
+      score_min_nonwhite: 0.01
+      min_nonwhite_ratio: 0.02
+      max_text_ratio: 0.02
+      text_line_kernel_w: 31
+      text_line_kernel_h: 3
+      text_line_iterations: 1
+      text_block_kernel_w: 25
+      text_block_kernel_h: 3
+      text_block_iterations: 1
+      min_area_ratio: 0.001
+      min_width: 120
+      min_height: 120
+      padding_percent: 0.08
+      text_kernel: 3
+      text_iterations: 1
+      rescue_model: gemini-3-pro-preview
+      rescue_temperature: 0.0
+      rescue_max_tokens: 4096  # Gemini uses thinking tokens that eat into output budget; was 800 for GPT-5.1
+      rescue_max_pages: 20
+      rescue_include_alt: true
+      rescue_always: false
+      rescue_retry_on_overlap: true
+      rescue_retry_on_missing: true
+      rescue_retry_max: 1
+      rescue_require_caption_schema: true
+      rescue_retry_on_text: true
+      rescue_caption_second_pass: true
+      rescue_caption_max_tokens: 400
+      rescue_refine_boxes: true
+      rescue_refine_max_tokens: 400
+      rescue_refine_min_area_ratio: 0.05
+      refine_with_textlines: false
+      trim_layout_text: true
+      layout_text_model: PP-DocLayout_plus-L
+      layout_text_score_thresh: 0.6
+      layout_text_max_gap_ratio: 0.2
+      layout_text_bottom_band_ratio: 0.35
+      layout_text_top_band_ratio: 0.35
+      layout_text_margin_px: 6
+      layout_text_min_width_ratio: 0.4
+      layout_text_max_height_ratio: 0.2
+      layout_split_text: false
+      layout_split_min_gap_ratio: 0.12
+      layout_split_margin_px: 6
+      trim_text_edges: false
+      trim_ocr_text_edges: false
+      split_when_missing: true
+      trim_caption: false
+      caption_relax_max_gap_ratio: 0.2
+
+  - id: table_rescue
+    stage: adapter
+    module: table_rescue_html_loop_v1
+    needs: [ocr_ai]
+    inputs:
+      pages: ocr_ai
+    out: pages_html_rescued.jsonl
+    params:
+      model: gpt-5.1
+      max_passes: 3
+      max_pages: 50
+      fail_on_unresolved: false
+      rescue_hints: |
+        - Preserve row/column boundaries exactly; do not reflow text.
+        - Use <br> for multiple entries inside a single cell.
+        - Do not add or remove words.
+
+  - id: extract_page_numbers
+    stage: transform
+    module: extract_page_numbers_html_v1
+    needs: [table_rescue]
+    inputs:
+      pages: table_rescue
+    out: pages_html_with_page_numbers.jsonl
+
+  - id: onward_table_rescue
+    stage: adapter
+    module: table_rescue_onward_tables_v1
+    needs: [extract_page_numbers]
+    inputs:
+      pages: extract_page_numbers
+    out: pages_html_onward_tables.jsonl
+    params:
+      model: gpt-5.1
+      header_threshold: 0.8
+      fail_on_unresolved: false
+
+  - id: table_fix_continuations
+    stage: adapter
+    module: table_fix_continuations_v1
+    needs: [onward_table_rescue]
+    inputs:
+      pages: onward_table_rescue
+    out: pages_html_onward_tables_fixed.jsonl
+
+  - id: portionize_headings
+    stage: portionize
+    module: portionize_headings_html_v1
+    needs: [table_fix_continuations]
+    inputs:
+      pages: table_fix_continuations
+    out: portions_headings.jsonl
+    params:
+      heading_tags: h1
+      min_printed_page: 1
+
+  - id: build_chapters
+    stage: build
+    module: build_chapter_html_v1
+    needs: [table_fix_continuations, portionize_headings, crop_illustrations]
+    inputs:
+      pages: table_fix_continuations
+      portions: portionize_headings
+      illustration_manifest: crop_illustrations
+    out: chapters_manifest.jsonl
+    params:
+      images_subdir: images

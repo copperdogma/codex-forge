@@ -1,0 +1,9 @@
+# Large data files — regenerate by running promptfoo eval
+results/*.json
+results/visual-comparison/
+
+# Source page images (copies from input/)
+input/source-pages-b64/
+
+# Golden crop images (large binaries)
+golden/crops/

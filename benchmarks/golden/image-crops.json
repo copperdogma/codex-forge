@@ -1,0 +1,414 @@
+{
+  "Image000": {
+    "source": "input/source-pages/Image000.jpg",
+    "source_width": 5096,
+    "source_height": 6772,
+    "crops": [
+      {
+        "crop_file": "Image000-001.jpg",
+        "bbox": [
+          0,
+          0,
+          5096,
+          6772
+        ],
+        "bbox_normalized": [
+          0.0,
+          0.0,
+          1.0,
+          1.0
+        ],
+        "confidence": 1.0
+      }
+    ]
+  },
+  "Image001": {
+    "source": "input/source-pages/Image001.jpg",
+    "source_width": 5100,
+    "source_height": 6600,
+    "crops": [
+      {
+        "crop_file": "Image001-001.jpg",
+        "bbox": [
+          980,
+          1780,
+          4352,
+          2524
+        ],
+        "bbox_normalized": [
+          0.192157,
+          0.269697,
+          0.853333,
+          0.382424
+        ],
+        "confidence": 0.9933,
+        "match_scale": 4.0
+      }
+    ]
+  },
+  "Image003": {
+    "source": "input/source-pages/Image003.jpg",
+    "source_width": 5100,
+    "source_height": 6600,
+    "crops": [
+      {
+        "crop_file": "Image003-001.jpg",
+        "bbox": [
+          307,
+          1769,
+          4786,
+          3045
+        ],
+        "bbox_normalized": [
+          0.060196,
+          0.26803,
+          0.938431,
+          0.461364
+        ],
+        "confidence": 0.9994
+      }
+    ]
+  },
+  "Image008": {
+    "source": "input/source-pages/Image008.jpg",
+    "source_width": 5100,
+    "source_height": 6600,
+    "crops": [
+      {
+        "crop_file": "Image008-001.jpg",
+        "bbox": [
+          1116,
+          1697,
+          4136,
+          4435
+        ],
+        "bbox_normalized": [
+          0.218824,
+          0.257121,
+          0.81098,
+          0.67197
+        ],
+        "confidence": 0.9977
+      }
+    ]
+  },
+  "Image011": {
+    "source": "input/source-pages/Image011.jpg",
+    "source_width": 5100,
+    "source_height": 6600,
+    "crops": [
+      {
+        "crop_file": "Image011-001.jpg",
+        "bbox": [
+          1922,
+          498,
+          2958,
+          1525
+        ],
+        "bbox_normalized": [
+          0.376863,
+          0.075455,
+          0.58,
+          0.231061
+        ],
+        "confidence": 0.9997
+      },
+      {
+        "crop_file": "Image011-002.jpg",
+        "bbox": [
+          611,
+          4528,
+          4472,
+          5918
+        ],
+        "bbox_normalized": [
+          0.119804,
+          0.686061,
+          0.876863,
+          0.896667
+        ],
+        "confidence": 0.9998
+      }
+    ]
+  },
+  "Image013": {
+    "source": "input/source-pages/Image013.jpg",
+    "source_width": 5100,
+    "source_height": 6600,
+    "crops": [
+      {
+        "crop_file": "Image013-001.jpg",
+        "bbox": [
+          496,
+          2735,
+          2493,
+          4510
+        ],
+        "bbox_normalized": [
+          0.097255,
+          0.414394,
+          0.488824,
+          0.683333
+        ],
+        "confidence": 0.9998
+      }
+    ]
+  },
+  "Image020": {
+    "source": "input/source-pages/Image020.jpg",
+    "source_width": 5100,
+    "source_height": 6600,
+    "crops": [
+      {
+        "crop_file": "Image020-001.jpg",
+        "bbox": [
+          410,
+          399,
+          4668,
+          3048
+        ],
+        "bbox_normalized": [
+          0.080392,
+          0.060455,
+          0.915294,
+          0.461818
+        ],
+        "confidence": 0.9996
+      },
+      {
+        "crop_file": "Image020-002.jpg",
+        "bbox": [
+          465,
+          3353,
+          4622,
+          5811
+        ],
+        "bbox_normalized": [
+          0.091176,
+          0.50803,
+          0.906275,
+          0.880455
+        ],
+        "confidence": 0.9996
+      }
+    ]
+  },
+  "Image021": {
+    "source": "input/source-pages/Image021.jpg",
+    "source_width": 5100,
+    "source_height": 6600,
+    "crops": [
+      {
+        "crop_file": "Image021-001.jpg",
+        "bbox": [
+          547,
+          2859,
+          2441,
+          4400
+        ],
+        "bbox_normalized": [
+          0.107255,
+          0.433182,
+          0.478627,
+          0.666667
+        ],
+        "confidence": 0.9997
+      }
+    ]
+  },
+  "Image037": {
+    "source": "input/source-pages/Image037.jpg",
+    "source_width": 5100,
+    "source_height": 6600,
+    "crops": [
+      {
+        "crop_file": "Image037-001.jpg",
+        "bbox": [
+          496,
+          4237,
+          2508,
+          5924
+        ],
+        "bbox_normalized": [
+          0.097255,
+          0.64197,
+          0.491765,
+          0.897576
+        ],
+        "confidence": 0.9998
+      },
+      {
+        "crop_file": "Image037-002.jpg",
+        "bbox": [
+          2984,
+          343,
+          4342,
+          2071
+        ],
+        "bbox_normalized": [
+          0.585098,
+          0.05197,
+          0.851373,
+          0.313788
+        ],
+        "confidence": 0.9999
+      }
+    ]
+  },
+  "Image059": {
+    "source": "input/source-pages/Image059.jpg",
+    "source_width": 5100,
+    "source_height": 6600,
+    "crops": [
+      {
+        "crop_file": "Image059-001.jpg",
+        "bbox": [
+          495,
+          2280,
+          2501,
+          4810
+        ],
+        "bbox_normalized": [
+          0.097059,
+          0.345455,
+          0.490392,
+          0.728788
+        ],
+        "confidence": 0.9998
+      },
+      {
+        "crop_file": "Image059-002.jpg",
+        "bbox": [
+          2627,
+          4172,
+          4640,
+          5915
+        ],
+        "bbox_normalized": [
+          0.515098,
+          0.632121,
+          0.909804,
+          0.896212
+        ],
+        "confidence": 0.9996
+      }
+    ]
+  },
+  "Image121": {
+    "source": "input/source-pages/Image121.jpg",
+    "source_width": 5100,
+    "source_height": 6600,
+    "crops": [
+      {
+        "crop_file": "Image121-001.jpg",
+        "bbox": [
+          464,
+          405,
+          4651,
+          2663
+        ],
+        "bbox_normalized": [
+          0.09098,
+          0.061364,
+          0.911961,
+          0.403485
+        ],
+        "confidence": 0.9997
+      },
+      {
+        "crop_file": "Image121-002.jpg",
+        "bbox": [
+          479,
+          2927,
+          2565,
+          5814
+        ],
+        "bbox_normalized": [
+          0.093922,
+          0.443485,
+          0.502941,
+          0.880909
+        ],
+        "confidence": 0.9998
+      },
+      {
+        "crop_file": "Image121-003.jpg",
+        "bbox": [
+          2663,
+          2962,
+          4708,
+          5768
+        ],
+        "bbox_normalized": [
+          0.522157,
+          0.448788,
+          0.923137,
+          0.873939
+        ],
+        "confidence": 0.9998
+      }
+    ]
+  },
+  "Image124": {
+    "source": "input/source-pages/Image124.jpg",
+    "source_width": 5100,
+    "source_height": 6600,
+    "crops": [
+      {
+        "crop_file": "Image124-001.jpg",
+        "bbox": [
+          544,
+          473,
+          4645,
+          4483
+        ],
+        "bbox_normalized": [
+          0.106667,
+          0.071667,
+          0.910784,
+          0.679242
+        ],
+        "confidence": 1.0
+      }
+    ]
+  },
+  "Image126": {
+    "source": "input/source-pages/Image126.jpg",
+    "source_width": 5100,
+    "source_height": 6600,
+    "crops": [
+      {
+        "crop_file": "Image126-001.jpg",
+        "bbox": [
+          1040,
+          752,
+          4000,
+          2864
+        ],
+        "bbox_normalized": [
+          0.203922,
+          0.113939,
+          0.784314,
+          0.433939
+        ],
+        "confidence": 0.9998
+      },
+      {
+        "crop_file": "Image126-002.jpg",
+        "bbox": [
+          1120,
+          3520,
+          4080,
+          5648
+        ],
+        "bbox_normalized": [
+          0.219608,
+          0.533333,
+          0.8,
+          0.855758
+        ],
+        "confidence": 0.9998
+      }
+    ]
+  }
+}

@@ -40,10 +40,95 @@ parameters:
     default: 230
     description: White threshold for transparency processing (0-255)
 
+  - name: output_format
+    type: string
+    default: png
+    description: Output image format (png or jpeg)
+
+  - name: jpeg_quality
+    type: integer
+    default: 92
+    description: JPEG quality when output_format=jpeg
+
   - name: blur
     type: integer
     default: 5
     description: Gaussian blur kernel size for CV detection
+
+  - name: text_kernel
+    type: integer
+    default: 3
+    description: Morphological open kernel size to suppress small text
+
+  - name: text_iterations
+    type: integer
+    default: 1
+    description: Morphological open iterations for text suppression
+
+  - name: detection_mode
+    type: string
+    default: contour
+    description: "Detection mode: contour, nonwhite, nontext, or auto"
+
+  - name: white_threshold
+    type: integer
+    default: 245
+    description: Nonwhite detection threshold (nonwhite mode)
+
+  - name: close_kernel
+    type: integer
+    default: 15
+    description: Morphological close kernel size (nonwhite mode)
+
+  - name: close_iterations
+    type: integer
+    default: 2
+    description: Morphological close iterations (nonwhite mode)
+
+  - name: score_min_nonwhite
+    type: float
+    default: 0.02
+    description: Minimum nonwhite ratio for scoring candidate boxes (auto mode)
+
+  - name: min_nonwhite_ratio
+    type: float
+    default: 0.02
+    description: Minimum nonwhite ratio for nonwhite mode
+
+  - name: max_text_ratio
+    type: float
+    default: 0.02
+    description: Maximum text ratio for nonwhite mode
+
+  - name: text_line_kernel_w
+    type: integer
+    default: 25
+    description: Text line kernel width for nonwhite mode
+
+  - name: text_line_kernel_h
+    type: integer
+    default: 3
+    description: Text line kernel height for nonwhite mode
+
+  - name: text_line_iterations
+    type: integer
+    default: 1
+    description: Text line morphology iterations for nonwhite mode
+
+  - name: text_block_kernel_w
+    type: integer
+    default: 35
+    description: Text block kernel width for nontext mode
+
+  - name: text_block_kernel_h
+    type: integer
+    default: 7
+    description: Text block kernel height for nontext mode
+
+  - name: text_block_iterations
+    type: integer
+    default: 2
+    description: Text block dilation iterations for nontext mode
 
   - name: min_area_ratio
     type: float
@@ -65,14 +150,402 @@ parameters:
     default: 50
     description: Minimum box height in pixels
 
+  - name: highres_manifest
+    type: string
+    default: null
+    description: Optional high-res page images manifest (for better quality crops)
+
+  - name: highres_images_dir
+    type: string
+    default: null
+    description: Optional high-res images directory (sorted to page order)
+
+  - name: padding_percent
+    type: float
+    default: 0.05
+    description: Percentage padding around detected boxes (default 0.05 = 5%)
+
+  - name: rescue_model
+    type: string
+    default: null
+    description: Optional vision model for box rescue (e.g., gpt-5.1)
+
+  - name: rescue_temperature
+    type: float
+    default: 0.0
+    description: Rescue model temperature
+
+  - name: rescue_max_tokens
+    type: integer
+    default: 800
+    description: Rescue model max output tokens
+
+  - name: rescue_max_pages
+    type: integer
+    default: 20
+    description: Maximum pages to rescue with VLM
+
+  - name: rescue_timeout_seconds
+    type: float
+    default: null
+    description: Timeout seconds for rescue model requests
+
+  - name: rescue_include_alt
+    type: boolean
+    default: false
+    description: Include OCR image descriptions in rescue prompt
+
+  - name: rescue_always
+    type: boolean
+    default: false
+    description: Always use rescue model on image pages (overrides CV boxes)
+
+  - name: rescue_retry_on_overlap
+    type: boolean
+    default: false
+    description: Retry VLM when returned boxes overlap heavily
+
+  - name: rescue_retry_on_missing
+    type: boolean
+    default: false
+    description: Retry VLM when returned count is below expected
+
+  - name: rescue_retry_on_text
+    type: boolean
+    default: false
+    description: Retry VLM when crops still include detectable text bands
+
+  - name: rescue_retry_max
+    type: integer
+    default: 1
+    description: Maximum number of VLM retries
+
+  - name: rescue_require_caption_schema
+    type: boolean
+    default: false
+    description: Require VLM to return image_box/caption_box schema
+
+  - name: rescue_caption_second_pass
+    type: boolean
+    default: false
+    description: Run a second VLM pass to locate caption boxes
+
+  - name: rescue_caption_max_tokens
+    type: integer
+    default: 400
+    description: Max tokens for VLM caption pass
+
+  - name: rescue_refine_boxes
+    type: boolean
+    default: false
+    description: Refine each crop with a second VLM call on the crop
+
+  - name: rescue_refine_max_tokens
+    type: integer
+    default: 400
+    description: Max tokens for VLM refine pass
+
+  - name: rescue_refine_min_area_ratio
+    type: float
+    default: 0.05
+    description: Minimum area ratio vs original crop to accept VLM refine
+
+  - name: refine_with_nonwhite
+    type: boolean
+    default: false
+    description: Refine boxes by expanding to nonwhite connected components
+
+  - name: refine_close_kernel
+    type: integer
+    default: 5
+    description: Close kernel size for refine nonwhite mask
+
+  - name: refine_close_iterations
+    type: integer
+    default: 1
+    description: Close iterations for refine nonwhite mask
+
+  - name: refine_with_nontext
+    type: boolean
+    default: false
+    description: Refine boxes by removing text blocks from nonwhite mask
+
+  - name: refine_with_textlines
+    type: boolean
+    default: false
+    description: Refine boxes by removing horizontal text lines (keep largest non-text component)
+
+  - name: refine_textlines_min_area_ratio
+    type: float
+    default: 0.05
+    description: Minimum area ratio for text-line refinement
+
+  - name: trim_text_edges
+    type: boolean
+    default: false
+    description: Trim text-line runs at top/bottom edges of a crop
+
+  - name: text_edge_max_ratio
+    type: float
+    default: 0.2
+    description: Max fraction of box height allowed for text-edge trimming
+
+  - name: text_edge_margin_px
+    type: integer
+    default: 4
+    description: Extra margin to remove past detected text-edge
+
+  - name: trim_ocr_text_edges
+    type: boolean
+    default: false
+    description: Trim crops using OCR text detection in top/bottom bands
+
+  - name: ocr_trim_edge_ratio
+    type: float
+    default: 0.2
+    description: Fraction of crop height to scan for OCR text
+
+  - name: ocr_trim_min_conf
+    type: integer
+    default: 50
+    description: Minimum OCR confidence to consider text
+
+  - name: ocr_trim_min_word_len
+    type: integer
+    default: 3
+    description: Minimum OCR word length to consider text
+
+  - name: ocr_trim_min_line_words
+    type: integer
+    default: 2
+    description: Minimum number of words in a line to trim
+
+  - name: ocr_trim_min_line_chars
+    type: integer
+    default: 6
+    description: Minimum number of characters in a line to trim
+
+  - name: ocr_trim_max_ratio
+    type: float
+    default: 0.45
+    description: Maximum fraction of crop height allowed for OCR trimming
+
+  - name: ocr_trim_margin_px
+    type: integer
+    default: 6
+    description: Extra margin to remove past OCR text
+
+  - name: ocr_tesseract_cmd
+    type: string
+    default: null
+    description: Optional tesseract command path for OCR trimming
+
+  - name: trim_layout_text
+    type: boolean
+    default: false
+    description: Trim crops using layout text boxes (PaddleOCR LayoutDetection)
+
+  - name: layout_text_model
+    type: string
+    default: PP-DocLayout_plus-L
+    description: Layout detection model name
+
+  - name: layout_text_score_thresh
+    type: float
+    default: 0.6
+    description: Minimum score for layout text boxes
+
+  - name: layout_text_max_gap_ratio
+    type: float
+    default: 0.2
+    description: Max gap ratio beyond crop edge to consider text
+
+  - name: layout_text_bottom_band_ratio
+    type: float
+    default: 0.35
+    description: Bottom band ratio for caption trimming
+
+  - name: layout_text_top_band_ratio
+    type: float
+    default: 0.35
+    description: Top band ratio for header trimming
+
+  - name: layout_text_margin_px
+    type: integer
+    default: 6
+    description: Extra margin to remove past layout text
+
+  - name: layout_text_min_width_ratio
+    type: float
+    default: 0.3
+    description: Minimum width ratio for layout text boxes
+
+  - name: layout_text_max_height_ratio
+    type: float
+    default: 0.25
+    description: Maximum height ratio for layout text boxes
+
+  - name: layout_split_text
+    type: boolean
+    default: false
+    description: Split image boxes on mid-page layout text bands
+
+  - name: layout_split_min_gap_ratio
+    type: float
+    default: 0.15
+    description: Minimum gap ratio around text band for splitting
+
+  - name: layout_split_margin_px
+    type: integer
+    default: 6
+    description: Extra margin to remove past layout text band when splitting
+
+  - name: split_when_missing
+    type: boolean
+    default: false
+    description: Split large boxes by whitespace gaps when expected_count is higher
+
+  - name: split_gap_ratio_threshold
+    type: float
+    default: 0.01
+    description: Row nonwhite ratio threshold for gap splitting
+
+  - name: split_min_gap_px
+    type: integer
+    default: 12
+    description: Minimum consecutive gap rows for splitting
+
+  - name: split_min_segment_height_ratio
+    type: float
+    default: 0.12
+    description: Minimum segment height as fraction of page height
+
+  - name: split_min_segment_nonwhite_ratio
+    type: float
+    default: 0.01
+    description: Minimum nonwhite ratio for segment retention
+
+  - name: trim_caption
+    type: boolean
+    default: false
+    description: Trim caption text from bottom of detected image boxes
+
+  - name: caption_max_height_ratio
+    type: float
+    default: 0.18
+    description: Max caption height as fraction of box height
+
+  - name: caption_text_ratio_threshold
+    type: float
+    default: 0.2
+    description: Row text ratio threshold for caption trimming
+
+  - name: caption_margin_px
+    type: integer
+    default: 4
+    description: Extra margin to remove above detected caption line
+
+  - name: caption_max_nonwhite_ratio
+    type: float
+    default: 0.2
+    description: Skip caption trimming if bottom window has high nonwhite ratio
+
+  - name: caption_trim_passes
+    type: integer
+    default: 1
+    description: Number of caption trim passes
+
+  - name: caption_relax_max_gap_ratio
+    type: float
+    default: 0.15
+    description: Max gap ratio to allow caption trim even if separated
+
 command: |
   python modules/extract/crop_illustrations_guided_v1/main.py \
     --ocr-manifest {ocr_manifest} \
     --output-dir {output_dir} \
     --transparency={transparency} \
     --threshold={threshold} \
+    --output-format={output_format} \
+    --jpeg-quality={jpeg_quality} \
     --blur={blur} \
+    --text-kernel={text_kernel} \
+    --text-iterations={text_iterations} \
+    --detection-mode={detection_mode} \
+    --white-threshold={white_threshold} \
+    --close-kernel={close_kernel} \
+    --close-iterations={close_iterations} \
+    --score-min-nonwhite={score_min_nonwhite} \
+    --min-nonwhite-ratio={min_nonwhite_ratio} \
+    --max-text-ratio={max_text_ratio} \
+    --text-line-kernel-w={text_line_kernel_w} \
+    --text-line-kernel-h={text_line_kernel_h} \
+    --text-line-iterations={text_line_iterations} \
+    --text-block-kernel-w={text_block_kernel_w} \
+    --text-block-kernel-h={text_block_kernel_h} \
+    --text-block-iterations={text_block_iterations} \
     --min-area-ratio={min_area_ratio} \
     --max-area-ratio={max_area_ratio} \
     --min-width={min_width} \
-    --min-height={min_height}
+    --min-height={min_height} \
+    {highres_manifest:+--highres-manifest {highres_manifest}} \
+    {highres_images_dir:+--highres-images-dir {highres_images_dir}} \
+    --padding-percent={padding_percent} \
+    {rescue_model:+--rescue-model {rescue_model}} \
+    --rescue-temperature={rescue_temperature} \
+    --rescue-max-tokens={rescue_max_tokens} \
+    --rescue-max-pages={rescue_max_pages} \
+    {rescue_timeout_seconds:+--rescue-timeout-seconds {rescue_timeout_seconds}} \
+    {rescue_include_alt:+--rescue-include-alt} \
+    {rescue_always:+--rescue-always} \
+    {rescue_retry_on_overlap:+--rescue-retry-on-overlap} \
+    {rescue_retry_on_missing:+--rescue-retry-on-missing} \
+    {rescue_retry_on_text:+--rescue-retry-on-text} \
+    --rescue-retry-max={rescue_retry_max} \
+    {rescue_require_caption_schema:+--rescue-require-caption-schema} \
+    {rescue_caption_second_pass:+--rescue-caption-second-pass} \
+    --rescue-caption-max-tokens={rescue_caption_max_tokens} \
+    {rescue_refine_boxes:+--rescue-refine-boxes} \
+    --rescue-refine-max-tokens={rescue_refine_max_tokens} \
+    --rescue-refine-min-area-ratio={rescue_refine_min_area_ratio} \
+    {refine_with_nonwhite:+--refine-with-nonwhite} \
+    --refine-close-kernel={refine_close_kernel} \
+    --refine-close-iterations={refine_close_iterations} \
+    {refine_with_nontext:+--refine-with-nontext} \
+    {refine_with_textlines:+--refine-with-textlines} \
+    {trim_text_edges:+--trim-text-edges} \
+    --text-edge-max-ratio={text_edge_max_ratio} \
+    --text-edge-margin-px={text_edge_margin_px} \
+    {trim_ocr_text_edges:+--trim-ocr-text-edges} \
+    --ocr-trim-edge-ratio={ocr_trim_edge_ratio} \
+    --ocr-trim-min-conf={ocr_trim_min_conf} \
+    --ocr-trim-min-word-len={ocr_trim_min_word_len} \
+    --ocr-trim-min-line-words={ocr_trim_min_line_words} \
+    --ocr-trim-min-line-chars={ocr_trim_min_line_chars} \
+    --ocr-trim-max-ratio={ocr_trim_max_ratio} \
+    --ocr-trim-margin-px={ocr_trim_margin_px} \
+    {ocr_tesseract_cmd:+--ocr-tesseract-cmd={ocr_tesseract_cmd}} \
+    {trim_layout_text:+--trim-layout-text} \
+    --layout-text-model={layout_text_model} \
+    --layout-text-score-thresh={layout_text_score_thresh} \
+    --layout-text-max-gap-ratio={layout_text_max_gap_ratio} \
+    --layout-text-bottom-band-ratio={layout_text_bottom_band_ratio} \
+    --layout-text-top-band-ratio={layout_text_top_band_ratio} \
+    --layout-text-margin-px={layout_text_margin_px} \
+    --layout-text-min-width-ratio={layout_text_min_width_ratio} \
+    --layout-text-max-height-ratio={layout_text_max_height_ratio} \
+    {layout_split_text:+--layout-split-text} \
+    --layout-split-min-gap-ratio={layout_split_min_gap_ratio} \
+    --layout-split-margin-px={layout_split_margin_px} \
+    {split_when_missing:+--split-when-missing} \
+    --split-gap-ratio-threshold={split_gap_ratio_threshold} \
+    --split-min-gap-px={split_min_gap_px} \
+    --split-min-segment-height-ratio={split_min_segment_height_ratio} \
+    --split-min-segment-nonwhite-ratio={split_min_segment_nonwhite_ratio} \
+    {trim_caption:+--trim-caption} \
+    --caption-max-height-ratio={caption_max_height_ratio} \
+    --caption-text-ratio-threshold={caption_text_ratio_threshold} \
+    --caption-margin-px={caption_margin_px} \
+    --caption-max-nonwhite-ratio={caption_max_nonwhite_ratio} \
+    --caption-trim-passes={caption_trim_passes} \
+    --caption-relax-max-gap-ratio={caption_relax_max_gap_ratio}

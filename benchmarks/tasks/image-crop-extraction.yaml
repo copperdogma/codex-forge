@@ -1,0 +1,180 @@
+description: "Image crop extraction from scanned book pages — Onward to the Unknown"
+
+# Judge model for llm-rubric assertions
+defaultTest:
+  options:
+    provider: anthropic:messages:claude-opus-4-6
+
+# Three prompt variants (JS functions adapt image format per provider)
+prompts:
+  - id: "file://../prompts/crop-baseline.js"
+    label: "baseline"
+  - id: "file://../prompts/crop-strict-exclude.js"
+    label: "strict-exclude"
+  - id: "file://../prompts/crop-two-step.js"
+    label: "two-step"
+
+# Vision-capable models from all three providers
+providers:
+  # OpenAI — GPT-4.1 series (budget)
+  - id: openai:chat:gpt-4.1-mini
+    label: "GPT-4.1 Mini"
+    config:
+      temperature: 0
+      max_tokens: 4096
+  - id: openai:chat:gpt-4.1
+    label: "GPT-4.1"
+    config:
+      temperature: 0
+      max_tokens: 4096
+
+  # OpenAI — GPT-5 series (frontier)
+  - id: openai:chat:gpt-5-mini
+    label: "GPT-5 Mini"
+    config:
+      temperature: 0
+      max_tokens: 4096
+  - id: openai:chat:gpt-5
+    label: "GPT-5"
+    config:
+      temperature: 0
+      max_tokens: 4096
+  - id: openai:chat:gpt-5.1
+    label: "GPT-5.1"
+    config:
+      temperature: 0
+      max_tokens: 4096
+  - id: openai:chat:gpt-5.2
+    label: "GPT-5.2"
+    config:
+      temperature: 0
+      max_tokens: 4096
+
+  # Anthropic
+  - id: anthropic:messages:claude-sonnet-4-5-20250929
+    label: "Claude Sonnet 4.5"
+    config:
+      temperature: 0
+      max_tokens: 4096
+  - id: anthropic:messages:claude-opus-4-6
+    label: "Claude Opus 4.6"
+    config:
+      temperature: 0
+      max_tokens: 4096
+
+  # Google — Gemini 2.5 series
+  - id: google:gemini-2.5-flash
+    label: "Gemini 2.5 Flash"
+    config:
+      temperature: 0
+      maxOutputTokens: 16384
+  - id: google:gemini-2.5-pro
+    label: "Gemini 2.5 Pro"
+    config:
+      temperature: 0
+      maxOutputTokens: 16384
+
+  # Google — Gemini 3 series
+  - id: google:gemini-3-flash-preview
+    label: "Gemini 3 Flash"
+    config:
+      temperature: 0
+      maxOutputTokens: 16384
+  - id: google:gemini-3-pro-preview
+    label: "Gemini 3 Pro"
+    config:
+      temperature: 0
+      maxOutputTokens: 16384
+
+# One test case per source image
+tests:
+  - vars:
+      image: file://../input/source-pages-b64/Image000.b64.txt
+      golden_key: "Image000"
+    assert:
+      - type: python
+        value: file://../scorers/image_crop_scorer.py
+
+  - vars:
+      image: file://../input/source-pages-b64/Image001.b64.txt
+      golden_key: "Image001"
+    assert:
+      - type: python
+        value: file://../scorers/image_crop_scorer.py
+
+  - vars:
+      image: file://../input/source-pages-b64/Image003.b64.txt
+      golden_key: "Image003"
+    assert:
+      - type: python
+        value: file://../scorers/image_crop_scorer.py
+
+  - vars:
+      image: file://../input/source-pages-b64/Image008.b64.txt
+      golden_key: "Image008"
+    assert:
+      - type: python
+        value: file://../scorers/image_crop_scorer.py
+
+  - vars:
+      image: file://../input/source-pages-b64/Image011.b64.txt
+      golden_key: "Image011"
+    assert:
+      - type: python
+        value: file://../scorers/image_crop_scorer.py
+
+  - vars:
+      image: file://../input/source-pages-b64/Image013.b64.txt
+      golden_key: "Image013"
+    assert:
+      - type: python
+        value: file://../scorers/image_crop_scorer.py
+
+  - vars:
+      image: file://../input/source-pages-b64/Image020.b64.txt
+      golden_key: "Image020"
+    assert:
+      - type: python
+        value: file://../scorers/image_crop_scorer.py
+
+  - vars:
+      image: file://../input/source-pages-b64/Image021.b64.txt
+      golden_key: "Image021"
+    assert:
+      - type: python
+        value: file://../scorers/image_crop_scorer.py
+
+  - vars:
+      image: file://../input/source-pages-b64/Image037.b64.txt
+      golden_key: "Image037"
+    assert:
+      - type: python
+        value: file://../scorers/image_crop_scorer.py
+
+  - vars:
+      image: file://../input/source-pages-b64/Image059.b64.txt
+      golden_key: "Image059"
+    assert:
+      - type: python
+        value: file://../scorers/image_crop_scorer.py
+
+  - vars:
+      image: file://../input/source-pages-b64/Image121.b64.txt
+      golden_key: "Image121"
+    assert:
+      - type: python
+        value: file://../scorers/image_crop_scorer.py
+
+  - vars:
+      image: file://../input/source-pages-b64/Image124.b64.txt
+      golden_key: "Image124"
+    assert:
+      - type: python
+        value: file://../scorers/image_crop_scorer.py
+
+  - vars:
+      image: file://../input/source-pages-b64/Image126.b64.txt
+      golden_key: "Image126"
+    assert:
+      - type: python
+        value: file://../scorers/image_crop_scorer.py
