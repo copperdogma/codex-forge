@@ -9,8 +9,13 @@ models/
 .DS_Store
 .env
 
-# Stray local debug logs accidentally written to repo root
+# Stray local stage-state files written to repo root by driver
 /detect_boundaries_code_first_v1
+/build_chapter_html_v1
+/extract_page_numbers_html_v1
+/images_dir_to_manifest_v1
+/portionize_headings_html_v1
+/portionize_toc_html_v1
 
 # Local pip cache
 .pip-packages/
