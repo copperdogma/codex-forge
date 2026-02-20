@@ -1,0 +1,316 @@
+description: "Crop quality validation — post-crop pass/fail gate for illustration extraction"
+
+# Six validation prompt variants (Round 2: added tolerant + caption-focus)
+prompts:
+  - id: "file://../prompts/validate-basic.js"
+    label: "basic"
+  - id: "file://../prompts/validate-strict-no-text.js"
+    label: "strict-no-text"
+  - id: "file://../prompts/validate-conditional.js"
+    label: "conditional"
+  - id: "file://../prompts/validate-checklist.js"
+    label: "checklist"
+  - id: "file://../prompts/validate-tolerant.js"
+    label: "tolerant"
+  - id: "file://../prompts/validate-caption-focus.js"
+    label: "caption-focus"
+
+# Vision models — Gemini 3 Pro daily quota exhausted, using Flash + 2.5 Pro for now
+providers:
+  # - id: google:gemini-3-pro-preview
+  #   label: "Gemini 3 Pro"
+  #   config:
+  #     temperature: 0
+  #     maxOutputTokens: 2048
+  - id: google:gemini-2.5-flash
+    label: "Gemini 2.5 Flash"
+    config:
+      temperature: 0
+      maxOutputTokens: 2048
+  - id: google:gemini-2.5-pro
+    label: "Gemini 2.5 Pro"
+    config:
+      temperature: 0
+      maxOutputTokens: 2048
+
+# 40 test cases — one per crop from onward-gemini3pro-001 run
+tests:
+  - vars:
+      image: file://../input/crop-validation-b64/page-001-000.b64.txt
+      crop_key: "page-001-000"
+    assert:
+      - type: python
+        value: file://../scorers/crop_validation_scorer.py
+
+  - vars:
+      image: file://../input/crop-validation-b64/page-004-000.b64.txt
+      crop_key: "page-004-000"
+    assert:
+      - type: python
+        value: file://../scorers/crop_validation_scorer.py
+
+  - vars:
+      image: file://../input/crop-validation-b64/page-009-000.b64.txt
+      crop_key: "page-009-000"
+    assert:
+      - type: python
+        value: file://../scorers/crop_validation_scorer.py
+
+  - vars:
+      image: file://../input/crop-validation-b64/page-012-000.b64.txt
+      crop_key: "page-012-000"
+    assert:
+      - type: python
+        value: file://../scorers/crop_validation_scorer.py
+
+  - vars:
+      image: file://../input/crop-validation-b64/page-012-001.b64.txt
+      crop_key: "page-012-001"
+    assert:
+      - type: python
+        value: file://../scorers/crop_validation_scorer.py
+
+  - vars:
+      image: file://../input/crop-validation-b64/page-014-000.b64.txt
+      crop_key: "page-014-000"
+    assert:
+      - type: python
+        value: file://../scorers/crop_validation_scorer.py
+
+  - vars:
+      image: file://../input/crop-validation-b64/page-018-000.b64.txt
+      crop_key: "page-018-000"
+    assert:
+      - type: python
+        value: file://../scorers/crop_validation_scorer.py
+
+  - vars:
+      image: file://../input/crop-validation-b64/page-021-000.b64.txt
+      crop_key: "page-021-000"
+    assert:
+      - type: python
+        value: file://../scorers/crop_validation_scorer.py
+
+  - vars:
+      image: file://../input/crop-validation-b64/page-021-001.b64.txt
+      crop_key: "page-021-001"
+    assert:
+      - type: python
+        value: file://../scorers/crop_validation_scorer.py
+
+  - vars:
+      image: file://../input/crop-validation-b64/page-022-000.b64.txt
+      crop_key: "page-022-000"
+    assert:
+      - type: python
+        value: file://../scorers/crop_validation_scorer.py
+
+  - vars:
+      image: file://../input/crop-validation-b64/page-028-000.b64.txt
+      crop_key: "page-028-000"
+    assert:
+      - type: python
+        value: file://../scorers/crop_validation_scorer.py
+
+  - vars:
+      image: file://../input/crop-validation-b64/page-038-000.b64.txt
+      crop_key: "page-038-000"
+    assert:
+      - type: python
+        value: file://../scorers/crop_validation_scorer.py
+
+  - vars:
+      image: file://../input/crop-validation-b64/page-038-001.b64.txt
+      crop_key: "page-038-001"
+    assert:
+      - type: python
+        value: file://../scorers/crop_validation_scorer.py
+
+  - vars:
+      image: file://../input/crop-validation-b64/page-048-000.b64.txt
+      crop_key: "page-048-000"
+    assert:
+      - type: python
+        value: file://../scorers/crop_validation_scorer.py
+
+  - vars:
+      image: file://../input/crop-validation-b64/page-054-000.b64.txt
+      crop_key: "page-054-000"
+    assert:
+      - type: python
+        value: file://../scorers/crop_validation_scorer.py
+
+  - vars:
+      image: file://../input/crop-validation-b64/page-060-000.b64.txt
+      crop_key: "page-060-000"
+    assert:
+      - type: python
+        value: file://../scorers/crop_validation_scorer.py
+
+  - vars:
+      image: file://../input/crop-validation-b64/page-060-001.b64.txt
+      crop_key: "page-060-001"
+    assert:
+      - type: python
+        value: file://../scorers/crop_validation_scorer.py
+
+  - vars:
+      image: file://../input/crop-validation-b64/page-066-000.b64.txt
+      crop_key: "page-066-000"
+    assert:
+      - type: python
+        value: file://../scorers/crop_validation_scorer.py
+
+  - vars:
+      image: file://../input/crop-validation-b64/page-072-000.b64.txt
+      crop_key: "page-072-000"
+    assert:
+      - type: python
+        value: file://../scorers/crop_validation_scorer.py
+
+  - vars:
+      image: file://../input/crop-validation-b64/page-078-000.b64.txt
+      crop_key: "page-078-000"
+    assert:
+      - type: python
+        value: file://../scorers/crop_validation_scorer.py
+
+  - vars:
+      image: file://../input/crop-validation-b64/page-086-000.b64.txt
+      crop_key: "page-086-000"
+    assert:
+      - type: python
+        value: file://../scorers/crop_validation_scorer.py
+
+  - vars:
+      image: file://../input/crop-validation-b64/page-092-000.b64.txt
+      crop_key: "page-092-000"
+    assert:
+      - type: python
+        value: file://../scorers/crop_validation_scorer.py
+
+  - vars:
+      image: file://../input/crop-validation-b64/page-096-000.b64.txt
+      crop_key: "page-096-000"
+    assert:
+      - type: python
+        value: file://../scorers/crop_validation_scorer.py
+
+  - vars:
+      image: file://../input/crop-validation-b64/page-096-001.b64.txt
+      crop_key: "page-096-001"
+    assert:
+      - type: python
+        value: file://../scorers/crop_validation_scorer.py
+
+  - vars:
+      image: file://../input/crop-validation-b64/page-102-000.b64.txt
+      crop_key: "page-102-000"
+    assert:
+      - type: python
+        value: file://../scorers/crop_validation_scorer.py
+
+  - vars:
+      image: file://../input/crop-validation-b64/page-108-000.b64.txt
+      crop_key: "page-108-000"
+    assert:
+      - type: python
+        value: file://../scorers/crop_validation_scorer.py
+
+  - vars:
+      image: file://../input/crop-validation-b64/page-108-001.b64.txt
+      crop_key: "page-108-001"
+    assert:
+      - type: python
+        value: file://../scorers/crop_validation_scorer.py
+
+  - vars:
+      image: file://../input/crop-validation-b64/page-116-000.b64.txt
+      crop_key: "page-116-000"
+    assert:
+      - type: python
+        value: file://../scorers/crop_validation_scorer.py
+
+  - vars:
+      image: file://../input/crop-validation-b64/page-121-000.b64.txt
+      crop_key: "page-121-000"
+    assert:
+      - type: python
+        value: file://../scorers/crop_validation_scorer.py
+
+  - vars:
+      image: file://../input/crop-validation-b64/page-121-001.b64.txt
+      crop_key: "page-121-001"
+    assert:
+      - type: python
+        value: file://../scorers/crop_validation_scorer.py
+
+  - vars:
+      image: file://../input/crop-validation-b64/page-122-000.b64.txt
+      crop_key: "page-122-000"
+    assert:
+      - type: python
+        value: file://../scorers/crop_validation_scorer.py
+
+  - vars:
+      image: file://../input/crop-validation-b64/page-122-001.b64.txt
+      crop_key: "page-122-001"
+    assert:
+      - type: python
+        value: file://../scorers/crop_validation_scorer.py
+
+  - vars:
+      image: file://../input/crop-validation-b64/page-123-000.b64.txt
+      crop_key: "page-123-000"
+    assert:
+      - type: python
+        value: file://../scorers/crop_validation_scorer.py
+
+  - vars:
+      image: file://../input/crop-validation-b64/page-123-001.b64.txt
+      crop_key: "page-123-001"
+    assert:
+      - type: python
+        value: file://../scorers/crop_validation_scorer.py
+
+  - vars:
+      image: file://../input/crop-validation-b64/page-124-000.b64.txt
+      crop_key: "page-124-000"
+    assert:
+      - type: python
+        value: file://../scorers/crop_validation_scorer.py
+
+  - vars:
+      image: file://../input/crop-validation-b64/page-125-000.b64.txt
+      crop_key: "page-125-000"
+    assert:
+      - type: python
+        value: file://../scorers/crop_validation_scorer.py
+
+  - vars:
+      image: file://../input/crop-validation-b64/page-126-000.b64.txt
+      crop_key: "page-126-000"
+    assert:
+      - type: python
+        value: file://../scorers/crop_validation_scorer.py
+
+  - vars:
+      image: file://../input/crop-validation-b64/page-126-001.b64.txt
+      crop_key: "page-126-001"
+    assert:
+      - type: python
+        value: file://../scorers/crop_validation_scorer.py
+
+  - vars:
+      image: file://../input/crop-validation-b64/page-127-000.b64.txt
+      crop_key: "page-127-000"
+    assert:
+      - type: python
+        value: file://../scorers/crop_validation_scorer.py
+
+  - vars:
+      image: file://../input/crop-validation-b64/page-127-001.b64.txt
+      crop_key: "page-127-001"
+    assert:
+      - type: python
+        value: file://../scorers/crop_validation_scorer.py

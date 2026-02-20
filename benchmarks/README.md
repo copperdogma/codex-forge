@@ -47,34 +47,59 @@ promptfoo eval -c tasks/image-crop-extraction.yaml --no-cache --output results/i
 promptfoo view
 ```
 
-## Current Evals
+## Eval Catalog
 
-### Image Crop Extraction (Story 125)
+Quick reference for all promptfoo eval setups. Re-run any eval when new models come out to check for improvements.
 
-Evaluates VLM prompts/models for extracting photo bounding boxes from scanned book pages.
+### 1. Image Crop Extraction (Story 125)
 
-**Test pages** (from *Onward to the Unknown*):
+**Task**: Extract photo/illustration bounding boxes from scanned book pages.
+**Winner**: Gemini 3 Pro (0.856 avg score, 77% pass rate)
+**Config**: `tasks/image-crop-extraction.yaml`
+**Scorer**: `scorers/image_crop_scorer.py` — IoU + coverage metrics
+**Prompts**: 3 variants (baseline, strict-exclude, two-step)
+**Test set**: 13 pages from *Onward to the Unknown* with diverse image content
 
-| Source File | Content | Failure Mode |
-|------------|---------|-------------|
-| `page-012.jpg` | Certificate with seal/signatures | Non-photo image, header text bleed |
-| `page-018.jpg` | Group portrait | Single large photo with caption |
-| `page-021.jpg` | Two photos with captions | Multi-image, caption separation |
-| `page-022.jpg` | Single photo with caption | Caption-adjacent |
-| `page-038.jpg` | Multi-photo page | Multiple images to detect/separate |
-| `page-060.jpg` | Two photos with captions | Caption text in crops |
-
-**Golden references**: Manually cropped photos in `golden/crops/` with bounding boxes in `golden/image-crops.json`.
-
-**Naming convention for golden crops**:
+```bash
+cd benchmarks && source ~/.zshrc && promptfoo eval -c tasks/image-crop-extraction.yaml --no-cache
 ```
-golden/crops/page-NNN-MMM.jpg
-```
-Where `NNN` = source page number (matching source-pages/page-NNN.jpg), `MMM` = zero-indexed image number on that page (000, 001, ...).
 
-Example: page 21 has two photos:
-- `golden/crops/page-021-000.jpg` (top photo)
-- `golden/crops/page-021-001.jpg` (bottom photo)
+**Key findings** (Feb 2026):
+- Gemini 3 Pro best for bbox accuracy, lowest hallucination rate
+- GPT-5.1 baseline: decent but over-crops (includes text regions)
+- `strict-exclude` prompt marginally better than baseline across all models
+
+---
+
+### 2. OCR Model Eval — Genealogy Pages (Story 127)
+
+**Task**: Single-pass VLM OCR — model sees raw page image, outputs structured HTML with `<table>` elements and `<img>` placeholders.
+**Winner**: Gemini 3 Pro + table-strict (0.877 avg score, 100% pass rate)
+**Config**: `tasks/ocr-genealogy-tables.yaml`
+**Scorer**: `scorers/table_structure_scorer.py` — table detection, column/row/cell accuracy, header detection, img detection
+**Prompts**: 2 variants (baseline, table-strict)
+**Test set**: 25 pages from *Onward to the Unknown* covering:
+  - 14 table-heavy pages (6-column genealogy tables, dense multi-table, TABLE-AS-TEXT failures)
+  - 11 image-heavy pages (photos, illustrations, certificates, mixed narrative+images)
+
+```bash
+cd benchmarks && source ~/.zshrc && promptfoo eval -c tasks/ocr-genealogy-tables.yaml --no-cache -j 2
+```
+
+**Scoring**: Dynamic weights based on page content:
+- Table-only: table_detection 25%, column_accuracy 25%, cell_text 25%, row_accuracy 15%, header_accuracy 10%
+- Mixed (tables + images): table weights reduced, 15% to img_detection
+- Image-only: 100% img_detection
+
+**Golden references**: `golden/ocr-genealogy/page-NNN-golden.html` — hand-corrected HTML with `<table>` and `<img>` tags.
+**Inputs**: `input/onward-pages-b64/ImageNNN.b64.txt` — base64-encoded page images.
+
+**Key findings** (Feb 2026):
+- `table-strict` prompt dramatically outperforms `baseline` across all models
+- Top 4 (table-strict): Gemini 3 Pro (0.877, 100% pass), Gemini 2.5 Pro (0.870), Claude Opus 4.6 (0.866), Claude Sonnet 4.5 (0.861)
+- GPT models rate-limited to 14/25 pages even at concurrency 1; best GPT: GPT-5 Mini (0.768)
+- Image detection (`<img>` placeholders) near-perfect across all models (0.96-1.00)
+- GPT-5.1 (current pipeline model) ranks 8th at 0.761 — switching to Gemini 3 Pro = ~15% improvement
 
 ## Adding a New Eval
 

@@ -1,0 +1,9 @@
+module_id: table_rescue_html_loop_v1
+stage: adapter
+entrypoint: modules/adapter/table_rescue_html_loop_v1/main.py
+input_schema: page_html_v1
+output_schema: page_html_v1
+default_params:
+  max_passes: 3
+  max_pages: 20
+  fail_on_unresolved: true

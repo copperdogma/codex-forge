@@ -33,9 +33,21 @@ parameters:
     default: 230
     description: White threshold for transparency processing (0-255)
 
+  - name: output_format
+    type: string
+    default: png
+    description: Output image format (png or jpeg)
+
+  - name: jpeg_quality
+    type: integer
+    default: 92
+    description: JPEG quality when output_format=jpeg
+
 command: |
   python modules/extract/crop_illustrations_from_ocr_v1/main.py \
     --ocr-manifest {ocr_manifest} \
     --output-dir {output_dir} \
     --transparency={transparency} \
-    --threshold={threshold}
+    --threshold={threshold} \
+    --output-format={output_format} \
+    --jpeg-quality={jpeg_quality}

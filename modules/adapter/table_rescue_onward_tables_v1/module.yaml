@@ -1,0 +1,9 @@
+module_id: table_rescue_onward_tables_v1
+stage: adapter
+entrypoint: modules/adapter/table_rescue_onward_tables_v1/main.py
+input_schema: page_html_v1
+output_schema: page_html_v1
+default_params:
+  header_threshold: 0.8
+  max_pages: 200
+  fail_on_unresolved: false

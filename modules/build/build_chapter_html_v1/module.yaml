@@ -1,0 +1,17 @@
+module_id: build_chapter_html_v1
+stage: build
+entrypoint: modules/build/build_chapter_html_v1/main.py
+input_schema: null
+output_schema: null
+description: "Build per-chapter HTML files from pages + TOC-derived portion hypotheses."
+params:
+  - name: output_dir
+    type: str
+    default: null
+  - name: illustration_manifest
+    type: str
+    default: null
+  - name: images_subdir
+    type: str
+    default: images
+notes: "Removes running heads and page numbers from final HTML; preserves printed_page_number in JSON."

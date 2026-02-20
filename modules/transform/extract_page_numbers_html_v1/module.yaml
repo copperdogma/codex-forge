@@ -1,0 +1,8 @@
+module_id: extract_page_numbers_html_v1
+stage: transform
+entrypoint: modules/transform/extract_page_numbers_html_v1/main.py
+input_schema: page_html_v1
+output_schema: page_html_v1
+description: "Extract printed page numbers from OCR HTML into JSON fields (printed_page_number)."
+params: []
+notes: "Leaves HTML unchanged; page-number tags can be stripped in a later stage. Can infer missing numeric page numbers by sequential order."

@@ -15,11 +15,21 @@ except Exception as exc:  # pragma: no cover - environment dependency
     OpenAI = None
     _OPENAI_IMPORT_ERROR = exc
 
+try:
+    from modules.common.google_client import GeminiVisionClient
+except Exception as exc:  # pragma: no cover - environment dependency
+    GeminiVisionClient = None
+    _GEMINI_IMPORT_ERROR = exc
+
+
+def _is_gemini_model(model: str) -> bool:
+    return model.startswith("gemini-")
+
 
 ALLOWED_TAGS = {
     "h1", "h2", "h3", "p", "strong", "em", "ol", "ul", "li",
     "table", "thead", "tbody", "tr", "th", "td", "caption",
-    "img", "dl", "dt", "dd", "a",
+    "img", "dl", "dt", "dd", "a", "br",
 }
 
 RUNNING_HEAD_CLASS = "running-head"
@@ -30,7 +40,7 @@ SYSTEM_PROMPT = """You are an OCR engine for scanned book pages.
 Return ONLY minimal HTML that preserves text and basic structure.
 
 Allowed tags (only):
-- Structural: <h1>, <h2>, <h3>, <p>, <dl>, <dt>, <dd>
+- Structural: <h1>, <h2>, <h3>, <p>, <dl>, <dt>, <dd>, <br>
 - Emphasis: <strong>, <em>
 - Lists: <ol>, <ul>, <li>
 - Tables: <table>, <thead>, <tbody>, <tr>, <th>, <td>, <caption>
@@ -148,6 +158,9 @@ class TagSanitizer(HTMLParser):
             else:
                 self.out.append(f"<img alt=\"{alt}\">")
             return
+        if tag == "br":
+            self.out.append("<br>")
+            return
         if tag == "a":
             href = ""
             for k, v in attrs:
@@ -175,7 +188,7 @@ class TagSanitizer(HTMLParser):
 
     def handle_endtag(self, tag: str):
         tag = tag.lower()
-        if tag in ALLOWED_TAGS and tag != "img":
+        if tag in ALLOWED_TAGS and tag not in {"img", "br"}:
             self.out.append(f"</{tag}>")
 
     def handle_data(self, data: str):
@@ -263,9 +276,6 @@ def main() -> None:
     args = parser.parse_args()
 
     try:
-        if OpenAI is None:  # pragma: no cover
-            raise RuntimeError("openai package required") from _OPENAI_IMPORT_ERROR
-
         manifest_path = resolve_manifest_path(args)
         if not manifest_path.exists():
             raise SystemExit(f"Manifest not found: {manifest_path}")
@@ -281,6 +291,7 @@ def main() -> None:
             raise SystemExit(f"Manifest is empty: {manifest_path}")
 
         # Preserve stage id for instrumentation; driver sets INSTRUMENT_STAGE to recipe stage id.
+        use_gemini = _is_gemini_model(args.model)
 
         logger = ProgressLogger(state_path=args.state_file, progress_path=args.progress_file, run_id=args.run_id)
         logger.log(
@@ -288,13 +299,22 @@ def main() -> None:
             "running",
             current=0,
             total=total,
-            message="Running GPT-5.1 OCR to HTML",
+            message=f"Running OCR to HTML (model={args.model})",
             artifact=str(out_path),
             module_id="ocr_ai_gpt51_v1",
             schema_version="page_html_v1",
         )
 
-        client = OpenAI()
+        if use_gemini:
+            if GeminiVisionClient is None:
+                raise RuntimeError("google-genai package required for Gemini models") from _GEMINI_IMPORT_ERROR
+            gemini_client = GeminiVisionClient()
+            client = None
+        else:
+            if OpenAI is None:
+                raise RuntimeError("openai package required") from _OPENAI_IMPORT_ERROR
+            client = OpenAI()
+            gemini_client = None
         system_prompt = build_system_prompt(args.ocr_hints)
         if out_path.exists() and args.force:
             out_path.unlink()
@@ -337,10 +357,22 @@ def main() -> None:
             meta = {}
             meta_tag = None
             cleaned = ""
+            user_text = "Return HTML only. FIRST line MUST be: <meta name=\"ocr-metadata\" data-ocr-quality=\"0.0-1.0\" data-ocr-integrity=\"0.0-1.0\" data-continuation-risk=\"0.0-1.0\">"
+            data_uri = f"data:{mime};base64,{b64}"
+
             # Retry once if the model returns empty HTML.
             for attempt in range(2):
                 try:
-                    if hasattr(client, "responses"):
+                    if use_gemini:
+                        raw, usage, request_id = gemini_client.generate_vision(
+                            model=args.model,
+                            system_prompt=system_prompt,
+                            user_text=user_text,
+                            image_data=data_uri,
+                            temperature=args.temperature,
+                            max_tokens=args.max_output_tokens,
+                        )
+                    elif hasattr(client, "responses"):
                         resp = client.responses.create(
                             model=args.model,
                             temperature=args.temperature,
@@ -353,8 +385,8 @@ def main() -> None:
                                 {
                                     "role": "user",
                                     "content": [
-                                        {"type": "input_text", "text": "Return HTML only. FIRST line MUST be: <meta name=\"ocr-metadata\" data-ocr-quality=\"0.0-1.0\" data-ocr-integrity=\"0.0-1.0\" data-continuation-risk=\"0.0-1.0\">"},
-                                        {"type": "input_image", "image_url": f"data:{mime};base64,{b64}"},
+                                        {"type": "input_text", "text": user_text},
+                                        {"type": "input_image", "image_url": data_uri},
                                     ],
                                 },
                             ],
@@ -372,8 +404,8 @@ def main() -> None:
                                 {
                                     "role": "user",
                                     "content": [
-                                        {"type": "text", "text": "Return HTML only. FIRST line MUST be: <meta name=\"ocr-metadata\" data-ocr-quality=\"0.0-1.0\" data-ocr-integrity=\"0.0-1.0\" data-continuation-risk=\"0.0-1.0\">"},
-                                        {"type": "image_url", "image_url": {"url": f"data:{mime};base64,{b64}"}},
+                                        {"type": "text", "text": user_text},
+                                        {"type": "image_url", "image_url": {"url": data_uri}},
                                     ],
                                 },
                             ],

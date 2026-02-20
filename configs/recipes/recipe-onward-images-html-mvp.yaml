@@ -19,7 +19,8 @@ stages:
       pages: images_to_manifest
     out: pages_html.jsonl
     params:
-      model: gpt-5.1
+      model: gemini-3-pro-preview
+      max_output_tokens: 16384
       ocr_hints: |
         - Preserve text exactly as printed; do not correct spelling or normalize punctuation.
         - Preserve line breaks and paragraph structure as seen in the image.
@@ -62,7 +63,7 @@ stages:
       rescue_max_tokens: 4096  # Gemini uses thinking tokens that eat into output budget; was 800 for GPT-5.1
       rescue_max_pages: 20
       rescue_include_alt: true
-      rescue_always: false
+      rescue_always: true
       rescue_retry_on_overlap: true
       rescue_retry_on_missing: true
       rescue_retry_max: 1
@@ -73,6 +74,9 @@ stages:
       rescue_refine_boxes: true
       rescue_refine_max_tokens: 400
       rescue_refine_min_area_ratio: 0.05
+      rescue_validate_crops: true
+      rescue_validate_model: gemini-2.5-flash
+      rescue_validate_max_tokens: 300
       refine_with_textlines: false
       trim_layout_text: true
       layout_text_model: PP-DocLayout_plus-L
@@ -91,6 +95,7 @@ stages:
       split_when_missing: true
       trim_caption: false
       caption_relax_max_gap_ratio: 0.2
+      cover_pages: "1"
 
   - id: table_rescue
     stage: adapter

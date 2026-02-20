@@ -222,6 +222,10 @@ class PageHtml(BaseModel):
     ocr_empty_reason: Optional[str] = None
     raw_html: Optional[str] = None
     html: str
+    printed_page_number: Optional[int] = None
+    printed_page_number_text: Optional[str] = None
+    printed_page_number_inferred: Optional[bool] = None
+    images: Optional[List[Dict[str, Any]]] = None
 
 
 class HtmlBlock(BaseModel):

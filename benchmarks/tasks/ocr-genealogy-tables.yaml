@@ -1,0 +1,265 @@
+description: "OCR model eval for genealogy pages — tables, images, and narrative — Onward to the Unknown"
+
+# Two prompt variants
+prompts:
+  - id: "file://../prompts/ocr-genealogy-baseline.js"
+    label: "baseline"
+  - id: "file://../prompts/ocr-genealogy-table-strict.js"
+    label: "table-strict"
+
+# Vision-capable models — OCR needs higher max_tokens than crop extraction
+providers:
+  # OpenAI — GPT-5 series (current pipeline uses gpt-5.1)
+  - id: openai:chat:gpt-5-mini
+    label: "GPT-5 Mini"
+    config:
+      temperature: 0
+      max_tokens: 16384
+  - id: openai:chat:gpt-5.1
+    label: "GPT-5.1"
+    config:
+      temperature: 0
+      max_tokens: 16384
+  - id: openai:chat:gpt-5.2
+    label: "GPT-5.2"
+    config:
+      temperature: 0
+      max_tokens: 16384
+
+  # Anthropic
+  - id: anthropic:messages:claude-sonnet-4-5-20250929
+    label: "Claude Sonnet 4.5"
+    config:
+      temperature: 0
+      max_tokens: 16384
+  - id: anthropic:messages:claude-opus-4-6
+    label: "Claude Opus 4.6"
+    config:
+      temperature: 0
+      max_tokens: 16384
+
+  # Google — Gemini
+  - id: google:gemini-2.5-flash
+    label: "Gemini 2.5 Flash"
+    config:
+      temperature: 0
+      maxOutputTokens: 16384
+  - id: google:gemini-2.5-pro
+    label: "Gemini 2.5 Pro"
+    config:
+      temperature: 0
+      maxOutputTokens: 16384
+  - id: google:gemini-3-flash-preview
+    label: "Gemini 3 Flash"
+    config:
+      temperature: 0
+      maxOutputTokens: 16384
+  - id: google:gemini-3-pro-preview
+    label: "Gemini 3 Pro"
+    config:
+      temperature: 0
+      maxOutputTokens: 16384
+
+# 25 test cases — tables, image-heavy pages, and narrative pages
+tests:
+  # Index page (unique table format: Children/Birth/Descendants/Color)
+  - vars:
+      image: file://../input/onward-pages-b64/Image007.b64.txt
+      golden_file: "golden/ocr-genealogy/page-008-golden.html"
+    assert:
+      - type: python
+        value: file://../scorers/table_structure_scorer.py
+
+  # Ancestral lineage (two-column genealogy chart)
+  - vars:
+      image: file://../input/onward-pages-b64/Image009.b64.txt
+      golden_file: "golden/ocr-genealogy/page-010-golden.html"
+    assert:
+      - type: python
+        value: file://../scorers/table_structure_scorer.py
+
+  # Veterans table (Family/Name two-column)
+  - vars:
+      image: file://../input/onward-pages-b64/Image019.b64.txt
+      golden_file: "golden/ocr-genealogy/page-020-golden.html"
+    assert:
+      - type: python
+        value: file://../scorers/table_structure_scorer.py
+
+  # Alma's family — main family table + grandchildren sub-tables
+  - vars:
+      image: file://../input/onward-pages-b64/Image022.b64.txt
+      golden_file: "golden/ocr-genealogy/page-023-golden.html"
+    assert:
+      - type: python
+        value: file://../scorers/table_structure_scorer.py
+
+  # Continuation page — many small sub-tables
+  - vars:
+      image: file://../input/onward-pages-b64/Image023.b64.txt
+      golden_file: "golden/ocr-genealogy/page-024-golden.html"
+    assert:
+      - type: python
+        value: file://../scorers/table_structure_scorer.py
+
+  # TABLE-AS-TEXT failure page — mixed table sizes
+  - vars:
+      image: file://../input/onward-pages-b64/Image024.b64.txt
+      golden_file: "golden/ocr-genealogy/page-025-golden.html"
+    assert:
+      - type: python
+        value: file://../scorers/table_structure_scorer.py
+
+  # Summary page — totals table at bottom
+  - vars:
+      image: file://../input/onward-pages-b64/Image025.b64.txt
+      golden_file: "golden/ocr-genealogy/page-026-golden.html"
+    assert:
+      - type: python
+        value: file://../scorers/table_structure_scorer.py
+
+  # Arthur's family — dense main table with remarriages
+  - vars:
+      image: file://../input/onward-pages-b64/Image029.b64.txt
+      golden_file: "golden/ocr-genealogy/page-030-golden.html"
+    assert:
+      - type: python
+        value: file://../scorers/table_structure_scorer.py
+
+  # TABLE-AS-TEXT failure — very dense, many sub-families
+  - vars:
+      image: file://../input/onward-pages-b64/Image030.b64.txt
+      golden_file: "golden/ocr-genealogy/page-031-golden.html"
+    assert:
+      - type: python
+        value: file://../scorers/table_structure_scorer.py
+
+  # Agnes' grandchildren + Dora's family — mixed column counts
+  - vars:
+      image: file://../input/onward-pages-b64/Image034.b64.txt
+      golden_file: "golden/ocr-genealogy/page-035-golden.html"
+    assert:
+      - type: python
+        value: file://../scorers/table_structure_scorer.py
+
+  # Leonidas family — first + second family with variable column counts
+  - vars:
+      image: file://../input/onward-pages-b64/Image038.b64.txt
+      golden_file: "golden/ocr-genealogy/page-039-golden.html"
+    assert:
+      - type: python
+        value: file://../scorers/table_structure_scorer.py
+
+  # Edouard + Ralph + Emile families — 3 main families per page
+  - vars:
+      image: file://../input/onward-pages-b64/Image042.b64.txt
+      golden_file: "golden/ocr-genealogy/page-043-golden.html"
+    assert:
+      - type: python
+        value: file://../scorers/table_structure_scorer.py
+
+  # Josephine family — main + grandchildren + great grandchildren tables
+  - vars:
+      image: file://../input/onward-pages-b64/Image048.b64.txt
+      golden_file: "golden/ocr-genealogy/page-049-golden.html"
+    assert:
+      - type: python
+        value: file://../scorers/table_structure_scorer.py
+
+  # TABLE-AS-TEXT failure — continuation + multiple family groups
+  - vars:
+      image: file://../input/onward-pages-b64/Image049.b64.txt
+      golden_file: "golden/ocr-genealogy/page-050-golden.html"
+    assert:
+      - type: python
+        value: file://../scorers/table_structure_scorer.py
+
+  # ── Image-heavy pages (img_detection scoring) ──────────────────
+
+  # Illustration credit page (1 illustration)
+  - vars:
+      image: file://../input/onward-pages-b64/Image003.b64.txt
+      golden_file: "golden/ocr-genealogy/page-003-golden.html"
+    assert:
+      - type: python
+        value: file://../scorers/table_structure_scorer.py
+
+  # Introduction + portrait photo (1 photo)
+  - vars:
+      image: file://../input/onward-pages-b64/Image008.b64.txt
+      golden_file: "golden/ocr-genealogy/page-008-img-golden.html"
+    assert:
+      - type: python
+        value: file://../scorers/table_structure_scorer.py
+
+  # Farm Heritage Award certificate + seal (2 images)
+  - vars:
+      image: file://../input/onward-pages-b64/Image011.b64.txt
+      golden_file: "golden/ocr-genealogy/page-003-cert-golden.html"
+    assert:
+      - type: python
+        value: file://../scorers/table_structure_scorer.py
+
+  # Moise and Sophie narrative + portrait (1 photo)
+  - vars:
+      image: file://../input/onward-pages-b64/Image013.b64.txt
+      golden_file: "golden/ocr-genealogy/page-005-golden.html"
+    assert:
+      - type: python
+        value: file://../scorers/table_structure_scorer.py
+
+  # Two landscape photos — aerial + ranch house (2 photos)
+  - vars:
+      image: file://../input/onward-pages-b64/Image020.b64.txt
+      golden_file: "golden/ocr-genealogy/page-012-golden.html"
+    assert:
+      - type: python
+        value: file://../scorers/table_structure_scorer.py
+
+  # Alma Marie narrative + wedding photo (1 photo)
+  - vars:
+      image: file://../input/onward-pages-b64/Image021.b64.txt
+      golden_file: "golden/ocr-genealogy/page-013-golden.html"
+    assert:
+      - type: python
+        value: file://../scorers/table_structure_scorer.py
+
+  # Leonidas narrative + 2 portraits (2 photos)
+  - vars:
+      image: file://../input/onward-pages-b64/Image037.b64.txt
+      golden_file: "golden/ocr-genealogy/page-029-golden.html"
+    assert:
+      - type: python
+        value: file://../scorers/table_structure_scorer.py
+
+  # George narrative + couple photo + portrait (2 photos)
+  - vars:
+      image: file://../input/onward-pages-b64/Image059.b64.txt
+      golden_file: "golden/ocr-genealogy/page-051-golden.html"
+    assert:
+      - type: python
+        value: file://../scorers/table_structure_scorer.py
+
+  # 3 historic family photos (reunion + 2 portraits)
+  - vars:
+      image: file://../input/onward-pages-b64/Image121.b64.txt
+      golden_file: "golden/ocr-genealogy/page-113-golden.html"
+    assert:
+      - type: python
+        value: file://../scorers/table_structure_scorer.py
+
+  # Covered wagon illustration (1 illustration)
+  - vars:
+      image: file://../input/onward-pages-b64/Image124.b64.txt
+      golden_file: "golden/ocr-genealogy/page-116-golden.html"
+    assert:
+      - type: python
+        value: file://../scorers/table_structure_scorer.py
+
+  # Memorial cairn photos (2 photos)
+  - vars:
+      image: file://../input/onward-pages-b64/Image126.b64.txt
+      golden_file: "golden/ocr-genealogy/page-118-golden.html"
+    assert:
+      - type: python
+        value: file://../scorers/table_structure_scorer.py

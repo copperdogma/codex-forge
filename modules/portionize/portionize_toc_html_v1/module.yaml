@@ -1,0 +1,11 @@
+module_id: portionize_toc_html_v1
+stage: portionize
+entrypoint: modules/portionize/portionize_toc_html_v1/main.py
+input_schema: page_html_v1
+output_schema: portion_hyp_v1
+description: "Portionize chapters by parsing TOC entries from OCR HTML; uses printed page numbers for ranges."
+params:
+  - name: min_entries
+    type: int
+    default: 3
+notes: "Code-first TOC parsing; avoids book-specific rules, but mirrors existing TOC detection patterns."

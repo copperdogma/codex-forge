@@ -17,7 +17,7 @@ import os
 import shutil
 from datetime import datetime
 from pathlib import Path
-from typing import List, Dict, Any, Optional, Tuple
+from typing import List, Dict, Any, Optional, Set, Tuple
 
 import cv2
 import numpy as np
@@ -67,12 +67,17 @@ You are given a scanned book page. Identify each distinct illustration or photo 
 Return a JSON array of objects with keys:
   - image_box: {x0, y0, x1, y1}
   - caption_box: {x0, y0, x1, y1} or null
+  - image_description: string — brief description of the image content (e.g. "portrait of a man in military uniform", "pen-and-ink drawing of a farmhouse")
+  - contains_text: boolean — true ONLY if the image INHERENTLY contains text as part of the image itself (e.g. stamps, seals, signs, memorial plaques, labels within diagrams, handwritten text on the photo). False for photos/illustrations with no integral text.
+  - text_reason: string or null — if contains_text is true, explain what text is part of the image and why it belongs (e.g. "memorial plaque with engraved names", "official seal with organization name")
+  - source_issues: string or null — note any quality issues visible in the SOURCE photo itself, not crop issues (e.g. "top of head cut off in original photo", "photo is faded/damaged", "torn edge on right side")
 - Coordinates must be normalized floats in [0,1], relative to the full image.
 - Origin is top-left; x increases right, y increases down.
-- image_box must be a tight box around the image content ONLY (exclude captions, page numbers, and any text).
+- image_box must be a tight box around the image content ONLY (exclude captions, page numbers, and body text).
+- EXCEPTION — handwritten signatures, autographs, and hand-drawn marks are IMAGES, not text. Always include them inside image_box. If signatures appear next to a seal, stamp, or emblem, draw ONE image_box that encompasses the seal AND all adjacent signatures together.
 - If the image has a clear border, crop to that border.
 - If there is any caption or nearby text directly below or above the image, caption_box MUST be that text region (non-null), even if it is a header line.
-- Prefer to under-crop rather than include any text; if in doubt, shrink image_box to exclude text.
+- Prefer to under-crop rather than include body text; if in doubt, shrink image_box to exclude printed text. But never exclude handwritten signatures.
 - If multiple illustrations, return distinct, non-overlapping boxes in top-to-bottom, left-to-right order.
 Return JSON only.
 """.strip()
@@ -86,6 +91,31 @@ Return a JSON array of objects with keys: x0, y0, x1, y1.
 - If a caption is absent for an image, return a zero-area box by repeating x0,y0,x1,y1=0, or omit it.
 Return JSON only.
 """.strip()
+
+
+# Keys propagated from detector VLM response through box transformations
+_DETECTOR_META_KEYS = ("_description", "_contains_text", "_text_reason", "_source_issues")
+
+
+def _copy_detector_meta(src: dict, dst: dict) -> dict:
+    """Copy detector metadata keys from src box to dst box."""
+    for k in _DETECTOR_META_KEYS:
+        if k in src:
+            dst[k] = src[k]
+    return dst
+
+
+def _autocrop_whitespace(img: Image.Image, white_threshold: int = 252) -> Tuple[int, int, int, int]:
+    """Find bounding box of non-white content. Returns (x0, y0, x1, y1) in pixels."""
+    arr = np.array(img.convert("L"))
+    mask = arr < white_threshold
+    if not mask.any():
+        return (0, 0, img.width, img.height)
+    rows = np.any(mask, axis=1)
+    cols = np.any(mask, axis=0)
+    y0, y1 = int(np.argmax(rows)), int(len(rows) - np.argmax(rows[::-1]))
+    x0, x1 = int(np.argmax(cols)), int(len(cols) - np.argmax(cols[::-1]))
+    return (x0, y0, x1, y1)
 
 
 def _encode_image(path: str) -> str:
@@ -226,6 +256,12 @@ def _call_vlm_boxes(
                             "x1": cx1,
                             "y1": cy1,
                         }
+                # Detector metadata (enriched schema)
+                if schema_mode:
+                    box["_description"] = str(item.get("image_description") or "")
+                    box["_contains_text"] = bool(item.get("contains_text", False))
+                    box["_text_reason"] = str(item.get("text_reason") or "")
+                    box["_source_issues"] = str(item.get("source_issues") or "")
                 boxes.append(box)
     except Exception:
         boxes = []
@@ -395,23 +431,200 @@ def _refine_boxes_with_vlm(
         if new_area / float(old_area) < min_area_ratio:
             refined.append(box)
             continue
-        refined.append({
+        new_box = {
             "x0": x0 + px["x0"],
             "y0": y0 + px["y0"],
             "x1": x0 + px["x1"],
             "y1": y0 + px["y1"],
             "width": new_w,
             "height": new_h,
-        })
+        }
+        _copy_detector_meta(box, new_box)
+        refined.append(new_box)
     return refined
+
+
+_VALIDATE_CROP_PROMPT_BASE = """This is a cropped illustration extracted from a SCANNED HISTORICAL BOOK (genealogy, early 1900s-1980s). Evaluate crop quality.
+
+Return JSON: {"verdict": "pass" or "fail", "reason": "brief explanation"}
+
+IMPORTANT CONTEXT — these are scanned pages from old books. The following are NORMAL and should NOT cause a fail:
+- Portrait photos cropped at the chest, waist, or knees (standard portrait composition)
+- Group photos where some people at edges are partially visible (natural group photo framing)
+- White corners around oval or round portrait photos
+- White/light backgrounds in line drawings, sketches, or illustrations
+- Landscape photos with sky, grass, or other natural "empty" areas
+- Handwritten annotations, stamps, or dates ON the original photograph
+- Faint page numbers at the very edge/corner from the book scan
+- Halftone dot patterns or grain from the printing/scanning process
+- Historical text printed directly ON a photograph (e.g. "Smith family, 1920")
+
+FAIL ONLY for these CLEAR crop errors:
+1. EXTERNAL PAGE TEXT: Printed body text, italic captions, or typed text from the BOOK PAGE (not from the photo itself) is visible in the crop
+2. MASSIVE BLANK SPACE: More than 30% of the crop is empty white with no image content at all (not counting photo backgrounds or drawing backgrounds)
+3. OBVIOUS WRONG CROP: The crop clearly contains the wrong region (e.g., mostly text with a tiny image fragment)
+
+When in doubt, PASS. A slightly imperfect crop is better than rejecting a valid image."""
+
+
+def _build_validate_prompt(box: dict) -> str:
+    """Build a validation prompt with detector context injected."""
+    parts = [_VALIDATE_CROP_PROMPT_BASE]
+
+    context_lines = []
+    desc = box.get("_description", "")
+    if desc:
+        context_lines.append(f"DETECTOR DESCRIPTION: {desc}")
+    if box.get("_contains_text"):
+        reason = box.get("_text_reason", "inherent to the image")
+        context_lines.append(
+            f"DETECTOR SAYS TEXT IS EXPECTED: {reason}. "
+            "Do NOT fail this crop for containing that text — it is part of the image."
+        )
+    issues = box.get("_source_issues", "")
+    if issues:
+        context_lines.append(
+            f"SOURCE PHOTO ISSUES: {issues}. "
+            "These are defects in the original photo, NOT crop errors. Do NOT fail for these."
+        )
+
+    if context_lines:
+        parts.append("")
+        parts.append("DETECTOR CONTEXT (from the model that identified this image):")
+        parts.extend(context_lines)
+
+    parts.append("")
+    parts.append("Return ONLY valid JSON.")
+    return "\n".join(parts)
+
+
+def _validate_crop_with_vlm(
+    page_img: Image.Image,
+    boxes: List[Dict[str, int]],
+    model: str,
+    temperature: float,
+    max_tokens: int,
+    timeout_seconds: Optional[float],
+) -> List[Dict[str, int]]:
+    """Validate crops with a VLM quality gate. Returns only boxes that pass."""
+    import json as _json
+    import re as _re
+    validated = []
+    for box in boxes:
+        x0, y0, x1, y1 = box["x0"], box["y0"], box["x1"], box["y1"]
+        if x1 <= x0 or y1 <= y0:
+            validated.append(box)
+            continue
+        crop = page_img.crop((x0, y0, x1, y1))
+        try:
+            import tempfile
+            with tempfile.TemporaryDirectory() as tmpdir:
+                tmp_path = Path(tmpdir) / "crop.jpg"
+                crop.save(tmp_path, format="JPEG", quality=92)
+                image_data = _encode_image(str(tmp_path))
+        except Exception:
+            validated.append(box)
+            continue
+        prompt = _build_validate_prompt(box)
+        try:
+            if _is_gemini_model(model):
+                if GeminiVisionClient is None:
+                    raise RuntimeError("google-genai package required")
+                gclient = GeminiVisionClient()
+                raw, _, _ = gclient.generate_vision(
+                    model=model,
+                    system_prompt=prompt,
+                    user_text="Evaluate this crop.",
+                    image_data=image_data,
+                    temperature=temperature,
+                    max_tokens=max_tokens,
+                )
+            else:
+                if OpenAI is None:
+                    raise RuntimeError("openai package required")
+                client = OpenAI(timeout=timeout_seconds) if timeout_seconds else OpenAI()
+                if hasattr(client, "responses"):
+                    resp = client.responses.create(
+                        model=model,
+                        temperature=temperature,
+                        max_output_tokens=max_tokens,
+                        input=[
+                            {"role": "system", "content": [{"type": "input_text", "text": prompt}]},
+                            {"role": "user", "content": [
+                                {"type": "input_text", "text": "Evaluate this crop."},
+                                {"type": "input_image", "image_url": image_data},
+                            ]},
+                        ],
+                    )
+                    raw = resp.output_text or ""
+                else:
+                    resp = client.chat.completions.create(
+                        model=model,
+                        temperature=temperature,
+                        max_tokens=max_tokens,
+                        messages=[
+                            {"role": "system", "content": prompt},
+                            {"role": "user", "content": [
+                                {"type": "text", "text": "Evaluate this crop."},
+                                {"type": "image_url", "image_url": {"url": image_data}},
+                            ]},
+                        ],
+                    )
+                    raw = resp.choices[0].message.content or ""
+        except Exception as exc:
+            _log(f"    Validate VLM error: {exc}")
+            validated.append(box)
+            continue
+        # Parse verdict
+        verdict = "pass"
+        reason = ""
+        try:
+            text = raw.strip()
+            if "```" in text:
+                parts = text.split("```")
+                if len(parts) >= 2:
+                    text = parts[1]
+                    if text.startswith("json"):
+                        text = text[4:]
+            parsed = _json.loads(text.strip())
+            verdict = parsed.get("verdict", "pass").lower()
+            reason = parsed.get("reason", "")
+        except Exception:
+            m = _re.search(r'"verdict"\s*:\s*"(pass|fail)"', raw, _re.IGNORECASE)
+            if m:
+                verdict = m.group(1).lower()
+        if verdict == "fail":
+            _log(f"    Validate: REJECT ({x0},{y0})-({x1},{y1}): {reason}")
+        else:
+            _log(f"    Validate: pass  ({x0},{y0})-({x1},{y1})")
+            validated.append(box)
+    return validated
 
 
 def _normalize_box(box: Dict[str, float], w: int, h: int) -> Optional[Dict[str, int]]:
     try:
-        x0 = max(0.0, min(1.0, float(box["x0"])))
-        y0 = max(0.0, min(1.0, float(box["y0"])))
-        x1 = max(0.0, min(1.0, float(box["x1"])))
-        y1 = max(0.0, min(1.0, float(box["y1"])))
+        raw_x0, raw_y0 = float(box["x0"]), float(box["y0"])
+        raw_x1, raw_y1 = float(box["x1"]), float(box["y1"])
+    except Exception:
+        return None
+    # Auto-detect coordinate scale per axis: models may return normalized (0-1),
+    # Gemini 0-1000 scale, or pixel coordinates. Handle each axis independently
+    # since some models mix scales (e.g. x in 0-1, y in 0-1000).
+    def _normalize_axis(v0: float, v1: float, dim: int) -> Tuple[float, float]:
+        max_v = max(abs(v0), abs(v1))
+        if max_v <= 1.0:
+            return v0, v1  # already normalized
+        if max_v <= 1000:
+            return v0 / 1000.0, v1 / 1000.0  # Gemini 0-1000 scale
+        return v0 / float(dim), v1 / float(dim)  # pixel coordinates
+
+    raw_x0, raw_x1 = _normalize_axis(raw_x0, raw_x1, w)
+    raw_y0, raw_y1 = _normalize_axis(raw_y0, raw_y1, h)
+    try:
+        x0 = max(0.0, min(1.0, raw_x0))
+        y0 = max(0.0, min(1.0, raw_y0))
+        x1 = max(0.0, min(1.0, raw_x1))
+        y1 = max(0.0, min(1.0, raw_y1))
     except Exception:
         return None
     if x1 <= x0 or y1 <= y0:
@@ -531,14 +744,16 @@ def _refine_boxes_remove_text_lines(
         if rx1 <= rx0 or ry1 <= ry0:
             refined.append(box)
         else:
-            refined.append({
+            new_box = {
                 "x0": int(rx0),
                 "y0": int(ry0),
                 "x1": int(rx1),
                 "y1": int(ry1),
                 "width": int(rx1 - rx0),
                 "height": int(ry1 - ry0),
-            })
+            }
+            _copy_detector_meta(box, new_box)
+            refined.append(new_box)
     return refined
 
 
@@ -654,7 +869,7 @@ def _trim_text_edges(
                 new_y0 = y0 + max(0, gap_start + margin_px)
                 new_y1 = y1
                 if new_y1 > new_y0:
-                    return {
+                    new_box = {
                         "x0": x0,
                         "y0": new_y0,
                         "x1": x1,
@@ -662,13 +877,15 @@ def _trim_text_edges(
                         "width": x1 - x0,
                         "height": new_y1 - new_y0,
                     }
+                    _copy_detector_meta(box, new_box)
+                    return new_box
         return box
 
     new_y0 = y0 + top_trim
     new_y1 = y1 - bottom_trim
     if new_y1 <= new_y0:
         return box
-    return {
+    new_box = {
         "x0": x0,
         "y0": new_y0,
         "x1": x1,
@@ -676,6 +893,8 @@ def _trim_text_edges(
         "width": x1 - x0,
         "height": new_y1 - new_y0,
     }
+    _copy_detector_meta(box, new_box)
+    return new_box
 
 
 def _box_has_text_band(
@@ -850,7 +1069,7 @@ def _trim_box_by_ocr_text(
         return box
     if new_y0 == y0 and new_y1 == y1:
         return box
-    return {
+    new_box = {
         "x0": x0,
         "y0": new_y0,
         "x1": x1,
@@ -858,6 +1077,8 @@ def _trim_box_by_ocr_text(
         "width": x1 - x0,
         "height": new_y1 - new_y0,
     }
+    _copy_detector_meta(box, new_box)
+    return new_box
 
 
 def _trim_box_by_layout_text(
@@ -897,6 +1118,11 @@ def _trim_box_by_layout_text(
         th = ty1 - ty0
         if tw <= 0 or th <= 0:
             continue
+        # Text box must overlap horizontally with image box — otherwise
+        # text in an adjacent column can incorrectly trim the image.
+        overlap_x = min(tx1, x1) - max(tx0, x0)
+        if overlap_x <= 0:
+            continue
         if (tw / float(max(1, x1 - x0))) < min_width_ratio:
             continue
         if (th / float(max(1, y1 - y0))) > max_height_ratio:
@@ -917,7 +1143,7 @@ def _trim_box_by_layout_text(
         return box
     if new_y0 == y0 and new_y1 == y1:
         return box
-    return {
+    new_box = {
         "x0": x0,
         "y0": new_y0,
         "x1": x1,
@@ -925,6 +1151,8 @@ def _trim_box_by_layout_text(
         "width": x1 - x0,
         "height": new_y1 - new_y0,
     }
+    _copy_detector_meta(box, new_box)
+    return new_box
 
 
 def _split_box_by_layout_text_band(
@@ -958,6 +1186,10 @@ def _split_box_by_layout_text_band(
         th = ty1 - ty0
         if tw <= 0 or th <= 0:
             continue
+        # Text box must overlap horizontally with image box
+        overlap_x = min(tx1, x1) - max(tx0, x0)
+        if overlap_x <= 0:
+            continue
         if (tw / float(max(1, bw))) < min_width_ratio:
             continue
         if (th / float(max(1, bh))) > max_height_ratio:
@@ -973,27 +1205,27 @@ def _split_box_by_layout_text_band(
     bottom_y0 = band_y1 + margin_px
     out = []
     if top_y1 > y0:
-        out.append(
-            {
-                "x0": x0,
-                "y0": y0,
-                "x1": x1,
-                "y1": top_y1,
-                "width": bw,
-                "height": top_y1 - y0,
-            }
-        )
+        top_box = {
+            "x0": x0,
+            "y0": y0,
+            "x1": x1,
+            "y1": top_y1,
+            "width": bw,
+            "height": top_y1 - y0,
+        }
+        _copy_detector_meta(box, top_box)
+        out.append(top_box)
     if bottom_y0 < y1:
-        out.append(
-            {
-                "x0": x0,
-                "y0": bottom_y0,
-                "x1": x1,
-                "y1": y1,
-                "width": bw,
-                "height": y1 - bottom_y0,
-            }
-        )
+        bottom_box = {
+            "x0": x0,
+            "y0": bottom_y0,
+            "x1": x1,
+            "y1": y1,
+            "width": bw,
+            "height": y1 - bottom_y0,
+        }
+        _copy_detector_meta(box, bottom_box)
+        out.append(bottom_box)
     return out if out else [box]
 
 
@@ -1110,14 +1342,16 @@ def _refine_boxes_with_nonwhite(
         if rx1 <= rx0 or ry1 <= ry0:
             refined.append(box)
         else:
-            refined.append({
+            new_box = {
                 "x0": int(rx0),
                 "y0": int(ry0),
                 "x1": int(rx1),
                 "y1": int(ry1),
                 "width": int(rx1 - rx0),
                 "height": int(ry1 - ry0),
-            })
+            }
+            _copy_detector_meta(box, new_box)
+            refined.append(new_box)
     return refined
 
 
@@ -1180,14 +1414,16 @@ def _refine_boxes_with_nontext(
         if rx1 <= rx0 or ry1 <= ry0:
             refined.append(box)
         else:
-            refined.append({
+            new_box = {
                 "x0": int(rx0),
                 "y0": int(ry0),
                 "x1": int(rx1),
                 "y1": int(ry1),
                 "width": int(rx1 - rx0),
                 "height": int(ry1 - ry0),
-            })
+            }
+            _copy_detector_meta(box, new_box)
+            refined.append(new_box)
     return refined
 
 
@@ -1242,7 +1478,7 @@ def _trim_caption_from_box(
                 cut_row = top_idx
                 new_y1 = y0 + start + cut_row - margin_px
                 if new_y1 > y0:
-                    return {
+                    new_box = {
                         "x0": x0,
                         "y0": y0,
                         "x1": x1,
@@ -1250,6 +1486,8 @@ def _trim_caption_from_box(
                         "width": x1 - x0,
                         "height": new_y1 - y0,
                     }
+                    _copy_detector_meta(box, new_box)
+                    return new_box
 
     nonwhite_ratios = []
     for yy in range(band.shape[0]):
@@ -1367,7 +1605,7 @@ def _trim_caption_from_box(
     new_y1 = y0 + start + cut_row - margin_px
     if new_y1 <= y0:
         return box
-    return {
+    new_box = {
         "x0": x0,
         "y0": y0,
         "x1": x1,
@@ -1375,6 +1613,9 @@ def _trim_caption_from_box(
         "width": x1 - x0,
         "height": new_y1 - y0,
     }
+    _copy_detector_meta(box, new_box)
+    return new_box
+
 def _extract_images_from_html(html: str) -> List[Dict[str, Any]]:
     """Extract image metadata from HTML img tags (fallback for older OCR output)."""
     images = []
@@ -1767,6 +2008,7 @@ def _split_box_by_gaps(
                 "width": x1 - x0,
                 "height": seg_h,
             }
+            _copy_detector_meta(box, seg)
             seg_roi = img_gray[seg["y0"]:seg["y1"], seg["x0"]:seg["x1"]]
             if seg_roi.size > 0:
                 ratio = float(np.count_nonzero(seg_roi < white_threshold)) / float(seg_roi.size)
@@ -2122,6 +2364,9 @@ def crop_illustrations_guided(
     rescue_refine_boxes: bool = False,
     rescue_refine_max_tokens: int = 400,
     rescue_refine_min_area_ratio: float = 0.05,
+    rescue_validate_crops: bool = False,
+    rescue_validate_model: Optional[str] = None,
+    rescue_validate_max_tokens: int = 300,
     refine_with_nonwhite: bool = False,
     refine_close_kernel: int = 5,
     refine_close_iterations: int = 1,
@@ -2164,6 +2409,8 @@ def crop_illustrations_guided(
     caption_max_nonwhite_ratio: float = 0.2,
     caption_trim_passes: int = 1,
     caption_relax_max_gap_ratio: float = 0.15,
+    cover_pages: str = "",
+    only_pages: str = "",
 ) -> List[Dict[str, Any]]:
     """Crop illustrations from pages identified by OCR.
 
@@ -2260,6 +2507,52 @@ def crop_illustrations_guided(
 
     _log(f"Found {len(pages_with_images)} pages with images out of {len(pages)} total")
 
+    # Parse cover_pages param
+    cover_pages_set = set()
+    if cover_pages:
+        for token in cover_pages.split(","):
+            token = token.strip()
+            if token:
+                try:
+                    cover_pages_set.add(int(token))
+                except ValueError:
+                    pass
+
+    # Ensure cover pages are in the processing list even if OCR didn't flag them
+    if cover_pages_set:
+        existing_page_nums = {p.get("page_number") for p in pages_with_images}
+        for p in pages:
+            pn = p.get("page_number")
+            if pn in cover_pages_set and pn not in existing_page_nums:
+                pages_with_images.append(p)
+                _log(f"  Added page {pn} to processing list (cover page)")
+        # Re-sort by page number to maintain order
+        pages_with_images.sort(key=lambda p: p.get("page_number", 0))
+
+    # --only-pages: filter to specific pages for targeted re-runs
+    only_pages_set: Set[int] = set()
+    if only_pages:
+        for token in only_pages.split(","):
+            token = token.strip()
+            if token:
+                try:
+                    only_pages_set.add(int(token))
+                except ValueError:
+                    pass
+    if only_pages_set:
+        pages_with_images = [
+            p for p in pages_with_images
+            if p.get("page_number") in only_pages_set
+        ]
+        _log(f"--only-pages: filtered to {len(pages_with_images)} pages {sorted(only_pages_set)}")
+
+        # Clean up old crop images for targeted pages so stale files don't linger
+        for pn in only_pages_set:
+            pattern = os.path.join(images_dir, f"page-{pn:03d}-*")
+            import glob as _glob
+            for old_file in _glob.glob(pattern):
+                os.remove(old_file)
+
     rescue_used = 0
     for page_rec in pages_with_images:
         page_num = page_rec.get("page_number")
@@ -2271,6 +2564,49 @@ def crop_illustrations_guided(
 
         if not source_image_path or not os.path.exists(source_image_path):
             _log(f"  Page {page_num}: Image not found, skipping")
+            continue
+
+        # Cover page: capture full page with whitespace trimming only
+        if page_num in cover_pages_set:
+            _log(f"  Page {page_num}: Cover page — full-page capture with whitespace trim")
+            try:
+                cover_img = Image.open(source_image_path)
+                cx0, cy0, cx1, cy1 = _autocrop_whitespace(cover_img, white_threshold=white_threshold)
+                cropped = cover_img.crop((cx0, cy0, cx1, cy1))
+                filename = f"page-{page_num:03d}-000.{ext}"
+                filepath = os.path.join(images_dir, filename)
+                if fmt == "jpeg":
+                    if cropped.mode not in ("RGB", "L"):
+                        cropped = cropped.convert("RGB")
+                    cropped.save(filepath, "JPEG", quality=jpeg_quality, optimize=True)
+                else:
+                    cropped.save(filepath, "PNG")
+                is_bw = _is_bw_image(cropped)
+                alt = ""
+                if ocr_images:
+                    alt = ocr_images[0].get("alt", "")
+                manifest.append({
+                    "schema_version": "illustration_v1",
+                    "module_id": "crop_illustrations_guided_v1",
+                    "run_id": run_id,
+                    "created_at": _utc(),
+                    "source_image": image_path,
+                    "source_page": page_num,
+                    "filename": filename,
+                    "filename_alpha": None,
+                    "has_transparency": False,
+                    "is_color": not is_bw,
+                    "alt": alt,
+                    "bbox": {"x0": cx0, "y0": cy0, "x1": cx1, "y1": cy1,
+                             "width": cx1 - cx0, "height": cy1 - cy0},
+                    "area_ratio": round(((cx1 - cx0) * (cy1 - cy0)) / float(max(1, cover_img.width * cover_img.height)), 4),
+                    "detection_method": "cover_page",
+                    "image_description": "Book cover page",
+                    "contains_text": True,
+                    "source_issues": "",
+                })
+            except Exception as exc:
+                _log(f"  Page {page_num}: Cover page capture failed: {exc}")
             continue
 
         # Calculate expected count.
@@ -2403,6 +2739,7 @@ def crop_illustrations_guided(
             )
 
         image_data = None
+        cv_boxes_backup = [dict(b) for b in boxes]  # save CV boxes for fallback if VLM boxes all fail validation
         if rescue_model and rescue_used < rescue_max_pages and (rescue_always or len(boxes) < expected_count):
             try:
                 img = cv2.imread(str(source_image_path), cv2.IMREAD_GRAYSCALE)
@@ -2450,6 +2787,7 @@ def crop_illustrations_guided(
                         if cap_px:
                             px["caption_box"] = cap_px
                     px["_from_vlm"] = True
+                    _copy_detector_meta(box, px)
                     area_ratio = (px["width"] * px["height"]) / float(w * h)
                     px["area_ratio"] = round(area_ratio, 4)
                     normalized.append(px)
@@ -2515,6 +2853,7 @@ def crop_illustrations_guided(
                                 if cap_px:
                                     px["caption_box"] = cap_px
                             px["_from_vlm"] = True
+                            _copy_detector_meta(box, px)
                             area_ratio = (px["width"] * px["height"]) / float(w * h)
                             px["area_ratio"] = round(area_ratio, 4)
                             normalized.append(px)
@@ -2793,6 +3132,124 @@ def crop_illustrations_guided(
             except Exception as exc:
                 _log(f"    VLM refine failed: {exc}")
 
+        validate_model = rescue_validate_model or rescue_model
+        if rescue_validate_crops and validate_model and boxes_sorted:
+            pre_count = len(boxes_sorted)
+            try:
+                if page_img is None:
+                    page_img = Image.open(source_image_path)
+                boxes_sorted = _validate_crop_with_vlm(
+                    page_img,
+                    boxes_sorted,
+                    model=validate_model,
+                    temperature=rescue_temperature,
+                    max_tokens=rescue_validate_max_tokens,
+                    timeout_seconds=rescue_timeout_seconds,
+                )
+                rejected = pre_count - len(boxes_sorted)
+                if rejected:
+                    _log(f"    Validation: {rejected}/{pre_count} crops rejected by {validate_model}")
+                    # Fallback: if ALL VLM boxes were rejected, revert to CV-detected boxes
+                    if not boxes_sorted and cv_boxes_backup:
+                        boxes_sorted = sorted(cv_boxes_backup, key=lambda b: (b["y0"], b["x0"]))
+                        _log(f"    Validation fallback: using {len(boxes_sorted)} CV-detected box(es)")
+                else:
+                    _log(f"    Validation: {pre_count}/{pre_count} crops passed ({validate_model})")
+            except Exception as exc:
+                _log(f"    VLM validate failed: {exc}")
+
+        # Auto-retry: if post-validation crop count != expected, retry VLM detection.
+        # VLM non-determinism means a second call often returns different (better) boxes.
+        if (rescue_validate_crops and validate_model and rescue_model and
+                len(boxes_sorted) != expected_count):
+            _log(f"    Auto-retry: {len(boxes_sorted)}/{expected_count} crops after validation, re-running VLM")
+            if image_data is None:
+                image_data = _encode_image(source_image_path)
+            retry_instructions = (
+                f"IMPORTANT: This page contains exactly {expected_count} distinct images. "
+                f"Return exactly {expected_count} tight bounding boxes. "
+                "Each box must tightly enclose ONE image only — do not include surrounding body text. "
+                "Do not combine multiple images into one box."
+            )
+            try:
+                retry_vlm_boxes, _, retry_req_id, _ = _call_vlm_boxes(
+                    rescue_model, image_data, expected_count,
+                    ocr_descriptions if rescue_include_alt else None,
+                    rescue_temperature, rescue_max_tokens, rescue_timeout_seconds,
+                    extra_instructions=retry_instructions,
+                )
+                retry_normalized = []
+                for rbox in retry_vlm_boxes:
+                    rpx = _normalize_box(rbox, img_w, img_h)
+                    if not rpx:
+                        continue
+                    cap_box = rbox.get("caption_box")
+                    if isinstance(cap_box, dict):
+                        cap_px = _normalize_box(cap_box, img_w, img_h)
+                        if cap_px:
+                            rpx["caption_box"] = cap_px
+                    rpx["_from_vlm"] = True
+                    _copy_detector_meta(rbox, rpx)
+                    rpx["area_ratio"] = round(
+                        (rpx["width"] * rpx["height"]) / float(img_w * img_h), 4
+                    )
+                    retry_normalized.append(rpx)
+                if retry_normalized:
+                    retry_boxes = sorted(retry_normalized[:expected_count], key=lambda b: (b["y0"], b["x0"]))
+                    # Apply layout text trim
+                    if trim_layout_text and layout_engine is not None:
+                        cached_lb = layout_text_cache.get(page_num)
+                        if cached_lb:
+                            retry_boxes = [
+                                _trim_box_by_layout_text(
+                                    rb, cached_lb,
+                                    max_gap_ratio=layout_text_max_gap_ratio,
+                                    bottom_band_ratio=layout_text_bottom_band_ratio,
+                                    top_band_ratio=layout_text_top_band_ratio,
+                                    margin_px=layout_text_margin_px,
+                                    min_width_ratio=layout_text_min_width_ratio,
+                                    max_height_ratio=layout_text_max_height_ratio,
+                                ) for rb in retry_boxes
+                            ]
+                    # Apply caption boxes
+                    retry_boxes = [_apply_caption_box(b, caption_margin_px, caption_relax_max_gap_ratio) for b in retry_boxes]
+                    # Refine boxes
+                    if rescue_refine_boxes:
+                        try:
+                            if page_img is None:
+                                page_img = Image.open(source_image_path)
+                            retry_boxes = _refine_boxes_with_vlm(
+                                page_img, retry_boxes,
+                                model=rescue_model, temperature=rescue_temperature,
+                                max_tokens=rescue_refine_max_tokens,
+                                timeout_seconds=rescue_timeout_seconds,
+                                min_area_ratio=rescue_refine_min_area_ratio,
+                            )
+                        except Exception:
+                            pass
+                    # Validate
+                    if page_img is None:
+                        page_img = Image.open(source_image_path)
+                    retry_validated = _validate_crop_with_vlm(
+                        page_img, retry_boxes,
+                        model=validate_model, temperature=rescue_temperature,
+                        max_tokens=rescue_validate_max_tokens,
+                        timeout_seconds=rescue_timeout_seconds,
+                    )
+                    _log(f"    Auto-retry: {len(retry_validated)}/{len(retry_normalized)} passed validation (request {retry_req_id})")
+                    # Use retry result if closer to expected count
+                    if abs(len(retry_validated) - expected_count) < abs(len(boxes_sorted) - expected_count):
+                        boxes_sorted = sorted(retry_validated, key=lambda b: (b["y0"], b["x0"]))
+                        _log(f"    Auto-retry: improved to {len(boxes_sorted)}/{expected_count} crops")
+                    elif len(retry_validated) == len(boxes_sorted) and len(retry_validated) > 0:
+                        _log(f"    Auto-retry: same count ({len(retry_validated)}), keeping original")
+                    else:
+                        _log(f"    Auto-retry: no improvement ({len(retry_validated)} vs {len(boxes_sorted)}), keeping original")
+                else:
+                    _log("    Auto-retry: VLM returned no valid boxes, keeping original")
+            except Exception as exc:
+                _log(f"    Auto-retry VLM failed: {exc}")
+
         for box in boxes_sorted:
             if "area_ratio" not in box:
                 area = (box["x1"] - box["x0"]) * (box["y1"] - box["y0"])
@@ -2857,7 +3314,10 @@ def crop_illustrations_guided(
                     "height": box["height"]
                 },
                 "area_ratio": box["area_ratio"],
-                "detection_method": "cv_guided"
+                "detection_method": "cv_guided",
+                "image_description": box.get("_description", ""),
+                "contains_text": box.get("_contains_text", False),
+                "source_issues": box.get("_source_issues", ""),
             }
 
             manifest.append(record)
@@ -3139,6 +3599,33 @@ def main():
         type=float,
         default=0.05,
         help="Minimum area ratio vs original crop to accept VLM refine (default 0.05)"
+    )
+    parser.add_argument(
+        "--rescue-validate-crops",
+        action="store_true",
+        help="Validate each crop with VLM quality gate (reject bad crops)"
+    )
+    parser.add_argument(
+        "--rescue-validate-model",
+        help="Vision model for crop validation (defaults to rescue_model)"
+    )
+    parser.add_argument(
+        "--rescue-validate-max-tokens",
+        type=int,
+        default=300,
+        help="Max tokens for VLM validate pass (default 300)"
+    )
+    parser.add_argument(
+        "--cover-pages",
+        type=str,
+        default="",
+        help="Comma-separated page numbers to capture as full-page images (e.g. '1' or '1,127')"
+    )
+    parser.add_argument(
+        "--only-pages",
+        type=str,
+        default="",
+        help="Comma-separated page numbers to process (skip all others). Merges results into existing manifest."
     )
     parser.add_argument(
         "--refine-with-nonwhite",
@@ -3434,6 +3921,9 @@ def main():
         rescue_refine_boxes=args.rescue_refine_boxes,
         rescue_refine_max_tokens=args.rescue_refine_max_tokens,
         rescue_refine_min_area_ratio=args.rescue_refine_min_area_ratio,
+        rescue_validate_crops=args.rescue_validate_crops,
+        rescue_validate_model=args.rescue_validate_model,
+        rescue_validate_max_tokens=args.rescue_validate_max_tokens,
         refine_with_nonwhite=args.refine_with_nonwhite,
         refine_close_kernel=args.refine_close_kernel,
         refine_close_iterations=args.refine_close_iterations,
@@ -3476,11 +3966,31 @@ def main():
         caption_max_nonwhite_ratio=args.caption_max_nonwhite_ratio,
         caption_trim_passes=args.caption_trim_passes,
         caption_relax_max_gap_ratio=args.caption_relax_max_gap_ratio,
+        cover_pages=args.cover_pages,
+        only_pages=args.only_pages,
     )
 
-    # Save manifest
+    # Save manifest — merge when --only-pages is active
     manifest_path = os.path.join(args.output_dir, "illustration_manifest.jsonl")
-    save_jsonl(manifest_path, manifest)
+    if args.only_pages and os.path.exists(manifest_path):
+        # Parse which pages were targeted
+        targeted = set()
+        for token in args.only_pages.split(","):
+            token = token.strip()
+            if token:
+                try:
+                    targeted.add(int(token))
+                except ValueError:
+                    pass
+        # Keep existing entries for non-targeted pages, replace targeted pages
+        existing = list(read_jsonl(manifest_path))
+        merged = [r for r in existing if r.get("source_page") not in targeted]
+        merged.extend(manifest)
+        merged.sort(key=lambda r: (r.get("source_page", 0), r.get("filename", "")))
+        save_jsonl(manifest_path, merged)
+        _log(f"Merged {len(manifest)} new + {len(merged) - len(manifest)} existing = {len(merged)} total records")
+    else:
+        save_jsonl(manifest_path, manifest)
 
     _log(f"Manifest: {manifest_path}")
     _log(f"Images: {os.path.join(args.output_dir, 'images')}")

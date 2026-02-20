@@ -1,0 +1,79 @@
+# MVP: image-directory OCR to per-page HTML (generic, no cleanup)
+
+input:
+  images: input/onward-to-the-unknown-images  # override via run config
+
+stages:
+  - id: images_to_manifest
+    stage: extract
+    module: images_dir_to_manifest_v1
+    out: pages_images_manifest.jsonl
+    params:
+      input_dir: input/onward-to-the-unknown-images  # override via run config
+
+  - id: ocr_ai
+    stage: extract
+    module: ocr_ai_gpt51_v1
+    needs: [images_to_manifest]
+    inputs:
+      pages: images_to_manifest
+    out: pages_html.jsonl
+    params:
+      model: gpt-5.1
+      ocr_hints: |
+        - Preserve text exactly as printed; do not correct spelling or normalize punctuation.
+        - Preserve line breaks and paragraph structure as seen in the image.
+        - When tables are present, preserve the grid as <table> with correct rows/columns.
+        - Do not infer missing cells or merge columns unless explicitly visible.
+
+  - id: crop_illustrations
+    stage: extract
+    module: crop_illustrations_guided_v1
+    needs: [ocr_ai]
+    inputs:
+      ocr_manifest: ocr_ai
+    out: illustration_manifest.jsonl
+    params:
+      transparency: true
+
+  - id: table_rescue
+    stage: adapter
+    module: table_rescue_html_loop_v1
+    needs: [ocr_ai]
+    inputs:
+      pages: ocr_ai
+    out: pages_html_rescued.jsonl
+    params:
+      model: gpt-5.1
+      max_passes: 3
+      max_pages: 50
+      fail_on_unresolved: true
+      rescue_hints: |
+        - Preserve row/column boundaries exactly; do not reflow text.
+        - Use <br> for multiple entries inside a single cell.
+        - Do not add or remove words.
+
+  - id: extract_page_numbers
+    stage: transform
+    module: extract_page_numbers_html_v1
+    needs: [table_rescue]
+    inputs:
+      pages: table_rescue
+    out: pages_html_with_page_numbers.jsonl
+
+  - id: portionize_toc
+    stage: portionize
+    module: portionize_toc_html_v1
+    needs: [extract_page_numbers]
+    inputs:
+      pages: extract_page_numbers
+    out: portions_toc.jsonl
+
+  - id: build_chapters
+    stage: build
+    module: build_chapter_html_v1
+    needs: [extract_page_numbers, portionize_toc]
+    inputs:
+      pages: extract_page_numbers
+      portions: portionize_toc
+    out: chapters_manifest.jsonl

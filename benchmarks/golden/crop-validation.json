@@ -1,0 +1,210 @@
+{
+  "_meta": {
+    "description": "Golden labels for crop quality validation eval",
+    "source_run": "output/runs/onward-gemini3pro-001/03_crop_illustrations_guided_v1/images/",
+    "total_crops": 40,
+    "pass_count": 36,
+    "fail_count": 4,
+    "notes": "Text within logos, plaques, and monuments is considered PART of the image (pass). Only external captions/body text counts as text_included."
+  },
+  "page-001-000": {
+    "verdict": "pass",
+    "reasons": [],
+    "notes": "Gold embossed book cover illustration. Clean crop, no text."
+  },
+  "page-004-000": {
+    "verdict": "pass",
+    "reasons": [],
+    "notes": "Covered wagon drawing. Tight crop, clean."
+  },
+  "page-009-000": {
+    "verdict": "pass",
+    "reasons": [],
+    "notes": "Portrait of Moise and Sophie. Good framing."
+  },
+  "page-012-000": {
+    "verdict": "pass",
+    "reasons": [],
+    "notes": "Celebrate Saskatchewan 1905-1980 logo. Text is integral part of the logo graphic."
+  },
+  "page-012-001": {
+    "verdict": "pass",
+    "reasons": [],
+    "notes": "Official Seal of Saskatchewan. Dark/low contrast but crop is accurate."
+  },
+  "page-014-000": {
+    "verdict": "pass",
+    "reasons": [],
+    "notes": "Portrait of Moise and Sophie L'Heureux c.1910. Good crop."
+  },
+  "page-018-000": {
+    "verdict": "fail",
+    "reasons": ["text_included", "blank_space", "incomplete_crop"],
+    "notes": "WORST CROP: Only left half of full-width group photo captured (x1=2479 vs ~4700 page width). Caption text visible ('Moise and Sophie's Family / Back Row: George...'). ~40% blank white space at bottom. VLM returned a box that was too narrow and too tall."
+  },
+  "page-021-000": {
+    "verdict": "pass",
+    "reasons": [],
+    "notes": "Aerial view of ranch buildings. Good full-width crop."
+  },
+  "page-021-001": {
+    "verdict": "pass",
+    "reasons": [],
+    "notes": "Ranch house and barn with livestock. Good crop."
+  },
+  "page-022-000": {
+    "verdict": "pass",
+    "reasons": [],
+    "notes": "Henry and Alma Alain 50th anniversary. Good crop."
+  },
+  "page-028-000": {
+    "verdict": "pass",
+    "reasons": [],
+    "notes": "Arthur and Lucille L'Heureux portrait. Good crop."
+  },
+  "page-038-000": {
+    "verdict": "pass",
+    "reasons": [],
+    "notes": "Oval portrait of Mrs. Leonidas (Laetitia). Good tight crop around oval."
+  },
+  "page-038-001": {
+    "verdict": "pass",
+    "reasons": [],
+    "notes": "Portrait of Leonidas and Josephine seated. Good crop."
+  },
+  "page-048-000": {
+    "verdict": "pass",
+    "reasons": [],
+    "notes": "Alphonse and Josephine Alain outdoors. Good crop."
+  },
+  "page-054-000": {
+    "verdict": "pass",
+    "reasons": [],
+    "notes": "Napoleon Paul and Beatrice L'Heureux elderly portrait. Good crop."
+  },
+  "page-060-000": {
+    "verdict": "pass",
+    "reasons": [],
+    "notes": "George and Sophranie L'Heureux outdoors in coats. Good crop."
+  },
+  "page-060-001": {
+    "verdict": "pass",
+    "reasons": [],
+    "notes": "Mrs. George L'Heureux (Emilienne) sitting outdoors. Good crop."
+  },
+  "page-066-000": {
+    "verdict": "pass",
+    "reasons": [],
+    "notes": "Joe and Eva L'Heureux portrait. Good crop."
+  },
+  "page-072-000": {
+    "verdict": "pass",
+    "reasons": [],
+    "notes": "Bert and Mathilda Devlin portrait. Good crop."
+  },
+  "page-078-000": {
+    "verdict": "pass",
+    "reasons": [],
+    "notes": "Marie-Louise and Howard LaClare standing outdoors. Good crop."
+  },
+  "page-086-000": {
+    "verdict": "pass",
+    "reasons": [],
+    "notes": "Roseanna and Roch Landreville with anniversary cake. Good crop."
+  },
+  "page-092-000": {
+    "verdict": "fail",
+    "reasons": ["text_included"],
+    "notes": "Portrait of Archie Richard has body paragraph text from both columns of the book page visible on left and right sides. Crop should have excluded surrounding page text."
+  },
+  "page-096-000": {
+    "verdict": "pass",
+    "reasons": [],
+    "notes": "Patrick and Emilie Nolin wedding photo. Good crop."
+  },
+  "page-096-001": {
+    "verdict": "pass",
+    "reasons": [],
+    "notes": "Small portrait of Isidore Nolin (1036x827). Top of head slightly cropped but matches source. Borderline."
+  },
+  "page-102-000": {
+    "verdict": "pass",
+    "reasons": [],
+    "notes": "Maggie and Wilfrid L'Heureux outdoors. Small source image (1968x1050) so blurry. Crop bounds correct."
+  },
+  "page-108-000": {
+    "verdict": "pass",
+    "reasons": [],
+    "notes": "Portrait of Pierre and Selina L'Heureux. Small (988x1241) but crop correct."
+  },
+  "page-108-001": {
+    "verdict": "pass",
+    "reasons": [],
+    "notes": "Portrait of Mrs. Pierre L'Heureux (Annie) with glasses. Good crop."
+  },
+  "page-116-000": {
+    "verdict": "pass",
+    "reasons": [],
+    "notes": "Antoine and Delima L'Heureux formal portrait. Good crop."
+  },
+  "page-121-000": {
+    "verdict": "pass",
+    "reasons": [],
+    "notes": "Group photograph of L'Heureux family gathering outdoors. Good wide crop."
+  },
+  "page-121-001": {
+    "verdict": "pass",
+    "reasons": [],
+    "notes": "Dark purebred Percheron stallion in profile. Good crop."
+  },
+  "page-122-000": {
+    "verdict": "fail",
+    "reasons": ["text_included"],
+    "notes": "Group reunion photo includes printed caption text at bottom: 'L'Heureux family re-union — July, 1939. Ninety members...' This external caption should have been excluded by the crop."
+  },
+  "page-122-001": {
+    "verdict": "pass",
+    "reasons": [],
+    "notes": "Two side-by-side oval portraits (Moise and brother Edward). Good crop."
+  },
+  "page-123-000": {
+    "verdict": "pass",
+    "reasons": [],
+    "notes": "Horse-drawn sleigh carrying coffin in winter 1944. Good crop."
+  },
+  "page-123-001": {
+    "verdict": "pass",
+    "reasons": [],
+    "notes": "Large group moving church building across snow with horses. Good wide crop."
+  },
+  "page-124-000": {
+    "verdict": "pass",
+    "reasons": [],
+    "notes": "Man standing in field holding lead of large bull. Good crop."
+  },
+  "page-125-000": {
+    "verdict": "pass",
+    "reasons": [],
+    "notes": "Sketch of covered wagon with two oxen. Good crop."
+  },
+  "page-126-000": {
+    "verdict": "fail",
+    "reasons": ["text_included"],
+    "notes": "Monument plaque photo has book page text visible on the left side (names, descriptions from the page layout). The plaque text itself is integral, but external page text was included in the crop."
+  },
+  "page-126-001": {
+    "verdict": "pass",
+    "reasons": [],
+    "notes": "Bronze plaque MOISE & SOPHIE L'HEUREUX 1887-1987. Text is engraved on plaque (integral)."
+  },
+  "page-127-000": {
+    "verdict": "pass",
+    "reasons": [],
+    "notes": "Stone monument with three plaques. Text on plaques is integral to the monument image."
+  },
+  "page-127-001": {
+    "verdict": "pass",
+    "reasons": [],
+    "notes": "Close-up of Canada Post plaque on monument. Text on plaque is integral."
+  }
+}

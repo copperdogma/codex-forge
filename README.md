@@ -635,6 +635,26 @@ conda activate codex-arm
 
 **Rollback:** Simply use your existing x86_64 environment. Miniforge and Miniconda can coexist.
 
+## Model Eval Catalog (promptfoo)
+
+Systematic evaluations of AI models/prompts for pipeline tasks. Re-run any eval when new models come out. Full setup details in `benchmarks/README.md`.
+
+### 1. Image Crop Extraction (Story 125)
+
+**Task**: Extract photo/illustration bounding boxes from scanned book pages.
+**Winner**: Gemini 3 Pro (0.856 avg, 77% pass) — `strict-exclude` prompt
+**Config**: `benchmarks/tasks/image-crop-extraction.yaml`
+**Run**: `cd benchmarks && source ~/.zshrc && promptfoo eval -c tasks/image-crop-extraction.yaml --no-cache`
+
+### 2. OCR — Genealogy / Table-Heavy Pages (Story 127)
+
+**Task**: Single-pass VLM OCR producing structured HTML with `<table>` elements and `<img>` placeholders.
+**Winner**: Gemini 3 Pro (0.877 avg, 100% pass) — `table-strict` prompt
+**Config**: `benchmarks/tasks/ocr-genealogy-tables.yaml` (25 pages: 14 table + 11 image)
+**Run**: `cd benchmarks && source ~/.zshrc && promptfoo eval -c tasks/ocr-genealogy-tables.yaml --no-cache -j 2`
+
+Top 4 with table-strict: Gemini 3 Pro (0.877), Gemini 2.5 Pro (0.870), Claude Opus 4.6 (0.866), Claude Sonnet 4.5 (0.861). GPT models rate-limited to 14/25 pages. Image detection near-perfect across all models.
+
 ## Dev notes
 - Requires Tesseract installed/on PATH.
 - Models configurable; defaults use `gpt-4.1-mini` with `--boost_model gpt-5`.

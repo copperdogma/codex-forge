@@ -54,7 +54,7 @@ This index tracks stories in `/docs/stories/` for the codex-forge pipeline.
 || 023 | Consolidate section target adapters | Medium | Done | /docs/stories/story-023-section-target-guard.md |
 || 024 | Image cropper follow-up | Medium | Done | /docs/stories/story-024-image-cropper-followup.md |
 || 025 | Module pruning & registry hygiene | Medium | Done | /docs/stories/story-025-module-prune.md |
-|| 026 | Onward to the Unknown — Arthur L'Heureux pilot | Medium | To Do | /docs/stories/story-026-onward-unknown-arthur-lheureux.md |
+|| 026 | Onward to the Unknown — Arthur L'Heureux pilot | Medium | In Progress | /docs/stories/story-026-onward-unknown-arthur-lheureux.md |
 || 027 | Contact-sheet intake for automatic book type planning | Medium | Done | /docs/stories/story-027-contact-sheet-auto-intake.md |
 || 028 | Market Discovery for codex-forge | Medium | In Progress | /docs/stories/story-028-market-discovery.md |
 || 029 | Audit model lineup vs latest OpenAI sheets | Medium | Obsolete | /docs/stories/story-029-model-audit-openai.md |
@@ -142,6 +142,8 @@ This index tracks stories in `/docs/stories/` for the codex-forge pipeline.
 |||| 123 | Patch File Support for Manual Corrections | Medium | Done | /docs/stories/story-123-patch-file-support.md |
 |||| 124 | Player Vehicle/Robot Extraction (Secondary Stats) | High | Done | /docs/stories/story-124-player-vehicle-robot-extraction.md |
 |||| 125 | Image Extraction Evaluation with promptfoo | High | Done | /docs/stories/story-125-image-extraction-eval-promptfoo.md |
+|||| 126 | Crop Quality — Text Validation Loop | High | Done | /docs/stories/story-126-crop-quality-text-validation-loop.md |
+|||| 127 | OCR Model Eval for Genealogy / Table-Heavy Books | High | Done | /docs/stories/story-127-ocr-model-eval-genealogy.md |
 
 ## Notes
 - Status "Done" reflects current working state in codex-forge. "To Do" items are planned next steps aligned with `docs/requirements.md` and `snapshot.md`.

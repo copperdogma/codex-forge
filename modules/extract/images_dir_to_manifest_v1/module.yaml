@@ -1,0 +1,19 @@
+module_id: images_dir_to_manifest_v1
+stage: extract
+entrypoint: modules/extract/images_dir_to_manifest_v1/main.py
+input_schema: null
+output_schema: page_image_v1
+description: "Build a page_image_v1 manifest from an input directory of scanned page images."
+params:
+  - name: input_dir
+    type: str
+  - name: out
+    type: str
+    default: pages_images_manifest.jsonl
+  - name: start
+    type: int
+    default: null
+  - name: end
+    type: int
+    default: null
+notes: "Reads image files (jpg/png/tiff/webp/bmp) from a directory and emits a page_image_v1 manifest referencing the original paths. No image copying or modification."

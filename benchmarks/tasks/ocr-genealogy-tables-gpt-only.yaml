@@ -1,0 +1,179 @@
+description: "OCR model eval — GPT models only (rate-limit safe, concurrency 1)"
+
+prompts:
+  - id: "file://../prompts/ocr-genealogy-baseline.js"
+    label: "baseline"
+  - id: "file://../prompts/ocr-genealogy-table-strict.js"
+    label: "table-strict"
+
+providers:
+  - id: openai:chat:gpt-5-mini
+    label: "GPT-5 Mini"
+    config:
+      temperature: 0
+      max_tokens: 16384
+  - id: openai:chat:gpt-5.1
+    label: "GPT-5.1"
+    config:
+      temperature: 0
+      max_tokens: 16384
+  - id: openai:chat:gpt-5.2
+    label: "GPT-5.2"
+    config:
+      temperature: 0
+      max_tokens: 16384
+
+tests:
+  # ── Table pages (14) ───────────────────────────────────────────
+  - vars:
+      image: file://../input/onward-pages-b64/Image007.b64.txt
+      golden_file: "golden/ocr-genealogy/page-008-golden.html"
+    assert:
+      - type: python
+        value: file://../scorers/table_structure_scorer.py
+  - vars:
+      image: file://../input/onward-pages-b64/Image009.b64.txt
+      golden_file: "golden/ocr-genealogy/page-010-golden.html"
+    assert:
+      - type: python
+        value: file://../scorers/table_structure_scorer.py
+  - vars:
+      image: file://../input/onward-pages-b64/Image019.b64.txt
+      golden_file: "golden/ocr-genealogy/page-020-golden.html"
+    assert:
+      - type: python
+        value: file://../scorers/table_structure_scorer.py
+  - vars:
+      image: file://../input/onward-pages-b64/Image022.b64.txt
+      golden_file: "golden/ocr-genealogy/page-023-golden.html"
+    assert:
+      - type: python
+        value: file://../scorers/table_structure_scorer.py
+  - vars:
+      image: file://../input/onward-pages-b64/Image023.b64.txt
+      golden_file: "golden/ocr-genealogy/page-024-golden.html"
+    assert:
+      - type: python
+        value: file://../scorers/table_structure_scorer.py
+  - vars:
+      image: file://../input/onward-pages-b64/Image024.b64.txt
+      golden_file: "golden/ocr-genealogy/page-025-golden.html"
+    assert:
+      - type: python
+        value: file://../scorers/table_structure_scorer.py
+  - vars:
+      image: file://../input/onward-pages-b64/Image025.b64.txt
+      golden_file: "golden/ocr-genealogy/page-026-golden.html"
+    assert:
+      - type: python
+        value: file://../scorers/table_structure_scorer.py
+  - vars:
+      image: file://../input/onward-pages-b64/Image029.b64.txt
+      golden_file: "golden/ocr-genealogy/page-030-golden.html"
+    assert:
+      - type: python
+        value: file://../scorers/table_structure_scorer.py
+  - vars:
+      image: file://../input/onward-pages-b64/Image030.b64.txt
+      golden_file: "golden/ocr-genealogy/page-031-golden.html"
+    assert:
+      - type: python
+        value: file://../scorers/table_structure_scorer.py
+  - vars:
+      image: file://../input/onward-pages-b64/Image034.b64.txt
+      golden_file: "golden/ocr-genealogy/page-035-golden.html"
+    assert:
+      - type: python
+        value: file://../scorers/table_structure_scorer.py
+  - vars:
+      image: file://../input/onward-pages-b64/Image038.b64.txt
+      golden_file: "golden/ocr-genealogy/page-039-golden.html"
+    assert:
+      - type: python
+        value: file://../scorers/table_structure_scorer.py
+  - vars:
+      image: file://../input/onward-pages-b64/Image042.b64.txt
+      golden_file: "golden/ocr-genealogy/page-043-golden.html"
+    assert:
+      - type: python
+        value: file://../scorers/table_structure_scorer.py
+  - vars:
+      image: file://../input/onward-pages-b64/Image048.b64.txt
+      golden_file: "golden/ocr-genealogy/page-049-golden.html"
+    assert:
+      - type: python
+        value: file://../scorers/table_structure_scorer.py
+  - vars:
+      image: file://../input/onward-pages-b64/Image049.b64.txt
+      golden_file: "golden/ocr-genealogy/page-050-golden.html"
+    assert:
+      - type: python
+        value: file://../scorers/table_structure_scorer.py
+
+  # ── Image pages (11) ───────────────────────────────────────────
+  - vars:
+      image: file://../input/onward-pages-b64/Image003.b64.txt
+      golden_file: "golden/ocr-genealogy/page-003-golden.html"
+    assert:
+      - type: python
+        value: file://../scorers/table_structure_scorer.py
+  - vars:
+      image: file://../input/onward-pages-b64/Image008.b64.txt
+      golden_file: "golden/ocr-genealogy/page-008-img-golden.html"
+    assert:
+      - type: python
+        value: file://../scorers/table_structure_scorer.py
+  - vars:
+      image: file://../input/onward-pages-b64/Image011.b64.txt
+      golden_file: "golden/ocr-genealogy/page-003-cert-golden.html"
+    assert:
+      - type: python
+        value: file://../scorers/table_structure_scorer.py
+  - vars:
+      image: file://../input/onward-pages-b64/Image013.b64.txt
+      golden_file: "golden/ocr-genealogy/page-005-golden.html"
+    assert:
+      - type: python
+        value: file://../scorers/table_structure_scorer.py
+  - vars:
+      image: file://../input/onward-pages-b64/Image020.b64.txt
+      golden_file: "golden/ocr-genealogy/page-012-golden.html"
+    assert:
+      - type: python
+        value: file://../scorers/table_structure_scorer.py
+  - vars:
+      image: file://../input/onward-pages-b64/Image021.b64.txt
+      golden_file: "golden/ocr-genealogy/page-013-golden.html"
+    assert:
+      - type: python
+        value: file://../scorers/table_structure_scorer.py
+  - vars:
+      image: file://../input/onward-pages-b64/Image037.b64.txt
+      golden_file: "golden/ocr-genealogy/page-029-golden.html"
+    assert:
+      - type: python
+        value: file://../scorers/table_structure_scorer.py
+  - vars:
+      image: file://../input/onward-pages-b64/Image059.b64.txt
+      golden_file: "golden/ocr-genealogy/page-051-golden.html"
+    assert:
+      - type: python
+        value: file://../scorers/table_structure_scorer.py
+  - vars:
+      image: file://../input/onward-pages-b64/Image121.b64.txt
+      golden_file: "golden/ocr-genealogy/page-113-golden.html"
+    assert:
+      - type: python
+        value: file://../scorers/table_structure_scorer.py
+  - vars:
+      image: file://../input/onward-pages-b64/Image124.b64.txt
+      golden_file: "golden/ocr-genealogy/page-116-golden.html"
+    assert:
+      - type: python
+        value: file://../scorers/table_structure_scorer.py
+  - vars:
+      image: file://../input/onward-pages-b64/Image126.b64.txt
+      golden_file: "golden/ocr-genealogy/page-118-golden.html"
+    assert:
+      - type: python
+        value: file://../scorers/table_structure_scorer.py

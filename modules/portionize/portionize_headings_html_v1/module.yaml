@@ -1,0 +1,4 @@
+module_id: portionize_headings_html_v1
+stage: portionize
+entrypoint: modules/portionize/portionize_headings_html_v1/main.py
+description: "Portionize chapters by detecting top-level HTML headings (e.g., <h1>) and mapping to printed page numbers."

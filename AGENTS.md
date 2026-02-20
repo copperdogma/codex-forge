@@ -43,6 +43,8 @@ Before writing any significant code or starting implementation:
 
 **When adding new behaviors**, prefer shipping them as a separate module first, run a baseline, and only merge into an existing module after comparing baselines to prove no regressions.
 
+**Default stance (important):** When requirements are ambiguous or correctness hinges on interpretation, **pause, investigate, and reason first**. Surface 1–2 plausible interpretations/options and only ask if uncertainty remains after reasoning.
+
 ### AI-Assist Guideline (Fundamental)
 - Prefer code-first extraction for speed/cost, but **use targeted AI calls** when rules would balloon or edge cases are too varied.
 - Keep AI calls bounded and **focused on flagged sections**; avoid overfitting regexes to brittle cases.
@@ -51,6 +53,11 @@ Before writing any significant code or starting implementation:
 ## Module Development & Testing Workflow
 
 This is a **data pipeline** project. Success means correct data in `output/runs/`, not just code that runs without errors.
+
+**Cost discipline (OCR):**
+- Treat the initial OCR stage as **expensive and single-run** whenever possible.
+- Iterate downstream by reusing OCR artifacts (`load_artifact_v1`, `--start-from`, or run-local `config.yaml`), not by re-running OCR.
+- Only re-run OCR when the OCR itself is the suspected failure source and a controlled re-OCR is required.
 
 ### Development Phase: Standalone Testing (Encouraged)
 **Use standalone testing for rapid iteration during development:**
@@ -198,6 +205,36 @@ When a first-pass run leaves quality gaps, escalate in a controlled, data-driven
 5. **Verify artifacts**: Spot-check the repaired items and confirm warnings/errors are cleared or correctly justified (e.g., true deaths).
 Avoid manual text edits; use this loop to stay generic, reproducible, and book-agnostic (see “Generality & Non-Overfitting”).
 
+## Patching System (Last Resort)
+When a book strongly defies conventions and generic/escalation passes still fail, use the patching system to override specific outputs. This is a **last-resort** mechanism after attempts to generalize.
+
+**When to use patches:**
+- After generic modules + escalation loops still produce wrong structure/data.
+- When fixes would be overly specific and would harm reusability.
+- When the book has unique layout rules that can’t be reliably inferred.
+
+**Patch rules:**
+- Patches must be minimal and scoped to the smallest necessary correction.
+- Preserve original provenance; do not hand-edit artifacts outside the pipeline.
+- Prefer patching structured outputs (portion boundaries, chapter map, table rows) rather than raw OCR text.
+- Document the rationale, the patch file, and verification evidence in the story work log.
+
+**Workflow (recommended):**
+1. Run the pipeline to the best generic result.
+2. Inspect artifacts and identify specific incorrect items.
+3. Create/update a `*.patch.json` file (see `input/FF22 Robot Commando.patch.json` for structure).
+4. Apply the patch via the patching module/recipe step.
+5. Rebuild downstream artifacts and re-validate.
+6. Manually verify patched outputs and record the artifact paths + samples.
+
+**How patches are applied (meta-layer in driver):**
+- `driver.py` discovers a patch file next to the input (`{book_name}.patch.json`) and copies it into the run as `output/runs/<run_id>/patch.json`.
+- Patches are applied **outside** modules by the driver, keyed by `apply_before` / `apply_after` with a **module_id**.
+- `apply_before`: driver finds the input artifact that matches `target_file` and applies the patch before the module runs.
+- `apply_after`: driver applies the patch directly to the module’s output artifact (so downstream stages read patched data).
+- Patch failures do **not** fail the pipeline; they emit warnings in `pipeline_events.jsonl`.
+- Validation modules (currently `validate_ff_engine_v2`) can receive `--patch-file` so warnings may be suppressed.
+
 ### OCR structural guard (add before baseline split)
 Before portionization, automatically flag pages for high-fidelity re-OCR if either engine output shows fused/structurally bad text:
 - Headers present in the image but missing as standalone lines (e.g., multiple section numbers fused into one long line).
@@ -308,6 +345,112 @@ Before portionization, automatically flag pages for high-fidelity re-OCR if eith
 - Dry-run the canonical recipe: `python driver.py --recipe configs/recipes/recipe-ff-ai-ocr-gpt51.yaml --dry-run`
 - Section coverage check: `python modules/adapter/section_target_guard_v1/main.py --inputs output/runs/ocr-enrich-sections-noconsensus/portions_enriched.jsonl --out /tmp/portions_enriched_guard.jsonl --report /tmp/section_target_report.json`
 - Dashboard: `python -m http.server 8000` then open `http://localhost:8000/docs/pipeline-visibility.html`
+## Model Benchmarking (promptfoo)
+
+We use [promptfoo](https://www.promptfoo.dev/) for evaluating AI model/prompt quality on pipeline tasks. Benchmark workspace lives in `benchmarks/`.
+
+### Prerequisites
+- **Node.js 22+** (24 LTS recommended). Promptfoo requires Node 22+. Installed via nvm.
+- **promptfoo** installed globally: `npm install -g promptfoo` (v0.120.24+).
+- Shell sessions need nvm loaded: `source ~/.nvm/nvm.sh && nvm use 24`.
+- API keys: `OPENAI_API_KEY`, `ANTHROPIC_API_KEY`, and `GEMINI_API_KEY` must be set.
+
+### Workspace Structure
+```
+benchmarks/
+├── tasks/           # promptfoo YAML configs (one per eval task)
+├── prompts/         # Prompt templates with {{variable}} placeholders
+├── golden/          # Hand-crafted reference data for scoring
+├── input/           # Test input files (page images, etc.)
+├── scorers/         # Python scoring scripts
+├── results/         # JSON output from eval runs
+└── scripts/         # Analysis helpers
+```
+
+### Running Benchmarks
+```bash
+# From the benchmarks/ directory:
+source ~/.nvm/nvm.sh && nvm use 24 > /dev/null 2>&1
+
+# Run a benchmark (no cache for reproducibility)
+promptfoo eval -c tasks/image-crop-extraction.yaml --no-cache -j 3
+
+# Save results to file
+promptfoo eval -c tasks/image-crop-extraction.yaml --no-cache --output results/run-name.json
+
+# View results in web UI
+promptfoo view
+
+# Override the judge/grader model
+promptfoo eval -c tasks/image-crop-extraction.yaml --grader anthropic:messages:claude-opus-4-6
+```
+
+### Judge / Grader Model
+
+**Default**: promptfoo uses `gpt-5` (OpenAI) for `llm-rubric` assertions when `OPENAI_API_KEY` is set.
+
+**Our standard**: Use **`claude-opus-4-6`** as the judge for all evals. Rationale:
+- The judge must be at least as capable as the models being tested.
+- Cross-provider judging reduces same-provider bias.
+
+Override per-eval in the YAML config:
+```yaml
+defaultTest:
+  options:
+    provider: anthropic:messages:claude-opus-4-6
+```
+
+**Provider prefixes**: `openai:`, `anthropic:messages:`, `google:` (uses `GEMINI_API_KEY`).
+
+### Python Scorer Interface
+
+Promptfoo calls `get_assert(output, context)` from Python scorer files:
+
+```python
+def get_assert(output: str, context: dict) -> dict:
+    """
+    Args:
+        output: Raw model response text
+        context: Dict with 'vars' (test variables), 'prompt', etc.
+    Returns:
+        {"pass": bool, "score": float 0-1, "reason": str}
+    """
+```
+
+- Access test variables via `context["vars"]["variable_name"]`.
+- `file://` in vars loads file *content*, not paths — use plain strings for paths the scorer will resolve itself.
+
+### Dual Evaluation Pattern
+
+Every eval should use both:
+1. **Python scorer** — Deterministic, structural quality. Fast, reproducible, catches structural failures.
+2. **LLM rubric** — Semantic quality (coherence, insight depth). Catches qualitative issues the structural scorer misses.
+
+A test case passes only if *both* assertions pass.
+
+### Pitfalls and Gotchas
+
+- **`max_tokens` is NOT set by default for OpenAI models.** Always set `max_tokens` in provider config or outputs will truncate silently (producing invalid JSON).
+- **`---` in prompt files is a prompt separator.** Use `==========` or another delimiter instead.
+- **`file://` paths resolve relative to the config file**, not CWD.
+- **`file://` in test vars loads content, not path.** If a scorer needs a file *path*, use a plain string without `file://` prefix.
+- **Anthropic models wrap output in ```json blocks.** Scorers must strip markdown fences before JSON.parse.
+- **Exit code 100 = test failures**, not system errors. This is normal.
+- **`--dry-run` doesn't exist.** Use `--filter-first-n 1` to validate config with a single test case.
+- **Concurrency**: Use `-j 3` as default (avoids rate limits while keeping runs reasonable).
+- **Gemini extended thinking eats output tokens.** Set `maxOutputTokens: 16384` for all Gemini providers (4096 is insufficient — thinking tokens consume 3000+).
+- **Gemini model IDs have no dated preview suffixes.** Use `gemini-2.5-flash`, `gemini-2.5-pro`, `gemini-3-pro-preview` (no `-preview-06-17` etc.).
+
+### Adding a New Eval
+
+When a new AI-powered module needs tuning:
+1. Copy test input to `benchmarks/input/`
+2. Create golden reference in `benchmarks/golden/` (hand-crafted, expert-validated)
+3. Write prompt template in `benchmarks/prompts/` (use `{{var}}` placeholders)
+4. Write Python scorer in `benchmarks/scorers/` (implement `get_assert(output, context)`)
+5. Create promptfoo config in `benchmarks/tasks/` (providers x test cases x assertions)
+6. Run eval, analyze results, iterate on prompts, pick winning model
+
 ## Open Questions / WIP
 - Enrichment stage not implemented (Story 018).
 - Shared helpers now live under `modules/common` (utils, ocr); module mains should import from `modules.common.*` without mutating `sys.path`.
@@ -334,3 +477,32 @@ Before portionization, automatically flag pages for high-fidelity re-OCR if eith
     ```
 - **Schema stamping gotcha (critical):** `driver.py` *stamps* artifacts using `schemas.py`. Any output fields not declared in the schema **will be dropped** when stamping rewrites the JSONL. If you add new fields in a module output, **you must add them to the corresponding schema** (e.g., `PageHtml`) or they will disappear. Always verify the stamped artifact (`output/runs/<run_id>/.../*.jsonl`) contains the new fields after the stage completes.
 - **Validation report HTML generation:** `validation_report.html` is produced by `tools/generate_forensic_html.py` when `validate_ff_engine_v2` runs with `forensics: true`. The JSON report (`validation_report.json`) lives in the run root and is the source of the HTML.
+
+## Agent Memory: AI Self-Improvement Log
+
+Treat this section as a living memory. When you discover a mistake, pitfall, or effective pattern during work, record it here so future sessions avoid repeating errors. Entry format: `YYYY-MM-DD — short title`: summary plus explanation including file paths.
+
+### Effective Patterns
+- 2026-01-17 — Story-first implementation with focused smoke checks: Implement in dependency order and validate each milestone with a targeted subset run before expanding.
+- 2026-01-17 — Reuse existing modules first: Before building new logic, check if an existing module (even from a different recipe) can be reused or adapted. Mimicking battle-tested patterns avoids new bugs.
+- 2026-01-24 — Dual evaluation catches what code can't: Python scorers measure structural quality (IoU, field coverage) but miss semantic issues. LLM rubric judges catch qualitative problems. Always use both in promptfoo evals.
+- 2026-01-24 — Cross-provider judging reduces bias: Use Claude Opus 4.6 as default judge when evaluating models from OpenAI/Google.
+
+### Known Pitfalls
+- 2026-01-17 — Schema stamping drops undeclared fields: `driver.py` stamps artifacts using `schemas.py`. New fields not in the schema are silently dropped. Always add new output fields to the corresponding schema.
+- 2026-01-17 — Stale .pyc files cause silent failures: Always `find modules/<module> -name "*.pyc" -delete` before integration testing a modified module.
+- 2026-01-24 — VLM image box detection includes nearby text: VLM bounding boxes for photos often absorb captions, headers, and body text. Heuristic trimming is unreliable; systematic eval with golden data is needed.
+- 2026-02-16 — promptfoo `max_tokens` trap: OpenAI providers silently truncate long outputs without `max_tokens` set, producing invalid JSON.
+- 2026-02-16 — promptfoo `---` in prompts is a separator: Three dashes split one prompt into two fragments. Use `==========` instead.
+- 2026-02-16 — Gemini extended thinking eats output tokens: Set `maxOutputTokens: 16384` for Gemini providers (4096 is insufficient).
+- 2026-02-16 — Gemini model IDs: No dated preview suffixes. Use `gemini-2.5-flash`, `gemini-2.5-pro`, `gemini-3-pro-preview`.
+- 2026-02-16 — promptfoo `raw` prompts bypass format translation: When using `raw:` prompt key, content is sent verbatim to every provider. Anthropic expects `type: "image"` (not `image_url`), Google expects `inlineData` (not `image_url`). Use JS prompt functions with `id: "file://..."` that detect `provider.id` and adapt the image content block format per provider.
+- 2026-02-16 — GEMINI_API_KEY in wrong shell: If key is in `.zshrc` but promptfoo runs in bash, it won't be found. Export the key before running or add to `.bashrc`.
+- 2026-02-16 — `file://` corrupts binary image data: promptfoo's `file://` loader corrupts binary JPEG when interpolated into prompt templates. Pre-encode images as base64 data URI text files (`data:image/jpeg;base64,...`) stored as `.b64.txt`.
+
+### Lessons Learned
+- 2026-01-17 — Cost discipline on OCR: Treat OCR as expensive and single-run. Iterate downstream by reusing OCR artifacts, not re-running OCR.
+- 2026-01-24 — Systematic eval beats ad-hoc iteration: After ~10 rounds of heuristic tuning on image cropping without converging, switching to a promptfoo-based eval with golden data was the right move.
+- 2026-01-17 — Escalate-to-success loops need caps: Every escalation loop must have a max retry/budget cap to prevent infinite loops.
+- 2026-02-16 — Provider-specific image format handling: OpenAI uses `{type: "image_url", image_url: {url: "data:..."}}`, Anthropic uses `{type: "image", source: {type: "base64", media_type: "...", data: "..."}}`, Google uses `{inlineData: {mimeType: "...", data: "..."}}`. For multi-provider evals, use a shared JS helper that adapts format based on `provider.id`.
+- 2026-02-16 — Simpler prompts win for stronger models: Gemini 3 Pro scored best with the simplest (baseline) prompt. Overly prescriptive prompts (strict-exclude) can hurt strong models while helping weaker ones. Always test prompt complexity as a variable.

@@ -94,12 +94,24 @@ def _make_transparent(img: Image.Image, threshold: int = 230) -> Image.Image:
     return Image.fromarray(rgba_array.astype('uint8'), 'RGBA')
 
 
+def _normalize_output_format(output_format: Optional[str]) -> tuple[str, str]:
+    fmt = (output_format or "png").strip().lower().lstrip(".")
+    if fmt == "jpg":
+        fmt = "jpeg"
+    if fmt not in {"png", "jpeg"}:
+        raise ValueError(f"Unsupported output_format: {output_format}")
+    ext = "png" if fmt == "png" else "jpg"
+    return fmt, ext
+
+
 def crop_illustrations(
     ocr_manifest: str,
     output_dir: str,
     run_id: Optional[str] = None,
     transparency: bool = False,
-    threshold: int = 230
+    threshold: int = 230,
+    output_format: Optional[str] = None,
+    jpeg_quality: int = 92
 ) -> List[Dict[str, Any]]:
     """Crop illustrations from OCR bounding boxes.
 
@@ -109,6 +121,8 @@ def crop_illustrations(
         run_id: Optional run identifier
         transparency: Generate alpha versions for B&W images
         threshold: White threshold for transparency
+        output_format: Output image format (png or jpeg)
+        jpeg_quality: JPEG quality when output_format=jpeg
 
     Returns:
         List of manifest records for cropped illustrations
@@ -119,6 +133,11 @@ def crop_illustrations(
 
     pages = list(read_jsonl(ocr_manifest))
     manifest = []
+
+    fmt, ext = _normalize_output_format(output_format)
+    if transparency and fmt == "jpeg":
+        _log("  WARNING: transparency requested with JPEG output; disabling transparency.")
+        transparency = False
 
     _log(f"Processing {len(pages)} OCR pages...")
 
@@ -160,11 +179,16 @@ def crop_illustrations(
             cropped = page_img.crop((x, y, x1, y1))
 
             # Generate filename
-            filename = f"page-{page_num:03d}-{illus_idx:03d}.png"
+            filename = f"page-{page_num:03d}-{illus_idx:03d}.{ext}"
             filepath = os.path.join(images_dir, filename)
 
             # Save original
-            cropped.save(filepath, "PNG")
+            if fmt == "jpeg":
+                if cropped.mode not in ("RGB", "L"):
+                    cropped = cropped.convert("RGB")
+                cropped.save(filepath, "JPEG", quality=jpeg_quality, optimize=True)
+            else:
+                cropped.save(filepath, "PNG")
 
             # Generate alpha version if B&W and transparency enabled
             filename_alpha = None
@@ -236,6 +260,18 @@ def main():
         default=230,
         help="White threshold for transparency (default 230)"
     )
+    parser.add_argument(
+        "--output-format",
+        default="png",
+        choices=["png", "jpeg", "jpg"],
+        help="Output image format: png (default) or jpeg"
+    )
+    parser.add_argument(
+        "--jpeg-quality",
+        type=int,
+        default=92,
+        help="JPEG quality when output-format=jpeg (default 92)"
+    )
 
     args = parser.parse_args()
 
@@ -245,7 +281,9 @@ def main():
         output_dir=args.output_dir,
         run_id=args.run_id,
         transparency=args.transparency,
-        threshold=args.threshold
+        threshold=args.threshold,
+        output_format=args.output_format,
+        jpeg_quality=args.jpeg_quality
     )
 
     # Save manifest

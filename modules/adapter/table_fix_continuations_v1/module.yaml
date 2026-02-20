@@ -1,0 +1,4 @@
+module_id: table_fix_continuations_v1
+stage: adapter
+entrypoint: modules/adapter/table_fix_continuations_v1/main.py
+description: "Generic table postprocess to fix continuation rows (e.g., multi-line spouse names) and align trailing columns."

@@ -1113,8 +1113,13 @@ def build_command(entrypoint: str, params: Dict[str, Any], stage_conf: Dict[str,
 
     # Progress/state plumbing (skip for adapter modules that don't accept these flags)
     # Also skip for modules that don't support these flags
+    adapter_with_progress = {
+        "table_rescue_onward_tables_v1",
+        "table_rescue_html_loop_v1",
+        "table_rescue_html_v1",
+    }
     skip_state_progress = (
-        stage_conf["stage"] == "adapter" or
+        (stage_conf["stage"] == "adapter" and stage_conf.get("module") not in adapter_with_progress) or
         stage_conf.get("module") == "crop_illustrations_guided_v1" or
         stage_conf.get("module") == "associate_illustrations_to_sections_v1"
     )

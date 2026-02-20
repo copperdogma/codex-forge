@@ -250,6 +250,21 @@ parameters:
     default: 0.05
     description: Minimum area ratio vs original crop to accept VLM refine
 
+  - name: rescue_validate_crops
+    type: boolean
+    default: false
+    description: Validate each crop with VLM quality gate (reject bad crops)
+
+  - name: rescue_validate_model
+    type: string
+    default: null
+    description: Vision model for crop validation (defaults to rescue_model)
+
+  - name: rescue_validate_max_tokens
+    type: integer
+    default: 300
+    description: Max tokens for VLM validate pass
+
   - name: refine_with_nonwhite
     type: boolean
     default: false
@@ -460,6 +475,16 @@ parameters:
     default: 0.15
     description: Max gap ratio to allow caption trim even if separated
 
+  - name: cover_pages
+    type: string
+    default: ""
+    description: Comma-separated page numbers to capture as full-page images (e.g. '1' or '1,127')
+
+  - name: only_pages
+    type: string
+    default: ""
+    description: Comma-separated page numbers to process (skip all others). Merges results into existing manifest.
+
 command: |
   python modules/extract/crop_illustrations_guided_v1/main.py \
     --ocr-manifest {ocr_manifest} \
@@ -508,6 +533,9 @@ command: |
     {rescue_refine_boxes:+--rescue-refine-boxes} \
     --rescue-refine-max-tokens={rescue_refine_max_tokens} \
     --rescue-refine-min-area-ratio={rescue_refine_min_area_ratio} \
+    {rescue_validate_crops:+--rescue-validate-crops} \
+    {rescue_validate_model:+--rescue-validate-model {rescue_validate_model}} \
+    --rescue-validate-max-tokens={rescue_validate_max_tokens} \
     {refine_with_nonwhite:+--refine-with-nonwhite} \
     --refine-close-kernel={refine_close_kernel} \
     --refine-close-iterations={refine_close_iterations} \
@@ -548,4 +576,6 @@ command: |
     --caption-margin-px={caption_margin_px} \
     --caption-max-nonwhite-ratio={caption_max_nonwhite_ratio} \
     --caption-trim-passes={caption_trim_passes} \
-    --caption-relax-max-gap-ratio={caption_relax_max_gap_ratio}
+    --caption-relax-max-gap-ratio={caption_relax_max_gap_ratio} \
+    {cover_pages:+--cover-pages {cover_pages}} \
+    {only_pages:+--only-pages {only_pages}}
