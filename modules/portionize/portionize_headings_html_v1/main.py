@@ -163,7 +163,7 @@ def main() -> None:
         portion.pop("title_norm", None)
 
     save_jsonl(args.out, portions)
-    logger = ProgressLogger("portionize_headings_html_v1")
+    logger = ProgressLogger(state_path=args.state_file, progress_path=args.progress_file, run_id=args.run_id)
     logger.log("portionize", "done", current=len(portions), total=len(portions),
                message=f"Wrote {len(portions)} portions to {args.out}")
 

@@ -125,7 +125,7 @@ def main() -> None:
     parser.add_argument("--progress-file", dest="progress_file", default=None, help="Ignored (driver compatibility)")
     args = parser.parse_args()
 
-    logger = ProgressLogger("extract_page_numbers_html_v1")
+    logger = ProgressLogger(state_path=args.state_file, progress_path=args.progress_file, run_id=args.run_id)
     logger.log("extract_page_numbers", "running", message=f"Loading {args.pages}")
 
     rows = []

@@ -91,9 +91,9 @@ def main() -> None:
                         help="Optional illustration_manifest.jsonl to attach img src tags")
     parser.add_argument("--images-subdir", dest="images_subdir", default="images",
                         help="Subdir under output/html for cropped images (default: images)")
-    parser.add_argument("--run-id", dest="run_id", default=None, help="Ignored (driver compatibility)")
-    parser.add_argument("--state-file", dest="state_file", default=None, help="Ignored (driver compatibility)")
-    parser.add_argument("--progress-file", dest="progress_file", default=None, help="Ignored (driver compatibility)")
+    parser.add_argument("--run-id", dest="run_id", default=None, help="Run ID for progress logging")
+    parser.add_argument("--state-file", dest="state_file", default=None, help="Pipeline state JSON path")
+    parser.add_argument("--progress-file", dest="progress_file", default=None, help="Pipeline progress JSONL path")
     args = parser.parse_args()
 
     pages = list(read_jsonl(args.pages))
@@ -260,7 +260,7 @@ def main() -> None:
         f.write("</ul>\n")
 
     save_jsonl(args.out, manifest_rows)
-    logger = ProgressLogger("build_chapter_html_v1")
+    logger = ProgressLogger(state_path=args.state_file, progress_path=args.progress_file, run_id=args.run_id)
     logger.log("build", "done", current=len(manifest_rows), total=len(manifest_rows),
                message=f"Wrote {len(manifest_rows)} chapters to {html_dir}")
 

@@ -100,7 +100,7 @@ def main() -> None:
     if not input_dir.is_dir():
         raise SystemExit(f"Input path is not a directory: {input_dir}")
 
-    logger = ProgressLogger("images_dir_to_manifest_v1")
+    logger = ProgressLogger(state_path=args.state_file, progress_path=args.progress_file, run_id=args.run_id)
     logger.log("build_manifest", "running", message=f"Reading images from {input_dir}")
     out_path = build_manifest(
         input_dir=input_dir,
