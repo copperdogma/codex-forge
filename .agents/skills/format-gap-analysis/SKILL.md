@@ -44,6 +44,9 @@ For each format (or the single `--format` target):
    - Is there an existing module that could handle this format with minor changes?
    - What's the estimated effort to build a pipeline?
 
+4. **Graduation check** — For passing formats, check if ALL graduation criteria are met
+   (see `docs/format-registry.md` § Graduation Criteria). Flag candidates.
+
 For each gap found, identify:
 - **Root cause**: Why is the score low or the pipeline missing?
 - **Fix category**: One of:
@@ -98,6 +101,9 @@ Present findings in this structure:
 - **Proposed story:** `/create-story "Title" --priority P`
 
 ### 2. ...
+
+## Graduation Candidates
+- [Formats meeting all graduation criteria from docs/format-registry.md]
 
 ## Regressions
 - [Any scores that dropped since last measurement]
