@@ -84,7 +84,9 @@ Canonical location: `.agents/skills/` — works across Claude Code, Cursor, Gemi
 - `docs/stories.md` — Story index (130+ stories)
 - `docs/stories/` — Individual story files with ACs, tasks, work logs
 - `docs/scout.md` — Scout expedition index
-- `CHANGELOG.md` — Release history (CalVer format)
+- `docs/ai-learning-log.md` — AI self-improvement log (patterns, pitfalls, lessons)
+- `docs/runbooks/` — Operational runbooks for repeatable workflows
+- `CHANGELOG.md` — Release history (CalVer `YYYY-MM-DD-NN` format)
 
 ## Generality & Non-Overfitting (Read First)
 - Optimize for an input *category* (e.g., Fighting Fantasy scans), not a single PDF/run.
@@ -96,30 +98,6 @@ Canonical location: `.agents/skills/` — works across Claude Code, Cursor, Gemi
 - Prefer *signals and loops* over brittle fixes: detect → validate → targeted escalate → validate.
 - If adding deterministic corrections, they must be generic (class-based, conservative), opt-in by default, and preserve original text/provenance.
 - Validate across multiple pages/runs; add regression checks on *patterns* (coverage, bad-token occurrence, empty text rate), not exact strings.
-
-## Critical AI Mindset: Think First, Verify Always
-
-### Before Building: Question the Approach
-**DO NOT blindly implement what was asked without critical evaluation.**
-
-Before writing any significant code or starting implementation:
-1. **Pause and analyze**: Is this the right approach? Is there a better way?
-2. **Consider alternatives**: Could this be simpler? More robust? More maintainable?
-3. **Spot obvious issues**: Does the request seem problematic, incomplete, or suboptimal?
-4. **Speak up**: If you see a better solution or potential issue, **STOP and discuss with the user first**
-   - Example: "Before implementing X, I notice Y approach would be significantly better because Z. Should we discuss?"
-   - Example: "This request asks for A, but I see it may not address the root cause B. Can we verify the goal?"
-
-**You are not a code monkey**. You are a technical partner. Think critically, challenge assumptions, propose improvements.
-
-**When adding new behaviors**, prefer shipping them as a separate module first, run a baseline, and only merge into an existing module after comparing baselines to prove no regressions.
-
-**Default stance (important):** When requirements are ambiguous or correctness hinges on interpretation, **pause, investigate, and reason first**. Surface 1–2 plausible interpretations/options and only ask if uncertainty remains after reasoning.
-
-### AI-Assist Guideline (Fundamental)
-- Prefer code-first extraction for speed/cost, but **use targeted AI calls** when rules would balloon or edge cases are too varied.
-- Keep AI calls bounded and **focused on flagged sections**; avoid overfitting regexes to brittle cases.
-- Any AI-assisted outputs must still be validated (tests + pipeline run) and logged in the work log.
 
 ## Module Development & Testing Workflow
 
@@ -225,48 +203,6 @@ For every missing/no-text/no-choice warning, emit a per-item provenance trace wa
 - Surface evidence automatically: emit per-item presence/reason flags and small debug bundles for failures.
 - **Escalation caps are mandatory:** Every escalation loop must have a maximum iteration/retry/budget cap to prevent infinite loops. Examples: `max_retries`, `budget_pages`, `max_repairs`, `max_candidates`. If a stage hits its cap without reaching 100% accuracy, it must fail explicitly (not silently pass partial results).
 
-### Choice Extraction & Validation (Critical for Game Engine)
-
-**Code-first extraction approach:**
-- **Primary signal:** Pattern matching for "turn to X", "go to Y" references in text
-- **AI role:** Validation only, not primary extraction (saves costs, more reliable)
-- **Module:** `extract_choices_v1` - dedicated, single-purpose choice extractor
-
-### Scanning for Section Features
-
-When implementing modules that scan sections for specific features (combat, inventory, stat changes, etc.), strictly follow the **try-validate-escalate** pattern:
-
-1.  **Try (Code-first)**: Use deterministic patterns (regex, keyword matching) to identify and extract features. This is fast and free.
-2.  **Validate**: Apply custom validation rules specific to the feature (e.g., "SKILL must be between 1-15", "Item gain must include an item name").
-3.  **Escalate (AI)**: If validation fails or the code-first pass detects ambiguity (e.g., "SKILL mentioned but no block found"), escalate to a targeted AI call with a stronger model.
-
-Always think about **HOW** to validate the data for the specific feature you are extracting. Each feature likely needs its own set of integrity checks.
-
-**Two-layer validation:**
-
-1. **Per-section validation:** Text patterns vs. extracted choices
-   - Scan text for all "turn to X" references
-   - Compare with extracted choices
-   - Flag discrepancies (text mentions choice not extracted)
-   - **Limitation:** Can't detect missing choices not mentioned in text patterns
-
-2. **Graph validation (Orphan Detection):**
-   - Every section (except section 1) must be referenced by at least one choice
-   - Build graph: sections → incoming choice references
-   - Find orphans: sections with zero incoming references
-   - **Signal:** Orphans prove we're missing pointers somewhere (even if we don't know where)
-   - **Limitation:** Tells us THAT we have errors, not WHERE the missing choices are
-
-**Escalation:** If validation fails, flagged sections must be re-extracted with choice-focused prompts and stronger models. Maximum retry cap required (e.g., `max_choice_repairs: 50`).
-
-### Prompt Design: Trust AI Intelligence, Don't Over-Engineer
-
-- Write prompts at the document/recipe level (keep them generic; see "Generality & Non-Overfitting").
-- Prefer simple, structural instructions over brittle heuristics:
-  - ✅ "This is a Fighting Fantasy gamebook with front matter, rules, then numbered sections 1–400. Find section headers."
-  - ❌ Complex regex/keyword rule stacks and confidence micro-tuning.
-- Use code for deterministic transforms; use AI for semantic structure (classification, boundary detection, context).
-
 ## Escalation Strategy (known-good pattern)
 When a first-pass run leaves quality gaps, escalate in a controlled, data-driven loop:
 1. **Baseline**: Run the fastest/cheapest model with conservative prompts.
@@ -312,14 +248,14 @@ Before portionization, automatically flag pages for high-fidelity re-OCR if eith
 - Extreme per-page text divergence between engines (token Jaccard low or one engine has a mega-line while the other does not), based on flattened page text, not headers.
 - On flagged pages, re-OCR with a stronger, layout-aware vision model (page ±1 if needed), then continue the pipeline with the improved page text.
 
-## Repo Map (high level)
-- Modules live under `modules/<stage>/<module_id>/` with `module.yaml` + `main.py` (no registry file).
-- Driver: `driver.py` (executes recipes, stamps/validates artifacts).
-- Schemas: `schemas.py`; validator: `validate_artifact.py`.
-- Settings samples: `settings.example.yaml`, `settings.smoke.yaml`
-- FF smoke (20pp run-only check): `configs/settings.ff-ai-ocr-gpt51-smoke-20.yaml` with canonical recipe; use `--settings` instead of a separate recipe.
-- Docs: `README.md`, `snapshot.md`, `docs/stories/` (story tracker in `docs/stories.md`)
-- Inputs: `input/` (PDF, images, text); Outputs: `output/` (git-ignored)
+## Repo Map
+- `modules/<stage>/<module_id>/` — `module.yaml` + `main.py` (no registry file)
+- `driver.py` — pipeline orchestrator; `schemas.py` — data schemas; `validate_artifact.py` — schema validator
+- `configs/recipes/` — YAML recipes; `configs/settings.*.yaml` — run settings
+- `benchmarks/` — promptfoo evals (tasks, golden, scorers, prompts)
+- `tests/` — pytest suite (79 files)
+- `scripts/` — utility scripts
+- `input/` — source PDFs/images (git-ignored); `output/` — pipeline artifacts (git-ignored)
 
 ## Current Pipeline (modules + driver)
 - Use `driver.py` with recipes in `configs/recipes/`.
@@ -468,11 +404,6 @@ When a new AI-powered module needs tuning:
 5. Create promptfoo config in `benchmarks/tasks/` (providers x test cases x assertions)
 6. Run eval, analyze results, iterate on prompts, pick winning model
 
-## Open Questions / WIP
-- Enrichment stage not implemented (Story 018).
-- Shared helpers now live under `modules/common` (utils, ocr); module mains should import from `modules.common.*` without mutating `sys.path`.
-- DAG/schema/adapter improvements tracked in Story 016/017.
-
 ## Etiquette
 - Update the relevant story work log for any change or investigation.
 - Keep responses concise; cite file paths when referencing changes.
@@ -495,31 +426,6 @@ When a new AI-powered module needs tuning:
 - **Schema stamping gotcha (critical):** `driver.py` *stamps* artifacts using `schemas.py`. Any output fields not declared in the schema **will be dropped** when stamping rewrites the JSONL. If you add new fields in a module output, **you must add them to the corresponding schema** (e.g., `PageHtml`) or they will disappear. Always verify the stamped artifact (`output/runs/<run_id>/.../*.jsonl`) contains the new fields after the stage completes.
 - **Validation report HTML generation:** `validation_report.html` is produced by `tools/generate_forensic_html.py` when `validate_ff_engine_v2` runs with `forensics: true`. The JSON report (`validation_report.json`) lives in the run root and is the source of the HTML.
 
-## Agent Memory: AI Self-Improvement Log
+## AI Learning Log
 
-Treat this section as a living memory. When you discover a mistake, pitfall, or effective pattern during work, record it here so future sessions avoid repeating errors. Entry format: `YYYY-MM-DD — short title`: summary plus explanation including file paths.
-
-### Effective Patterns
-- 2026-01-17 — Story-first implementation with focused smoke checks: Implement in dependency order and validate each milestone with a targeted subset run before expanding.
-- 2026-01-17 — Reuse existing modules first: Before building new logic, check if an existing module (even from a different recipe) can be reused or adapted. Mimicking battle-tested patterns avoids new bugs.
-- 2026-01-24 — Dual evaluation catches what code can't: Python scorers measure structural quality (IoU, field coverage) but miss semantic issues. LLM rubric judges catch qualitative problems. Always use both in promptfoo evals.
-- 2026-01-24 — Cross-provider judging reduces bias: Use Claude Opus 4.6 as default judge when evaluating models from OpenAI/Google.
-
-### Known Pitfalls
-- 2026-01-17 — Schema stamping drops undeclared fields: `driver.py` stamps artifacts using `schemas.py`. New fields not in the schema are silently dropped. Always add new output fields to the corresponding schema.
-- 2026-01-17 — Stale .pyc files cause silent failures: Always `find modules/<module> -name "*.pyc" -delete` before integration testing a modified module.
-- 2026-01-24 — VLM image box detection includes nearby text: VLM bounding boxes for photos often absorb captions, headers, and body text. Heuristic trimming is unreliable; systematic eval with golden data is needed.
-- 2026-02-16 — promptfoo `max_tokens` trap: OpenAI providers silently truncate long outputs without `max_tokens` set, producing invalid JSON.
-- 2026-02-16 — promptfoo `---` in prompts is a separator: Three dashes split one prompt into two fragments. Use `==========` instead.
-- 2026-02-16 — Gemini extended thinking eats output tokens: Set `maxOutputTokens: 16384` for Gemini providers (4096 is insufficient).
-- 2026-02-16 — Gemini model IDs: No dated preview suffixes. Use `gemini-2.5-flash`, `gemini-2.5-pro`, `gemini-3-pro-preview`.
-- 2026-02-16 — promptfoo `raw` prompts bypass format translation: When using `raw:` prompt key, content is sent verbatim to every provider. Anthropic expects `type: "image"` (not `image_url`), Google expects `inlineData` (not `image_url`). Use JS prompt functions with `id: "file://..."` that detect `provider.id` and adapt the image content block format per provider.
-- 2026-02-16 — GEMINI_API_KEY in wrong shell: If key is in `.zshrc` but promptfoo runs in bash, it won't be found. Export the key before running or add to `.bashrc`.
-- 2026-02-16 — `file://` corrupts binary image data: promptfoo's `file://` loader corrupts binary JPEG when interpolated into prompt templates. Pre-encode images as base64 data URI text files (`data:image/jpeg;base64,...`) stored as `.b64.txt`.
-
-### Lessons Learned
-- 2026-01-17 — Cost discipline on OCR: Treat OCR as expensive and single-run. Iterate downstream by reusing OCR artifacts, not re-running OCR.
-- 2026-01-24 — Systematic eval beats ad-hoc iteration: After ~10 rounds of heuristic tuning on image cropping without converging, switching to a promptfoo-based eval with golden data was the right move.
-- 2026-01-17 — Escalate-to-success loops need caps: Every escalation loop must have a max retry/budget cap to prevent infinite loops.
-- 2026-02-16 — Provider-specific image format handling: OpenAI uses `{type: "image_url", image_url: {url: "data:..."}}`, Anthropic uses `{type: "image", source: {type: "base64", media_type: "...", data: "..."}}`, Google uses `{inlineData: {mimeType: "...", data: "..."}}`. For multi-provider evals, use a shared JS helper that adapts format based on `provider.id`.
-- 2026-02-16 — Simpler prompts win for stronger models: Gemini 3 Pro scored best with the simplest (baseline) prompt. Overly prescriptive prompts (strict-exclude) can hurt strong models while helping weaker ones. Always test prompt complexity as a variable.
+See [`docs/ai-learning-log.md`](docs/ai-learning-log.md) — living memory of effective patterns, known pitfalls, and lessons learned across sessions. Update it when you discover something worth remembering.

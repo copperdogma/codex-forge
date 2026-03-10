@@ -1,1 +1,0 @@
-/Users/cam/Documents/Projects/codex-forge/.cursor/commands/fix-difficult-issue.md

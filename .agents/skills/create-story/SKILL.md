@@ -42,8 +42,9 @@ Create a new story in `docs/stories/` with consistent format.
    - Does it only optimize a compromise without closing a gap? → flag as low-value, confirm with user
    - If introducing a new AI compromise: note whether a detection eval exists
 
-4. **Update story index** — Add a row to the table in `docs/stories.md`:
-   `| NNN | Title | Priority | Draft | [link](stories/story-NNN-slug.md) |`
+4. **Update story index** — Add a row to the end of the table in `docs/stories.md`:
+   `| NNN | Title | Priority | Draft | /docs/stories/story-NNN-slug.md |`
+   Match the existing table format (check surrounding rows for pipe alignment).
 
 5. **Verify** — Confirm file exists, numbering is consistent, stories.md row is correct.
 

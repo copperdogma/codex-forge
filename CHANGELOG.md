@@ -1,3 +1,15 @@
+## [2026-03-10-02] - Infrastructure cleanup and AGENTS.md tightening
+
+### Changed
+- AGENTS.md trimmed from 525 to 431 lines: removed redundant sections, tightened repo map
+- AI Self-Improvement Log extracted to `docs/ai-learning-log.md`
+- CHANGELOG.md normalized to CalVer `YYYY-MM-DD-NN` format across all 47 entries
+- `/build-story` now sets status to In Progress in `docs/stories.md` when starting work
+- `/create-story` updated to match actual `docs/stories.md` table format
+
+### Removed
+- Stale `.claude/commands/` directory (8 files) — replaced by `.agents/skills/`
+
 ## [2026-03-10-01] - Cross-project infrastructure modernization (Scout 001-003)
 
 ### Added
@@ -17,7 +29,7 @@
 - `AGENTS.md` restructured with Ideal-First methodology, Central Tenets, and skill ecosystem
 - `Makefile` expanded with test, lint, format, skills-sync, skills-check, check-size targets
 
-## [2025-12-31] - Canonical sequence pipeline + Node validator alignment
+## [2025-12-31-02] - Canonical sequence pipeline + Node validator alignment
 
 ### Added
 - `sequence_order_v1` for deterministic sequence ordering.
@@ -25,7 +37,7 @@
 - Resume-build recipe and load adapter for reusing enriched portions.
 - Tests covering sequence normalization, choice effects, inventory/stat/combat extraction, and stat-change dice patterns.
 
-## [2026-01-02] - Combat vNext outcomes, schema updates, and special-case docs
+## [2026-01-02-02] - Combat vNext outcomes, schema updates, and special-case docs
 
 ### Added
 - Combat vNext schema support (rules/modifiers/triggers/modes) with new triggers and terminal continuation outcomes.
@@ -59,7 +71,7 @@
 - `PYTHONPATH=. python modules/validate/validate_ff_engine_node_v1/main.py --input output/runs/ff-ai-ocr-gpt51-pristine-fast-full/gamebook.json --out output/runs/ff-ai-ocr-gpt51-pristine-fast-full/gamebook_validation_node.json`
 - `PYTHONPATH=. python modules/validate/validate_gamebook_smoke_v1/main.py --gamebook output/runs/ff-ai-ocr-gpt51-pristine-fast-full/gamebook.json --out output/runs/ff-ai-ocr-gpt51-pristine-fast-full/validation_report_smoke.json`
 
-## [2025-12-30] - Unified navigation schema and validators
+## [2025-12-30-01] - Unified navigation schema and validators
 
 ### Added
 - Canonical `navigation` edges with typed kinds/outcomes in the gamebook schema.
@@ -72,7 +84,7 @@
 ### Tested
 - `PYTHONPATH=. python modules/validate/validate_ff_engine_v2/main.py --gamebook output/runs/ff-ai-ocr-gpt51-pristine-fast-full/gamebook.json --out output/runs/ff-ai-ocr-gpt51-pristine-fast-full/validation_report.navigation.json --expected-range-start 1 --expected-range-end 400`
 
-## [2025-12-25] - Scope ARM64/MPS to legacy EasyOCR and split deps
+## [2025-12-25-02] - Scope ARM64/MPS to legacy EasyOCR and split deps
 
 ### Added
 - `requirements-legacy-easyocr.txt` for legacy EasyOCR/torch installs.
@@ -87,7 +99,7 @@
 ### Tested
 - `python driver.py --recipe configs/recipes/recipe-ff-ai-ocr-gpt51.yaml --settings configs/settings.ff-ai-ocr-gpt51-smoke-20.yaml --run-id ff-ai-ocr-gpt51-smoke-20 --output-dir /tmp/cf-ff-ai-ocr-gpt51-smoke-20 --force`
 
-## [2025-12-25] - Retired legacy OCR recipes and clarified smoke guidance
+## [2025-12-25-01] - Retired legacy OCR recipes and clarified smoke guidance
 
 ### Added
 - Archived legacy OCR recipes under `configs/recipes/legacy/` with deprecation headers.
@@ -104,7 +116,7 @@
 ### Tested
 - `python driver.py --recipe configs/recipes/recipe-ff-ai-ocr-gpt51.yaml --settings configs/settings.ff-ai-ocr-gpt51-smoke-20.yaml --run-id ff-ai-ocr-gpt51-smoke-20 --output-dir /tmp/cf-ff-ai-ocr-gpt51-smoke-20 --force`
 
-## [2025-12-23] - Large-image OCR cost tuning + pristine parity scaffolding
+## [2025-12-23-01] - Large-image OCR cost tuning + pristine parity scaffolding
 
 ### Added
 - Line-height driven PDF render stage (`extract_pdf_images_capped_v1`) and manifest-based split stage (`split_pages_from_manifest_v1`).
@@ -122,7 +134,7 @@
 ### Tested
 - Deep smoke run through `html_repair_loop` on a single page.
 
-## [2025-12-18] - Boundary ordering guard + targeted escalation
+## [2025-12-18-03] - Boundary ordering guard + targeted escalation
 
 ### Added
 - Ordering/span guard and sidecar report for code-first boundary detection (`detect_boundaries_code_first_v1`).
@@ -141,7 +153,7 @@
 ### Tested
 - `pytest -q tests/test_boundary_ordering_guard.py`
 
-## [2025-12-22] - HTML-first pipeline hardening and OCR bench artifacts
+## [2025-12-22-02] - HTML-first pipeline hardening and OCR bench artifacts
 
 ### Added
 - GPT-5.1 HTML-first pipeline enhancements: background section support and HTML-only sections in final gamebook.
@@ -153,7 +165,7 @@
 - Build/export modules support dropping text and provenance text (HTML is source of truth).
 - Choice repair and extraction now derive text from HTML where appropriate.
 
-## [2025-12-22] - Table rescue OCR pipeline stage
+## [2025-12-22-01] - Table rescue OCR pipeline stage
 
 ### Added
 - `table_rescue_html_v1` module to detect collapsed tables and re-read targeted crops with GPT-5.1.
@@ -164,7 +176,7 @@
 - GPT-5.1 recipe now runs `table_rescue_html_v1` before HTML block extraction and boundary detection.
 - Story 085 marked Done with detailed validation logs.
 
-## [2025-12-12] - GPU “pit of success” for EasyOCR on Apple Silicon
+## [2025-12-12-01] - GPU “pit of success” for EasyOCR on Apple Silicon
 
 ### Added
 - DocLayNet-style content tagging stage (`elements_content_type_v1`) and canonical FF recipe wiring to produce/use `elements_core_typed.jsonl` (Story 062).
@@ -201,7 +213,7 @@
 - `PYTHONPATH=. pytest -q modules/common/tests/test_progress_logger_warning.py`
 - `python -m pytest -q` (96 passed, 3 skipped).
 
-## [2025-12-10] - FF20 regression suite and quality guards
+## [2025-12-10-01] - FF20 regression suite and quality guards
 
 ### Added
 - 20-page Fighting Fantasy regression test suite (`tests/test_ff_20_page_regression.py`) with goldens in `testdata/ff-20-pages/`, covering counts, schemas, per-page hashes, fragmentation, column layouts, forbidden OCR tokens, choice counts, and long-line guards.
@@ -216,7 +228,7 @@
 - `python -m unittest discover -s tests -p '*test.py' -v`
 - `scripts/tests/run_ff20_regression_fast.sh`
 
-## [2025-12-18] - Story 074: 100% section-id coverage + monitored runs
+## [2025-12-18-02] - Story 074: 100% section-id coverage + monitored runs
 
 ### Added
 - Monitored driver run helpers (`scripts/run_driver_monitored.sh`, `scripts/monitor_run.sh`) to avoid “silent crash” long runs; docs updated to prefer these over manual tailing.
@@ -236,7 +248,7 @@
 ### Tested
 - `pytest -q` (171 passed, 3 skipped)
 
-## [2025-12-01] - OCR ensemble retries, resolver, and fuzzy headers
+## [2025-12-01-01] - OCR ensemble retries, resolver, and fuzzy headers
 
 ### Added
 - Pagelines-first recipes with GPT-4V escalation and missing-header resolver (`recipe-pagelines-two-pass.yaml`, `recipe-pagelines-to-gamebook.yaml`, `recipe-ocr-ensemble-gpt4v.yaml`).
@@ -253,7 +265,7 @@
 - `PYTHONPATH=. python tests/test_headers_numeric_fuzzy.py`
 - `PYTHONPATH=. python tests/test_missing_header_resolver.py`
 
-## [2025-11-27] - Intake dashboard fixes and reuse guidance
+## [2025-11-27-01] - Intake dashboard fixes and reuse guidance
 
 ### Added
 - AGENTS guide now reminds agents to reuse existing working patterns before inventing new solutions.
@@ -264,7 +276,7 @@
 ### Tested
 - Manual dashboard reload and artifact open on intake runs (`intake-onward`, `intake-deathtrap`).
 
-## [2025-11-26] - Dashboard stage help, metrics, and artifact links
+## [2025-11-26-02] - Dashboard stage help, metrics, and artifact links
 
 ### Added
 - Pipeline visibility dashboard now shows per-stage help tooltips sourced from module notes and recipe descriptions; module notes rewritten verb-first for AI/human clarity.
@@ -280,7 +292,7 @@
 - `python driver.py --recipe /tmp/recipe-ocr-1-5.yaml --mock --instrument`
 - `python driver.py --recipe /tmp/recipe-ocr-6-10.yaml --mock --instrument`
 
-## [2025-11-25] - Stage elapsed UX and resumable long runs
+## [2025-11-25-01] - Stage elapsed UX and resumable long runs
 
 ### Added
 - Pipeline visibility dashboard now shows per-stage elapsed time (live for running, final for done) using progress/event timestamps with `<1s` handling and fallbacks.
@@ -294,7 +306,7 @@
 - `python driver.py --recipe configs/recipes/recipe-text.yaml --mock --force`
 - `python driver.py --recipe configs/recipes/recipe-ocr.yaml --skip-done --start-from portionize_fine --force`
 
-## [2025-11-21] - Pluginized modules and validated pipelines
+## [2025-11-21-03] - Pluginized modules and validated pipelines
 
 ### Added
 - Moved all pipeline modules into self-contained plugin folders under `modules/<stage>/<module_id>/` with `module.yaml` manifests.
@@ -305,7 +317,7 @@
 - `python driver.py --recipe configs/recipes/recipe-text.yaml --force` (passes; stamps/validates).
 - `python driver.py --recipe configs/recipes/recipe-ff-canonical.yaml --skip-done` (passes; stamps/validates) — replaces legacy 20-page OCR smoke.
 
-## [2025-11-21] - Legacy cleanup and DAG-style recipes
+## [2025-11-21-02] - Legacy cleanup and DAG-style recipes
 
 ### Changed
 - Removed legacy `run_pipeline.py`, `llm_clean.py`, and `validate.py` now that plugins/driver supersede them.
@@ -316,7 +328,7 @@
 - `python driver.py --recipe configs/recipes/recipe-text.yaml --force`
 - `python driver.py --recipe configs/recipes/recipe-ff-canonical.yaml --force`
 
-## [2025-11-21] - Added modular pipeline story
+## [2025-11-21-01] - Added modular pipeline story
 
 ### Added
 - New story 015 document outlining modular pipeline and registry plan.
@@ -324,7 +336,7 @@
 - Scaffolded `modules/registry.yaml`, sample recipes under `configs/recipes/`, `extract_text.py` stub, and `validate_artifact.py` validator CLI.
 - Added pipeline driver with stamping/validation hooks and resume/skip toggles; added schemas for page/clean/resolved/enriched artifacts.
 - Reorganized modules into per-module plugin folders with manifests; driver now scans `modules/` for entrypoints.
-## [2025-11-22] - DAG driver, adapter merge, and CI tests
+## [2025-11-22-05] - DAG driver, adapter merge, and CI tests
 
 ### Added
 - DAG-capable driver plan/validation with schema-aware resume checks and adapter stage support.
@@ -335,7 +347,7 @@
 - Portionize fine params cleaned up (removed unsupported `min_conf`), OCR recipe simplified (no `images` flag, end page capped).
 - Resume skips now verify artifact schema_version; multi-input consensus uses deduped merge helper.
 
-## [2025-11-22] - Pipeline visibility dashboard & progress logging
+## [2025-11-22-04] - Pipeline visibility dashboard & progress logging
 
 ### Added
 - Progress event schema validation and append-only logger with tests; driver/module commands now inject `--state-file/--progress-file/--run-id` by default.
@@ -355,7 +367,7 @@
 - `python driver.py --recipe configs/recipes/recipe-text-dag.yaml --force` (passes; artifacts stamped/validated).
 - `python driver.py --recipe configs/recipes/recipe-ff-canonical.yaml --skip-done` (passes; OCR pages 1–20 end-to-end).
 
-## [2025-11-22] - Shared common package and module import cleanup
+## [2025-11-22-03] - Shared common package and module import cleanup
 
 ### Added
 - Introduced `modules/common` package consolidating shared helpers (utils, ocr) with explicit public surface.
@@ -371,7 +383,7 @@
 - `python driver.py --recipe configs/recipes/recipe-text.yaml --mock --force`
 - `python driver.py --recipe configs/recipes/recipe-ocr.yaml --mock --force`
 
-## [2025-11-22] - Param schemas and stage output overrides
+## [2025-11-22-02] - Param schemas and stage output overrides
 
 ### Added
 - JSON-Schema-lite `param_schema` support in `driver.py` with fail-fast validation (type/enum/range/pattern, required/unknown detection, schema defaults).
@@ -383,7 +395,7 @@
 ### Tested
 - `python -m pytest tests/driver_plan_test.py tests/driver_integration_test.py` (13 total; includes param validation errors, out precedence, resume honors custom out, multi-stage custom outputs).
 
-## [2025-11-22] - Enrichment stage + alternate modules
+## [2025-11-22-01] - Enrichment stage + alternate modules
 
 ### Added
 - Enrichment module `enrich_struct_v1` producing `enriched_portion_v1`; low-cost deterministic portionizer `portionize_page_v1`; greedy gap-fill consensus `consensus_spanfill_v1`.
@@ -397,7 +409,7 @@
 - `python driver.py --recipe configs/recipes/recipe-text-enrich-alt.yaml --registry modules` (passes; enriched output with choices).
 - `python driver.py --recipe configs/recipes/recipe-ocr-enrich-alt.yaml --registry modules` (passes; intro pages enriched with images).
 - `python -m pytest tests/driver_plan_test.py` (11 tests, includes stamp backfill and cleanup helpers; existing pydantic warning).
-## [2025-11-23] - Section target guard, portionizer fixes, doc cleanup
+## [2025-11-23-03] - Section target guard, portionizer fixes, doc cleanup
 
 ### Added
 - Consolidated adapter `section_target_guard_v1` (maps targets, backfills, coverage report/exit) with module manifest and unit tests.
@@ -412,7 +424,7 @@
 - `python driver.py --recipe configs/recipes/recipe-ocr-enrich-sections-noconsensus.yaml --force` (0 missing targets; guard passes, 400 sections/384 targets).
 - `python -m pytest` (all suites; existing pydantic deprecation warning only).
 
-## [2025-11-23] - Section coverage pipeline and validator guard
+## [2025-11-23-02] - Section coverage pipeline and validator guard
 
 ### Added
 - No-consensus section recipe `configs/recipes/recipe-ocr-enrich-sections-noconsensus.yaml` (full book) plus chunked variants; full run produced `portions_enriched_backfill.jsonl` with zero missing targets.
@@ -429,7 +441,7 @@
 - `python driver.py --recipe configs/recipes/recipe-ocr-enrich-sections-noconsensus.yaml --registry modules --force` (full run, 0 missing targets).
 - `pytest tests/assert_section_targets_test.py`
 
-## [2025-11-23] - Instrumentation & dashboard surfacing
+## [2025-11-23-01] - Instrumentation & dashboard surfacing
 
 ### Added
 - Instrumentation schemas (`instrumentation_call_v1`, `_stage_v1`, `_run_v1`) and validation hook in `validate_artifact.py`.
@@ -444,7 +456,7 @@
 - `python -m pytest -q tests/test_instrumentation_schema.py`
 - `python driver.py --recipe configs/recipes/recipe-text.yaml --instrument --mock --force`
 
-## [2025-11-24] - Coarse+fine merge, continuation propagation, and smoke/regression
+## [2025-11-24-04] - Coarse+fine merge, continuation propagation, and smoke/regression
 
 ### Added
 - Coarse portionizer module `portionize_coarse_v1` and merge adapter `merge_coarse_fine_v1` with continuation-aware heuristics and duplicate-span collapse.
@@ -456,7 +468,7 @@
 - DAG recipes now use the new coarse/merge modules; uncovered threshold tightened to 0.5 to reduce noise.
 - Schemas plus consensus/resolve/build stages now preserve `continuation_of`/`continuation_confidence` through final artifacts.
 - README and story notes updated with merge rules, smoke recipe, and regression command.
-## [2025-11-24] - Image cropper baseline & GT
+## [2025-11-24-03] - Image cropper baseline & GT
 
 ### Added
 - `image_crop_v1` schema and validation mapping; contour-based cropper module `modules/extract/image_crop_cv_v1` with tuned defaults (min_area_ratio=0.005, max_area_ratio=0.99, blur=3, topk=5).
@@ -467,7 +479,7 @@
 ### Changed
 - Tuned CV detector parameters and documented manual validation results (Micro P=0.75 / R=0.95 / F1=0.84 on current GT); story-008 marked Done.
 
-## [2025-11-24] - Driver snapshots & manifest links
+## [2025-11-24-02] - Driver snapshots & manifest links
 
 ### Added
 - Driver now snapshots recipe, resolved plan, registry subset, optional settings/pricing, and instrumentation config into `snapshots/` per run, recording relative paths in `output/run_manifest.jsonl`.
@@ -479,7 +491,7 @@
 
 ### Tested
 - `python -m pytest` (all suites; 34 passed, pre-existing pydantic warning).
-## [2025-11-24] - Cost/perf benchmarks, presets, and instrumentation UX
+## [2025-11-24-01] - Cost/perf benchmarks, presets, and instrumentation UX
 
 ### Added
 - Bench harness writes per-session `bench_metrics.csv/jsonl` and `metadata.json` under `output/runs/bench-*`; presets in `configs/presets/` (speed text, cost OCR, balanced OCR, quality OCR) with usage examples in README.
@@ -492,7 +504,7 @@
 
 ### Documentation
 - README documents presets, benchmark artifact locations, and cost/perf usage examples.
-## [2025-11-26] - Module registry prune (story 025)
+## [2025-11-26-01] - Module registry prune (story 025)
 
 ### Removed
 - Deleted unused modules: portionize_numbered_v1, merge_portion_hyp_v1, image_crop_cv_v1, portionize_page_v1, consensus_spanfill_v1, enrich_struct_v1, build_appdata_v1.
@@ -500,7 +512,7 @@
 
 ### Planned follow-ups
 - Tag remaining experimental modules (section stack, coarse/merge) in manifests and rerun OCR/text smoke recipes.
-## [2025-11-28] - FF output refinement paused, AI guardrails noted
+## [2025-11-28-02] - FF output refinement paused, AI guardrails noted
 
 ### Added
 - Issue 0 analysis updated with guidance to avoid overcoding and to use AI ensemble/arbiter patterns for high-stakes steps.
@@ -512,7 +524,7 @@
 ### Tested
 - Not run (story paused; analysis/documentation only).
 
-## [2025-11-28] - Fighting Fantasy Engine export complete
+## [2025-11-28-01] - Fighting Fantasy Engine export complete
 
 ### Added
 - Official FF Engine validator bundled with Ajv and wrapped as `validate_ff_engine_node_v1`; recipe `recipe-ff-engine.yaml` builds and validates `gamebook.json`.
@@ -526,7 +538,7 @@
 ### Tested
 - Mock smoke: `bash scripts/smoke-ff-engine.sh` (passes official validator).
 - Full run: `python driver.py --recipe configs/recipes/recipe-ff-engine.yaml --instrument --start-from portionize_fine` (passes official validator; reachability warnings only due to stubbed targets).
-## [2025-11-30] - FF cleanup/backfill modules and OCR recovery planning
+## [2025-11-30-01] - FF cleanup/backfill modules and OCR recovery planning
 
 ### Added
 - New cleaning module `strip_section_numbers_v1` to remove section/page numbers, gibberish lines, and null `created_at` while preserving paragraphs.
@@ -541,7 +553,7 @@
 ### Tested
 - Manual runs: backfill + LLM gap backfill + cleanup on `ff-redesign-v2-improved` artifacts; validation shows 382 sections (18 missing) as current best baseline.
 
-## [2025-12-18] - Spell-weighted OCR voting + downstream choice tolerance
+## [2025-12-18-01] - Spell-weighted OCR voting + downstream choice tolerance
 
 ### Added
 - Per-engine spell-quality metrics (`dictionary_score`, `char_confusion_score`, etc.) and spell-weighted voting plumbing in `extract_ocr_ensemble_v1`, including conservative tie-breaking + navigation-phrase repair telemetry.
@@ -557,7 +569,7 @@
 ### Testing
 - `pytest -q tests/test_spell_weighted_voting.py tests/test_extract_choices_tolerant.py`
 - 20-page smoke runs with/without navigation repair that reach `extract_choices_v1` and validate all “turn to” references; telemetry recorded per run.
-## [2025-12-02] - Header/choice loops & pipeline hardening
+## [2025-12-02-01] - Header/choice loops & pipeline hardening
 
 ### Added
 - Header and choice loop runner modules to iterate detect→validate→escalate until clean; recipe `recipe-pagelines-repair-choices-r6.yaml` now runs the loops automatically.
@@ -572,7 +584,7 @@
 
 ### Tested
 - `python driver.py --recipe configs/recipes/recipe-pagelines-repair-choices-r6.yaml`
-## [2025-12-13] - Story 058 post-OCR quality finalized
+## [2025-12-13-01] - Story 058 post-OCR quality finalized
 
 ### Added
 - `context_aware_post_process_v1` and `context_aware_t5_v1` adapters for post-OCR smoothing plus section-number/truncation validators to capture remaining warnings.
@@ -586,14 +598,14 @@
 
 ### Fixed
 - Documented that the 20-page smoke is the verification target so we no longer require a full-book run; validators now capture source artifacts for traceability.
-## [2025-12-19] - Smoke test tuning and validator compatibility
+## [2025-12-19-01] - Smoke test tuning and validator compatibility
 
 ### Changed
 - Smoke settings now align with 20-page slice expectations (boundary coverage thresholds and expected range set to sections 20–21).
 - Choice completeness validator relaxed for smoke runs (`max_discrepancy`).
 - Frontmatter fine segmentation accepts split page IDs in coarse segments.
 - Module param schemas updated for new boundary/scan/extract flags.
-## [2025-12-20] - AI OCR benchmark suite and GPT‑5.1 pipeline planning
+## [2025-12-20-02] - AI OCR benchmark suite and GPT‑5.1 pipeline planning
 
 ### Added
 - OCR benchmark harness + vendor runners (OpenAI, Anthropic, Gemini, Mistral, Azure DI, AWS Textract, HF/Qwen) with HTML/text diffing and cost aggregation.
@@ -604,7 +616,7 @@
 - Story 077 marked Done; pipeline redesign work moved to Story 081.
 - Story index updated with Story 081.
 
-## [2025-12-20] - Dual-field page numbering completion and ordering guard improvements
+## [2025-12-20-01] - Dual-field page numbering completion and ordering guard improvements
 
 ### Added
 - Logical page numbering propagation across OCR → elements → portions, with original-page provenance fields.
@@ -619,7 +631,7 @@
 
 ### Fixed
 - Ordering/span validation progress reporting and guard logic consistency across stages.
-## [2025-12-21] - GPT‑5.1 HTML-first OCR pipeline and validation
+## [2025-12-21-01] - GPT‑5.1 HTML-first OCR pipeline and validation
 
 ### Added
 - GPT‑5.1 HTML OCR pipeline modules (split-only intake, OCR HTML, HTML→blocks, coarse segmentation, boundary detection + repair loop, HTML portionizer).
@@ -636,7 +648,7 @@
 - `PYTHONPATH=. pytest -q tests/test_ocr_ai_gpt51_schema.py`
 - 20-page end-to-end run: `/tmp/cf-ff-ai-ocr-gpt51-smoke-20`
 - Full-book run: `/tmp/cf-ff-ai-ocr-gpt51-full-`
-## [2025-12-26] - Pipeline visibility cost/status and OpenAI usage centralization
+## [2025-12-26-01] - Pipeline visibility cost/status and OpenAI usage centralization
 
 ### Added
 - Central OpenAI client wrapper to log LLM usage across modules.
@@ -650,7 +662,7 @@
 
 ### Fixed
 - Dashboard now treats stale runs as crashed when status is stamped.
-## [2025-12-28] - Game-ready validation consolidation and OCR robustness
+## [2025-12-28-01] - Game-ready validation consolidation and OCR robustness
 
 ### Added
 - Consolidated game-ready validation report with attempt details for orphans and broken links.
@@ -665,7 +677,7 @@
 ### Fixed
 - Choice repair no longer overrides explicit numeric references; HTML anchors are patched on repair.
 - Ordering/duplicate header issues surfaced in issues report and game-ready validation.
-## [2025-12-29] - Gamebook output cleanup, ending status, and validator guards
+## [2025-12-29-01] - Gamebook output cleanup, ending status, and validator guards
 
 ### Added
 - Story 105 (choice text enrichment spec) and Story 107 (shared validator unification) scaffolds.
@@ -682,7 +694,7 @@
 
 ### Tested
 - `python driver.py --recipe configs/recipes/recipe-ff-ai-ocr-gpt51-pristine-fast.yaml --run-id ff-ai-ocr-gpt51-pristine-fast-full --output-dir output/runs/ff-ai-ocr-gpt51-pristine-fast-full --start-from detect_endings --allow-run-id-reuse`
-## [2025-12-31] - Game-ready output package bundling
+## [2025-12-31-01] - Game-ready output package bundling
 
 ### Added
 - `package_game_ready_v1` export module to bundle `gamebook.json` and validator into `output/` with README.
@@ -693,7 +705,7 @@
 
 ### Tested
 - `python driver.py --recipe configs/recipes/recipe-ff-ai-ocr-gpt51.yaml --run-id ff-ai-ocr-gpt51-pristine-fast-full --allow-run-id-reuse --output-dir output/runs/ff-ai-ocr-gpt51-pristine-fast-full --start-from package_game_ready`
-## [2026-01-02] - Edgecase scanner/patch workflow and link-claim tracking
+## [2026-01-02-01] - Edgecase scanner/patch workflow and link-claim tracking
 
 ### Added
 - Edgecase scanner + AI verification + patch application modules with schemas and tests.

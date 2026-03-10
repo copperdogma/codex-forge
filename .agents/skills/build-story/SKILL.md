@@ -11,6 +11,7 @@ Execute a development story end-to-end.
 ## Phase 1 — Explore (read-only, no file writes)
 
 1. **Resolve story** — Read `docs/stories/story-{NNN}-*.md` (or resolve from `docs/stories.md`). Verify status is Pending or In Progress. If **Draft**, STOP — tell the user to promote it to Pending first (needs detailed ACs and tasks).
+   - If status is Pending, update it to **In Progress** in both the story file and the corresponding row in `docs/stories.md`.
 
 2. **Verify required sections** — Ensure the story has:
    - Goal
