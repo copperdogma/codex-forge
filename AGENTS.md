@@ -283,68 +283,14 @@ Before portionization, automatically flag pages for high-fidelity re-OCR if eith
   - **Reference**: [OpenAI Models Documentation](https://platform.openai.com/docs/models) - Check this for latest models, capabilities, and pricing
 - Defaults: `gpt-4.1-mini` with optional boost `gpt-5`; see scripts/recipes.
 
-## Running & Monitoring (canonical recipe: recipe-ff-ai-ocr-gpt51.yaml)
+## Running & Monitoring
 
-**ARM64 + MPS is required only for legacy EasyOCR/ensemble runs.** The canonical GPT-5.1 OCR pipeline runs on any arch; use MPS only when running legacy OCR recipes or EasyOCR GPU smoke tests.
+**See [docs/RUNBOOK.md](docs/RUNBOOK.md) for full execution instructions.**
 
-**Current canonical recipe**: `configs/recipes/recipe-ff-ai-ocr-gpt51.yaml` (GPT-5.1 AI-first OCR)
-- HTML-native output, faster than legacy OCR ensemble
-- Legacy `configs/recipes/legacy/recipe-ff-canonical.yaml` is deprecated and disabled
+### Key Developer Commands
+- **Resume a run:** `scripts/run_driver_monitored.sh ... --start-from <stage>`
+- **Smoke Test:** `python driver.py ... --settings configs/settings.ff-ai-ocr-gpt51-smoke-20.yaml`
 
-### Environment (required)
-- **Canonical GPT-5.1 OCR**:
-  - `pip install --no-cache-dir -r requirements.txt`
-- **Legacy EasyOCR / OCR ensemble (optional)**:
-  - `conda config --add envs_dirs /Users/cam/.conda_envs`
-  - `conda create -n codex-arm-mps python=3.11 -y`
-  - `conda activate codex-arm-mps`
-  - `pip install --no-cache-dir -r requirements-legacy-easyocr.txt -c constraints/metal.txt`
-  - Guard (legacy only): `python scripts/check_arm_mps.py` (must pass)
-  - SHM-safe env (EasyOCR/libomp stability):
-    - `KMP_USE_SHMEM=0 KMP_CREATE_SHMEM=FALSE OMP_NUM_THREADS=1 KMP_AFFINITY=disabled KMP_INIT_AT_FORK=FALSE`
-
-### Full pipeline run (preferred)
-- Use the monitored wrapper (creates pidfile + crash markers):
-  - `scripts/run_driver_monitored.sh --recipe configs/recipes/recipe-ff-ai-ocr-gpt51.yaml --run-id <run_id> --output-dir output/runs -- --instrument --force`
-- **Important**:
-  - `--output-dir` must be the **parent** (`output/runs`), not a run-specific path.
-  - `run_driver_monitored.sh` pre-deletes the run dir on `--force`, strips `--force`, and adds `--allow-run-id-reuse`.
-  - `driver.py` refuses `--force` on `output/runs` root; always pass a run-specific dir.
-
-### Monitoring (choose one)
-- Active monitor (recommended; shows crash immediately):
-  - `scripts/monitor_run.sh output/runs/<run_id> output/runs/<run_id>/driver.pid 5`
-- Foreground 60s polling loop (only if background terminals are disabled):
-  - `while true; do date; tail -n 1 output/runs/<run_id>/pipeline_events.jsonl; sleep 60; done`
-- Crash visibility:
-  - `monitor_run.sh` tails `driver.log` when PID disappears and appends a `run_monitor` failure event.
-  - `run_driver_monitored.sh` calls `scripts/postmortem_run.sh` on exit to append a `run_postmortem` failure event.
-
-### Smoke runs
-- 20pp smoke: `python driver.py --recipe configs/recipes/recipe-ff-ai-ocr-gpt51.yaml --settings configs/settings.ff-ai-ocr-gpt51-smoke-20.yaml --run-id ff-ai-ocr-gpt51-smoke-20 --output-dir /tmp/cf-ff-ai-ocr-gpt51-smoke-20 --force`
-- Note: If smoke settings don't exist, create them based on the main recipe with reduced page ranges
-
-### Smoke tests (quick reference)
-- Canonical smoke (current pipeline): `configs/recipes/recipe-ff-ai-ocr-gpt51.yaml` + `configs/settings.ff-ai-ocr-gpt51-smoke-20.yaml`
-- Offline fixture smoke (no external calls): `configs/recipes/recipe-ff-smoke.yaml` (uses `testdata/smoke/ff/`)
-- Legacy/archived smoke: `configs/recipes/legacy/recipe-ocr-coarse-fine-smoke.yaml` and `configs/settings.ff-canonical-smoke*.yaml`
-
-### Troubleshooting (must-read)
-- **OMP SHM crash** (`Can't open SHM2`) — legacy EasyOCR only:
-  - Ensure `codex-arm-mps` env + SHM-safe vars are set.
-  - If it still fails, run outside any restricted/sandboxed shell or disable EasyOCR/torch paths.
-- **MPS unavailable** (legacy EasyOCR): rerun env setup; `python scripts/check_arm_mps.py` must pass.
-- **Apple Vision OCR sandbox failure** (`sysctlbyname for kern.hv_vmm_present failed`): run outside sandbox/full host permissions or disable `apple` engine.
-- **Monitoring looks idle but process died**: check `driver.log` in the run dir and confirm `run_monitor` / `run_postmortem` events exist in `pipeline_events.jsonl`.
-
-## Safe Command Examples
-- Inspect status: `git status --short`
-- List files: `ls`, `rg --files`
-- View docs: `sed -n '1,120p' docs/stories/story-015-modular-pipeline.md`
-- Run validator: `python validate_artifact.py --schema portion_hyp_v1 --file output/...jsonl`
-- Dry-run the canonical recipe: `python driver.py --recipe configs/recipes/recipe-ff-ai-ocr-gpt51.yaml --dry-run`
-- Section coverage check: `python modules/adapter/section_target_guard_v1/main.py --inputs output/runs/ocr-enrich-sections-noconsensus/portions_enriched.jsonl --out /tmp/portions_enriched_guard.jsonl --report /tmp/section_target_report.json`
-- Dashboard: `python -m http.server 8000` then open `http://localhost:8000/docs/pipeline-visibility.html`
 ## Model Benchmarking (promptfoo)
 
 We use [promptfoo](https://www.promptfoo.dev/) for evaluating AI model/prompt quality on pipeline tasks. Benchmark workspace lives in `benchmarks/`.

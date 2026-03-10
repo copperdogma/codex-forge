@@ -53,6 +53,18 @@ def _utc() -> str:
     return datetime.utcnow().isoformat() + "Z"
 
 
+def _model_to_dict(obj: Any) -> Any:
+    if obj is None:
+        return None
+    if hasattr(obj, "model_dump"):
+        return obj.model_dump()
+    if hasattr(obj, "dict"):
+        return obj.dict()
+    if hasattr(obj, "__dict__"):
+        return obj.__dict__
+    return obj
+
+
 def _encode_image(path: str) -> str:
     with open(path, "rb") as f:
         b64 = base64.b64encode(f.read()).decode("utf-8")
@@ -501,7 +513,7 @@ def main() -> None:
             "rescued": True,
             "model": args.model,
             "request_id": request_id,
-            "usage": usage,
+            "usage": _model_to_dict(usage),
         })
 
         if idx % log_every == 0:
