@@ -1,9 +1,8 @@
 # Story: Onward to the Unknown — image-only → chapter-linked HTML
 
-**Status**: In Progress
+**Status**: Done
 
 ---
-**Depends On**: story-009 (layout-preserving table capture capability)
 
 ## Goal
 Create a **generic, image-first recipe** that converts scanned book images into **one HTML page per chapter**, with an index/TOC that links chapters together. Output must preserve original wording, spelling, and structure exactly as printed. No cleanup or normalization is allowed.
@@ -62,11 +61,11 @@ Create a **generic, image-first recipe** that converts scanned book images into 
 - [x] Implement TOC extraction + chapter segmentation modules with retry caps.
 - [x] Add new recipe under `configs/recipes/` for image-only chapter HTML.
 - [x] **Image extraction quality** → completed in **Story 125** (`story-125-image-extraction-eval-promptfoo.md`): promptfoo eval found Gemini 3 Pro + baseline prompt as winner; wired into pipeline.
-- [ ] **Crop quality validation** → broken out to **Story 126** (`story-126-crop-quality-text-validation-loop.md`): post-crop text validation loop + OCR image detection improvements to eliminate text-only crops, caption bleed, and missed photos.
-- [ ] **Table layout quality / OCR model eval** → broken out to **Story 127** (`story-127-ocr-model-eval-genealogy.md`): promptfoo eval to find the best model + prompt for genealogy table OCR. GPT-5.1 was picked for FF narrative pages; genealogy tables may have a different winner. If a better model captures tables correctly on the first pass, the rescue stages may become unnecessary.
+- [x] **Crop quality validation** → completed in **Story 126** (`story-126-crop-quality-text-validation-loop.md`): two-stage detector-validator with Gemini 3 Pro + Flash, auto-retry on count mismatch, 41 crops from 29 pages at 100% coverage.
+- [x] **Table layout quality / OCR model eval** → completed in **Story 127** (`story-127-ocr-model-eval-genealogy.md`): promptfoo eval across 8 models; Gemini 3.1 Pro is quality winner (0.969 score). Wired into pipeline.
 - [x] Run pipeline via `driver.py`, generate outputs in `output/runs/<run_id>/output/html/`.
 - [x] Manually inspect 5 chapter outputs + 5 genealogy tables, record evidence in work log.
-- [ ] Document usage and troubleshooting in story + README if needed.
+- [x] Document usage and troubleshooting in story.
 
 ## Open Questions
 - Should **page headers/footers** be preserved in chapter HTML or filtered?
@@ -541,3 +540,76 @@ Impact
   - `output/runs/onward-canonical/09_build_chapter_html_v1/chapters_manifest.jsonl`
 - **Table quality note:** Tables have correct column structure and headers but some quality issues remain with continuation-row alignment and date formats. These are OCR fidelity issues, not pipeline bugs. The table promptfoo evaluation (noted in Tasks) would address this systematically.
 - **Next:** Check off acceptance criteria. Consider creating a sub-story for table OCR promptfoo eval if the current quality isn't sufficient for the user's needs.
+
+## Usage
+
+### Running the Onward pipeline
+
+```bash
+# Full run (OCR + crop + table rescue + chapter build)
+PYTHONPATH=. python driver.py \
+  --recipe configs/recipes/recipe-onward-images-html-mvp.yaml \
+  --run-id onward-canonical \
+  --output-dir output/runs/onward-canonical
+
+# Resume from a specific stage (reuses cached artifacts)
+PYTHONPATH=. python driver.py \
+  --recipe configs/recipes/recipe-onward-images-html-mvp.yaml \
+  --run-id onward-canonical \
+  --output-dir output/runs/onward-canonical \
+  --start-from build_chapters \
+  --skip-done
+```
+
+### Output structure
+
+```
+output/runs/onward-canonical/
+├── output/html/
+│   ├── index.html              # TOC linking all chapters
+│   ├── chapter-001.html        # One HTML file per chapter
+│   ├── ...
+│   ├── page-001.html           # Frontmatter pages
+│   └── images/                 # Cropped illustrations (JPEG)
+├── 01_ocr_ai_gpt51_v1/        # Raw OCR HTML per page
+├── 03_crop_illustrations_.../  # Illustration manifest + crops
+├── 04_table_rescue_.../        # Table-rescued HTML
+└── ...                         # Other stage artifacts
+```
+
+### Key configuration
+
+- **OCR model**: `gemini-3.1-pro-preview` (quality winner from Story 127 eval, 0.969 score)
+- **Crop detector**: `gemini-3-flash-preview` (cost-optimized, Story 133)
+- **Crop validator**: `gemini-2.5-flash` (text contamination check, Story 126)
+- **Table rescue**: `gpt-5.1` with Onward-specific header detection
+- **Downsampling**: `max_long_side: 2048` (12x token reduction, Story 134)
+- **Parallelism**: `concurrency: 5` (Story 134)
+
+### Troubleshooting
+
+- **Table structure issues**: If tables have misaligned columns or continuation-row drift, check `table_rescue_onward_tables_v1` output. The `header_threshold` param controls how aggressively headers are detected.
+- **Missing images**: If `<img>` tags in chapter HTML lack `src`, verify `crop_illustrations` ran with `rescue_always: true` and check `illustration_manifest.jsonl` for the page.
+- **Blank pages consuming API budget**: Ensure `skip_blank_pages: true` is set in the OCR stage.
+- **Slow pipeline**: The full 60-page run takes ~18 min with concurrency=5 and downsampling. Use `--skip-done` to reuse cached OCR artifacts.
+
+### Sub-stories spawned
+
+| Story | Focus | Status |
+|-------|-------|--------|
+| 125 | Image extraction eval (promptfoo) | Done |
+| 126 | Crop quality text validation loop | Done |
+| 127 | OCR model eval for genealogy | Done |
+| 128 | Table fidelity verification | Done |
+| 129 | HTML output polish + image integration | Done |
+| 130 | Book website template module | In Progress |
+| 131 | Table structure fidelity | Done |
+| 132 | Provenance envelope fixes | Done |
+| 133 | Gemini Flash crop detector | Done |
+| 134 | OCR pipeline speed & cost optimization | Done |
+
+### 20260312 — Story closed
+- **Result:** All acceptance criteria met. 10 sub-stories spawned (9 Done, 1 In Progress — Story 130 stands independently as a website template module).
+- **Notes:** Removed stale dependency on Story 009 (layout-preserving extractor). Story 026 built table content fidelity and image extraction; Story 009 has been reframed as the orthogonal problem of spatial layout understanding for content linearization.
+- **Evidence:** All 11 ACs checked. Pipeline produces 18 chapters + 9 frontmatter pages + 16 cropped images from 60 source pages. OCR model: Gemini 3.1 Pro (0.969). Crop detector: Gemini 3 Flash. Pipeline: 18 min, $0.69 for full run.
+- **Next:** Story 130 (book website template) continues independently.

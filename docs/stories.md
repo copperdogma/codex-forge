@@ -20,7 +20,7 @@ Guiding priorities: **development stability first**, then **quality definitions*
 15. **098 — Late-Stage Section Validation and Reachability Analysis**: Final integrity pass to ensure 100% graph connectivity across all extracted gameplay mechanics.
 16. DONE: **083 — Game-Ready Validation Checklist**: Establishes the formal quality bar for "authoritative" artifacts before declaring the FF phase complete.
 17. **009 — Spatial Layout Understanding**: Intelligent placement of images, tables, and figures when linearizing complex multi-column layouts to single-column HTML.
-18. **026 — Onward to the Unknown — Arthur L'Heureux pilot**: First end-to-end testbed for genealogy/complex layouts; depends on 009.
+18. DONE: **026 — Onward to the Unknown — Arthur L'Heureux pilot**: End-to-end image-to-chapter-HTML pipeline for genealogy book. 10 sub-stories (125-134) completed.
 19. **099 — Remove dev-only backcompat disclaimer**: Final milestone marking the entire pipeline as stable and production-ready.
 
 
@@ -54,7 +54,7 @@ This index tracks stories in `/docs/stories/` for the codex-forge pipeline.
 || 023 | Consolidate section target adapters | Medium | Done | /docs/stories/story-023-section-target-guard.md |
 || 024 | Image cropper follow-up | Medium | Done | /docs/stories/story-024-image-cropper-followup.md |
 || 025 | Module pruning & registry hygiene | Medium | Done | /docs/stories/story-025-module-prune.md |
-|| 026 | Onward to the Unknown — Arthur L'Heureux pilot | Medium | In Progress | /docs/stories/story-026-onward-unknown-arthur-lheureux.md |
+|| 026 | Onward to the Unknown — Arthur L'Heureux pilot | Medium | Done | /docs/stories/story-026-onward-unknown-arthur-lheureux.md |
 || 027 | Contact-sheet intake for automatic book type planning | Medium | Done | /docs/stories/story-027-contact-sheet-auto-intake.md |
 || 028 | Market Discovery for codex-forge | Medium | In Progress | /docs/stories/story-028-market-discovery.md |
 || 029 | Audit model lineup vs latest OpenAI sheets | Medium | Obsolete | /docs/stories/story-029-model-audit-openai.md |

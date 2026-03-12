@@ -1,3 +1,13 @@
+## [2026-03-12-03] - Close Story 026 (Onward to the Unknown)
+
+### Changed
+- Story 026 marked Done — all 11 acceptance criteria met, 10 sub-stories spawned (9 Done, Story 130 continues independently)
+- Removed stale dependency on Story 009 (layout-preserving extractor)
+- Checked off sub-story tasks (Story 126 crop quality, Story 127 OCR model eval — both Done)
+
+### Added
+- Usage documentation in Story 026: run commands, output structure, key config, troubleshooting, sub-story table
+
 ## [2026-03-12-02] - Triage skills + Story 009 reframe (Scout 004)
 
 ### Added
