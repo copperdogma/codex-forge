@@ -1,3 +1,20 @@
+## [2026-03-11-05] - OCR model eval refresh, new tooling, and Story 134
+
+### Added
+- `scripts/discover-models.ts` — model discovery across OpenAI/Anthropic/Google APIs with tier classification and eval registry cross-reference
+- `benchmarks/scripts/enrich-eval-results.py` — cost/latency/quality enrichment for promptfoo results with MODEL_PRICING table
+- Story 134 (OCR Pipeline Speed & Cost Optimization) — 7 optimization axes: downsampling, parallelism, multi-page context, batch API, model tiering, blank page skip, single-page budget model re-eval
+- Gemini budget model eval configs for table fidelity testing
+
+### Changed
+- Onward recipe OCR model: `claude-sonnet-4-6` → `gemini-3.1-pro-preview` (quality winner, 0.969 score, $0.09/call vs $0.18)
+- Onward recipe `max_output_tokens`: 16384 → 65536 (required for Gemini reasoning token budget)
+- Eval registry: new quality winner Gemini 3.1 Pro (0.969), new value winner GPT-5.4 (0.952 at $0.11), 8 models scored with full cost/latency metrics
+- `onward-table-fidelity.yaml` providers updated with GPT-5.4, Gemini 3.1 Pro, maxOutputTokens fix
+
+### Fixed
+- Gemini 3.1 Pro table fidelity: 0.115 → 0.969 after fixing maxOutputTokens (reasoning tokens were consuming output budget, truncating tables)
+
 ## [2026-03-11-04] - Begin Story 130: Book Website Template Module
 
 ### Added

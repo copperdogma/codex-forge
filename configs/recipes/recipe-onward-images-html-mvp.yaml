@@ -19,8 +19,8 @@ stages:
       pages: images_to_manifest
     out: pages_html.jsonl
     params:
-      model: claude-sonnet-4-6
-      max_output_tokens: 16384
+      model: gemini-3.1-pro-preview
+      max_output_tokens: 65536
       ocr_hints: |
         - Preserve text exactly as printed; do not correct spelling or normalize punctuation.
         - Preserve line breaks and paragraph structure as seen in the image.

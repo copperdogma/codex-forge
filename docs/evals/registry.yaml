@@ -156,39 +156,75 @@ evals:
       value: 0.95
 
     ranking:
-      quality_winner: "Claude Opus 4.6"
-      balanced_winner: "Claude Sonnet 4.6"
-      value_winner: null  # No model is 2x cheaper AND within quality window
+      quality_winner: "Gemini 3.1 Pro"
+      balanced_winner: "Gemini 3.1 Pro"
+      value_winner: "GPT-5.4"
       note: >
-        Sonnet is 41% cheaper ($0.18 vs $0.31/call), 10% faster, and only 0.7%
-        lower quality. Balanced winner for production use. Opus for max quality.
+        2026-03-11 refresh: Gemini 3.1 Pro is new quality winner (0.969, up from 0.115
+        with truncation fix). Cheapest of the models that meet 0.95 target ($0.09/call).
+        GPT-5.4 is value winner — same quality as Opus (0.952) at 3x lower cost ($0.11).
+        Previous Claude winners stable but dethroned on quality by Gemini.
       applied: >
-        AnthropicVisionClient added to pipeline. Onward recipe OCR stage updated
-        from gemini-3-pro-preview to claude-sonnet-4-6 (balanced winner).
+        Recipe updated to gemini-3.1-pro-preview with maxOutputTokens=65536 (2026-03-11).
+        Previous: claude-sonnet-4-6 (balanced winner from attempt 001).
 
     scores:
+      # --- 2026-03-11 refresh (attempt 002) ---
+      - model: "Gemini 3.1 Pro"
+        metrics:
+          structure_preservation: 0.969
+          alma: 0.923
+          arthur: 0.989
+          marie_louise: 0.995
+        latency_ms: 207500
+        cost_usd: 0.0903
+        cost_estimated: true
+        measured: 2026-03-11
+        note: "New quality winner. maxOutputTokens=65536 required (reasoning eats budget). Slowest but cheapest of quality tier."
       - model: "Claude Opus 4.6"
         metrics:
-          structure_preservation: 0.952
-          alma: 0.921
-          arthur: 0.963
+          structure_preservation: 0.953
+          alma: 0.923
+          arthur: 0.964
           marie_louise: 0.973
-        latency_ms: 123200
-        cost_usd: 0.3125
+        latency_ms: 123118
+        cost_usd: 0.3175
+        measured: 2026-03-11
+        note: "Stable vs prior run (+0.001). 3.5x more expensive than Gemini 3.1 Pro."
+      - model: "GPT-5.4"
+        metrics:
+          structure_preservation: 0.952
+          alma: 0.907
+          arthur: 0.976
+          marie_louise: 0.972
+        latency_ms: 102571
+        cost_usd: 0.1067
         cost_estimated: true
-        measured: 2026-03-10
-        note: "Quality winner. Meets 0.95 target. Weak on alma (handwritten annotations)."
+        measured: 2026-03-11
+        note: "New. Fastest model that meets 0.95 target. Value winner — Opus quality at Sonnet price."
       - model: "Claude Sonnet 4.6"
         metrics:
-          structure_preservation: 0.946
-          alma: 0.919
+          structure_preservation: 0.945
+          alma: 0.918
           arthur: 0.978
           marie_louise: 0.939
-        latency_ms: 110100
-        cost_usd: 0.1841
+        latency_ms: 110051
+        cost_usd: 0.1842
+        measured: 2026-03-11
+        note: "Stable vs prior run (-0.001). No longer balanced winner — GPT-5.4 is cheaper and higher quality."
+      # --- Budget Gemini models (truncation-limited, pending re-eval) ---
+      - model: "Gemini 2.5 Flash"
+        metrics:
+          structure_preservation: 0.886
+          alma: 0.839
+          arthur: 0.918
+          marie_louise: 0.900
+        latency_ms: 84000
+        cost_usd: 0.0555
         cost_estimated: true
-        measured: 2026-03-10
-        note: "Balanced winner (3-part: 0.9673). Beats Opus on arthur. 41% cheaper."
+        measured: 2026-03-11
+        note: "Best budget model. Below 0.95 target but fast and cheap. May improve with prompt tuning."
+      # --- Previous scores (attempt 001, 2026-03-10) ---
       - model: "GPT-4o"
         metrics:
           structure_preservation: 0.855
@@ -196,7 +232,7 @@ evals:
         cost_usd: 0.1104
         cost_estimated: true
         measured: 2026-03-10
-        note: "Decent but slow (689s avg). Not competitive with Claude."
+        note: "Decent but slow (689s avg). Not competitive with Claude or GPT-5.4."
       - model: "GPT-5.1"
         metrics:
           structure_preservation: 0.847
@@ -204,7 +240,7 @@ evals:
         cost_usd: 0.1155
         cost_estimated: true
         measured: 2026-03-10
-        note: "Fastest and cheapest, but merges continuation rows. Below Claude models."
+        note: "Merges continuation rows. Superseded by GPT-5.4."
       - model: "Gemini 2.5 Pro"
         metrics:
           structure_preservation: 0.577
@@ -212,7 +248,7 @@ evals:
         cost_usd: 0.1480
         cost_estimated: true
         measured: 2026-03-10
-        note: "Merges BOY/GIRL columns despite instructions. Disqualified."
+        note: "Merges BOY/GIRL columns despite instructions. Superseded by Gemini 3.1 Pro."
 
     attempts:
       - id: "001"
@@ -225,12 +261,25 @@ evals:
           Started with broken scorer (strict positional comparison), 0.57 avg.
           Fixed scorer with LCS alignment → 0.916. Fixed prompt for section headers → 0.952.
           Key wins: (1) alignment scorer, (2) explicit section header separation, (3) Claude Opus model.
+      - id: "002"
+        date: 2026-03-11
+        status: succeeded
+        approach: "8-model refresh: GPT-5.4, GPT-5.2 Pro, Gemini 3.1 Pro, Gemini budget models (Flash, Flash-Lite) + re-run previous winners"
+        score_before: 0.952
+        score_after: 0.969
+        note: >
+          Gemini 3.1 Pro jumped from 0.115 → 0.969 after fixing maxOutputTokens (16384→65536).
+          Reasoning tokens were consuming output budget, truncating tables. GPT-5.4 matched Opus
+          quality at 3x lower cost. GPT-5.2 Pro is not a chat model (404). Budget Gemini models
+          (Flash, Flash-Lite) scored 0.72-0.89 but truncation-limited on longer tables.
+          Created enrich-eval-results.py for cost/latency/quality analysis.
+          Created discover-models.ts for model discovery across providers.
 
     retry_when:
       - condition: new-subject-model
-        note: "Future Claude/Gemini models may improve alma score past 0.95"
+        note: "Future models may improve alma score (weakest across all models due to handwritten annotations)"
       - condition: cheaper-subject-model
-        note: "Sonnet 4.6 at 0.946 is very close — future Sonnet may cross 0.95 and become quality+value winner"
+        note: "Gemini Flash at 0.886 is close — prompt tuning or future Flash versions may cross 0.95"
 
   # ── Compromise Detection Evals ───────────────────────────────────────────
 

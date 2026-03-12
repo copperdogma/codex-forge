@@ -150,6 +150,7 @@ This index tracks stories in `/docs/stories/` for the codex-forge pipeline.
 |||| 131 | Onward Table Structure Fidelity | High | Done | /docs/stories/story-131-onward-table-structure-fidelity.md |
 |||| 132 | Fix Provenance Envelope Gaps | High | Done | /docs/stories/story-132-provenance-envelope-fixes.md |
 |||| 133 | Gemini 3 Flash as Cost-Optimized Crop Detector | High | Done | /docs/stories/story-133-gemini-flash-crop-detector.md |
+|||| 134 | OCR Pipeline Speed & Cost Optimization | High | Draft | /docs/stories/story-134-ocr-pipeline-speed-cost-optimization.md |
 
 ## Notes
 - Status "Done" reflects current working state in codex-forge. "To Do" items are planned next steps aligned with `docs/requirements.md` and `snapshot.md`.
