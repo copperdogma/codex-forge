@@ -145,10 +145,11 @@ This index tracks stories in `/docs/stories/` for the codex-forge pipeline.
 |||| 126 | Crop Quality — Text Validation Loop | High | Done | /docs/stories/story-126-crop-quality-text-validation-loop.md |
 |||| 127 | OCR Model Eval for Genealogy / Table-Heavy Books | High | Done | /docs/stories/story-127-ocr-model-eval-genealogy.md |
 |||| 128 | Onward Table Fidelity Verification | High | Done | /docs/stories/story-128-onward-table-fidelity-verification.md |
-|||| 129 | Onward HTML Output Polish | Medium | To Do | /docs/stories/story-129-onward-html-output-polish.md |
+|||| 129 | HTML Output Polish + Image Integration | Medium | Done | /docs/stories/story-129-onward-html-output-polish.md |
 |||| 130 | Book Website Template Module | Medium | To Do | /docs/stories/story-130-onward-book-website-template.md |
 |||| 131 | Onward Table Structure Fidelity | High | Done | /docs/stories/story-131-onward-table-structure-fidelity.md |
 |||| 132 | Fix Provenance Envelope Gaps | High | Done | /docs/stories/story-132-provenance-envelope-fixes.md |
+|||| 133 | Gemini 3 Flash as Cost-Optimized Crop Detector | High | Done | /docs/stories/story-133-gemini-flash-crop-detector.md |
 
 ## Notes
 - Status "Done" reflects current working state in codex-forge. "To Do" items are planned next steps aligned with `docs/requirements.md` and `snapshot.md`.

@@ -1,0 +1,137 @@
+description: "Image crop extraction — all Gemini models with bbox normalization fix"
+
+defaultTest:
+  options:
+    provider: anthropic:messages:claude-opus-4-6
+
+prompts:
+  - id: "file://../prompts/crop-baseline.js"
+    label: "baseline"
+  - id: "file://../prompts/crop-strict-exclude.js"
+    label: "strict-exclude"
+  - id: "file://../prompts/crop-two-step.js"
+    label: "two-step"
+
+providers:
+  - id: google:gemini-3-pro-preview
+    label: "Gemini 3 Pro"
+    config:
+      temperature: 0
+      maxOutputTokens: 16384
+  - id: google:gemini-3.1-pro-preview
+    label: "Gemini 3.1 Pro"
+    config:
+      temperature: 0
+      maxOutputTokens: 16384
+  - id: google:gemini-3-flash-preview
+    label: "Gemini 3 Flash"
+    config:
+      temperature: 0
+      maxOutputTokens: 16384
+  - id: google:gemini-3.1-flash-lite-preview
+    label: "Gemini 3.1 Flash Lite"
+    config:
+      temperature: 0
+      maxOutputTokens: 16384
+  - id: google:gemini-2.5-pro
+    label: "Gemini 2.5 Pro"
+    config:
+      temperature: 0
+      maxOutputTokens: 16384
+  - id: google:gemini-2.5-flash
+    label: "Gemini 2.5 Flash"
+    config:
+      temperature: 0
+      maxOutputTokens: 16384
+
+tests:
+  - vars:
+      image: file://../input/source-pages-b64/Image000.b64.txt
+      golden_key: "Image000"
+    assert:
+      - type: python
+        value: file://../scorers/image_crop_scorer.py
+
+  - vars:
+      image: file://../input/source-pages-b64/Image001.b64.txt
+      golden_key: "Image001"
+    assert:
+      - type: python
+        value: file://../scorers/image_crop_scorer.py
+
+  - vars:
+      image: file://../input/source-pages-b64/Image003.b64.txt
+      golden_key: "Image003"
+    assert:
+      - type: python
+        value: file://../scorers/image_crop_scorer.py
+
+  - vars:
+      image: file://../input/source-pages-b64/Image008.b64.txt
+      golden_key: "Image008"
+    assert:
+      - type: python
+        value: file://../scorers/image_crop_scorer.py
+
+  - vars:
+      image: file://../input/source-pages-b64/Image011.b64.txt
+      golden_key: "Image011"
+    assert:
+      - type: python
+        value: file://../scorers/image_crop_scorer.py
+
+  - vars:
+      image: file://../input/source-pages-b64/Image013.b64.txt
+      golden_key: "Image013"
+    assert:
+      - type: python
+        value: file://../scorers/image_crop_scorer.py
+
+  - vars:
+      image: file://../input/source-pages-b64/Image020.b64.txt
+      golden_key: "Image020"
+    assert:
+      - type: python
+        value: file://../scorers/image_crop_scorer.py
+
+  - vars:
+      image: file://../input/source-pages-b64/Image021.b64.txt
+      golden_key: "Image021"
+    assert:
+      - type: python
+        value: file://../scorers/image_crop_scorer.py
+
+  - vars:
+      image: file://../input/source-pages-b64/Image037.b64.txt
+      golden_key: "Image037"
+    assert:
+      - type: python
+        value: file://../scorers/image_crop_scorer.py
+
+  - vars:
+      image: file://../input/source-pages-b64/Image059.b64.txt
+      golden_key: "Image059"
+    assert:
+      - type: python
+        value: file://../scorers/image_crop_scorer.py
+
+  - vars:
+      image: file://../input/source-pages-b64/Image121.b64.txt
+      golden_key: "Image121"
+    assert:
+      - type: python
+        value: file://../scorers/image_crop_scorer.py
+
+  - vars:
+      image: file://../input/source-pages-b64/Image124.b64.txt
+      golden_key: "Image124"
+    assert:
+      - type: python
+        value: file://../scorers/image_crop_scorer.py
+
+  - vars:
+      image: file://../input/source-pages-b64/Image126.b64.txt
+      golden_key: "Image126"
+    assert:
+      - type: python
+        value: file://../scorers/image_crop_scorer.py

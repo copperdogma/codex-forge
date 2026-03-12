@@ -58,9 +58,9 @@ stages:
       padding_percent: 0.08
       text_kernel: 3
       text_iterations: 1
-      rescue_model: gemini-3-pro-preview
+      rescue_model: gemini-3-flash-preview
       rescue_temperature: 0.0
-      rescue_max_tokens: 4096  # Gemini uses thinking tokens that eat into output budget; was 800 for GPT-5.1
+      rescue_max_tokens: 8192  # Gemini Flash uses thinking tokens that eat into output budget; 8192 prevents truncation on ambiguous pages
       rescue_max_pages: 20
       rescue_include_alt: true
       rescue_always: true
@@ -164,3 +164,5 @@ stages:
     out: chapters_manifest.jsonl
     params:
       images_subdir: images
+      book_title: "Onward to the Unknown"
+      book_author: ""

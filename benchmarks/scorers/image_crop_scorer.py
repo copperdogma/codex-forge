@@ -17,18 +17,23 @@ import sys
 from typing import Any
 
 
-def _parse_json(text: str) -> dict | None:
-    """Extract JSON from model output, handling markdown fences."""
+def _parse_json(text: str) -> dict | list | None:
+    """Extract JSON from model output, handling markdown fences and arrays."""
     # Strip markdown code fences
     text = text.strip()
-    # Try to find JSON in ```json ... ``` blocks
-    m = re.search(r"```(?:json)?\s*(\{.*?\})\s*```", text, re.DOTALL)
+    # Try to find JSON in ```json ... ``` blocks (object or array)
+    m = re.search(r"```(?:json)?\s*([\{\[].*?[\}\]])\s*```", text, re.DOTALL)
     if m:
         text = m.group(1)
-    # Also try bare JSON
-    m2 = re.search(r"\{.*\}", text, re.DOTALL)
-    if m2:
-        text = m2.group(0)
+    else:
+        # Try bare JSON object
+        m2 = re.search(r"\{.*\}", text, re.DOTALL)
+        # Try bare JSON array
+        m3 = re.search(r"\[.*\]", text, re.DOTALL)
+        if m2:
+            text = m2.group(0)
+        elif m3:
+            text = m3.group(0)
     try:
         return json.loads(text)
     except (json.JSONDecodeError, ValueError):
@@ -89,6 +94,53 @@ def _match_boxes_greedy(
     return matches
 
 
+def _normalize_scale(box: list[float]) -> list[float]:
+    """If any coordinate > 1.0, assume 0-1000 scale and normalize to 0-1."""
+    if any(v > 1.0 for v in box):
+        return [v / 1000.0 for v in box]
+    return list(box)
+
+
+def _swap_axes(box: list[float]) -> list[float]:
+    """Convert [y0, x0, y1, x1] -> [x0, y0, x1, y1]."""
+    return [box[1], box[0], box[3], box[2]]
+
+
+def _ensure_order(box: list[float]) -> list[float]:
+    """Ensure x0 <= x1 and y0 <= y1."""
+    x0, y0, x1, y1 = box
+    return [min(x0, x1), min(y0, y1), max(x0, x1), max(y0, y1)]
+
+
+def _auto_normalize_boxes(
+    predicted: list[list[float]], golden: list[list[float]]
+) -> list[list[float]]:
+    """Try standard and axis-swapped interpretations, pick the one with better IoU."""
+    if not predicted or not golden:
+        return predicted
+
+    # Candidate interpretations: (label, transform_fn)
+    def as_standard(box):
+        return _ensure_order(_normalize_scale(box))
+
+    def as_swapped(box):
+        return _ensure_order(_swap_axes(_normalize_scale(box)))
+
+    # Score each interpretation against golden boxes
+    best_interp = None
+    best_total_iou = -1.0
+
+    for transform in (as_standard, as_swapped):
+        candidate = [transform(b) for b in predicted]
+        matches = _match_boxes_greedy(candidate, golden)
+        total_iou = sum(m[2] for m in matches)
+        if total_iou > best_total_iou:
+            best_total_iou = total_iou
+            best_interp = candidate
+
+    return best_interp
+
+
 def get_assert(output: str, context: dict) -> dict:
     """Score image crop extraction output against golden bounding boxes.
 
@@ -128,23 +180,51 @@ def get_assert(output: str, context: dict) -> dict:
             "reason": "Failed to parse JSON from model output",
         }
 
-    images = parsed.get("images", [])
-    if not isinstance(images, list):
+    # Handle multiple response formats:
+    # Standard: {"images": [{bbox: ...}, ...]}
+    # Gemini native list: [{box_2d: ...}, ...]
+    # Gemini native single: {box_2d: ...}
+    if isinstance(parsed, list):
+        images = parsed
+    elif isinstance(parsed, dict):
+        images = parsed.get("images", [])
+        if not isinstance(images, list):
+            if "box_2d" in parsed:
+                images = [parsed]
+            else:
+                return {
+                    "pass": False,
+                    "score": 0.0,
+                    "reason": f"'images' field is not a list: {type(images).__name__}",
+                }
+    else:
         return {
             "pass": False,
             "score": 0.0,
-            "reason": f"'images' field is not a list: {type(images).__name__}",
+            "reason": f"Unexpected parsed type: {type(parsed).__name__}",
         }
 
-    # Extract predicted boxes
+    # Extract predicted boxes, normalizing coordinate systems
     predicted_boxes = []
     for img in images:
+        # Try standard "bbox", then Gemini's "box_2d", "box_3d", "box_4d", etc.
         bbox = img.get("bbox")
+        if not bbox:
+            for key in sorted(img.keys()):
+                if key.startswith("box_") and isinstance(img[key], list):
+                    bbox = img[key]
+                    break
         if isinstance(bbox, list) and len(bbox) == 4:
             try:
                 predicted_boxes.append([float(v) for v in bbox])
             except (TypeError, ValueError):
                 continue
+
+    # Auto-normalize: handle Gemini's native formats
+    # 1) Scale: if coords > 1.0, assume 0-1000 scale and divide
+    # 2) Axis order: Gemini natively returns [y_min, x_min, y_max, x_max],
+    #    try both [x,y,x,y] and [y,x,y,x] interpretations, pick best IoU
+    predicted_boxes = _auto_normalize_boxes(predicted_boxes, golden_boxes)
 
     n_predicted = len(predicted_boxes)
 

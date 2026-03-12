@@ -1,3 +1,39 @@
+## [2026-03-11-03] - HTML output polish and image integration (Story 129)
+
+### Added
+- HTML5 document wrapper (doctype, head, body) for all chapter and index output files
+- Embedded CSS stylesheet — system font stack, responsive images, table borders/padding, max-width container, print media query
+- `<nav>` with prev/next chapter links and index back-link (top + bottom of each page)
+- `<figure>`/`<figcaption>` wrapping for all attached images with VLM-extracted caption text
+- Rich alt text from VLM `image_description` (falls back to OCR `alt`)
+- `scope="col"` and `scope="row"` on table header cells for accessibility
+- Enhanced index page with book title, author, chapter list with page ranges
+- `--book-title` and `--book-author` CLI params for generic book support
+- `illustration_manifest` input wiring in `recipe-images-ocr-html-mvp.yaml`
+- 32 pytest structural tests for HTML output quality (`tests/test_build_chapter_html.py`)
+
+### Changed
+- `_attach_img_src()` → `_attach_images()` with page-aware matching and count-mismatch warnings
+- `module.yaml` updated with new params (`images_subdir`, `book_title`, `book_author`)
+
+## [2026-03-11-02] - Gemini 3 Flash as cost-optimized crop detector (Story 133)
+
+### Added
+- `_parse_gemini_box()` and `_auto_fix_axis_swap()` in crop module — handle Gemini's native `[y,x,y,x]` coordinate format
+- `benchmarks/prompts/crop-conservative-count.js` — prompt that reduces over-detection on cover/multi-element pages
+- `benchmarks/tasks/image-crop-g3flash-prompts.yaml` — eval config for prompt comparison
+- `tests/test_gemini_axis_swap.py` — 20 unit tests for Gemini coordinate handling
+- Stylized text logos (decorative fonts, title graphics) now detected as extractable images
+
+### Changed
+- Default crop detector: `gemini-3-pro-preview` → `gemini-3-flash-preview` (5.7x cost reduction, $1.25→$0.22/book)
+- `rescue_max_tokens`: 4096 → 8192 (prevents thinking token truncation on ambiguous pages)
+- Eval scorer auto-normalizes Gemini native formats (scale + axis swap)
+
+### Fixed
+- Gemini array axis swap: `image_box` arrays now correctly interpreted as `[y0,x0,y1,x1]` for Gemini models
+- Validator rejections on correct VLM boxes eliminated (was caused by swapped coordinates landing on wrong page regions)
+
 ## [2026-03-11-01] - Provenance envelope fixes and measurement tool (Story 132)
 
 ### Added

@@ -44,12 +44,18 @@ evals:
       pass_rate: 0.90
 
     scores:
+      - model: "Gemini 3 Flash (conservative-count prompt)"
+        metrics:
+          overall: 0.900
+          pass_rate: 0.923
+        measured: 2026-03-11
+        note: "Story 133. 5.7x cheaper than Pro ($0.22 vs $1.25/book). Axis-swap fix + conservative-count prompt."
       - model: "Gemini 3 Pro (detector) + Gemini 2.5 Flash (validator)"
         metrics:
           overall: 0.856
           pass_rate: 0.77
         measured: 2026-01-25
-        note: "Winning combo. Two-stage detector-validator with auto-retry on count mismatch."
+        note: "Previous winner. Two-stage detector-validator with auto-retry on count mismatch."
       - model: "Gemini 2.5 Pro"
         metrics:
           overall: 0.78
@@ -81,6 +87,13 @@ evals:
         score_before: 0.856
         score_after: 0.856
         note: "Score unchanged but text contamination eliminated in production crops"
+      - id: "003"
+        date: 2026-03-11
+        status: succeeded
+        approach: "Story 133: Gemini 3 Flash + conservative-count prompt + axis-swap fix + token budget increase"
+        score_before: 0.856
+        score_after: 0.900
+        note: "5.7x cost reduction ($1.25→$0.22/book). 20/20 golden crops in production pipeline."
 
     retry_when:
       - condition: new-subject-model

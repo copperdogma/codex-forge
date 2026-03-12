@@ -47,6 +47,109 @@ else:
 def _is_gemini_model(model: str) -> bool:
     return model.startswith("gemini-")
 
+
+def _parse_gemini_box(item: dict) -> dict | None:
+    """Extract bbox from a Gemini-native response item.
+
+    Gemini models may return boxes as:
+    - Standard: {"image_box": {"x0":..., "y0":..., ...}}
+    - Array: {"image_box": [x0, y0, x1, y1]} or [y0, x0, y1, x1]
+    - Native: {"box_2d": [y_min, x_min, y_max, x_max]} at 0-1000 scale
+
+    For box_2d (Gemini's native trained format), swap axes and scale.
+    Returns dict with x0, y0, x1, y1 in the standard orientation, or None.
+    """
+    # box_2d is Gemini's native format: [y_min, x_min, y_max, x_max] at 0-1000
+    for key in ("box_2d", "box_3d", "box_4d"):
+        raw = item.get(key)
+        if isinstance(raw, (list, tuple)) and len(raw) == 4:
+            try:
+                vals = [float(v) for v in raw]
+            except (TypeError, ValueError):
+                continue
+            # Gemini native: [y_min, x_min, y_max, x_max] → swap to [x0, y0, x1, y1]
+            y_min, x_min, y_max, x_max = vals
+            # Scale from 0-1000 to 0-1 if needed
+            if any(v > 1.0 for v in vals):
+                x_min, y_min, x_max, y_max = x_min / 1000, y_min / 1000, x_max / 1000, y_max / 1000
+            return {"x0": x_min, "y0": y_min, "x1": x_max, "y1": y_max}
+    return None
+
+
+def _auto_fix_axis_swap(boxes: list, page_w: int, page_h: int) -> list:
+    """Detect and fix Gemini's axis-swap tendency on all boxes from a page.
+
+    Gemini sometimes returns [y0, x0, y1, x1] instead of [x0, y0, x1, y1] even
+    when using standard image_box keys. We detect this by trying both interpretations
+    and scoring each based on how well the resulting pixel boxes fit the page geometry.
+
+    The key insight: on a portrait page (w < h), if coordinates are swapped, the
+    pixel-space box aspect ratio will be distorted in a predictable way.
+    """
+    if not boxes or page_w == 0 or page_h == 0:
+        return boxes
+
+    def _pixel_boxes(blist, swap=False):
+        """Convert normalized boxes to pixel coords, optionally swapping axes."""
+        result = []
+        for b in blist:
+            x0, y0, x1, y1 = b["x0"], b["y0"], b["x1"], b["y1"]
+            if swap:
+                x0, y0, x1, y1 = y0, x0, y1, x1
+            # Scale from 0-1000 to 0-1 if needed
+            if any(v > 1.0 for v in (x0, y0, x1, y1)):
+                x0, y0, x1, y1 = x0 / 1000, y0 / 1000, x1 / 1000, y1 / 1000
+            # Ensure order
+            if x0 > x1:
+                x0, x1 = x1, x0
+            if y0 > y1:
+                y0, y1 = y1, y0
+            px0, py0 = int(x0 * page_w), int(y0 * page_h)
+            px1, py1 = int(x1 * page_w), int(y1 * page_h)
+            result.append((px0, py0, px1, py1))
+        return result
+
+    def _score_boxes(pixel_boxes):
+        """Score how reasonable a set of pixel boxes looks.
+        Higher = more likely correct orientation."""
+        score = 0.0
+        for px0, py0, px1, py1 in pixel_boxes:
+            bw = px1 - px0
+            bh = py1 - py0
+            if bw <= 0 or bh <= 0:
+                score -= 10.0
+                continue
+            # Penalize out-of-bounds
+            if px1 > page_w * 1.02 or py1 > page_h * 1.02:
+                score -= 5.0
+            # Reward boxes with reasonable area (not too tiny, not the whole page)
+            area_ratio = (bw * bh) / (page_w * page_h)
+            if 0.005 < area_ratio < 0.8:
+                score += 1.0
+            # Reward boxes that are centered or well-positioned
+            # (not jammed into a corner with weird proportions)
+            cx = (px0 + px1) / 2 / page_w
+            cy = (py0 + py1) / 2 / page_h
+            if 0.1 < cx < 0.9 and 0.1 < cy < 0.9:
+                score += 0.5
+        return score
+
+    normal_pixels = _pixel_boxes(boxes, swap=False)
+    swapped_pixels = _pixel_boxes(boxes, swap=True)
+    score_normal = _score_boxes(normal_pixels)
+    score_swapped = _score_boxes(swapped_pixels)
+
+    if score_swapped > score_normal:
+        fixed = []
+        for b in boxes:
+            b_copy = dict(b)
+            b_copy["x0"], b_copy["y0"] = b["y0"], b["x0"]
+            b_copy["x1"], b_copy["y1"] = b["y1"], b["x1"]
+            fixed.append(b_copy)
+        _log(f"    Auto-fix: swapped axes on {len(fixed)} box(es) (score {score_normal:.1f} → {score_swapped:.1f})")
+        return fixed
+    return boxes
+
 Image.MAX_IMAGE_PIXELS = None
 
 SUPPORTED_EXTS = {".jpg", ".jpeg", ".png", ".tif", ".tiff", ".webp", ".bmp"}
@@ -68,13 +171,15 @@ Return a JSON array of objects with keys:
   - image_box: {x0, y0, x1, y1}
   - caption_box: {x0, y0, x1, y1} or null
   - image_description: string — brief description of the image content (e.g. "portrait of a man in military uniform", "pen-and-ink drawing of a farmhouse")
-  - contains_text: boolean — true ONLY if the image INHERENTLY contains text as part of the image itself (e.g. stamps, seals, signs, memorial plaques, labels within diagrams, handwritten text on the photo). False for photos/illustrations with no integral text.
-  - text_reason: string or null — if contains_text is true, explain what text is part of the image and why it belongs (e.g. "memorial plaque with engraved names", "official seal with organization name")
+  - contains_text: boolean — true ONLY if the image INHERENTLY contains text as part of the image itself (e.g. stamps, seals, signs, memorial plaques, labels within diagrams, handwritten text on the photo, stylized title text). False for photos/illustrations with no integral text.
+  - text_reason: string or null — if contains_text is true, explain what text is part of the image and why it belongs (e.g. "memorial plaque with engraved names", "official seal with organization name", "stylized book title in decorative font")
+  - caption_text: string or null — if caption_box is non-null, transcribe the exact caption text (e.g. "Arthur L'Heureux, circa 1942"). Null if no caption.
   - source_issues: string or null — note any quality issues visible in the SOURCE photo itself, not crop issues (e.g. "top of head cut off in original photo", "photo is faded/damaged", "torn edge on right side")
 - Coordinates must be normalized floats in [0,1], relative to the full image.
 - Origin is top-left; x increases right, y increases down.
 - image_box must be a tight box around the image content ONLY (exclude captions, page numbers, and body text).
 - EXCEPTION — handwritten signatures, autographs, and hand-drawn marks are IMAGES, not text. Always include them inside image_box. If signatures appear next to a seal, stamp, or emblem, draw ONE image_box that encompasses the seal AND all adjacent signatures together.
+- Stylized title text, decorative logos, or text rendered in artistic/display fonts that differ visually from body text ARE images — include them.
 - If the image has a clear border, crop to that border.
 - If there is any caption or nearby text directly below or above the image, caption_box MUST be that text region (non-null), even if it is a header line.
 - Prefer to under-crop rather than include body text; if in doubt, shrink image_box to exclude printed text. But never exclude handwritten signatures.
@@ -94,7 +199,7 @@ Return JSON only.
 
 
 # Keys propagated from detector VLM response through box transformations
-_DETECTOR_META_KEYS = ("_description", "_contains_text", "_text_reason", "_source_issues")
+_DETECTOR_META_KEYS = ("_description", "_contains_text", "_text_reason", "_source_issues", "_caption_text")
 
 
 def _copy_detector_meta(src: dict, dst: dict) -> dict:
@@ -223,14 +328,34 @@ def _call_vlm_boxes(
                     cap_box = item.get("caption_box")
                     schema_mode = True
                 else:
-                    img_box = item
-                    cap_box = None
-                    schema_mode = False
-                # Handle array format [x0, y0, x1, y1] from some models
+                    # Check for Gemini native box_2d/box_3d/box_4d format
+                    gemini_box = _parse_gemini_box(item)
+                    if gemini_box is not None:
+                        img_box = gemini_box
+                        cap_box = None
+                        schema_mode = False
+                        # Pull description from Gemini's native fields
+                        desc = item.get("label") or item.get("description") or ""
+                        if desc:
+                            img_box["_gemini_description"] = str(desc)
+                    else:
+                        img_box = item
+                        cap_box = None
+                        schema_mode = False
+                # Handle array format from models.
+                # Gemini returns arrays as [y0, x0, y1, x1] (native format) even
+                # when asked for [x0, y0, x1, y1]. Swap axes for Gemini arrays.
                 if isinstance(img_box, (list, tuple)) and len(img_box) == 4:
-                    img_box = {"x0": img_box[0], "y0": img_box[1], "x1": img_box[2], "y1": img_box[3]}
+                    if _is_gemini_model(model):
+                        # Gemini native: [y0, x0, y1, x1] → swap to [x0, y0, x1, y1]
+                        img_box = {"x0": img_box[1], "y0": img_box[0], "x1": img_box[3], "y1": img_box[2]}
+                    else:
+                        img_box = {"x0": img_box[0], "y0": img_box[1], "x1": img_box[2], "y1": img_box[3]}
                 if isinstance(cap_box, (list, tuple)) and len(cap_box) == 4:
-                    cap_box = {"x0": cap_box[0], "y0": cap_box[1], "x1": cap_box[2], "y1": cap_box[3]}
+                    if _is_gemini_model(model):
+                        cap_box = {"x0": cap_box[1], "y0": cap_box[0], "x1": cap_box[3], "y1": cap_box[2]}
+                    else:
+                        cap_box = {"x0": cap_box[0], "y0": cap_box[1], "x1": cap_box[2], "y1": cap_box[3]}
                 try:
                     x0 = float(img_box.get("x0"))
                     y0 = float(img_box.get("y0"))
@@ -262,6 +387,9 @@ def _call_vlm_boxes(
                     box["_contains_text"] = bool(item.get("contains_text", False))
                     box["_text_reason"] = str(item.get("text_reason") or "")
                     box["_source_issues"] = str(item.get("source_issues") or "")
+                    box["_caption_text"] = str(item.get("caption_text") or "")
+                elif img_box.get("_gemini_description"):
+                    box["_description"] = img_box["_gemini_description"]
                 boxes.append(box)
     except Exception:
         boxes = []
@@ -358,6 +486,11 @@ def _call_vlm_caption_boxes(
                 if isinstance(item, (list, tuple)) and len(item) == 4:
                     item = {"x0": item[0], "y0": item[1], "x1": item[2], "y1": item[3]}
                 if not isinstance(item, dict):
+                    continue
+                # Check for Gemini native box_2d format
+                gemini_box = _parse_gemini_box(item)
+                if gemini_box is not None:
+                    boxes.append(gemini_box)
                     continue
                 try:
                     x0 = float(item.get("x0"))
@@ -2604,6 +2737,8 @@ def crop_illustrations_guided(
                     "image_description": "Book cover page",
                     "contains_text": True,
                     "source_issues": "",
+                    "caption_box": None,
+                    "caption_text": None,
                 })
             except Exception as exc:
                 _log(f"  Page {page_num}: Cover page capture failed: {exc}")
@@ -2758,6 +2893,9 @@ def crop_illustrations_guided(
                     rescue_max_tokens,
                     rescue_timeout_seconds,
                 )
+                # Fix Gemini's axis-swap tendency: [y,x,y,x] → [x,y,x,y]
+                if _is_gemini_model(rescue_model) and vlm_boxes:
+                    vlm_boxes = _auto_fix_axis_swap(vlm_boxes, w, h)
                 has_caption_schema = any(b.get("_caption_schema") for b in vlm_boxes)
                 _log(f"    VLM rescue: caption schema returned={has_caption_schema}")
                 debug_dir = os.environ.get("CROP_VLM_DEBUG_DIR")
@@ -2825,6 +2963,9 @@ def crop_illustrations_guided(
                             rescue_timeout_seconds,
                             extra_instructions=retry_instructions,
                         )
+                        # Fix Gemini's axis-swap tendency on retry too
+                        if _is_gemini_model(rescue_model) and vlm_boxes:
+                            vlm_boxes = _auto_fix_axis_swap(vlm_boxes, w, h)
                         has_caption_schema = any(b.get("_caption_schema") for b in vlm_boxes)
                         debug_dir = os.environ.get("CROP_VLM_DEBUG_DIR")
                         if debug_dir:
@@ -3178,6 +3319,9 @@ def crop_illustrations_guided(
                     rescue_temperature, rescue_max_tokens, rescue_timeout_seconds,
                     extra_instructions=retry_instructions,
                 )
+                # Fix Gemini's axis-swap tendency on auto-retry
+                if _is_gemini_model(rescue_model) and retry_vlm_boxes:
+                    retry_vlm_boxes = _auto_fix_axis_swap(retry_vlm_boxes, img_w, img_h)
                 retry_normalized = []
                 for rbox in retry_vlm_boxes:
                     rpx = _normalize_box(rbox, img_w, img_h)
@@ -3318,6 +3462,8 @@ def crop_illustrations_guided(
                 "image_description": box.get("_description", ""),
                 "contains_text": box.get("_contains_text", False),
                 "source_issues": box.get("_source_issues", ""),
+                "caption_box": box.get("caption_box"),
+                "caption_text": box.get("_caption_text") or None,
             }
 
             manifest.append(record)
