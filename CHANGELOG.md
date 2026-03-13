@@ -1,3 +1,10 @@
+## [2026-03-13-02] - Improve story closure and scope guidance
+
+### Changed
+- Updated `build-story`, `validate`, and `mark-story-done` so agents make a firm closure recommendation instead of ending in ambiguous "not done" states
+- Added explicit guidance to absorb modest, tightly coupled scope deltas into the current story and present larger scope expansions for user approval
+- Standardized effort guidance around relative sizing instead of human-style hour/day estimates
+
 ## [2026-03-13-01] - OCR empty-page recovery and TOC coarse boundaries (Story 137)
 
 ### Added
