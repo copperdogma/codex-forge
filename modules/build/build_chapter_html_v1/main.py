@@ -280,6 +280,8 @@ def _titles_related(a: Optional[str], b: Optional[str]) -> bool:
     def _tokens_match(left: str, right: str) -> bool:
         if left == right:
             return True
+        if min(len(left), len(right)) <= 1:
+            return False
         if left.startswith(right) or right.startswith(left):
             return True
         return SequenceMatcher(a=left, b=right).ratio() >= 0.83
@@ -413,21 +415,165 @@ def _stitch_page_breaks(page_htmls: List[str]) -> str:
     return "\n".join(soup.decode_contents() for soup in soups if soup.decode_contents().strip())
 
 
+def _related_title_index(heading: Optional[str], titles: List[str]) -> Optional[int]:
+    if not heading:
+        return None
+    for idx, title in enumerate(titles):
+        if _titles_related(heading, title):
+            return idx
+    return None
+
+
+def _build_segment(
+    title: str,
+    portion_title: str,
+    portion_page_start: int,
+    pages: List[Dict[str, Any]],
+    *,
+    carry_back: bool = False,
+) -> Dict[str, Any]:
+    return {
+        "title": title,
+        "page_start": pages[0]["printed_page_number"],
+        "page_end": pages[-1]["printed_page_number"],
+        "source_pages": [p["page_number"] for p in pages if isinstance(p.get("page_number"), int)],
+        "source_printed_pages": [
+            p["printed_page_number"]
+            for p in pages
+            if isinstance(p.get("printed_page_number"), int)
+        ],
+        "body_html": _stitch_page_breaks([p["html"] for p in pages]),
+        "source_portion_title": portion_title,
+        "source_portion_page_start": portion_page_start,
+        "source_portion_titles": [portion_title],
+        "source_portion_page_starts": [portion_page_start],
+        "carry_back": carry_back,
+    }
+
+
 def _refine_chapter_segments(
     portion_title: str,
     portion_page_start: int,
     prepared_pages: List[Dict[str, Any]],
     candidate_titles: List[str],
+    *,
+    previous_title: Optional[str] = None,
+    stale_portion: bool = False,
 ) -> List[Dict[str, Any]]:
     if not prepared_pages:
         return []
 
     segments: List[Dict[str, Any]] = []
-    current_pages: List[Dict[str, Any]] = []
+    remaining_pages = list(prepared_pages)
     current_title = portion_title
     current_heading = None
 
-    for page in prepared_pages:
+    if previous_title:
+        first_prev_heading_idx = None
+        next_owner_idx = None
+
+        for idx, page in enumerate(remaining_pages):
+            heading = page.get("owner_heading")
+            if not heading:
+                continue
+
+            heading_matches_prev = _titles_related(heading, previous_title)
+            heading_matches_known_title = _related_title_index(heading, candidate_titles) is not None
+            heading_starts_page = _starts_with_strong_h1(page.get("html") or "", heading)
+
+            if first_prev_heading_idx is None:
+                if heading_matches_prev:
+                    first_prev_heading_idx = idx
+                    continue
+                break
+
+            if not heading_matches_prev and (heading_matches_known_title or heading_starts_page):
+                next_owner_idx = idx
+                break
+
+        if first_prev_heading_idx is not None:
+            if next_owner_idx is None:
+                return [
+                    _build_segment(
+                        previous_title,
+                        portion_title,
+                        portion_page_start,
+                        remaining_pages,
+                        carry_back=True,
+                    )
+                ]
+
+            carry_back_pages = remaining_pages[:next_owner_idx]
+            segments.append(
+                _build_segment(
+                    previous_title,
+                    portion_title,
+                    portion_page_start,
+                    carry_back_pages,
+                    carry_back=True,
+                )
+            )
+            remaining_pages = remaining_pages[next_owner_idx:]
+            next_heading = remaining_pages[0].get("owner_heading")
+            current_title = next_heading or portion_title
+            current_heading = next_heading
+
+    if stale_portion:
+        same_title_idx = None
+        first_new_heading_idx = None
+        first_new_heading = None
+
+        for idx, page in enumerate(remaining_pages):
+            heading = page.get("owner_heading")
+            if not heading:
+                continue
+
+            if same_title_idx is None and _titles_related(heading, portion_title):
+                same_title_idx = idx
+
+            if first_new_heading_idx is not None:
+                continue
+
+            heading_matches_known_title = _related_title_index(heading, candidate_titles) is not None
+            heading_starts_page = _starts_with_strong_h1(page.get("html") or "", heading)
+            if not _titles_related(heading, portion_title) and (heading_matches_known_title or heading_starts_page):
+                first_new_heading_idx = idx
+                first_new_heading = heading
+
+        if first_new_heading_idx is not None and (
+            same_title_idx is None or first_new_heading_idx < same_title_idx
+        ):
+            carry_back_pages = remaining_pages[:first_new_heading_idx]
+            if carry_back_pages:
+                segments.append(
+                    _build_segment(
+                        portion_title,
+                        portion_title,
+                        portion_page_start,
+                        carry_back_pages,
+                        carry_back=True,
+                    )
+                )
+            remaining_pages = remaining_pages[first_new_heading_idx:]
+            current_title = first_new_heading or portion_title
+            current_heading = first_new_heading
+        elif same_title_idx is None:
+            return [
+                _build_segment(
+                    portion_title,
+                    portion_title,
+                    portion_page_start,
+                    remaining_pages,
+                    carry_back=True,
+                )
+            ]
+
+    if not remaining_pages:
+        return segments
+
+    current_pages: List[Dict[str, Any]] = []
+
+    for page in remaining_pages:
         heading = page.get("owner_heading")
         heading_matches_known_title = bool(
             heading and any(_titles_related(heading, title) for title in candidate_titles)
@@ -440,20 +586,7 @@ def _refine_chapter_segments(
             and current_heading
             and not _titles_related(heading, current_heading)
         ):
-            segments.append({
-                "title": current_title,
-                "page_start": current_pages[0]["printed_page_number"],
-                "page_end": current_pages[-1]["printed_page_number"],
-                "source_pages": [p["page_number"] for p in current_pages if isinstance(p.get("page_number"), int)],
-                "source_printed_pages": [
-                    p["printed_page_number"]
-                    for p in current_pages
-                    if isinstance(p.get("printed_page_number"), int)
-                ],
-                "body_html": _stitch_page_breaks([p["html"] for p in current_pages]),
-                "source_portion_title": portion_title,
-                "source_portion_page_start": portion_page_start,
-            })
+            segments.append(_build_segment(current_title, portion_title, portion_page_start, current_pages))
             current_pages = []
             current_title = heading
             current_heading = heading
@@ -465,22 +598,36 @@ def _refine_chapter_segments(
         current_pages.append(page)
 
     if current_pages:
-        segments.append({
-            "title": current_title,
-            "page_start": current_pages[0]["printed_page_number"],
-            "page_end": current_pages[-1]["printed_page_number"],
-            "source_pages": [p["page_number"] for p in current_pages if isinstance(p.get("page_number"), int)],
-            "source_printed_pages": [
-                p["printed_page_number"]
-                for p in current_pages
-                if isinstance(p.get("printed_page_number"), int)
-            ],
-            "body_html": _stitch_page_breaks([p["html"] for p in current_pages]),
-            "source_portion_title": portion_title,
-            "source_portion_page_start": portion_page_start,
-        })
+        segments.append(_build_segment(current_title, portion_title, portion_page_start, current_pages))
 
     return segments
+
+
+def _extend_unique(existing: Optional[List[Any]], new_values: Optional[List[Any]]) -> List[Any]:
+    merged = list(existing or [])
+    for value in new_values or []:
+        if value not in merged:
+            merged.append(value)
+    return merged
+
+
+def _merge_carry_back_segment(entry: Dict[str, Any], segment: Dict[str, Any]) -> None:
+    entry["body_html"] = _stitch_page_breaks([entry.get("body_html") or "", segment.get("body_html") or ""])
+    if segment.get("page_end") is not None:
+        entry["page_end"] = segment["page_end"]
+    entry["source_pages"] = _extend_unique(entry.get("source_pages"), segment.get("source_pages"))
+    entry["source_printed_pages"] = _extend_unique(
+        entry.get("source_printed_pages"),
+        segment.get("source_printed_pages"),
+    )
+    entry["source_portion_titles"] = _extend_unique(
+        entry.get("source_portion_titles") or [entry.get("source_portion_title")],
+        segment.get("source_portion_titles") or [segment.get("source_portion_title")],
+    )
+    entry["source_portion_page_starts"] = _extend_unique(
+        entry.get("source_portion_page_starts") or [entry.get("source_portion_page_start")],
+        segment.get("source_portion_page_starts") or [segment.get("source_portion_page_start")],
+    )
 
 
 def _group_manifest_by_page(manifest_path: str) -> Dict[int, List[Dict[str, Any]]]:
@@ -770,9 +917,30 @@ def main() -> None:
             })
 
         candidate_titles = portion_titles[portion_idx:]
-        refined_segments = _refine_chapter_segments(title, page_start, prepared_pages, candidate_titles)
+        stale_portion = any(
+            entry.get("kind") == "chapter" and _titles_related(title, entry.get("title"))
+            for entry in chapter_files
+        )
+        refined_segments = _refine_chapter_segments(
+            title,
+            page_start,
+            prepared_pages,
+            candidate_titles,
+            previous_title=chapter_files[-1]["title"] if chapter_files else None,
+            stale_portion=stale_portion,
+        )
 
         for segment in refined_segments:
+            if segment.get("carry_back") and chapter_files:
+                prev_entry = chapter_files[-1]
+                _merge_carry_back_segment(prev_entry, segment)
+                prev_toc = chapters_by_start.get(prev_entry["page_start"])
+                if prev_toc:
+                    prev_toc["page_end"] = prev_entry["page_end"]
+                if toc_entries:
+                    toc_entries[-1]["page_end"] = prev_entry["page_end"]
+                continue
+
             chapter_counter += 1
             filename = f"chapter-{chapter_counter:03d}.html"
             toc_entries.append({
@@ -800,6 +968,8 @@ def main() -> None:
                 "source_printed_pages": segment["source_printed_pages"],
                 "source_portion_title": segment["source_portion_title"],
                 "source_portion_page_start": segment["source_portion_page_start"],
+                "source_portion_titles": segment.get("source_portion_titles") or [segment["source_portion_title"]],
+                "source_portion_page_starts": segment.get("source_portion_page_starts") or [segment["source_portion_page_start"]],
             })
 
     # ── Build fallback pages (uncovered by chapters) ────────────────────
@@ -881,6 +1051,8 @@ def main() -> None:
             "source_printed_pages": entry.get("source_printed_pages"),
             "source_portion_title": entry.get("source_portion_title"),
             "source_portion_page_start": entry.get("source_portion_page_start"),
+            "source_portion_titles": entry.get("source_portion_titles"),
+            "source_portion_page_starts": entry.get("source_portion_page_starts"),
         })
 
     # ── Build index page ────────────────────────────────────────────────

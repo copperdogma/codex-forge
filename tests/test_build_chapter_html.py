@@ -18,6 +18,7 @@ from modules.build.build_chapter_html_v1.main import (
     _refine_chapter_segments,
     _strip_headers_and_numbers,
     _stitch_page_breaks,
+    _titles_related,
 )
 
 
@@ -383,6 +384,10 @@ class TestStructureRefinement:
         assert "<br" not in result
         assert "JOSEPHINE (L'HEUREUX ) ALAIN" in result
 
+    def test_title_matching_does_not_confuse_single_letter_last_name_tokens(self):
+        assert _titles_related("Wilfrid L'Heureux", "Wilfred")
+        assert not _titles_related("LEONIDAS L'HEUREUX", "ARTHUR L'HEUREUX")
+
     def test_refines_coarse_span_into_multiple_owner_segments(self):
         pages = [
             {
@@ -413,7 +418,7 @@ class TestStructureRefinement:
         assert segments[0]["page_end"] == 49
         assert segments[1]["page_start"] == 50
 
-    def test_retitles_stale_coarse_span_from_first_visible_owner(self):
+    def test_marks_leading_pages_for_carry_back_when_stale_span_reaches_new_owner(self):
         pages = [
             {
                 "html": "<p>Blank spacer page.</p>",
@@ -428,11 +433,21 @@ class TestStructureRefinement:
                 "owner_heading": "PIERRE L'HEUREUX",
             },
         ]
-        segments = _refine_chapter_segments("Wilfred", 98, pages, ["Wilfred", "Pierre", "Antoine"])
-        assert len(segments) == 1
-        assert segments[0]["title"] == "PIERRE L'HEUREUX"
+        segments = _refine_chapter_segments(
+            "Wilfred",
+            98,
+            pages,
+            ["Wilfred", "Pierre", "Antoine"],
+            stale_portion=True,
+        )
+        assert len(segments) == 2
+        assert segments[0]["carry_back"] is True
+        assert segments[0]["title"] == "Wilfred"
         assert segments[0]["page_start"] == 98
-        assert segments[0]["page_end"] == 99
+        assert segments[0]["page_end"] == 98
+        assert segments[1]["title"] == "PIERRE L'HEUREUX"
+        assert segments[1]["page_start"] == 99
+        assert segments[1]["page_end"] == 99
 
     def test_accepts_minor_title_spelling_drift(self):
         pages = [
@@ -447,6 +462,129 @@ class TestStructureRefinement:
         assert len(segments) == 1
         assert segments[0]["title"] == "Wilfrid L'Heureux"
 
+    def test_carry_backs_entire_stale_anonymous_span(self):
+        pages = [
+            {
+                "html": "<table><tr><td>Tail rows.</td></tr></table>",
+                "page_number": 98,
+                "printed_page_number": 89,
+                "owner_heading": None,
+            },
+        ]
+        segments = _refine_chapter_segments(
+            "Roseanna",
+            89,
+            pages,
+            ["Roseanna", "Antoinette", "Emilie"],
+            stale_portion=True,
+        )
+        assert len(segments) == 1
+        assert segments[0]["carry_back"] is True
+        assert segments[0]["title"] == "Roseanna"
+        assert segments[0]["page_start"] == 89
+        assert segments[0]["page_end"] == 89
+
+    def test_carry_backs_prefix_when_first_heading_matches_previous_chapter(self):
+        pages = [
+            {
+                "html": "<h1>George L'Heureux</h1><p>George genealogy starts.</p>",
+                "page_number": 62,
+                "printed_page_number": 53,
+                "owner_heading": "George L'Heureux",
+            },
+            {
+                "html": "<table><tr><td>George continuation.</td></tr></table>",
+                "page_number": 63,
+                "printed_page_number": 54,
+                "owner_heading": None,
+            },
+            {
+                "html": "<h1>JOE (JOSEPH) L'HEUREUX</h1><p>Joe intro.</p>",
+                "page_number": 66,
+                "printed_page_number": 57,
+                "owner_heading": "JOE (JOSEPH) L'HEUREUX",
+            },
+        ]
+        segments = _refine_chapter_segments(
+            "Paul",
+            53,
+            pages,
+            ["Paul", "George", "Joe"],
+            previous_title="GEORGE L'HEUREUX",
+        )
+        assert len(segments) == 2
+        assert segments[0]["carry_back"] is True
+        assert segments[0]["title"] == "GEORGE L'HEUREUX"
+        assert segments[0]["page_start"] == 53
+        assert segments[0]["page_end"] == 54
+        assert segments[1]["title"] == "JOE (JOSEPH) L'HEUREUX"
+        assert segments[1]["page_start"] == 57
+
+    def test_previous_title_does_not_swallow_late_new_owner_after_anonymous_prefix(self):
+        pages = [
+            {
+                "html": "<table><tr><td>Arthur genealogy tail.</td></tr></table>",
+                "page_number": 35,
+                "printed_page_number": 26,
+                "owner_heading": None,
+            },
+            {
+                "html": "<table><tr><td>More Arthur genealogy.</td></tr></table>",
+                "page_number": 36,
+                "printed_page_number": 27,
+                "owner_heading": None,
+            },
+            {
+                "html": "<h1>LEONIDAS L'HEUREUX</h1><p>Leonidas intro.</p>",
+                "page_number": 38,
+                "printed_page_number": 29,
+                "owner_heading": "LEONIDAS L'HEUREUX",
+            },
+        ]
+        segments = _refine_chapter_segments(
+            "Arthur",
+            26,
+            pages,
+            ["Arthur", "Leonidas", "Josephine"],
+            previous_title="ARTHUR L'HEUREUX",
+            stale_portion=True,
+        )
+        assert len(segments) == 2
+        assert segments[0]["carry_back"] is True
+        assert segments[0]["title"] == "Arthur"
+        assert segments[0]["page_start"] == 26
+        assert segments[0]["page_end"] == 27
+        assert segments[1]["title"] == "LEONIDAS L'HEUREUX"
+        assert segments[1]["page_start"] == 29
+
+    def test_carry_backs_entire_portion_when_first_heading_matches_previous_chapter(self):
+        pages = [
+            {
+                "html": "<h1>Marie Louise L'Heureux LaClare</h1><p>Marie-Louise genealogy.</p>",
+                "page_number": 80,
+                "printed_page_number": 71,
+                "owner_heading": "Marie Louise L'Heureux LaClare",
+            },
+            {
+                "html": "<table><tr><td>More genealogy.</td></tr></table>",
+                "page_number": 81,
+                "printed_page_number": 72,
+                "owner_heading": None,
+            },
+        ]
+        segments = _refine_chapter_segments(
+            "Mathilda",
+            71,
+            pages,
+            ["Mathilda", "Marie-Louise", "Roseanna"],
+            previous_title="MARIE-LOUISE (L'HEUREUX) LaCLARE",
+        )
+        assert len(segments) == 1
+        assert segments[0]["carry_back"] is True
+        assert segments[0]["title"] == "MARIE-LOUISE (L'HEUREUX) LaCLARE"
+        assert segments[0]["page_start"] == 71
+        assert segments[0]["page_end"] == 72
+
     def test_retitles_from_first_page_heading_even_when_not_in_toc(self):
         pages = [
             {
@@ -459,6 +597,41 @@ class TestStructureRefinement:
         segments = _refine_chapter_segments("Antoine", 109, pages, ["Antoine"])
         assert len(segments) == 1
         assert segments[0]["title"] == "I WISH"
+
+    def test_allows_late_non_toc_heading_after_stale_leading_pages(self):
+        pages = [
+            {
+                "html": "<p>109</p>",
+                "page_number": 118,
+                "printed_page_number": 109,
+                "owner_heading": None,
+            },
+            {
+                "html": "<p>110</p>",
+                "page_number": 119,
+                "printed_page_number": 110,
+                "owner_heading": None,
+            },
+            {
+                "html": "<h1><strong><em>I WISH</em></strong></h1><p>Closing page.</p>",
+                "page_number": 120,
+                "printed_page_number": 111,
+                "owner_heading": "I WISH",
+            },
+        ]
+        segments = _refine_chapter_segments(
+            "Antoine",
+            109,
+            pages,
+            ["Antoine"],
+            stale_portion=True,
+        )
+        assert len(segments) == 2
+        assert segments[0]["carry_back"] is True
+        assert segments[0]["page_start"] == 109
+        assert segments[0]["page_end"] == 110
+        assert segments[1]["title"] == "I WISH"
+        assert segments[1]["page_start"] == 111
 
     def test_does_not_split_on_non_toc_family_heading(self):
         pages = [
@@ -606,3 +779,89 @@ class TestCLIIntegration:
         assert len(manifest) >= 1
         assert manifest[0]["kind"] == "chapter"
         assert manifest[0]["title"] == "Introduction"
+
+    def test_merges_stale_duplicate_tail_into_previous_chapter(self):
+        pages_path = self.tmpdir / "pages.jsonl"
+        portions_path = self.tmpdir / "portions.jsonl"
+        out_path = self.tmpdir / "manifest.jsonl"
+        html_dir = self.tmpdir / "html"
+
+        self._write_jsonl(pages_path, [
+            {"page_number": 1, "printed_page_number": 1, "html": "<h1>ALMA</h1><p>Alma intro.</p>"},
+            {"page_number": 2, "printed_page_number": 2, "html": "<table><tr><td>Arthur tail rows.</td></tr></table>"},
+            {"page_number": 3, "printed_page_number": 3, "html": "<h1>ARTHUR</h1><p>Arthur intro.</p>"},
+            {"page_number": 4, "printed_page_number": 4, "html": "<p>More Arthur.</p>"},
+        ])
+        self._write_jsonl(portions_path, [
+            {"title": "Veterans", "page_start": 1, "page_end": 1},
+            {"title": "Alma", "page_start": 2, "page_end": 3},
+            {"title": "Arthur", "page_start": 4, "page_end": 4},
+        ])
+
+        cmd = [
+            sys.executable, "-m", "modules.build.build_chapter_html_v1.main",
+            "--pages", str(pages_path),
+            "--portions", str(portions_path),
+            "--out", str(out_path),
+            "--output-dir", str(html_dir),
+            "--book-title", "Test Book",
+        ]
+        result = subprocess.run(cmd, capture_output=True, text=True, cwd=str(Path(__file__).resolve().parent.parent))
+        assert result.returncode == 0, f"STDERR: {result.stderr}"
+
+        manifest = [json.loads(line) for line in out_path.read_text().strip().split("\n")]
+        chapters = [row for row in manifest if row["kind"] == "chapter"]
+        assert len(chapters) == 2
+        assert chapters[0]["title"] == "ALMA"
+        assert chapters[0]["page_start"] == 1
+        assert chapters[0]["page_end"] == 2
+        assert chapters[0]["source_portion_titles"] == ["Veterans", "Alma"]
+        assert chapters[1]["title"] == "ARTHUR"
+        assert chapters[1]["page_start"] == 3
+        assert chapters[1]["page_end"] == 4
+        assert chapters[1]["source_portion_titles"] == ["Alma", "Arthur"]
+
+        chapter_one = (html_dir / "chapter-001.html").read_text()
+        chapter_two = (html_dir / "chapter-002.html").read_text()
+        assert "Arthur tail rows." in chapter_one
+        assert "Arthur intro." in chapter_two
+
+    def test_merges_same_family_prefix_into_previous_chapter(self):
+        pages_path = self.tmpdir / "pages.jsonl"
+        portions_path = self.tmpdir / "portions.jsonl"
+        out_path = self.tmpdir / "manifest.jsonl"
+        html_dir = self.tmpdir / "html"
+
+        self._write_jsonl(pages_path, [
+            {"page_number": 1, "printed_page_number": 1, "html": "<h1>GEORGE L'HEUREUX</h1><p>George intro.</p>"},
+            {"page_number": 2, "printed_page_number": 2, "html": "<p>George prose continues.</p>"},
+            {"page_number": 3, "printed_page_number": 3, "html": "<h1>George L'Heureux</h1><table><tr><td>George genealogy.</td></tr></table>"},
+            {"page_number": 4, "printed_page_number": 4, "html": "<p>More George genealogy.</p>"},
+            {"page_number": 5, "printed_page_number": 5, "html": "<h1>JOE (JOSEPH) L'HEUREUX</h1><p>Joe intro.</p>"},
+        ])
+        self._write_jsonl(portions_path, [
+            {"title": "Josephine", "page_start": 1, "page_end": 2},
+            {"title": "Paul", "page_start": 3, "page_end": 5},
+        ])
+
+        cmd = [
+            sys.executable, "-m", "modules.build.build_chapter_html_v1.main",
+            "--pages", str(pages_path),
+            "--portions", str(portions_path),
+            "--out", str(out_path),
+            "--output-dir", str(html_dir),
+            "--book-title", "Test Book",
+        ]
+        result = subprocess.run(cmd, capture_output=True, text=True, cwd=str(Path(__file__).resolve().parent.parent))
+        assert result.returncode == 0, f"STDERR: {result.stderr}"
+
+        manifest = [json.loads(line) for line in out_path.read_text().strip().split("\n")]
+        chapters = [row for row in manifest if row["kind"] == "chapter"]
+        assert len(chapters) == 2
+        assert chapters[0]["title"] == "GEORGE L'HEUREUX"
+        assert chapters[0]["page_start"] == 1
+        assert chapters[0]["page_end"] == 4
+        assert chapters[0]["source_portion_titles"] == ["Josephine", "Paul"]
+        assert chapters[1]["title"] == "JOE (JOSEPH) L'HEUREUX"
+        assert chapters[1]["page_start"] == 5
+        assert chapters[1]["page_end"] == 5

@@ -1,3 +1,11 @@
+## [2026-03-13-06] - Close Story 138 around whole-table genealogy ownership
+
+### Changed
+- Story 138 was rescoped and marked Done around the slice it actually shipped: keeping reviewed genealogy tables attached to the correct chapter as whole units, with remaining within-table rescue fidelity split to Story 140
+
+### Fixed
+- Generic stale-span chapter refinement now keeps reviewed genealogy table tails, headers, and summary rows with the owning family chapter instead of spilling them into adjacent chapters
+
 ## [2026-03-13-04] - Restore repo-wide test and lint baseline
 
 ### Changed

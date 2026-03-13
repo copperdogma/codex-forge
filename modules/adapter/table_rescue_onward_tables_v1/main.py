@@ -71,6 +71,10 @@ def _encode_image(path: str) -> str:
     return f"data:image/{ext};base64,{b64}"
 
 
+def _supports_temperature(model: str) -> bool:
+    return not (model or "").casefold().startswith("gpt-5")
+
+
 def _call_ocr(model: str, prompt: str, image_data: str, temperature: float, max_tokens: int,
               timeout_seconds: Optional[float]) -> Tuple[str, Optional[Any], Optional[str]]:
     if OpenAI is None:  # pragma: no cover
@@ -79,10 +83,14 @@ def _call_ocr(model: str, prompt: str, image_data: str, temperature: float, max_
     raw = ""
     usage = None
     request_id = None
+    request_kwargs: Dict[str, Any] = {
+        "model": model,
+    }
+    if _supports_temperature(model):
+        request_kwargs["temperature"] = temperature
     if hasattr(client, "responses"):
         resp = client.responses.create(
-            model=model,
-            temperature=temperature,
+            **request_kwargs,
             max_output_tokens=max_tokens,
             input=[
                 {"role": "system", "content": [{"type": "input_text", "text": prompt}]},
@@ -100,8 +108,7 @@ def _call_ocr(model: str, prompt: str, image_data: str, temperature: float, max_
         request_id = getattr(resp, "id", None)
     else:
         resp = client.chat.completions.create(
-            model=model,
-            temperature=temperature,
+            **request_kwargs,
             max_completion_tokens=max_tokens,
             messages=[
                 {"role": "system", "content": prompt},
