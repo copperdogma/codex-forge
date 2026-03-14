@@ -1,7 +1,7 @@
 # Story 141 — Onward Genealogy Table Consistency Pass
 
 **Priority**: High
-**Status**: Pending
+**Status**: In Progress
 **Ideal Refs**: Requirement #3 (Extract), Requirement #5 (Structure), Requirement #6 (Validate), Fidelity to Source, Dossier-ready output
 **Spec Refs**: C1 (Multi-Stage OCR Pipeline), C2 (Format-Specific Conversion Recipes), C3 (Heuristic + AI Layout Detection), C6 (Expensive OCR for Quality)
 **Decision Refs**: `docs/runbooks/golden-build.md`, `docs/scout/scout-003-storybook-patterns.md`, Story 140 work log and `story140-onward-targeted-rescue-r19` review evidence; none found after search in `docs/notes/`
@@ -74,7 +74,7 @@ Story 140 proved that local page rescue can recover missing data, but the remain
 ## Architectural Fit
 
 - **Owning module / area**: Likely a new recipe-scoped genealogy consistency module or narrowly extracted helper placed between page-level rescue and final chapter build. The exact seam should be selected during `/build-story` after the strong-model baseline, not assumed now.
-- **Data contracts / schemas**: If the pass emits new normalized HTML artifacts or normalization-decision metadata across stages, add the fields to `schemas.py` before relying on them. If the work stays inside final build only, schema impact may be avoidable.
+- **Data contracts / schemas**: A new adapter stage can likely stay on `page_html_v1` with no schema change if original access is preserved through the prior artifact chain plus a companion report JSONL. Only add schema fields if in-row normalization metadata must survive stamping.
 - **File sizes**: `modules/adapter/table_rescue_onward_tables_v1/main.py` is 1400 lines, `modules/build/build_chapter_html_v1/main.py` is 1383 lines, and `tests/test_build_chapter_html.py` is 1054 lines. This story should prefer a new focused module/test file over piling more special cases into already oversized files.
 - **Decision context**: Reviewed `docs/ideal.md`, `docs/spec.md`, `docs/runbooks/golden-build.md`, `docs/scout/scout-003-storybook-patterns.md`, Story 140 work log, and the live `story140-onward-targeted-rescue-r19` chapter/page artifacts. No directly relevant decision doc was found in `docs/notes/`.
 
@@ -127,8 +127,132 @@ Story 140 proved that local page rescue can recover missing data, but the remain
 
 ## Plan
 
-Pending `/build-story`. The first gate is to measure the one-shot strong-model normalization baseline before deciding whether this becomes a dedicated new stage, a builder-owned pass, or a hybrid helper.
+### Exploration Findings
+
+- The live `r19` review baseline confirms this is a chapter/run-consistency problem, not just a final-build presentation issue. The same incompatible structures already exist upstream in `/Users/cam/Documents/Projects/codex-forge/output/runs/story140-onward-targeted-rescue-r19/01_load_artifact_v1/pages_html_onward_tables_fixed.jsonl`.
+- Current reviewed chapter baseline on `story140-onward-targeted-rescue-r19`:
+  - `chapter-009.html` is the non-regression reference: `1` canonical split-header genealogy table plus `1` separate summary table.
+  - `chapter-010.html` still mixes `20` tables total (`15` split-header, `5` headerless fragments) and retains fused heading text like `Arthur’s Great Grandchildren Agnes’ Grandchildren LAWRENCE’S FAMILY`.
+  - `chapter-013.html` still has a second genealogy table carrying `BOY/GIRL` and fused heading ownership.
+  - `chapter-014.html` is the clearest open failure: `15` tables total, `3` combined-header genealogy tables, `12` headerless fragments, and `11` external family headings.
+  - `chapter-015.html` still has `2` combined-header genealogy tables, `1` headerless fragment, and isolated family-heading mini-tables such as `REAL'S FAMILY`.
+- Representative upstream page-level inconsistency is already visible before chapter build:
+  - page `30`: one combined-header table with `ARTHUR'S FAMILY` embedded as an internal row.
+  - page `32`: contextual heading fused inside `<thead>`, e.g. `Joe’s Grandchildren / MARIE’S FAMILY`.
+  - page `40`: same-schema table with a heading-only first `<thead>` row plus `BOY/GIRL`.
+  - page `41`: multiline external context heading before a combined-header table.
+  - page `43`: repeated heading + headerless mini-table fragments.
+  - page `45`: heading + table + separate totals split already exists upstream.
+- Existing code already contains two partial normalization layers:
+  - `table_rescue_onward_tables_v1` normalizes page-local table structure, splits `BOY/GIRL`, and promotes some contextual headings.
+  - `build_chapter_html_v1` merges contiguous genealogy heading/table runs during final build.
+- Neither layer owns whole-run normalization, and both files are already oversized. Exploration therefore favors a new adapter stage over adding more special cases to the rescue or builder modules.
+- Validation can stay cheap: `r19` is already a `load_artifact_v1` resume recipe (`load_pages` + `load_portions` + `load_crops` + `build_chapters`), so a fresh verification run can reuse OCR/rescue artifacts and insert one new stage between `load_pages` and `build_chapters`.
+
+### Ideal Alignment Gate
+
+- This story closes a direct Ideal gap: same-schema genealogy content is still not exporting as one faithful, inspectable structure.
+- The evidence points toward an AI-first solution, not more heuristic growth. A strong one-shot normalizer already repairs the structural shape better than the current layered deterministic fixes.
+- No new product compromise is required if deterministic code stays limited to run detection, acceptance/validation, provenance logging, and narrow rendering cleanup.
+
+### Eval / Baseline
+
+- Distinguishing eval for this story: reviewed chapter-level consistency on `chapter-010.html`, `chapter-013.html`, `chapter-014.html`, and `chapter-015.html`, plus non-regression on `chapter-009.html` and at least one of `chapter-018.html` / `chapter-020.html`.
+- Current code baseline:
+  - `chapter-014.html`: `15` tables, `0` subgroup rows, `11` external family headings, `1` summary table.
+  - `chapter-015.html`: `4` tables, `0` subgroup rows, combined `BOY/GIRL` headers still present.
+  - `chapter-010.html`: mixed compatible structures remain in the same chapter despite Story 140 page rescue gains.
+- AI-first bounded trials:
+  - `gpt-4.1` one-shot over pages `40-41` (`/tmp/story141_ai_baseline_pages40_41_gpt41.html`) normalized two incompatible source shapes into `1` canonical `NAME/BORN/MARRIED/SPOUSE/BOY/GIRL/DIED` table with `22` subgroup rows and no external family headings. This proves a single strong call can repair the core pattern on a bounded contiguous run.
+  - `gpt-4.1` one-shot over pages `40-45` (`/tmp/story141_ai_baseline_pages40_45_gpt41.html`) removed `BOY/GIRL` headers and external family headings, but still emitted `14` tables. Better than baseline, not canonical enough.
+  - `gpt-5` one-shot over full `chapter-014.html` (`/tmp/story141_ai_baseline_ch14.html`) was materially stronger: it collapsed `15` mixed tables down to `2` tables total (`1` main genealogy table + `1` separate summary table), split `BOY/GIRL`, emitted `31` subgroup rows, and removed all external family headings.
+- AI baseline conclusion: a single top-tier AI normalization pass is strong enough to be the primary normalization engine for this story, but deterministic glue is still required for run detection, provenance preservation, acceptance/rejection, and cleanup of residual fused multi-line subgroup rows.
+
+### Implementation Plan
+
+#### Task 1 — Add a New `genealogy_table_consistency_v1` Adapter Stage
+
+- Files: `modules/adapter/genealogy_table_consistency_v1/main.py`, `modules/adapter/genealogy_table_consistency_v1/module.yaml`, `configs/recipes/recipe-onward-images-html-mvp.yaml`
+- Change:
+  - Create a recipe-scoped adapter over `page_html_v1` that groups consecutive compatible genealogy pages into candidate normalization runs.
+  - Feed each run's current HTML to a strong model, defaulting to `gpt-5`, and ask for canonical run-level HTML with split `BOY/GIRL`, internal subgroup rows, and separate totals.
+  - Keep the previous stage artifact as the source-of-truth fallback. The new stage writes a fresh `page_html_v1` artifact plus a companion report JSONL that records run membership, source page numbers, model/request metadata, decision reasons, and candidate-vs-input quality signals.
+- Risk:
+  - Over-grouping could flatten genuinely distinct source structures.
+  - A run-level model call could return prettier HTML that silently loses content unless acceptance is strict.
+- Done when:
+  - The stage produces page HTML that `build_chapter_html_v1` can consume directly, while the report makes every normalization decision inspectable and traceable to source pages.
+
+#### Task 2 — Keep Deterministic Logic Thin and Auditable
+
+- Files: primarily `modules/adapter/genealogy_table_consistency_v1/main.py`; only extract tiny shared helpers if duplication is clearly worse
+- Change:
+  - Implement generic run-detection and acceptance checks only: canonical header presence, summary-table preservation, reduced heading/table fragmentation, retention of family labels and totals, and rejection of regressions such as combined `BOY/GIRL` or dropped rows.
+  - If AI output still fuses multiple context lines inside one subgroup row via `<br>`, add a narrow post-AI rendering cleanup to split that row into multiple full-width subgroup rows without changing textual content.
+  - Do not add family-name or page-number logic, and do not grow `table_rescue_onward_tables_v1` into a second chapter-level normalization layer unless a tiny shared helper extraction is clearly cleaner.
+- Risk:
+  - Acceptance logic that is too permissive could silently erase distinctions.
+  - Cleanup logic that is too aggressive could rewrite semantics rather than presentation.
+- Done when:
+  - The stage only applies AI output when structure materially improves without losing source content, and residual fused-heading cleanup is fixture-backed and conservative.
+
+#### Task 3 — Minimize Build Coupling
+
+- Files: `configs/recipes/recipe-onward-images-html-mvp.yaml`, possibly minimal changes in `modules/build/build_chapter_html_v1/main.py` and `tests/test_build_chapter_html.py`
+- Change:
+  - Insert the new stage after `table_fix_continuations` in the full Onward recipe and after `load_pages` in the reused-artifact validation recipe.
+  - Keep `merge_contiguous_genealogy_tables` enabled initially unless validation proves it now causes double-processing or becomes redundant. Prefer making it a harmless no-op on already-normalized runs rather than widening builder-specific logic.
+- Risk:
+  - Builder-side merging could re-fragment or double-merge already normalized output.
+- Done when:
+  - A fresh resumed driver run consumes the new stage output cleanly and does not regress Story 140's reviewed non-regression chapters.
+
+#### Task 4 — Add Focused Regression Coverage Before Benchmark Expansion
+
+- Files: `tests/test_genealogy_table_consistency_v1.py`, optionally minimal additions to `tests/test_build_chapter_html.py`
+- Change:
+  - Add fixture-backed tests for the reviewed patterns: combined-header pages like `40/41`, fragmented runs like `43/45`, and a chapter-level consistency case modeled on `chapter-014.html`.
+  - Add acceptance tests that explicitly guard summary-table preservation, run rejection on content loss, and narrow `<br>` subgroup splitting if that cleanup lands.
+  - Only add new promptfoo goldens/evals if the final stage output stabilizes enough that hand-verified chapter/run goldens are worth the maintenance cost.
+- Risk:
+  - Expanding promptfoo too early will create churn before the normalization contract is stable.
+- Done when:
+  - Current `r19` inconsistency signatures fail the focused fixtures, and the new stage makes them pass without builder regressions.
+
+#### Task 5 — Driver Validation and Manual Inspection
+
+- Files: run-local resume recipe/config under `output/runs/`, story work log, and any touched docs
+- Change:
+  - Clear stale `*.pyc`, run through `driver.py` from the new stage using reused artifacts, and inspect the resulting HTML/JSONL artifacts.
+  - Manually verify `chapter-009.html`, `chapter-010.html`, `chapter-013.html`, `chapter-014.html`, `chapter-015.html`, plus at least one non-regression chapter from `chapter-018.html` / `chapter-020.html`.
+  - Record specific artifact paths and sample rows/headings verified.
+- Done when:
+  - The reviewed chapters no longer mix compatible genealogy structures, totals remain separate, and the non-regression set still looks correct by manual inspection.
+
+### Scope Adjustment
+
+- Small coherent scope expansion absorbed: the new adapter stage should emit a companion report JSONL even if no schema change is required. That report is the cleanest way to preserve inspectable normalization decisions without bloating `page_html_v1`.
+- Small coherent scope expansion absorbed: the cheapest trustworthy validation path is a reused-artifact resume recipe, because the shared Onward output root lives outside this worktree and `r19` already proves the `load_artifact_v1` path.
+- Small coherent scope contraction absorbed: promptfoo/golden expansion is not the default first guardrail. Focused fixture tests plus manual driver inspection are the lower-risk path until the normalization output stabilizes.
+
+### Human Approval Gate
+
+- No new dependencies are expected.
+- Recommended default model for the new stage: `gpt-5`. The measured `gpt-4.1` baselines are promising on very small runs but materially weaker on a six-page slice.
+- Main risks to watch:
+  - run detection that over-merges genuinely different source structures;
+  - acceptance logic that allows silent content loss;
+  - builder double-processing already-normalized HTML;
+  - latency/cost if run chunking is too coarse.
+- Success is falsified if a fresh driver validation run still leaves mixed compatible genealogy table shapes in `chapter-010.html` / `chapter-013.html` / `chapter-014.html` / `chapter-015.html`, or if `chapter-009.html`, `chapter-018.html`, or `chapter-020.html` regress.
 
 ## Work Log
 
 20260314-1058 — story created: split chapter-level genealogy consistency normalization out of Story 140 after manual review of `story140-onward-targeted-rescue-r19` showed that page rescue recovered data but not chapter-wide structural consistency; next step is `/build-story` to evaluate AI-first normalization against the reviewed Arthur/Paul/George/Joe chapters
+20260314-1511 — exploration + AI-first baseline grounded Story 141 in the live `r19` artifacts and selected a new adapter-stage seam
+- **Result:** Verified that the reviewed inconsistency is already present upstream in `pages_html_onward_tables_fixed.jsonl`, quantified the current chapter-level failure signatures, and measured bounded one-shot AI normalization on both contiguous page runs and a full problematic chapter. The strongest measured baseline (`gpt-5` on `chapter-014.html`) already collapses the mixed structure into one canonical genealogy table plus a separate summary table, so the story should center an AI normalization stage with thin deterministic validation rather than more builder heuristics.
+- **Impact:**
+  - **Story-scope impact:** The implementation path is now materially clearer. This is not a good candidate for adding more special cases to `table_rescue_onward_tables_v1` or `build_chapter_html_v1`; a new `genealogy_table_consistency_v1` adapter stage is the clean seam.
+  - **Pipeline-scope impact:** The baseline proves a strong model can normalize same-schema runs across page boundaries. `gpt-4.1` fixed the core two-page pattern (`40-41`) but was weaker on the six-page run (`40-45`), while `gpt-5` normalized the full reviewed `chapter-014.html` from `15` mixed tables down to `2` tables with split `BOY/GIRL`, `31` subgroup rows, and a separate totals table.
+  - **Evidence:** `/Users/cam/Documents/Projects/codex-forge/output/runs/story140-onward-targeted-rescue-r19/01_load_artifact_v1/pages_html_onward_tables_fixed.jsonl`, `/Users/cam/Documents/Projects/codex-forge/output/runs/story140-onward-targeted-rescue-r19/output/html/chapter-010.html`, `/Users/cam/Documents/Projects/codex-forge/output/runs/story140-onward-targeted-rescue-r19/output/html/chapter-014.html`, `/tmp/story141_ai_baseline_pages40_41_gpt41.html`, `/tmp/story141_ai_baseline_pages40_45_gpt41.html`, `/tmp/story141_ai_baseline_ch14.html`
+  - **Next:** After approval, implement `genealogy_table_consistency_v1`, wire it into the Onward recipe/resume path, and validate through `driver.py` with artifact reuse. Success is falsified if the reviewed chapters still mix compatible table shapes or if `chapter-009.html` / `chapter-018.html` / `chapter-020.html` regress.

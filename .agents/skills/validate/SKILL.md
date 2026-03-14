@@ -4,6 +4,8 @@ description: Validate work against requirements using git diff analysis and grad
 user-invocable: true
 ---
 
+> Decision check: If this validation raises an architectural, workflow, schema, or cross-cutting project question, read the relevant decision record(s) in `docs/decisions/` before choosing an approach. If none apply, say so explicitly.
+
 # Validate Work Against Requirements
 
 Thoroughly analyze what was done and how it compares to the original instructions using git diff and file analysis.
@@ -40,6 +42,11 @@ Thoroughly analyze what was done and how it compares to the original instruction
        - **Kept open**
        - **Marked blocked**
      - Do not end in an ambiguous "not done" state without a firm recommendation.
+
+2.75 **Read decision context when relevant**
+   - If a known story/ticket affects architecture, workflows, schemas, or cross-cutting project behavior, read `docs/ideal.md`, the story's `Spec Refs`, and any ADRs or decision docs in `Decision Refs`.
+   - If the story appears to touch those areas and cites no ADRs, search `docs/decisions/` before assuming none exist.
+   - Call out missing ADR / decision alignment explicitly in the report when relevant.
 
 3. **Score Each Requirement**
    - **A**: Fully implemented, high quality, exceeds expectations

@@ -78,6 +78,8 @@ Canonical location: `.agents/skills/` — works across Claude Code, Cursor, Gemi
 
 **Workflow:** `/create-story` → `/build-story` → `/validate` → `/mark-story-done`
 
+**Decision discipline:** Hard-to-reverse architecture, workflow, schema, or cross-cutting project decisions belong in `docs/decisions/`. Stories affecting those areas should cite relevant ADRs in `Decision Refs`, or explicitly note that none were found after search.
+
 **Central Tenet Verification** — Every story includes a tenet checklist (T0-T5). Must be verified before marking Done.
 
 **Scope management default** — Stories are not fixed-size human sprint tickets. If a modest amount of tightly coupled work is discovered during implementation and is required to make the story actually succeed, absorb it into the current story and update the story document. If the expansion is larger, riskier, or changes the goal, recommend the scope change explicitly before proceeding.
@@ -86,6 +88,7 @@ Canonical location: `.agents/skills/` — works across Claude Code, Cursor, Gemi
 
 - `docs/ideal.md` — The Ideal: zero-limitation north star
 - `docs/spec.md` — Active compromises with detection evals
+- `docs/decisions/` — ADRs for hard-to-reverse architecture, workflow, schema, and cross-cutting project decisions
 - `docs/evals/registry.yaml` — Eval scores, targets, attempt history
 - `docs/requirements.md` — Functional requirements
 - `docs/stories.md` — Story index (130+ stories)

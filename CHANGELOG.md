@@ -1,3 +1,12 @@
+## [2026-03-14-02] - Add ADR workflow support and document Story 141 direction
+
+### Added
+- Added a cross-CLI `create-adr` skill with templates, starter script, an ADR runbook, and `docs/decisions/` scaffolding so architectural decisions can be captured consistently inside codex-forge
+
+### Changed
+- Updated agent skills, generated Gemini wrappers, and `AGENTS.md` so stories, validation, inbox triage, and check-in flows explicitly consult ADRs and route decision-sized work into architecture records
+- Rebuilt Story 141 as an in-progress planning artifact around a broader consistency-alignment direction instead of a narrow one-off genealogy table fix
+
 ## [2026-03-13-08] - Repair Onward chapter-level genealogy continuity after manual Alma review
 
 ### Changed

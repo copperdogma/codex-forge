@@ -4,7 +4,7 @@
 **Status**: Draft
 **Ideal Refs**: {ideal.md requirements}
 **Spec Refs**: {spec.md sections or compromises}
-**Decision Refs**: {runbooks, scout docs, notes, or "None found after search"}
+**Decision Refs**: {ADRs, runbooks, scout docs, notes, or "None found after search"}
 **Depends On**: {story IDs}
 
 ## Goal
@@ -29,7 +29,7 @@
 - **AI-only**: {Could an LLM call handle this? Cost per run?}
 - **Hybrid**: {Cheap detection + AI judgment? Where's the split?}
 - **Pure code**: {Only if strictly orchestration/plumbing with no reasoning.}
-- **Repo constraints / prior decisions**: {What existing runbooks, scout findings, notes, or patterns constrain the choice?}
+- **Repo constraints / prior decisions**: {What existing ADRs, runbooks, scout findings, notes, or patterns constrain the choice?}
 - **Existing patterns to reuse**: {Which helpers, modules, or prior stories should this extend instead of duplicating?}
 - **Eval**: {What test distinguishes the approaches? Does it exist yet?}
 
@@ -65,7 +65,7 @@
 - **Owning module / area**: {Which stage, module, script, or doc area should own this?}
 - **Data contracts / schemas**: {What schemas or artifact definitions change? If new fields cross artifact boundaries, they must be added to `schemas.py` first.}
 - **File sizes**: {Current line count of each file to be modified. Run `make check-size` when relevant. Flag any file >500 lines.}
-- **Decision context**: {Which runbooks, scout docs, notes, or decision docs were reviewed? If none apply, say why.}
+- **Decision context**: {Which ADRs, runbooks, scout docs, notes, or other decision docs were reviewed? If none apply, say why.}
 
 ## Files to Modify
 

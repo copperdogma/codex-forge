@@ -15,7 +15,7 @@ Create a new story in `docs/stories/` with consistent format.
 - `priority`: High / Medium / Low (default: Medium)
 - `ideal_refs`: ideal.md requirements this story serves
 - `spec_refs`: relevant spec.md sections or compromise numbers
-- `decision_refs`: relevant runbooks, scout docs, notes, or decision docs (or `None found after search`)
+- `decision_refs`: relevant ADRs, runbooks, scout docs, notes, or other decision docs (or `None found after search`)
 - `depends_on`: story IDs this depends on (if any)
 - `status`: Draft or Pending (default: Draft)
   - **Draft** — skeleton with goal and notes but not ready to build
@@ -66,7 +66,8 @@ Create a new story in `docs/stories/` with consistent format.
 - Acceptance criteria must be testable and concrete.
 - Always include the Approach Evaluation section — list candidates without pre-deciding. Approach selection happens during `/build-story`.
 - **Simplification baseline gate**: Every story involving new logic must answer: "Can a single LLM call already do this?" If untested, first task = measure the baseline.
-- Search `docs/runbooks/`, `docs/scout/`, and `docs/notes/` for prior decisions or constraints while drafting. If none apply, say so explicitly.
+- Search `docs/decisions/`, `docs/runbooks/`, `docs/scout/`, and `docs/notes/` for prior decisions or constraints while drafting. If none apply, say so explicitly.
+- If the story raises a new unresolved architecture, workflow, or schema question, either cite the missing ADR need explicitly or recommend creating one before implementation starts.
 - If the story changes pipeline, module, driver, schema, or recipe behavior, include a task for real `driver.py` verification and artifact inspection in `output/runs/`.
 - If the story changes agent tooling or project instructions, include `make skills-check` in the task list.
 - If the story will run evals, include a task to run `/verify-eval` and update `docs/evals/registry.yaml`.

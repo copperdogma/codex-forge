@@ -6,7 +6,7 @@ user-invocable: true
 
 # /check-in-diff [--autonomous] [--cleanup]
 
-> Decision check: If this task affects workflow, release process, schema compatibility, or cross-cutting project behavior, read relevant runbooks, scout docs, or notes before choosing an approach. If none apply, say so explicitly.
+> Decision check: If this task affects workflow, release process, schema compatibility, or cross-cutting project behavior, read relevant ADRs in `docs/decisions/` plus any supporting runbooks, scout docs, or notes before choosing an approach. If none apply, say so explicitly.
 
 Audit current git changes. When the user explicitly requests check-in, execute the repo's commit, sync, validate, and landing workflow.
 
@@ -44,6 +44,7 @@ Companion runbook: `docs/runbooks/check-in-worktree-landing.md`
 
 3. **Check alignment:**
    - Do changes match the story's task list?
+   - Do changes match any relevant ADR or decision-doc constraints?
    - Are docs updated for any behavioral changes?
    - Are new files in the right locations per project structure?
 

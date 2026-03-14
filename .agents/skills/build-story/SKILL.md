@@ -6,6 +6,8 @@ user-invocable: true
 
 # /build-story [story-number]
 
+> ADR check: If this task raises an architectural, workflow, schema, or cross-cutting project question, read the relevant decision record(s) in `docs/decisions/` before choosing an approach. If none apply, say so explicitly.
+
 Execute a development story end-to-end.
 
 ## Phase 1 — Explore (read-only, no file writes)
@@ -20,7 +22,7 @@ Execute a development story end-to-end.
    - Work Log
    If tasks are missing, add actionable items without discarding existing intent.
 
-3. **Read context** — Read `docs/ideal.md`, then all spec refs, dependency stories, and referenced docs.
+3. **Read context** — Read `docs/ideal.md`, then all spec refs, dependency stories, and referenced ADRs / decision docs. If the story does not cite an ADR and the work affects architecture, workflow, schemas, or cross-cutting project behavior, search `docs/decisions/` before assuming none exist.
 
 4. **Ideal Alignment Gate** — Before exploring code:
    - Does this story close an Ideal gap? → proceed
@@ -42,7 +44,11 @@ Execute a development story end-to-end.
    - Do not optimize for human sprint sizing. Optimize for a coherent slice that an AI can implement and validate end-to-end.
 
 7. **Record exploration findings** — Write a brief exploration entry in the work log:
-   - Files that will change, files at risk, patterns to follow, surprises found
+   - Files that will change
+   - Files at risk
+   - ADRs / decision docs consulted
+   - Patterns to follow
+   - Surprises found
 
 ## Phase 2 — Plan (produces a written artifact)
 

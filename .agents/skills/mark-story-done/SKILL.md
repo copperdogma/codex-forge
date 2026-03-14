@@ -6,6 +6,8 @@ user-invocable: true
 
 # /mark-story-done [story-number]
 
+> ADR check: If this task raises an architectural, workflow, schema, or cross-cutting project question, read the relevant decision record(s) in `docs/decisions/` before choosing an approach. If none apply, say so explicitly.
+
 Close a completed story after validation.
 
 ## Inputs
@@ -21,6 +23,7 @@ Close a completed story after validation.
    - [ ] All acceptance criteria met (with evidence)
    - [ ] Work log is current (no dangling "Next Steps" without resolution)
    - [ ] Dependencies addressed (if depends on other stories, are they done?)
+   - [ ] If `Decision Refs` cite ADRs or ADR open items: check the parent ADR `Remaining Work` and note whether this story resolves any item enough for that ADR to move toward `ACCEPTED`
    - [ ] Central Tenet verification checkboxes checked
    - [ ] Doc update checkbox checked
    - [ ] Project checks pass:

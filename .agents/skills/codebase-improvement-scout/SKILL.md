@@ -6,7 +6,7 @@ user-invocable: true
 
 # /codebase-improvement-scout [scope] [--create-story] [--autofix] [--autonomous]
 
-> Decision check: If this task affects architecture, workflow, schemas, or cross-cutting agent behavior, read relevant docs in `docs/runbooks/`, `docs/scout/`, `docs/notes/`, and any future decision-doc directories before choosing an approach. If none apply, say so explicitly.
+> Decision check: If this task affects architecture, workflow, schemas, or cross-cutting agent behavior, read relevant ADRs in `docs/decisions/` plus supporting docs in `docs/runbooks/`, `docs/scout/`, and `docs/notes/` before choosing an approach. If none apply, say so explicitly.
 
 Run a scheduled or on-demand repo-hygiene scan for codebase drift, AI-generated junk, and high-value cleanup opportunities.
 
@@ -43,6 +43,7 @@ This creates:
    - `AGENTS.md`
    - `docs/ideal.md`
    - `docs/spec.md`
+   - relevant ADRs for likely hotspots
    - relevant runbooks, scout docs, and notes for likely hotspots
    - `docs/stories.md`
    - `docs/reports/codebase-improvement/_state.yaml` if it exists
@@ -164,7 +165,7 @@ Only enter this phase when `--autofix` is set or the user explicitly approved sa
 
 - Default to report-first, not code-first.
 - Never run unconstrained "make the repo better" edits.
-- Never re-litigate settled guidance if runbooks or scout docs already answer the question.
+- Never re-litigate settled architecture if ADRs or other decision docs already answer the question.
 - Never raise the same suppressed finding repeatedly without new evidence.
 - Never do cosmetic-only churn.
 - Never auto-fix structural or architectural issues.
