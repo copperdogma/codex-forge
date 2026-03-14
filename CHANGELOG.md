@@ -1,3 +1,34 @@
+## [2026-03-13-08] - Repair Onward chapter-level genealogy continuity after manual Alma review
+
+### Changed
+- `build_chapter_html_v1` now supports an explicit `merge_contiguous_genealogy_tables` mode so recipes can collapse contiguous same-schema genealogy tables into one final HTML table with internal subgroup rows
+- The Onward recipe enables that build-stage merge, and Story 140 now records the downstream continuity fix alongside the earlier page-rescue work
+
+### Fixed
+- `chapter-009.html` in the validated run `story140-onward-targeted-rescue-r18` no longer fragments Alma genealogy data into dozens of orphaned subtables; the final output now preserves one main genealogy table plus the totals table, with subgroup labels such as `BERTHA'S FAMILY`, `NORBERT'S FAMILY`, `PAUL'S FAMILY`, and `GABRIELLE'S FAMILY` split correctly
+- Alma chapter golden fidelity improved from `0.657` in `story140-onward-targeted-rescue-r13` to `0.934` in `story140-onward-targeted-rescue-r18` while preserving the previously reviewed Emilie subgroup structure in `chapter-020.html`
+
+## [2026-03-14-01] - Restore image attachments after genealogy build merge
+
+### Fixed
+- `build_chapter_html_v1` now preserves existing `<figure>` and `<img>` attributes when applying the chapter-level genealogy merge, preventing `src` and crop metadata from being stripped out of final HTML
+- Corrected validation run `story140-onward-targeted-rescue-r19` copies the illustration manifest's sibling `images/` directory, so `chapter-009.html` and `chapter-020.html` again reference real files under `output/html/images/`
+
+## [2026-03-13-07] - Close Story 140 around targeted genealogy table rescue fidelity
+
+### Added
+- Focused rescue regression coverage for targeted Onward suspect pages and candidate-acceptance behavior
+- Hand-validated Emilie/Roseanna page goldens for `089`, `097`, and `098`, plus guarded baseline-normalization coverage for split genealogy continuations
+
+### Changed
+- Story 140 marked Done around the shipped slice: recipe-scoped targeted rescue for reviewed suspect pages with bounded acceptance checks, guarded one-table normalization fallback, and real-pipeline validation
+- Onward recipe now targets reviewed suspect pages `35,89,97,98` in `table_rescue_onward_tables_v1` with context-aware `gpt-4.1` retries
+
+### Fixed
+- `table_rescue_onward_tables_v1` now passes current extracted HTML/text into targeted retries and rejects structurally worse rescue candidates instead of blindly overwriting prior page HTML
+- `table_rescue_onward_tables_v1` now applies deterministic same-page genealogy normalization only when it safely collapses fragmented continuation tables into a single clean table, which fixes Emilie page `98` without reopening Arthur page `35`
+- Fresh validation run `story140-onward-targeted-rescue-r13` restores Arthur child rows, removes Roseanna's loose paragraph tail, and keeps Emilie's root heading plus canonical one-table continuation structure and summary counts without reopening Story 138 chapter-boundary regressions
+
 ## [2026-03-13-06] - Close Story 138 around whole-table genealogy ownership
 
 ### Changed

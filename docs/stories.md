@@ -156,7 +156,8 @@ This index tracks stories in `/docs/stories/` for the codex-forge pipeline.
 |||| 137 | Onward OCR Empty-Page Recovery and TOC Coarse Boundary Selection | High | Done | /docs/stories/story-137-onward-missing-content-and-chapter-boundary-gaps.md |
 |||| 138 | Onward Genealogy Table Whole-Table Continuation and Header Regressions | High | Done | /docs/stories/story-138-onward-genealogy-table-continuation-and-header-regressions.md |
 |||| 139 | Partial-TOC Section Splitting and Page-Break Continuation | High | Done | /docs/stories/story-139-partial-toc-section-splitting-and-page-break-continuation.md |
-|||| 140 | Onward Targeted Genealogy Table Rescue Fidelity | High | Pending | /docs/stories/story-140-onward-targeted-genealogy-table-rescue-fidelity.md |
+|||| 140 | Onward Targeted Genealogy Table Rescue Fidelity | High | Done | /docs/stories/story-140-onward-targeted-genealogy-table-rescue-fidelity.md |
+|||| 141 | Onward Genealogy Table Consistency Pass | High | Pending | /docs/stories/story-141-onward-genealogy-table-consistency-pass.md |
 
 ## Notes
 - Status "Done" reflects current working state in codex-forge. "To Do" items are planned next steps aligned with `docs/requirements.md` and `snapshot.md`.

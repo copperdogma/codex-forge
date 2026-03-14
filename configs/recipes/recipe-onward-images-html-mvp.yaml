@@ -134,8 +134,16 @@ stages:
       pages: extract_page_numbers
     out: pages_html_onward_tables.jsonl
     params:
-      model: gpt-5.1
+      model: gpt-4.1
+      pages_list: "24,25,35,89,97,98"
       header_threshold: 0.8
+      max_context_chars: 6000
+      min_score_gain: 15
+      rescue_hints: |
+        - Use the provided current HTML/text only as a clue for wording and row order; do not preserve its broken structure.
+        - Recover family subheaders and their child rows as actual table structure when the image supports them.
+        - Do not leave genealogy tail rows as loose paragraphs when they belong inside the reviewed table.
+        - Prefer keeping visible summary lines (`TOTAL DESCENDANTS`, `LIVING`, `DECEASED`) in structured output.
       fail_on_unresolved: false
 
   - id: table_fix_continuations
@@ -167,3 +175,4 @@ stages:
       images_subdir: images
       book_title: "Onward to the Unknown"
       book_author: ""
+      merge_contiguous_genealogy_tables: true

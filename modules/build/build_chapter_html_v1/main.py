@@ -8,6 +8,7 @@ Produces proper HTML5 documents with embedded CSS, semantic structure
 import argparse
 import re
 import sys
+from copy import deepcopy
 from datetime import datetime
 from difflib import SequenceMatcher
 from html import escape as html_escape
@@ -17,6 +18,28 @@ from typing import Any, Dict, List, Optional
 from bs4 import BeautifulSoup
 
 from modules.common.utils import read_jsonl, save_jsonl, ensure_dir, ProgressLogger
+
+try:
+    from modules.adapter.table_rescue_onward_tables_v1.main import (
+        _normalize_rescue_html as _normalize_genealogy_rescue_html,
+    )
+except Exception:  # pragma: no cover - optional downstream reuse
+    _normalize_genealogy_rescue_html = None
+
+
+_GENEALOGY_EXPECTED_HEADERS = ["name", "born", "married", "spouse", "boy", "girl", "died"]
+_GENEALOGY_HEADER_TOKEN_SETS = {
+    tuple(_GENEALOGY_EXPECTED_HEADERS),
+    ("name", "born", "married", "spouse", "boygirl", "died"),
+}
+_GENEALOGY_FAMILY_HEADING_RE = re.compile(r"\b[A-Z][A-Z'’\-]+(?:\s+[A-Z][A-Z'’\-]+)*\s+FAMILY\b")
+_GENEALOGY_GENERATION_CONTEXT_RE = re.compile(
+    r"\b(?:great\s+grandchildren|grandchildren|children)\b",
+    re.IGNORECASE,
+)
+_GENEALOGY_CONTEXT_LINE_RE = re.compile(
+    r"(?:[A-Z][\w'’\-]*\s+)*?[A-Z][\w'’\-]*['’](?:s)?\s+(?:Great\s+Grandchildren|Grandchildren|Children)\b"
+)
 
 
 def _utc() -> str:
@@ -247,6 +270,247 @@ def _add_table_scope(html: str) -> str:
             if ths and not ths[0].get("scope"):
                 ths[0]["scope"] = "row"
     return soup.decode_contents()
+
+
+def _normalize_genealogy_token(text: str) -> str:
+    return re.sub(r"[^a-z]", "", (text or "").lower())
+
+
+def _genealogy_heading_lines(tag: Any) -> List[str]:
+    if tag is None:
+        return []
+    raw_lines = [
+        line.strip()
+        for line in tag.get_text("\n", strip=True).split("\n")
+        if line.strip()
+    ]
+    lines: List[str] = []
+    for line in raw_lines:
+        lines.extend(_split_flattened_genealogy_heading_line(line))
+    return lines
+
+
+def _split_flattened_genealogy_heading_line(line: str) -> List[str]:
+    normalized = _normalize_ws(line)
+    if not normalized:
+        return []
+
+    family_line = None
+    prefix = normalized
+    family_matches = list(_GENEALOGY_FAMILY_HEADING_RE.finditer(normalized))
+    if family_matches and family_matches[-1].end() == len(normalized):
+        family_line = family_matches[-1].group(0).strip()
+        prefix = normalized[:family_matches[-1].start()].strip()
+
+    parts: List[str] = []
+    if prefix:
+        pos = 0
+        for match in _GENEALOGY_CONTEXT_LINE_RE.finditer(prefix):
+            if prefix[pos:match.start()].strip():
+                parts = []
+                break
+            parts.append(match.group(0).strip())
+            pos = match.end()
+        if parts and prefix[pos:].strip():
+            parts = []
+    if family_line:
+        parts.append(family_line)
+
+    if parts and all(
+        _extract_genealogy_family_labels(part) or _is_genealogy_generation_context(part)
+        for part in parts
+    ):
+        return parts
+    return [normalized]
+
+
+def _extract_genealogy_family_labels(text: str) -> List[str]:
+    normalized = _normalize_ws(text).replace("’", "'").upper()
+    return list(dict.fromkeys(_GENEALOGY_FAMILY_HEADING_RE.findall(normalized)))
+
+
+def _is_genealogy_generation_context(text: str) -> bool:
+    normalized = _normalize_ws(text).replace("’", "'")
+    if not normalized or len(normalized) > 120:
+        return False
+    if _extract_genealogy_family_labels(normalized):
+        return False
+    return bool(_GENEALOGY_GENERATION_CONTEXT_RE.search(normalized))
+
+
+def _is_genealogy_heading_tag(tag: Any) -> bool:
+    if getattr(tag, "name", None) not in {"h1", "h2", "h3", "p"}:
+        return False
+    lines = _genealogy_heading_lines(tag)
+    if not lines:
+        return False
+    return all(
+        _extract_genealogy_family_labels(line) or _is_genealogy_generation_context(line)
+        for line in lines
+    )
+
+
+def _genealogy_table_header_tokens(table: Any) -> List[str]:
+    thead = table.find("thead", recursive=False)
+    header_row = thead.find("tr", recursive=False) if thead is not None else None
+    if header_row is None:
+        header_row = table.find("tr", recursive=False)
+    if header_row is None:
+        return []
+    return [
+        _normalize_genealogy_token(cell.get_text(" ", strip=True))
+        for cell in header_row.find_all(["th", "td"], recursive=False)
+    ]
+
+
+def _is_genealogy_table_header(table: Any) -> bool:
+    return tuple(_genealogy_table_header_tokens(table)) in _GENEALOGY_HEADER_TOKEN_SETS
+
+
+def _genealogy_table_column_count(table: Any) -> int:
+    counts = [len(_genealogy_table_header_tokens(table))]
+    tbody = table.find("tbody", recursive=False)
+    rows = tbody.find_all("tr", recursive=False) if tbody is not None else table.find_all("tr", recursive=False)
+    for row in rows:
+        cells = row.find_all(["th", "td"], recursive=False)
+        if cells:
+            counts.append(len(cells))
+    return max(counts) if counts else len(_GENEALOGY_EXPECTED_HEADERS)
+
+
+def _is_compatible_genealogy_table(table: Any, expected_cols: int) -> bool:
+    if _is_genealogy_table_header(table):
+        return True
+    if table.find("thead", recursive=False) is not None:
+        return False
+
+    tbody = table.find("tbody", recursive=False)
+    rows = tbody.find_all("tr", recursive=False) if tbody is not None else table.find_all("tr", recursive=False)
+    if not rows:
+        return False
+
+    saw_cells = False
+    for row in rows:
+        cells = row.find_all(["th", "td"], recursive=False)
+        if not cells:
+            continue
+        saw_cells = True
+        if len(cells) > expected_cols:
+            return False
+    return saw_cells
+
+
+def _next_significant_sibling(node: Any) -> Any:
+    sibling = node.next_sibling
+    while sibling is not None:
+        if getattr(sibling, "name", None) is not None:
+            return sibling
+        if str(sibling).strip():
+            return sibling
+        sibling = sibling.next_sibling
+    return None
+
+
+def _build_genealogy_subgroup_row(line: str, colspan: int, soup: BeautifulSoup) -> Any:
+    row = soup.new_tag("tr")
+    row["class"] = "genealogy-subgroup-heading"
+    cell = soup.new_tag("th", colspan=str(colspan))
+    cell.string = line
+    row.append(cell)
+    return row
+
+
+def _clone_genealogy_row(row: Any, col_count: int, soup: BeautifulSoup) -> Any:
+    cloned = deepcopy(row)
+    cells = cloned.find_all(["td", "th"], recursive=False)
+    if "genealogy-subgroup-heading" in (cloned.get("class") or []):
+        if len(cells) == 1:
+            cells[0]["colspan"] = str(col_count)
+        return cloned
+
+    while len(cells) < col_count:
+        cell = soup.new_tag("td")
+        cloned.append(cell)
+        cells.append(cell)
+    return cloned
+
+
+def _append_genealogy_heading_and_rows(base_table: Any, heading_tags: List[Any], source_table: Any,
+                                       soup: BeautifulSoup) -> None:
+    base_tbody = base_table.find("tbody", recursive=False)
+    if base_tbody is None:
+        base_tbody = soup.new_tag("tbody")
+        base_table.append(base_tbody)
+
+    col_count = _genealogy_table_column_count(base_table)
+    for tag in heading_tags:
+        for line in _genealogy_heading_lines(tag):
+            base_tbody.append(_build_genealogy_subgroup_row(line, col_count, soup))
+
+    source_tbody = source_table.find("tbody", recursive=False)
+    rows = source_tbody.find_all("tr", recursive=False) if source_tbody is not None else source_table.find_all("tr", recursive=False)
+    if source_table.find("thead", recursive=False) is None and _is_genealogy_table_header(source_table) and rows:
+        rows = rows[1:]
+    for row in rows:
+        base_tbody.append(_clone_genealogy_row(row, col_count, soup))
+
+
+def _preserve_figure_and_image_attrs(original_html: str, merged_html: str) -> str:
+    original_soup = BeautifulSoup(original_html or "", "html.parser")
+    merged_soup = BeautifulSoup(merged_html or "", "html.parser")
+
+    original_imgs = original_soup.find_all("img")
+    merged_imgs = merged_soup.find_all("img")
+    if len(original_imgs) != len(merged_imgs):
+        return merged_html
+
+    for original_img, merged_img in zip(original_imgs, merged_imgs):
+        merged_img.attrs = dict(original_img.attrs)
+
+        original_parent = original_img.parent
+        merged_parent = merged_img.parent
+        if getattr(original_parent, "name", None) == "figure" and getattr(merged_parent, "name", None) == "figure":
+            merged_parent.attrs = dict(original_parent.attrs)
+
+    return merged_soup.decode_contents()
+
+
+def _merge_contiguous_genealogy_tables(html: str) -> str:
+    if "<table" not in (html or "").lower():
+        return html or ""
+
+    normalized = html or ""
+    if _normalize_genealogy_rescue_html is not None:
+        normalized = _normalize_genealogy_rescue_html(normalized)
+
+    soup = BeautifulSoup(normalized, "html.parser")
+    for base_table in list(soup.find_all("table")):
+        if base_table.parent is None or not _is_genealogy_table_header(base_table):
+            continue
+
+        expected_cols = _genealogy_table_column_count(base_table)
+        cursor = base_table
+        pending_headings: List[Any] = []
+
+        while True:
+            next_node = _next_significant_sibling(cursor)
+            if next_node is None:
+                break
+            if _is_genealogy_heading_tag(next_node):
+                pending_headings.append(next_node)
+                cursor = next_node
+                continue
+            if getattr(next_node, "name", None) == "table" and pending_headings and _is_compatible_genealogy_table(next_node, expected_cols):
+                _append_genealogy_heading_and_rows(base_table, pending_headings, next_node, soup)
+                for heading in pending_headings:
+                    heading.decompose()
+                pending_headings = []
+                next_node.decompose()
+                cursor = base_table
+                continue
+            break
+
+    return _preserve_figure_and_image_attrs(html, soup.decode_contents())
 
 
 # ---------------------------------------------------------------------------
@@ -830,6 +1094,13 @@ def main() -> None:
                         help="Book title for index page and HTML <title>")
     parser.add_argument("--book-author", dest="book_author", default="",
                         help="Book author for index page")
+    parser.add_argument(
+        "--merge-contiguous-genealogy-tables",
+        dest="merge_contiguous_genealogy_tables",
+        action="store_true",
+        default=False,
+        help="Collapse contiguous same-schema genealogy tables into one table with subgroup heading rows.",
+    )
     parser.add_argument("--run-id", dest="run_id", default=None, help="Run ID for progress logging")
     parser.add_argument("--state-file", dest="state_file", default=None, help="Pipeline state JSON path")
     parser.add_argument("--progress-file", dest="progress_file", default=None, help="Pipeline progress JSONL path")
@@ -943,6 +1214,9 @@ def main() -> None:
 
             chapter_counter += 1
             filename = f"chapter-{chapter_counter:03d}.html"
+            body_html = segment["body_html"]
+            if args.merge_contiguous_genealogy_tables:
+                body_html = _merge_contiguous_genealogy_tables(body_html)
             toc_entries.append({
                 "title": segment["title"],
                 "file": filename,
@@ -959,7 +1233,7 @@ def main() -> None:
             chapter_files.append({
                 "filename": filename,
                 "title": segment["title"],
-                "body_html": segment["body_html"],
+                "body_html": body_html,
                 "page_start": segment["page_start"],
                 "page_end": segment["page_end"],
                 "kind": "chapter",
@@ -999,6 +1273,8 @@ def main() -> None:
             html = _attach_images(html, crops, args.images_subdir.rstrip("/"))
         body_html = _strip_headers_and_numbers(html)
         body_html = _add_table_scope(body_html)
+        if args.merge_contiguous_genealogy_tables:
+            body_html = _merge_contiguous_genealogy_tables(body_html)
 
         fallback_entries.append({
             "title": title,

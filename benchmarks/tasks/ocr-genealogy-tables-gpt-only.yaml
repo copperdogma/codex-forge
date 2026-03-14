@@ -109,6 +109,24 @@ tests:
     assert:
       - type: python
         value: file://../scorers/table_structure_scorer.py
+  - vars:
+      image: file://../input/onward-pages-b64/Image088.b64.txt
+      golden_file: "golden/ocr-genealogy/page-089-golden.html"
+    assert:
+      - type: python
+        value: file://../scorers/table_structure_scorer.py
+  - vars:
+      image: file://../input/onward-pages-b64/Image096.b64.txt
+      golden_file: "golden/ocr-genealogy/page-097-golden.html"
+    assert:
+      - type: python
+        value: file://../scorers/table_structure_scorer.py
+  - vars:
+      image: file://../input/onward-pages-b64/Image097.b64.txt
+      golden_file: "golden/ocr-genealogy/page-098-golden.html"
+    assert:
+      - type: python
+        value: file://../scorers/table_structure_scorer.py
 
   # ── Image pages (11) ───────────────────────────────────────────
   - vars:

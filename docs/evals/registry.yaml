@@ -130,6 +130,18 @@ evals:
         status: partial
         approach: "Benchmarked GPT-5.1 on Onward table pages"
         note: "Prose excellent; tables need rescue pass or layout-aware model"
+      - id: "002"
+        date: 2026-03-14
+        status: succeeded
+        approach: "Story 140 page-golden coverage expansion for reviewed Roseanna/Emilie continuations"
+        note: >
+          Added hand-verified page goldens `page-089`, `page-097`, and `page-098`
+          to `benchmarks/tasks/ocr-genealogy-tables.yaml` and
+          `benchmarks/tasks/ocr-genealogy-tables-gpt-only.yaml`. Story 140
+          validated those pages by direct artifact-vs-golden scoring on
+          `story140-onward-targeted-rescue-r7`, `r13`, and `r19` rather than a
+          fresh promptfoo model sweep, so no new comparable model score is
+          recorded here yet.
 
     retry_when:
       - condition: new-subject-model

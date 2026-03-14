@@ -14,6 +14,7 @@ from modules.build.build_chapter_html_v1.main import (
     _html5_wrap,
     _add_table_scope,
     _build_nav,
+    _merge_contiguous_genealogy_tables,
     _normalize_heading_breaks,
     _refine_chapter_segments,
     _strip_headers_and_numbers,
@@ -671,6 +672,142 @@ class TestStructureRefinement:
         assert len(soup.find_all("p")) == 2
 
 
+class TestGenealogyMerging:
+    def test_merge_contiguous_genealogy_tables_preserves_existing_image_attrs(self):
+        html = """
+        <h1>ALMA</h1>
+        <figure data-placement="ocr-inline" data-caption-source="heuristic">
+          <img src="images/page-022-000.jpg" alt="Portrait" data-crop-filename="page-022-000.jpg"/>
+          <figcaption><strong><em>Henry and Alma Alain on their 50th wedding anniversary in 1957.</em></strong></figcaption>
+        </figure>
+        <table>
+          <thead>
+            <tr><th>NAME</th><th>BORN</th><th>MARRIED</th><th>SPOUSE</th><th>BOY/GIRL</th><th>DIED</th></tr>
+          </thead>
+          <tbody>
+            <tr><td>Alma</td><td>July 31, 1883</td><td>Apr. 8, 1907</td><td>Henry Alain</td><td>4 4</td><td>Dec. 15, 1982</td></tr>
+          </tbody>
+        </table>
+        <h2>Alma's Grandchildren</h2>
+        <h3>MARY PAULE'S FAMILY</h3>
+        <table>
+          <tbody>
+            <tr><td>Ronald</td><td>Jan. 24, 1933</td><td>July 20, 1963</td><td>Jean Bailey</td><td>1</td><td>1</td></tr>
+          </tbody>
+        </table>
+        """
+
+        result = _merge_contiguous_genealogy_tables(html)
+        soup = BeautifulSoup(result, "html.parser")
+        figure = soup.find("figure")
+        img = soup.find("img")
+
+        assert figure is not None
+        assert img is not None
+        assert figure["data-placement"] == "ocr-inline"
+        assert figure["data-caption-source"] == "heuristic"
+        assert img["src"] == "images/page-022-000.jpg"
+        assert img["data-crop-filename"] == "page-022-000.jpg"
+        assert img["alt"] == "Portrait"
+
+    def test_merge_contiguous_genealogy_tables_splits_flattened_context_headings(self):
+        html = """
+        <h1>ALMA</h1>
+        <table>
+          <thead>
+            <tr><th>NAME</th><th>BORN</th><th>MARRIED</th><th>SPOUSE</th><th>BOY/GIRL</th><th>DIED</th></tr>
+          </thead>
+          <tbody>
+            <tr><td>Wayne</td><td>Aug. 23, 1946</td><td>Dec., 1966</td><td>Lynn LeBlue</td><td>2</td><td></td></tr>
+          </tbody>
+        </table>
+        <h2>Alma's Grandchildren BERTHA'S FAMILY</h2>
+        <table>
+          <tbody>
+            <tr><td>Norbert</td><td>July 3, 1939</td><td>Apr. 15, 1961</td><td>Shirley Allen</td><td>4</td><td></td></tr>
+          </tbody>
+        </table>
+        <h2>Alma's Great Grandchildren Bertha's Grandchildren NORBERT'S FAMILY</h2>
+        <table>
+          <tbody>
+            <tr><td>Michelle</td><td>Jan. 12, 1962</td></tr>
+          </tbody>
+        </table>
+        """
+
+        result = _merge_contiguous_genealogy_tables(html)
+        soup = BeautifulSoup(result, "html.parser")
+        subgroup_rows = [
+            row.get_text(" ", strip=True)
+            for row in soup.find_all("tr", class_="genealogy-subgroup-heading")
+        ]
+
+        assert subgroup_rows == [
+            "Alma's Grandchildren",
+            "BERTHA'S FAMILY",
+            "Alma's Great Grandchildren",
+            "Bertha's Grandchildren",
+            "NORBERT'S FAMILY",
+        ]
+
+    def test_merge_contiguous_genealogy_tables_collapses_heading_table_runs(self):
+        html = """
+        <h1>ALMA</h1>
+        <p>Intro paragraph.</p>
+        <table>
+          <thead>
+            <tr><th>NAME</th><th>BORN</th><th>MARRIED</th><th>SPOUSE</th><th>BOY/GIRL</th><th>DIED</th></tr>
+          </thead>
+          <tbody>
+            <tr><td>Alma</td><td>July 31, 1883</td><td>Apr. 8, 1907</td><td>Henry Alain</td><td>4 4</td><td>Dec. 15, 1982</td></tr>
+          </tbody>
+        </table>
+        <h2>Alma's Grandchildren</h2>
+        <h3>MARY PAULE'S FAMILY</h3>
+        <table>
+          <tbody>
+            <tr><td>Ronald</td><td>Jan. 24, 1933</td><td>July 20, 1963</td><td>Jean Bailey</td><td>1</td><td>1</td></tr>
+          </tbody>
+        </table>
+        <p><strong>Alma's Great Grandchildren<br/>Mary Paule's Grandchildren<br/>RONALD'S FAMILY</strong></p>
+        <table>
+          <tbody>
+            <tr><td>Kari Lou</td><td>Oct. 30, 1964</td></tr>
+          </tbody>
+        </table>
+        <table>
+          <tbody>
+            <tr><td>TOTAL DESCENDANTS</td><td>83</td></tr>
+            <tr><td>LIVING</td><td>78</td></tr>
+            <tr><td>DECEASED</td><td>5</td></tr>
+          </tbody>
+        </table>
+        """
+
+        result = _merge_contiguous_genealogy_tables(html)
+        soup = BeautifulSoup(result, "html.parser")
+        tables = soup.find_all("table")
+
+        assert len(tables) == 2
+        assert [h.get_text(" ", strip=True) for h in soup.find_all(["h1", "h2", "h3"])] == ["ALMA"]
+
+        main_rows = tables[0].find("tbody").find_all("tr", recursive=False)
+        subgroup_rows = [
+            row.get_text(" ", strip=True)
+            for row in main_rows
+            if "genealogy-subgroup-heading" in (row.get("class") or [])
+        ]
+        assert subgroup_rows == [
+            "Alma's Grandchildren",
+            "MARY PAULE'S FAMILY",
+            "Alma's Great Grandchildren",
+            "Mary Paule's Grandchildren",
+            "RONALD'S FAMILY",
+        ]
+        assert "Kari Lou" in tables[0].get_text(" ", strip=True)
+        assert "TOTAL DESCENDANTS" in tables[1].get_text(" ", strip=True)
+
+
 # ---------------------------------------------------------------------------
 # Integration: full pipeline via CLI
 # ---------------------------------------------------------------------------
@@ -825,6 +962,56 @@ class TestCLIIntegration:
         chapter_two = (html_dir / "chapter-002.html").read_text()
         assert "Arthur tail rows." in chapter_one
         assert "Arthur intro." in chapter_two
+
+    def test_cli_merges_contiguous_genealogy_tables_when_enabled(self):
+        pages_path = self.tmpdir / "pages.jsonl"
+        portions_path = self.tmpdir / "portions.jsonl"
+        out_path = self.tmpdir / "manifest.jsonl"
+        html_dir = self.tmpdir / "html"
+
+        self._write_jsonl(pages_path, [
+            {
+                "page_number": 1,
+                "printed_page_number": 1,
+                "html": (
+                    "<h1>ALMA</h1>"
+                    "<table><thead><tr><th>NAME</th><th>BORN</th><th>MARRIED</th><th>SPOUSE</th><th>BOY/GIRL</th><th>DIED</th></tr></thead>"
+                    "<tbody><tr><td>Alma</td><td>July 31, 1883</td><td>Apr. 8, 1907</td><td>Henry Alain</td><td>4 4</td><td>Dec. 15, 1982</td></tr></tbody></table>"
+                ),
+            },
+            {
+                "page_number": 2,
+                "printed_page_number": 2,
+                "html": (
+                    "<h2>Alma's Grandchildren</h2><h3>MARY PAULE'S FAMILY</h3>"
+                    "<table><tbody><tr><td>Ronald</td><td>Jan. 24, 1933</td><td>July 20, 1963</td><td>Jean Bailey</td><td>1</td><td>1</td></tr></tbody></table>"
+                    "<p><strong>Alma's Great Grandchildren<br/>Mary Paule's Grandchildren<br/>RONALD'S FAMILY</strong></p>"
+                    "<table><tbody><tr><td>Kari Lou</td><td>Oct. 30, 1964</td></tr></tbody></table>"
+                ),
+            },
+        ])
+        self._write_jsonl(portions_path, [
+            {"title": "Alma", "page_start": 1, "page_end": 2},
+        ])
+
+        cmd = [
+            sys.executable, "-m", "modules.build.build_chapter_html_v1.main",
+            "--pages", str(pages_path),
+            "--portions", str(portions_path),
+            "--out", str(out_path),
+            "--output-dir", str(html_dir),
+            "--book-title", "Test Book",
+            "--merge-contiguous-genealogy-tables",
+        ]
+        result = subprocess.run(cmd, capture_output=True, text=True, cwd=str(Path(__file__).resolve().parent.parent))
+        assert result.returncode == 0, f"STDERR: {result.stderr}"
+
+        chapter = (html_dir / "chapter-001.html").read_text()
+        soup = BeautifulSoup(chapter, "html.parser")
+        tables = soup.find("article").find_all("table")
+        assert len(tables) == 1
+        assert "MARY PAULE'S FAMILY" in tables[0].get_text(" ", strip=True)
+        assert "RONALD'S FAMILY" in tables[0].get_text(" ", strip=True)
 
     def test_merges_same_family_prefix_into_previous_chapter(self):
         pages_path = self.tmpdir / "pages.jsonl"

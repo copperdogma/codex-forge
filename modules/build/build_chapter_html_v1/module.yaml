@@ -20,4 +20,7 @@ params:
   - name: book_author
     type: str
     default: ""
+  - name: merge_contiguous_genealogy_tables
+    type: bool
+    default: false
 notes: "Produces self-contained HTML5 documents. Images wrapped in <figure> with <figcaption> from VLM caption text. Alt text uses VLM image_description."

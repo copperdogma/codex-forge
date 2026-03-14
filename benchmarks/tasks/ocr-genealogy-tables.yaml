@@ -174,6 +174,30 @@ tests:
       - type: python
         value: file://../scorers/table_structure_scorer.py
 
+  # Roseanna continuation — one continuous genealogy table plus summary totals
+  - vars:
+      image: file://../input/onward-pages-b64/Image088.b64.txt
+      golden_file: "golden/ocr-genealogy/page-089-golden.html"
+    assert:
+      - type: python
+        value: file://../scorers/table_structure_scorer.py
+
+  # Emilie genealogy page — continuous table with nested subgroup headings
+  - vars:
+      image: file://../input/onward-pages-b64/Image096.b64.txt
+      golden_file: "golden/ocr-genealogy/page-097-golden.html"
+    assert:
+      - type: python
+        value: file://../scorers/table_structure_scorer.py
+
+  # Emilie continuation — continuous table across multiple grandchild branches
+  - vars:
+      image: file://../input/onward-pages-b64/Image097.b64.txt
+      golden_file: "golden/ocr-genealogy/page-098-golden.html"
+    assert:
+      - type: python
+        value: file://../scorers/table_structure_scorer.py
+
   # ── Image-heavy pages (img_detection scoring) ──────────────────
 
   # Illustration credit page (1 illustration)

@@ -6,4 +6,6 @@ output_schema: page_html_v1
 default_params:
   header_threshold: 0.8
   max_pages: 200
+  max_context_chars: 6000
+  min_score_gain: 15
   fail_on_unresolved: false
