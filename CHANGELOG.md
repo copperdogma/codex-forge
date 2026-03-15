@@ -1,3 +1,10 @@
+## [2026-03-15-02] - Accept ADR-001 consistency strategy
+
+### Changed
+- Accepted ADR-001 and finalized the project direction for document-wide consistency planning plus plan-aware selective reruns
+- Settled direct HTML as the default near-term repair target, with structured intermediates reserved for evidence-driven escalation if plan-aware reruns prove insufficient
+- Promoted the `25%` warning / `30%` redesign thresholds from discussion guidance to explicit operational heuristics in the ADR, and closed the remaining integration checklist items
+
 ## [2026-03-15-01] - Ship document-level genealogy consistency planning (Story 144)
 
 ### Added

@@ -1,6 +1,6 @@
 # ADR-001: Document-Wide Consistency Planning and Source-Aware Re-Extraction Strategy
 
-**Status:** DISCUSSING — Research synthesized, direction narrowing
+**Status:** ACCEPTED — Document-wide consistency planning and plan-aware selective reruns adopted
 
 <!-- Status lifecycle: PENDING → RESEARCHING → DISCUSSING → ACCEPTED -->
 <!-- Alternatives: REJECTED / DEFERRED / SUPERSEDED -->
@@ -23,7 +23,7 @@ At first glance this looks like an HTML normalization problem. That framing is t
 
 Local repo evidence already points toward a strong constraint: when extraction quality is poor or inconsistent, the strongest available source-aware model usually beats post-extraction cleanup. That suggests the default response to inconsistency should probably be "go back to source with better context," not "repair mediocre HTML."
 
-This ADR therefore needs to decide the architectural strategy for consistency:
+This ADR therefore settles the architectural strategy for consistency:
 - should codex-forge treat inconsistency as a trigger for selective, context-aware re-extraction from source;
 - should some recipes move to broader run-aware extraction from the start;
 - what role should deterministic/statistical analysis play in detection, clustering, acceptance, and provenance;
@@ -119,7 +119,7 @@ Cons:
 - `docs/spec.md`: the current pipeline is a compromise and should use detection mechanisms to know when a compromise is no longer justified.
 - Story 140 improved page-local genealogy rescue but did not solve chapter-wide structural consistency.
 - Story 141 now captures the completed investigation slice. Its local baselines already show that a strong model over a broader source-informed scope outperforms the current deterministic cleanup.
-- Story 142 is the draft implementation follow-up for the first concrete Onward slice under this ADR.
+- Story 142 completed the first concrete Onward slice under this ADR with read-only detection and rerun gating.
 - Current modules such as `table_rescue_onward_tables_v1` and `build_chapter_html_v1` already contain partial normalization logic and should not keep absorbing unrelated responsibility.
 - OCR/source reads are expensive, so any second pass must be selective by default.
 - No prior ADRs exist yet beyond this one.
@@ -127,7 +127,7 @@ Cons:
 ## Dependencies
 
 - Story 141 supplied the investigation and handoff evidence for this ADR.
-- Story 142 is the first implementation story expected to consume this ADR once research settles the direction.
+- Story 142, Story 143, and Story 144 now provide the first completed implementation ladder under this ADR.
 - May affect future stories for heading consistency, list consistency, repeated-record extraction, and other format-specific run-aware extraction policies.
 - No upstream ADR dependencies.
 
@@ -138,7 +138,7 @@ Cons:
 - The main disagreement is not direction but thresholding. OpenAI is slightly more aggressive about redesigning extraction granularity (`25-30%` rerun coverage warning band), while Gemini is more tolerant (`30-40%`). xAI and Opus both cluster near `30%`. Current synthesis recommendation: `25%` warning band, `30%` redesign trigger across multiple documents.
 - The reports agree that the first implementation slice should not jump straight to automated reruns. The safest first slice is a read-only detector/report that clusters likely same-schema runs, flags drift, infers provisional schema hints, and measures rerun coverage on real artifacts.
 - The reports also converge on deterministic building blocks that are realistic to adopt now: header/column/span fingerprints, DOM/tag-sequence similarity, MinHash/SimHash-style screening, clustering, and optional tree-edit-distance or record-linkage for deeper validation.
-- The strongest unresolved question is representation target: direct HTML reruns may remain harder to constrain than structured output plus deterministic rendering. That question should stay open until the first rerun implementation slice has evidence.
+- Research left representation target as the strongest open question, but Story 143 and Story 144 provided enough local evidence to settle the operational default: use direct HTML for the next repair slice, and escalate to a structured intermediate only if plan-aware reruns cannot reliably reduce conformance failures.
 
 ## Discussion
 
@@ -151,6 +151,7 @@ Cons:
 - 20260314: Story 143 materially strengthened the direct-HTML case for Onward genealogy reruns. A bounded coarse-page validation loop accepted `13/14` target pages and cleared three of the four reviewed bad chapters, but page `32` still shows that mixed context-heading plus family-heading pages may ultimately need a more structured target than raw HTML.
 - 20260315: Manual inspection of the Story 143 artifacts showed broader format inconsistency beyond the reviewed chapter set. Fragmented tables, concatenated subgroup headings, fused `BOY/GIRL` headers, and left-column-only family rows can persist even when the current validator passes, which strengthens the case for document-wide pattern discovery plus explicit conformance artifacts.
 - 20260315: The desired product is not a rigid global style guide. The consistency engine should infer document-local conventions from scratch each time, but it must emit those conventions as artifacts so they can be inspected, debugged, and later revised by users or downstream passes.
+- 20260315: Story 144 is enough evidence to accept the document-consistency architecture now. The remaining uncertainty is implementation sequencing, not the decision itself, so the repair target is settled as direct HTML first with a structured intermediate held in reserve if plan-aware reruns prove insufficient.
 
 ## Decisions
 
@@ -161,9 +162,9 @@ Cons:
 - Settled — a single document may contain multiple legitimate pattern families. The engine may choose different conventions for different families, but those choices must be made explicit in the emitted plan.
 - Settled — repair and rerun passes must be guided by the emitted `consistency_plan` and either conform to it or explicitly revise it. The policy must not drift invisibly across later passes.
 - Settled — global invariants remain fixed even when the plan is adaptive: preserve source content, avoid semantic corruption, preserve provenance, and maximize internal consistency rather than forcing global sameness.
-- Proposed — the default architecture should be `extract -> document-wide pattern discovery -> consistency_plan -> selective rerun -> light canonicalization -> conformance_report`.
-- Proposed — use `25%` rerun coverage as a warning band and `30%` across multiple documents as the trigger to prototype broader extraction granularity for a recipe.
-- Still open: whether the repair stage should emit direct HTML or a more structured intermediate representation that is then rendered deterministically.
+- Settled — the default architecture should be `extract -> document-wide pattern discovery -> consistency_plan -> selective rerun -> light canonicalization -> conformance_report`.
+- Settled — use `25%` rerun coverage as an operational warning band and `30%` across multiple documents as the trigger to prototype broader extraction granularity for a recipe. These are evidence-based heuristics, not immutable thresholds.
+- Settled — the next repair slice should emit direct HTML by default. Escalate to a structured intermediate representation only if plan-aware reruns cannot reliably reduce conformance failures, especially around mixed heading/family ownership cases.
 
 ## Integration Checklist
 
@@ -171,7 +172,7 @@ Cons:
 - [x] **Related stories** — update `Decision Refs` and add any new tasks or constraints
 - [x] **AGENTS.md** — update if this changes workflow, conventions, or agent guardrails
 - [x] **Runbooks / supporting docs** — update any operational docs affected by the decision
-- [ ] **Other ADRs / decision docs** — add cross-references where relevant
+- [x] **Other ADRs / decision docs** — no other ADRs currently require cross-references
 - [x] **Audit** — verify each decision is reflected in the right project artifact
 
 ## Remaining Work
@@ -181,8 +182,8 @@ Cons:
 - [x] Story 143 completed the first automated schema-frozen rerun slice: the final reused-artifact run targeted `14` bounded coarse pages, accepted `13`, cleared `chapter-013.html`, `chapter-014.html`, and `chapter-015.html`, and reduced `chapter-010.html` from drift score `45` to `25` while preserving the reviewed good chapters.
 - [x] Story 144 now captures the first document-level planning follow-up: emit `pattern_inventory`, `consistency_plan`, and `conformance_report` for the Onward genealogy slice, using the residual hard-page, fragmentation, fused-header, and concatenated-heading failures as validation cases.
 - Next likely story: use the emitted `consistency_plan` to guide plan-aware selective reruns instead of relying on narrower schema hints alone.
-- Once the strategy is accepted, distill the resulting workflow and decision heuristics into a reusable skill, runbook, or `AGENTS.md` guidance so future sessions do not have to reconstruct the pattern from ADR-001.
-- Create follow-up stories only after the framework boundary is settled.
+- [x] The resulting workflow and decision heuristics are now distilled into reusable guidance in `docs/runbooks/document-consistency-planning.md` and `AGENTS.md`, so future sessions do not have to reconstruct the pattern from ADR-001.
+- Next concrete implementation step: create the plan-aware selective rerun story that consumes `consistency_plan` and measures before/after conformance deltas.
 
 ## Work Log
 
@@ -198,3 +199,4 @@ Cons:
 - 20260315-1027 — ADR reframed again after manual artifact inspection and follow-up design discussion: chapter-level gating is now explicitly treated as an early seam, while the intended architecture becomes document-wide pattern discovery plus explicit `pattern_inventory`, `consistency_plan`, and `conformance_report` artifacts for later repair passes and debugging.
 - 20260315-1758 — Story 144 completed with validated document-level planning artifacts. Driver run `story144-onward-document-consistency-plan-r5` emitted `pattern_inventory`, `consistency_plan`, and `conformance_report` sidecars that surfaced the previously missed manual format-failure chapters (`011/012/013/014/018/019/020`), kept `chapter-009.html` in a row-semantic-containing bucket instead of pure format drift, and established the current chapter-first validator as an upstream signal producer rather than the policy source.
 - 20260315-1231 — Story 144 validation hardening: a `/validate` follow-up exposed two normalization bugs in the first planning slice, so the planner now splits pure format-drift summaries from mixed issue summaries and rejects unsupported AI issue types that are not backed by dossier signals. Revalidation run `story144-onward-document-consistency-plan-r7` preserved the missed-format coverage, kept `chapter-009.html` out of pure-format summary buckets, and restored clean `chapter-023.html` to conformant status.
+- 20260315-1347 — ADR accepted: Stories 142–144 resolved the major architecture questions. Codex-forge now treats document-wide consistency planning plus plan-aware selective reruns as the default strategy, adopts direct HTML as the next repair target by default, and reserves a structured intermediate for evidence-driven escalation rather than speculative upfront design.
