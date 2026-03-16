@@ -1,3 +1,16 @@
+## [2026-03-15-03] - Converge agent workflow around build-map tracking (Story 145)
+
+### Added
+- Added `docs/build-map.md` as the human-readable source of truth for system structure, compromise progress, input coverage, graduation criteria, and prioritized format gaps
+- Added the new `align`, `triage`, and `triage-evals` skills plus their generated Gemini wrappers
+
+### Changed
+- Merged the standalone eval-verification workflow into `improve-eval` and updated AGENTS, runbooks, templates, and skill guidance to the converged command surface
+- Refreshed `tests/fixtures/formats/_coverage-matrix.json` so the machine-readable coverage inventory matches current crop/provenance truth and the new build map
+
+### Fixed
+- Removed stale active references to `reflect`, standalone `verify-eval`, `docs/format-registry.md`, and missing build-map guidance from the live agent workflow surface
+
 ## [2026-03-15-02] - Accept ADR-001 consistency strategy
 
 ### Changed

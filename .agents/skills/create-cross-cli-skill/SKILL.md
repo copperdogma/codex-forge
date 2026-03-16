@@ -6,6 +6,8 @@ user-invocable: true
 
 # /create-cross-cli-skill
 
+> Alignment check: Before choosing an approach, verify it aligns with `docs/ideal.md` and relevant decision records in `docs/decisions/`. If this work touches a known compromise in `docs/spec.md`, respect its limitation type and evolution path. If none apply, say so explicitly.
+
 Use this skill whenever the user asks to create a new skill.
 
 ## Required Output
@@ -22,9 +24,15 @@ Optional colocated resources:
 ## Rules
 
 1. Use frontmatter with `name`, `description`, and `user-invocable: true` (or `false` for scaffolds not yet ready).
-2. Keep instructions implementation-oriented and testable.
-3. If the skill affects architecture, workflow, schemas, or cross-cutting agent behavior, include a short decision check telling the agent to consult relevant docs in `docs/runbooks/`, `docs/scout/`, `docs/notes/`, and any future decision-doc directories. If none apply, the skill should say to state that explicitly.
-4. Avoid tool-specific primary sources for skill content.
+2. Include the alignment check blockquote after the skill header in every new skill:
+   ```
+   > Alignment check: Before choosing an approach, verify it aligns with `docs/ideal.md`
+   > and relevant decision records in `docs/decisions/`. If this work touches a known
+   > compromise in `docs/spec.md`, respect its limitation type and evolution path.
+   > If none apply, say so explicitly.
+   ```
+3. Keep instructions implementation-oriented and testable.
+4. Avoid tool-specific primary sources (`.cursor/commands`, `.claude/commands`) for skill content.
 5. After creating or changing skills, run: `scripts/sync-agent-skills.sh`
 6. Validate with: `scripts/sync-agent-skills.sh --check`
 

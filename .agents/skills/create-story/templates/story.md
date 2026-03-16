@@ -44,7 +44,7 @@
   - [ ] Default Python lint: `make lint`
   - [ ] If pipeline behavior changed: clear stale `*.pyc`, run through `driver.py` or `make smoke`, verify artifacts in `output/runs/`, and manually inspect sample JSON/JSONL data
   - [ ] If agent tooling changed: `make skills-check`
-- [ ] If evals or goldens changed: run `/verify-eval` and update `docs/evals/registry.yaml`
+- [ ] If evals or goldens changed: run `/improve-eval` and update `docs/evals/registry.yaml`
 - [ ] Search all docs and update any related to what we touched
 - [ ] Verify Central Tenets:
   - [ ] T0 — Traceability: every output traces to source page, OCR engine, confidence, processing step

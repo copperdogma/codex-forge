@@ -1,6 +1,6 @@
 {
   "version": "1.0",
-  "generated": "2026-03-10",
+  "generated": "2026-03-15",
   "description": "Format coverage matrix tracking which input formats codex-forge can convert, how well, and what test fixtures exist. Agents query this to find untested formats and prioritize work.",
   "statuses": {
     "untested": "Format identified but no test fixtures or pipeline support",
@@ -60,13 +60,13 @@
       "scores": {
         "text_fidelity": 0.97,
         "structure_preservation": 0.95,
-        "illustration_extraction": 0.856,
-        "provenance_completeness": 0.984,
-        "measured": "2026-01-25",
-        "provenance_measured": "2026-03-10",
-        "notes": "Text fidelity from Story 127 OCR eval. Illustration score from image-crop-extraction eval. Provenance: 94.1% envelope, 100% page tracing, 100% OCR confidence, 99.5% gamebook."
+        "illustration_extraction": 0.9,
+        "provenance_completeness": 1.0,
+        "measured": "2026-03-11",
+        "provenance_measured": "2026-03-11",
+        "notes": "Text fidelity signal still comes from Story 127 OCR eval, but the composite format status was refreshed after the 2026-03-11 crop eval (0.900) and Story 132 provenance verification (1.0 completeness)."
       },
-      "known_gaps": ["extract_pdf_images_fast_v1 missing envelope fields on half its records", "detect_boundaries_html_loop_v1 missing envelope on boundary records"],
+      "known_gaps": ["Illustration extraction still sits below the 0.95 graduation target and still depends on validator + trim heuristics."],
       "graduated": false
     },
     {
@@ -88,13 +88,13 @@
       "scores": {
         "text_fidelity": 0.93,
         "structure_preservation": 0.95,
-        "illustration_extraction": 0.856,
-        "provenance_completeness": 0.956,
-        "measured": "2026-03-10",
-        "provenance_measured": "2026-03-10",
-        "notes": "Claude Opus 4.6 achieves 0.952 avg on onward-table-fidelity eval. Story 131. Provenance: 86.7% envelope, 100% page/OCR."
+        "illustration_extraction": 0.9,
+        "provenance_completeness": 1.0,
+        "measured": "2026-03-11",
+        "provenance_measured": "2026-03-11",
+        "notes": "Structure quality comes from Story 131 / the 2026-03-11 onward-table-fidelity refresh, illustration quality uses the 2026-03-11 crop eval (0.900), and provenance completeness was verified at 1.0 in Story 132."
       },
-      "known_gaps": ["Handwritten annotations sometimes missed", "Alma chapter scores 0.921 (below 0.95 individually)", "build_chapter_html_v1 emits no envelope fields", "portionize_headings_html_v1 missing run_id/created_at"],
+      "known_gaps": ["Handwritten annotations still weaken some table pages.", "Illustration extraction remains below the 0.95 graduation target."],
       "graduated": false
     },
     {
@@ -116,13 +116,13 @@
       "scores": {
         "text_fidelity": 0.93,
         "structure_preservation": 0.95,
-        "illustration_extraction": 0.856,
-        "provenance_completeness": 0.956,
-        "measured": "2026-03-10",
-        "provenance_measured": "2026-03-10",
-        "notes": "Same quality as PDF path since images are the intermediate format anyway. Updated with Story 131 results. Provenance shared with scanned-pdf-tables (same run)."
+        "illustration_extraction": 0.9,
+        "provenance_completeness": 1.0,
+        "measured": "2026-03-11",
+        "provenance_measured": "2026-03-11",
+        "notes": "Shares the current scanned-image quality envelope: table structure at 0.95, illustration extraction at 0.900, and provenance completeness at 1.0 after Story 132 verification."
       },
-      "known_gaps": ["Same provenance gaps as scanned-pdf-tables"],
+      "known_gaps": ["Illustration extraction remains below the 0.95 graduation target."],
       "graduated": false
     },
     {

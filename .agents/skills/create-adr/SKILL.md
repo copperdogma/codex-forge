@@ -59,8 +59,8 @@ Create a new ADR with proper structure and research scaffolding.
 
 7. **Show the created files** to the user for review
 
-8. **After the ADR matures, run `/reflect`**
-   - Once research or implementation changes the project direction, use `/reflect` to propagate implications across `docs/ideal.md`, `docs/spec.md`, `docs/requirements.md`, stories, ADRs, and evals
+8. **After the ADR matures, run `/align`**
+   - Once research or implementation changes the project direction, use `/align` to propagate implications across `docs/ideal.md`, `docs/spec.md`, `docs/build-map.md`, `docs/requirements.md`, stories, ADRs, and evals
 
 ## Guardrails
 
@@ -68,7 +68,7 @@ Create a new ADR with proper structure and research scaffolding.
 - ADR numbers are explicitly assigned, not auto-incremented
 - Never commit or push without explicit user request
 - The research prompt must stand alone
-- Do not assume Storybook-specific docs like `setup.md` or `feature-map.md` exist here
+- Do not assume Storybook-specific docs or product surfaces exist here
 - Do not assume deep-research CLI default filenames match codex-forge's ADR research naming convention
 - Do not let recurring patterns live only inside one ADR; once the direction is accepted, distill it into reusable repo guidance
 

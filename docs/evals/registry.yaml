@@ -6,6 +6,13 @@
 #   quality     — "How good is our output?" Continuous improvement target.
 #   compromise  — "Can we eliminate this compromise?" Binary pass/fail gate.
 #
+# Triage classes (derived, not stored as a separate field):
+#   quality-runtime        — quality evals where latency/cost are active decision inputs
+#   quality-capability     — quality evals focused on output fidelity / behavior quality
+#   compromise-detection   — compromise evals that gate deletion of spec workarounds
+# The triage skills should derive these from `type`, target fields, and context
+# rather than adding another registry field unless the taxonomy needs to diverge.
+#
 # Score fields:
 #   latency_ms      — avg per-call latency (REQUIRED when measurable)
 #   cost_usd        — avg per-call cost in USD (REQUIRED if model has pricing)

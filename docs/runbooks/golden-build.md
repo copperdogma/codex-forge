@@ -17,7 +17,7 @@ Operational guide for creating and maintaining golden reference files for evals.
 
 ## Eval-Driven Golden Improvement
 
-When `/verify-eval` identifies golden-wrong mismatches:
+When `/improve-eval` identifies golden-wrong mismatches:
 
 1. **Review the mismatch table** — each item classified as golden-wrong needs fixing.
 2. **Apply fixes**:
@@ -26,6 +26,10 @@ When `/verify-eval` identifies golden-wrong mismatches:
 3. **Validate** that golden fixture tests still pass.
 4. **Re-run the eval** to get verified scores.
 5. **Document the delta** in the story work log.
+
+`/improve-eval` now owns both improvement attempts and the old verification
+discipline. Raw scores do not count until mismatches are classified and any
+golden/scorer corrections are re-measured.
 
 ## Quality Standards
 

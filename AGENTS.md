@@ -64,6 +64,8 @@ Canonical location: `.agents/skills/` — works across Claude Code, Cursor, Gemi
 - `.claude/skills` and `.cursor/skills` are symlinks to `.agents/skills`
 - `skills/` at repo root is a symlink for backwards compatibility
 - `.gemini/commands/*.toml` are generated wrappers — run `scripts/sync-agent-skills.sh` after changes
+- Use `/align` for post-change methodology sweeps across the Ideal, spec, build map, stories, and evals
+- Use `/triage` for read-only full sweeps or scoped backlog / inbox / eval triage
 - To create a new skill: `/create-cross-cli-skill`
 
 ## Story Lifecycle
@@ -77,7 +79,7 @@ Canonical location: `.agents/skills/` — works across Claude Code, Cursor, Gemi
 
 **Story IDs are identifiers, not sequence numbers.** New stories get max+1. Order via `Depends On`, not ID. Never use letter suffixes.
 
-**Workflow:** `/create-story` → `/build-story` → `/validate` → `/mark-story-done`
+**Workflow:** `/triage` (when useful) → `/create-story` → `/build-story` → `/validate` → `/mark-story-done`
 
 **Decision discipline:** Hard-to-reverse architecture, workflow, schema, or cross-cutting project decisions belong in `docs/decisions/`. Stories affecting those areas should cite relevant ADRs in `Decision Refs`, or explicitly note that none were found after search.
 
@@ -88,6 +90,7 @@ Canonical location: `.agents/skills/` — works across Claude Code, Cursor, Gemi
 ## Docs
 
 - `docs/ideal.md` — The Ideal: zero-limitation north star
+- `docs/build-map.md` — System structure, compromise progress, input coverage, graduation tracking
 - `docs/spec.md` — Active compromises with detection evals
 - `docs/decisions/` — ADRs for hard-to-reverse architecture, workflow, schema, and cross-cutting project decisions
 - `docs/evals/registry.yaml` — Eval scores, targets, attempt history
@@ -96,7 +99,6 @@ Canonical location: `.agents/skills/` — works across Claude Code, Cursor, Gemi
 - `docs/stories/` — Individual story files with ACs, tasks, work logs
 - `docs/scout.md` — Scout expedition index
 - `docs/ai-learning-log.md` — AI self-improvement log (patterns, pitfalls, lessons)
-- `docs/format-registry.md` — Format conversion status, gaps, graduation tracking
 - `tests/fixtures/formats/_coverage-matrix.json` — Machine-readable format inventory (16 formats)
 - `docs/runbooks/` — Operational runbooks for repeatable workflows
 - `CHANGELOG.md` — Release history (CalVer `YYYY-MM-DD-NN` format)

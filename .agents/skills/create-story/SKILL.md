@@ -70,7 +70,7 @@ Create a new story in `docs/stories/` with consistent format.
 - If the story raises a new unresolved architecture, workflow, or schema question, either cite the missing ADR need explicitly or recommend creating one before implementation starts.
 - If the story changes pipeline, module, driver, schema, or recipe behavior, include a task for real `driver.py` verification and artifact inspection in `output/runs/`.
 - If the story changes agent tooling or project instructions, include `make skills-check` in the task list.
-- If the story will run evals, include a task to run `/verify-eval` and update `docs/evals/registry.yaml`.
+- If the story will run evals, include a task to run `/improve-eval` and update `docs/evals/registry.yaml`.
 - Always include the Workflow Gates section. These gates enforce the handoff chain: `/build-story` → `/validate` → `/mark-story-done`.
 - If the story supersedes existing code or docs, name likely removal targets up front instead of silently accumulating parallel paths.
 - "Files to Modify" is gold for AI agents — fill it in when known.

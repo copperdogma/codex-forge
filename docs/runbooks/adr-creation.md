@@ -109,7 +109,7 @@ Typical integration targets in codex-forge:
 - relevant runbooks or scout docs
 - other ADRs or decision records if cross-references are needed
 
-After major ADR discussion or implementation outcomes, run `/reflect` or perform an equivalent manual impact sweep so downstream doc, story, and eval implications are not missed.
+After major ADR discussion or implementation outcomes, run `/align` or perform an equivalent manual impact sweep so downstream doc, story, build-map, and eval implications are not missed.
 
 If the ADR establishes a reusable workflow, evaluation pattern, or architectural heuristic that future sessions should not rediscover from scratch, distill it into one of:
 
@@ -153,4 +153,4 @@ docs/decisions/
 - If a later ADR changes the decision, mark the old one `SUPERSEDED` and cross-link both
 - When an ADR settles a repeated way of working, capture the operational pattern in the repo's reusable instructions as part of closure, not as tribal memory
 - Use `docs/runbooks/deep-research.md` when the ADR needs current external research
-- Use `/reflect` when the ADR's implications may reach beyond the ADR file itself
+- Use `/align` when the ADR's implications may reach beyond the ADR file itself

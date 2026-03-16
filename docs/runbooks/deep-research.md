@@ -135,7 +135,7 @@ After synthesis:
 - move the ADR status forward (`RESEARCHING` or `DISCUSSING` as appropriate);
 - capture human corrections and judgment in `Discussion`;
 - record final choices in `Decisions`;
-- if the direction materially changes stories, specs, or guardrails, run `/reflect`.
+- if the direction materially changes stories, specs, build-map guidance, or guardrails, run `/align`.
 
 ## Recency Rules for AI Topics
 

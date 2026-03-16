@@ -33,5 +33,5 @@ research/final-synthesis.md
 - Create a new ADR with `/create-adr`
 - Follow `docs/runbooks/adr-creation.md` for lifecycle and integration
 - Use `docs/runbooks/deep-research.md` when an ADR needs multi-provider external research
-- Use `/reflect` after major ADR decisions or implementation outcomes to surface downstream doc, story, and eval impacts
+- Use `/align` after major ADR decisions or implementation outcomes to surface downstream doc, story, build-map, and eval impacts
 - Cross-link ADRs from stories via `Decision Refs` when they affect implementation

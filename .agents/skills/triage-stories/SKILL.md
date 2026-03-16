@@ -6,62 +6,98 @@ user-invocable: true
 
 # /triage-stories [story-number]
 
-> Decision check: If this task affects backlog policy, workflow, or cross-cutting project behavior, read relevant runbooks, scout docs, or notes before choosing an approach. If none apply, say so explicitly.
+> Alignment check: Before choosing an approach, verify it aligns with `docs/ideal.md` and relevant decision records in `docs/decisions/`. If this work touches a known compromise in `docs/spec.md`, respect its limitation type and evolution path. If none apply, say so explicitly.
 
-Evaluate the story backlog and recommend the best next stories to work on.
+Canonical story-backlog triage leaf skill. Direct invocation is allowed, and
+`/triage stories` routes here.
 
-## Arguments
+## What This Skill Produces
 
-- `[story-number]` — optional. If provided, assess that specific story's readiness instead of doing a full backlog scan.
+A short advisory report:
+- ranked story recommendations
+- bottlenecks / concerns
+- one recommended next command
+
+This skill is read-only.
 
 ## Steps
 
-1. **Read project state** — Load `docs/stories.md`. Identify all stories by status:
-   - **To Do / Draft** — scoped but may need detailed ACs and tasks before building
-   - **Pending** — fully detailed, ready to build
-   - **In Progress** — currently being worked on
-   - **Done** — complete, validated
-   - **Won't Do** — decided against
-   - **Blocked** — waiting on dependency or decision
+1. **Read project state**
+   Load `docs/stories.md` and identify all stories by status:
+   - Draft
+   - Pending
+   - In Progress
+   - Done
+   - Blocked
 
-   Both **Draft/To Do** and **Pending** stories with all dependencies met are candidates for recommendation.
+   Both Draft and Pending stories with met dependencies are candidates. Draft
+   stories are recommendable but not yet buildable until promoted to `Pending`.
 
-2. **Read the Ideal** — Load `docs/ideal.md`. This is the scoring rubric.
+2. **Read the Ideal**
+   Load `docs/ideal.md` and score against what the system should become, not
+   just what is locally convenient.
 
-3. **Handle focused mode if requested** — If `[story-number]` was provided:
-   - Read that story file
-   - Assess whether it has clear acceptance criteria, tasks, workflow gates, and satisfied dependencies
-   - Report whether it is ready for `/build-story`, needs promotion, or needs more scoping
-   - Stop after the readiness assessment
+3. **Read candidate stories**
+   For every candidate story with met dependencies, read the actual story file.
+   Do not rank by title alone. If a candidate touches inputs, filetypes,
+   artifacts, or channels, also read the relevant row(s) in the Input Coverage
+   section of `docs/build-map.md`.
 
-4. **Read candidate stories** — For every candidate story, read the actual story file to understand its goal, acceptance criteria, dependencies, and scope. Do not rank by title alone.
+4. **Score and rank**
+   Evaluate each candidate on:
+   - dependency readiness
+   - blocking power
+   - Ideal alignment
+   - stage leverage
+   - simplification leverage
+   - phase coherence
+   - momentum
+   - convergence value
+   - complexity vs payoff
+   - user impact
 
-5. **Ideal alignment check** — For each candidate, answer:
-   - Does it close an Ideal gap?
-   - Does it move away from the Ideal?
-   - Does it optimize a limitation that may be shrinking on its own?
-   - Is it building for stages or infrastructure that do not yet exist?
+5. **Flag concerns**
+   Surface issues such as:
+   - stories marked Draft/Pending that are actually blocked
+   - stale or superseded stories
+   - claimed scope that disagrees with `docs/build-map.md`
+   - bottlenecked dependency chains
 
-6. **Check spec compromises** — Read `docs/spec.md`. If a candidate story depends on a compromise persisting, consider whether the compromise's detection eval should be re-run before building the story.
+6. **Return the report**
 
-7. **Score and rank** — Evaluate each surviving candidate on:
-   - Ideal gap severity
-   - Dependency readiness
-   - Blocking power
-   - Phase coherence
-   - Momentum
-   - Complexity versus payoff
-   - Whether re-measurement should happen before implementation
+   Use this format:
 
-8. **Present recommendations** — Ranked top 3-5 with rationale and caveats.
+   ```markdown
+   ## Triage Stories
 
-9. **Flag concerns** — Surface stale stories, missing dependencies, bottlenecked chains, and stories that probably should be discarded.
+   ### Ranked Candidates
+   - Story NNN — {title} ({Draft|Pending}) — {why}
 
-10. **User decides** — Wait for the user to pick. Do not start building.
+   ### Bottlenecks / Concerns
+   - {issue}
+
+   ### Recommended Action
+   - {one next story action}
+   ```
+
+7. **User decides**
+   Wait for the user to pick a story or ask for more detail. Do not start
+   building; that's `/build-story`.
+
+## Arguments
+
+If the user passes a story ID, evaluate only that story's readiness instead of
+doing a full backlog scan. Report:
+- dependency status
+- blocking power
+- build readiness
+- concerns / missing prerequisites
 
 ## Guardrails
 
-- This is a read-only, advisory skill — do not modify any files
+- Read-only and advisory — never modify files
 - Always read the actual story files, not just the index titles
 - If the backlog is empty or everything is blocked, say so clearly
-- If a specific story ID was provided, answer that readiness question directly instead of forcing a full backlog scan
+- Do not recommend stories that depend on unfinished work unless the dependency
+  is trivially close to done
+- Keep the report compact enough for `/triage` to synthesize with other leaf reports

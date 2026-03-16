@@ -20,24 +20,24 @@ View results: `promptfoo view`
 
 - **Registry entry**: `image-crop-extraction` in `docs/evals/registry.yaml`
 - **Target**: overall ≥ 0.95, pass_rate ≥ 0.90
-- **Best score**: 0.856 (Gemini 3 Pro detector + Gemini 2.5 Flash validator)
+- **Best score**: 0.900 overall, 0.923 pass_rate (Gemini 3 Flash conservative-count prompt, measured 2026-03-11)
 - **Spec compromise**: C4 (Two-Stage Image Crop Detection)
 
 ## Improvement Cycle
 
 Use `/improve-eval image-crop-extraction` for the structured loop:
 1. Reads registry, checks if passing, reviews attempt history
-2. Diagnoses failure modes from scorer output
+2. Classifies failures before changing prompts, scorers, or goldens
 3. Proposes approaches (never retries blocked ones)
 4. Measures before/after
-5. Records attempt in registry
+5. Records the verified attempt in the registry
 
 ## Verifying Results
 
-After any eval run, use `/verify-eval` to classify mismatches:
-- **Model-wrong**: Detector hallucinated a crop or missed one
-- **Golden-wrong**: Golden bounding box is inaccurate or missing a valid crop
-- **Ambiguous**: Edge case (decorative border, partial illustration)
+After any eval run, keep the verification pass inside `/improve-eval`:
+- **Model-wrong**: detector hallucinated a crop or missed one
+- **Golden-wrong**: golden bounding box is inaccurate or missing a valid crop
+- **Ambiguous**: edge case (decorative border, partial illustration)
 
 Only verified scores are recorded in the registry.
 
