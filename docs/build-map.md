@@ -232,6 +232,52 @@ accepted reviewed outputs on the previously failing table-continuity and
 row-shape cases, so the next strategic step is a collapse / simplification
 story rather than another opportunistic repair layer. See Story 147.
 
+**Evidence run:** `story146-onward-build-stitch-r5`
+
+**Active workaround stack:**
+- `plan_onward_document_consistency_v1` plus its `pattern_inventory`,
+  `consistency_plan`, and `conformance_report` sidecars still define the
+  document-local policy for this recipe.
+- `rerun_onward_genealogy_consistency_v1` turns planner / validator signals into
+  bounded source-aware rereads.
+- `table_rescue_onward_tables_v1` still carries page-level deterministic
+  normalization that can beat or replace a weak OCR rerun on some genealogy
+  pages.
+- `build_chapter_html_v1 --merge_contiguous_genealogy_tables` still repairs late
+  table continuity and subgroup-row shape during chapter build.
+- `story-146-onward-plan-aware-genealogy-reruns-validate.yaml` remains the
+  dedicated proof loop for this seam.
+
+**Candidate deletion / merge targets:**
+- Collapse planner-guided rerun targeting and late build-stage repair into
+  fewer layers once one upstream seam can preserve subgroup rows, table
+  continuity, and row shape by default.
+- Delete or narrow deterministic normalization that only exists to compensate
+  for weak upstream extraction once the stronger seam proves stable on the
+  reviewed hard cases.
+- Replace the story-scoped validation recipe with a smaller permanent
+  regression bundle only after the main Onward path demonstrates the same
+  inspectability and safety.
+
+**Proof needed before simplification:**
+- A real `driver.py` run on the maintained Onward path or a clearly proposed
+  replacement path, not only the story-scoped validation recipe.
+- Manual review on the previously failing chapters covered by
+  `story146-onward-build-stitch-r5`.
+- No reopened fragmentation, subgroup-row, or row-shape defects in the reviewed
+  slice.
+- A file-level mapping showing which late repair step becomes redundant, which
+  step absorbs any still-necessary logic, and why provenance / inspectability
+  stay intact.
+
+**Non-goal:** this does not claim that C7, C1, or C3 are resolved. It is the
+inspectable roadmap for deciding what can be deleted or merged next.
+
+**Reusable pattern:** when another seam clears the acceptable-quality bar, reuse
+this same mini-template: evidence run, active workaround stack, candidate
+deletion / merge targets, and proof needed before simplification. Do not add an
+empty dedicated section until a second candidate exists.
+
 ---
 
 ## Input Coverage
@@ -361,8 +407,8 @@ A converter is ready to graduate to Dossier (spec:7) when:
 
 ## Next Actions
 
-1. Build Story 147 so the quality-bar-then-collapse rule becomes explicit
-   project direction instead of staying implicit in Story 146's work log.
+1. Create the Onward scanned-genealogy collapse implementation story from the
+   candidate inventory above.
 2. Create the born-digital PDF intake story.
 3. Create the DOCX intake story, then decide whether XLSX/PPTX should split or
    stay together.

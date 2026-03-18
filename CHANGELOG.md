@@ -1,3 +1,12 @@
+## [2026-03-18-01] - Document quality-bar complexity-collapse roadmap (Story 147)
+
+### Added
+- Added a first-pass collapse-candidate inventory to `docs/build-map.md` for the stabilized Onward genealogy seam, including the evidence run, active workaround stack, candidate deletion or merge targets, proof needed before simplification, and the reusable mini-template to apply when another seam reaches the same bar
+
+### Changed
+- Marked Story 147 done in `docs/stories/story-147-quality-bar-then-complexity-collapse.md` and `docs/stories.md` after the required `/mark-story-done` validation rerun
+- Replaced the stale build-map next action to "Build Story 147" with the real follow-up: create the Onward collapse implementation story from the new inventory
+
 ## [2026-03-17-01] - ADR-021 migration: dual-ideal, category spec, phase governance (Story 148)
 
 ### Added
