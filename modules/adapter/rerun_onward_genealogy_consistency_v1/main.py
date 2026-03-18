@@ -27,6 +27,7 @@ from modules.adapter.table_rescue_onward_tables_v1.main import (
     _normalize_rescue_html,
     _should_accept_rescue,
 )
+from modules.common.onward_genealogy_html import merge_contiguous_genealogy_tables
 from modules.common.utils import ProgressLogger, ensure_dir, read_jsonl, save_json, save_jsonl
 from modules.extract.ocr_ai_gpt51_v1.main import (
     _extract_code_fence,
@@ -36,13 +37,6 @@ from modules.extract.ocr_ai_gpt51_v1.main import (
     sanitize_html,
 )
 from modules.validate.validate_onward_genealogy_consistency_v1.main import analyze_page_row
-
-try:
-    from modules.build.build_chapter_html_v1.main import (
-        _merge_contiguous_genealogy_tables as _merge_genealogy_layout_html,
-    )
-except Exception:  # pragma: no cover - optional downstream reuse
-    _merge_genealogy_layout_html = None
 
 
 RERUN_HINTS = """
@@ -880,10 +874,10 @@ def load_targets(
 
 def _best_effort_normalize_html(html: str) -> str:
     cleaned = sanitize_html(html or "")
-    if _merge_genealogy_layout_html is not None:
-        cleaned = _merge_genealogy_layout_html(cleaned)
-    else:
-        cleaned = _normalize_rescue_html(cleaned)
+    cleaned = merge_contiguous_genealogy_tables(
+        cleaned,
+        rescue_normalizer=_normalize_rescue_html,
+    )
     return _restore_subgroup_row_markers(cleaned)
 
 

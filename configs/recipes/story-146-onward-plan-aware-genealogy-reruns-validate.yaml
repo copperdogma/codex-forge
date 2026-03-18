@@ -1,3 +1,7 @@
+# Historical Story 146 proof recipe.
+# Use `configs/recipes/onward-genealogy-build-regression.yaml` for the maintained
+# build/validate regression path after Story 149.
+
 stages:
   - id: load_story143_pages
     stage: extract

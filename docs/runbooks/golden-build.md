@@ -7,6 +7,7 @@ Operational guide for creating and maintaining golden reference files for evals.
 | Eval | Golden Path | Format |
 |------|-------------|--------|
 | Image crop extraction | `benchmarks/golden/` | JSON bounding boxes per page |
+| Onward reviewed HTML slice | `benchmarks/golden/onward/reviewed_html_slice/` | Exact blessed run artifacts + manifest |
 
 ## Creating a New Golden
 
@@ -37,6 +38,29 @@ golden/scorer corrections are re-measured.
 - Golden files should cover diverse cases (simple pages, multi-illustration, tables, edge cases)
 - When adding new test cases, include at least one "tricky" case per category
 - Golden changes that affect > 5% of test cases require user approval
+
+## Run-Backed Golden Slices
+
+Some goldens are not promptfoo fixtures. They are committed slices copied from a
+specific blessed pipeline run so later runs can be diffed against an exact,
+reviewed baseline.
+
+Use this pattern when:
+
+- a run has been manually reviewed and blessed for a named scope
+- the exact produced artifacts are valuable as a future diff baseline
+- the trusted slice is smaller than the full run output
+
+For these run-backed slices:
+
+- keep the files under a scope-specific subdirectory such as
+  `benchmarks/golden/onward/reviewed_html_slice/`
+- include a small manifest tying the committed files back to the run id, scope,
+  and trust caveats
+- copy the exact reviewed artifacts, not a cleaned or reformatted variant,
+  unless the golden itself is explicitly scoped/canonicalized
+- keep the run registry as the source of truth for trust status; the committed
+  slice is the diffable artifact snapshot
 
 ## Scoped Fixture Variants
 

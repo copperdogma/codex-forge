@@ -234,6 +234,24 @@ story rather than another opportunistic repair layer. See Story 147.
 
 **Evidence run:** `story146-onward-build-stitch-r5`
 
+**Story 149 result:** first collapse step landed. The maintained regression
+path is now `configs/recipes/onward-genealogy-build-regression.yaml`, and the
+retained shared genealogy HTML stitching logic now lives in
+`modules/common/onward_genealogy_html.py` instead of being reused through
+private build/rerun cross-imports.
+
+**Current state:** `climb` on the full canonical Onward output, `hold` on the
+reviewed table-continuity / row-shape slice, and not yet `converge`. The seam
+has a reviewed trusted slice and a maintained regression path, but the full
+Onward output is not yet blessed end-to-end and the workaround stack still
+survives.
+
+**Current blessed evidence run:** `story149-onward-build-regression-r1` is now
+recorded `known_good` for scope `onward_genealogy_reviewed_html_slice`; generic
+`html` remains `partial` until broader value-level verification is refreshed.
+The committed reviewed slice for this baseline now lives under
+`benchmarks/golden/onward/reviewed_html_slice/story149-onward-build-regression-r1/`.
+
 **Active workaround stack:**
 - `plan_onward_document_consistency_v1` plus its `pattern_inventory`,
   `consistency_plan`, and `conformance_report` sidecars still define the
@@ -243,10 +261,16 @@ story rather than another opportunistic repair layer. See Story 147.
 - `table_rescue_onward_tables_v1` still carries page-level deterministic
   normalization that can beat or replace a weak OCR rerun on some genealogy
   pages.
-- `build_chapter_html_v1 --merge_contiguous_genealogy_tables` still repairs late
-  table continuity and subgroup-row shape during chapter build.
-- `story-146-onward-plan-aware-genealogy-reruns-validate.yaml` remains the
-  dedicated proof loop for this seam.
+- `modules/common/onward_genealogy_html.py` now owns the retained deterministic
+  genealogy HTML stitching and row-shape normalization that both build and
+  rerun still need.
+- `build_chapter_html_v1 --merge_contiguous_genealogy_tables` is now narrowed to
+  chapter-local continuity assembly that calls the shared helper instead of
+  privately owning that normalization logic.
+- `configs/recipes/onward-genealogy-build-regression.yaml` is the smaller
+  permanent build/validate regression bundle for this seam; the old Story 146
+  proof recipe is historical evidence only, not a maintained second operating
+  path.
 
 **Candidate deletion / merge targets:**
 - Collapse planner-guided rerun targeting and late build-stage repair into
@@ -255,9 +279,9 @@ story rather than another opportunistic repair layer. See Story 147.
 - Delete or narrow deterministic normalization that only exists to compensate
   for weak upstream extraction once the stronger seam proves stable on the
   reviewed hard cases.
-- Replace the story-scoped validation recipe with a smaller permanent
-  regression bundle only after the main Onward path demonstrates the same
-  inspectability and safety.
+- Keep the permanent regression bundle small and evidence-backed; do not promote
+  the historical Story 146 proof recipe back into the maintained operating path
+  unless the smaller guardrail stops covering the reviewed slice.
 
 **Proof needed before simplification:**
 - A real `driver.py` run on the maintained Onward path or a clearly proposed
@@ -272,6 +296,22 @@ story rather than another opportunistic repair layer. See Story 147.
 
 **Non-goal:** this does not claim that C7, C1, or C3 are resolved. It is the
 inspectable roadmap for deciding what can be deleted or merged next.
+
+**Tracking model:** this build-map section is the high-level dashboard for the
+Onward seam: plan, current phase, trusted slice, and next simplification move.
+The detailed operational truth lives elsewhere:
+- `output/run_assessments.jsonl` is the trust ledger for blessed runs and
+  scopes (`known_good`, `partial`, `unsafe`, `superseded`).
+- `output/run_health.jsonl` and `output/run_manifest.jsonl` track reuse safety,
+  provenance, and exact run discovery.
+- `benchmarks/golden/onward/` holds the committed Onward golden slices used by
+  evals and spot-checked regression work today.
+- `docs/runbooks/golden-build.md` defines how those goldens are created and
+  maintained.
+- Long-term direction: these scoped trusted slices should accumulate toward one
+  canonical 100%-correct Onward baseline, but until that exists the registry
+  and committed goldens describe which parts of that baseline are actually
+  verified.
 
 **Reusable pattern:** when another seam clears the acceptable-quality bar, reuse
 this same mini-template: evidence run, active workaround stack, candidate
@@ -407,13 +447,11 @@ A converter is ready to graduate to Dossier (spec:7) when:
 
 ## Next Actions
 
-1. Create the Onward scanned-genealogy collapse implementation story from the
-   candidate inventory above.
-2. Create the born-digital PDF intake story.
-3. Create the DOCX intake story, then decide whether XLSX/PPTX should split or
+1. Create the born-digital PDF intake story.
+2. Create the DOCX intake story, then decide whether XLSX/PPTX should split or
    stay together.
-4. Create the handwriting-transcription story.
-5. Expand fixture breadth for already-passing formats so graduation decisions
+3. Create the handwriting-transcription story.
+4. Expand fixture breadth for already-passing formats so graduation decisions
    can be trusted.
-6. Re-run stale capability measurements where the code changed but the benchmark
+5. Re-run stale capability measurements where the code changed but the benchmark
    signal did not.

@@ -1,0 +1,60 @@
+# Permanent build/validate regression bundle for the reviewed Onward genealogy seam.
+# Reuses the accepted Story 143 page artifact set so we can verify chapter build
+# and consistency validation without re-running OCR or the old story-scoped proof loop.
+
+stages:
+  - id: load_pages
+    stage: extract
+    module: load_artifact_v1
+    out: pages_html_onward_genealogy_rerun.jsonl
+    params:
+      path: output/runs/story143-onward-genealogy-reruns-r1/06_rerun_onward_genealogy_consistency_v1/pages_html_onward_genealogy_rerun.jsonl
+      out: pages_html_onward_genealogy_rerun.jsonl
+      schema_version: page_html_v1
+
+  - id: load_portions
+    stage: extract
+    module: load_artifact_v1
+    out: portions_toc.jsonl
+    params:
+      path: output/runs/story140-onward-targeted-rescue-r19/02_load_artifact_v1/portions_toc.jsonl
+      out: portions_toc.jsonl
+      schema_version: portion_hyp_v1
+
+  - id: load_crops
+    stage: extract
+    module: load_artifact_v1
+    out: illustration_manifest.jsonl
+    params:
+      path: output/runs/story140-onward-targeted-rescue-r19/03_load_artifact_v1/illustration_manifest.jsonl
+      out: illustration_manifest.jsonl
+      copy_sibling_dir: images
+
+  - id: build_regression_chapters
+    stage: build
+    module: build_chapter_html_v1
+    needs: [load_pages, load_portions, load_crops]
+    inputs:
+      pages: load_pages
+      portions: load_portions
+      illustration_manifest: load_crops
+    out: chapters_manifest_regression.jsonl
+    params:
+      images_subdir: images
+      book_title: "Onward to the Unknown"
+      book_author: ""
+      merge_contiguous_genealogy_tables: true
+
+  - id: validate_regression_consistency
+    stage: validate
+    module: validate_onward_genealogy_consistency_v1
+    needs: [build_regression_chapters, load_pages]
+    inputs:
+      chapters: build_regression_chapters
+      pages: load_pages
+    out: genealogy_consistency_report_regression.jsonl
+    params:
+      detail_report: genealogy_consistency_detail_regression.json
+      flag_threshold: 25
+      warning_band: 0.25
+      redesign_band: 0.30

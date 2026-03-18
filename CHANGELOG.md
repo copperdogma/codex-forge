@@ -1,3 +1,15 @@
+## [2026-03-18-03] - Land first Onward genealogy collapse and reviewed golden slice (Story 149)
+
+### Added
+- Added the shared Onward genealogy HTML stitching owner `modules/common/onward_genealogy_html.py`, the maintained regression recipe `configs/recipes/onward-genealogy-build-regression.yaml`, and a committed reviewed golden slice at `benchmarks/golden/onward/reviewed_html_slice/story149-onward-build-regression-r1/`
+
+### Changed
+- Narrowed `build_chapter_html_v1` and `rerun_onward_genealogy_consistency_v1` to reuse the shared genealogy HTML helper instead of build-private cross-imports
+- Updated `docs/build-map.md`, `docs/runbooks/golden-build.md`, `docs/stories.md`, and Story 149 to record the scoped blessed run, the maintained regression path, and the run-backed golden workflow
+
+### Fixed
+- Marked the old Story 146 rerun validation recipe as historical-only now that the smaller Story 149 build/validate regression bundle is the maintained guardrail
+
 ## [2026-03-18-02] - Add model discovery skill and GPT-5.4 screens
 
 ### Added

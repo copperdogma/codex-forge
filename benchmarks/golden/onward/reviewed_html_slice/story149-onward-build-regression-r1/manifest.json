@@ -1,0 +1,64 @@
+{
+  "schema_version": "onward_reviewed_html_slice_v1",
+  "run_id": "story149-onward-build-regression-r1",
+  "document": "onward-to-the-unknown-images",
+  "scope": "onward_genealogy_reviewed_html_slice",
+  "scope_status": "known_good",
+  "full_html_status": "partial",
+  "captured_at": "2026-03-18",
+  "source_story": "docs/stories/story-149-onward-scanned-genealogy-collapse-implementation.md",
+  "source_run_path": "runs/story149-onward-build-regression-r1",
+  "notes": [
+    "User manually blessed this run as the current Onward golden for the reviewed genealogy HTML slice.",
+    "This committed slice preserves the exact reviewed chapter HTML and supporting sidecars from the blessed run.",
+    "The reviewed hard-case HTML is trusted; generic full-run html remains only partially blessed until broader value-level verification is refreshed."
+  ],
+  "reviewed_chapters": [
+    {
+      "path": "chapter-010.html",
+      "source_path": "output/html/chapter-010.html",
+      "sha256": "5e73383abbf73f74ca2172189bf936e27a9f9304f8a6ffb6c921b97f2a64bb89",
+      "review_note": "Retains the Richard death value in DIED and preserves subgroup-row continuity through the late Arthur slice."
+    },
+    {
+      "path": "chapter-011.html",
+      "source_path": "output/html/chapter-011.html",
+      "sha256": "1492acad7ebc48b95f4bdc45a57a12d978b024c6c9f0d9e20531d8e481008a11",
+      "review_note": "Keeps the Leonidas section without the previously fused run-on subgroup heading."
+    },
+    {
+      "path": "chapter-017.html",
+      "source_path": "output/html/chapter-017.html",
+      "sha256": "b3a0f8a35e11c425ade3b946e2939b2f439f5a3d6f8b9b9ba957f4fab7e6c3a7",
+      "review_note": "Preserves full-width subgroup rows and split BOY/GIRL headers instead of left-cell fused headings."
+    },
+    {
+      "path": "chapter-022.html",
+      "source_path": "output/html/chapter-022.html",
+      "sha256": "b5d1ebb62bdfd7bb3ecd12ca8da828ff688b7b46b77dfb0a79316df56f7e7e2e",
+      "review_note": "Keeps SANDRA'S FAMILY as a subgroup row and avoids the prior literal BOY/GIRL subgroup-header regression."
+    },
+    {
+      "path": "chapter-023.html",
+      "source_path": "output/html/chapter-023.html",
+      "sha256": "854ac95e10813604ad5f2e3e942cb5b6a3ad38097e09c19f610cea9b4130db29",
+      "review_note": "Stable clean reference chapter; byte-identical to the earlier surviving milestone runs."
+    }
+  ],
+  "supporting_artifacts": [
+    {
+      "path": "chapters_manifest_regression.jsonl",
+      "source_path": "04_build_chapter_html_v1/chapters_manifest_regression.jsonl"
+    },
+    {
+      "path": "genealogy_consistency_report_regression.jsonl",
+      "source_path": "05_validate_onward_genealogy_consistency_v1/genealogy_consistency_report_regression.jsonl"
+    }
+  ],
+  "registry_links": {
+    "known_good_scope": "onward_genealogy_reviewed_html_slice",
+    "partial_scope": "html",
+    "registry_path": "run_assessments.jsonl",
+    "registry_path_root": "shared_output_root"
+  }
+}

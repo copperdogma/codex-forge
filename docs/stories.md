@@ -165,6 +165,7 @@ This index tracks stories in `/docs/stories/` for the codex-forge pipeline.
 |||| 146 | Onward Plan-Aware Genealogy Selective Reruns | High | Done | /docs/stories/story-146-onward-plan-aware-genealogy-reruns.md |
 |||| 147 | Quality Bar Then Complexity Collapse | High | Done | /docs/stories/story-147-quality-bar-then-complexity-collapse.md |
 |||| 148 | ADR-021 Migration: Dual-Ideal, Category Spec, Phase Governance | High | In Progress | /docs/stories/story-148-adr-021-migration-dual-ideal-category-spec-phase-governance.md |
+|||| 149 | Onward Scanned-Genealogy Collapse Implementation | High | Done | /docs/stories/story-149-onward-scanned-genealogy-collapse-implementation.md |
 
 ## Notes
 - Status "Done" reflects current working state in codex-forge. "To Do" items are planned next steps aligned with `docs/requirements.md` and `snapshot.md`.
