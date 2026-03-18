@@ -1,9 +1,15 @@
 import argparse
 import json
-import shutil
 import os
+import shutil
+import sys
 from datetime import datetime
 from pathlib import Path
+
+if __package__ in (None, ""):
+    sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..", "..")))
+
+from modules.common.run_registry import resolve_output_root
 
 
 def _stamp_envelope(path: str, run_id: str) -> None:
@@ -44,6 +50,31 @@ def _copy_sibling_dirs(source_artifact: str, out_path: str, sibling_dirs: list[s
         print(f"Copied sibling directory {src_dir} to {dst_dir}")
 
 
+def _resolve_source_artifact_path(path: str, *, cwd: str | None = None) -> str:
+    raw = Path(path)
+    if raw.is_absolute():
+        return str(raw.resolve(strict=False))
+
+    base_cwd = Path(cwd or os.getcwd()).resolve(strict=False)
+    shared_output_root = Path(resolve_output_root(cwd=str(base_cwd))).resolve(strict=False)
+    candidates = [
+        base_cwd / raw,
+        shared_output_root / raw,
+        shared_output_root.parent / raw,
+    ]
+
+    seen: set[str] = set()
+    for candidate in candidates:
+        resolved = str(candidate.resolve(strict=False))
+        if resolved in seen:
+            continue
+        seen.add(resolved)
+        if os.path.exists(resolved):
+            return resolved
+
+    return str((base_cwd / raw).resolve(strict=False))
+
+
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("--path", required=True)
@@ -69,20 +100,22 @@ def main():
     if not out_path:
         raise ValueError("Either --out or --outdir must be provided")
 
-    if not os.path.exists(args.path):
+    source_path = _resolve_source_artifact_path(args.path)
+
+    if not os.path.exists(source_path):
         raise FileNotFoundError(f"Source artifact not found: {args.path}")
 
-    if os.path.abspath(args.path) != os.path.abspath(out_path):
+    if os.path.abspath(source_path) != os.path.abspath(out_path):
         out_dir = os.path.dirname(out_path)
         if out_dir:
             os.makedirs(out_dir, exist_ok=True)
-        shutil.copy2(args.path, out_path)
-        print(f"Copied {args.path} to {out_path}")
+        shutil.copy2(source_path, out_path)
+        print(f"Copied {source_path} to {out_path}")
     else:
         print(f"Artifact already at {out_path}")
 
     if args.copy_sibling_dirs:
-        _copy_sibling_dirs(args.path, out_path, args.copy_sibling_dirs)
+        _copy_sibling_dirs(source_path, out_path, args.copy_sibling_dirs)
 
     # Stamp current run's envelope on copied JSONL records
     _stamp_envelope(out_path, args.run_id)

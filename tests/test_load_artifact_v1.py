@@ -3,6 +3,8 @@ import subprocess
 import sys
 from pathlib import Path
 
+import modules.common.load_artifact_v1.main as load_artifact_main
+
 
 def test_load_artifact_can_copy_sibling_images_dir(tmp_path: Path) -> None:
     source_dir = tmp_path / "source"
@@ -72,3 +74,29 @@ def test_load_artifact_ignores_missing_sibling_dir(tmp_path: Path) -> None:
     assert result.returncode == 0, result.stderr
     assert out_path.exists()
     assert not (tmp_path / "out" / "images").exists()
+
+
+def test_resolve_source_artifact_path_falls_back_to_shared_output_root(
+    tmp_path: Path, monkeypatch
+) -> None:
+    shared_project = tmp_path / "shared-project"
+    shared_output = shared_project / "output"
+    artifact = shared_output / "runs" / "story143" / "stage" / "rows.jsonl"
+    artifact.parent.mkdir(parents=True, exist_ok=True)
+    artifact.write_text(json.dumps({"value": 1}) + "\n", encoding="utf-8")
+
+    worktree = tmp_path / "worktree"
+    worktree.mkdir()
+
+    monkeypatch.setattr(
+        load_artifact_main,
+        "resolve_output_root",
+        lambda **_: str(shared_output),
+    )
+
+    resolved = load_artifact_main._resolve_source_artifact_path(
+        "output/runs/story143/stage/rows.jsonl",
+        cwd=str(worktree),
+    )
+
+    assert resolved == str(artifact.resolve(strict=False))

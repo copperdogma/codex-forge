@@ -9,6 +9,7 @@
 
 ### Fixed
 - Marked the old Story 146 rerun validation recipe as historical-only now that the smaller Story 149 build/validate regression bundle is the maintained guardrail
+- `load_artifact_v1` now resolves reused `output/runs/...` artifacts against the shared project output root, so the maintained Story 149 regression recipe and older reuse recipes run correctly from worktrees instead of only the main checkout
 
 ## [2026-03-18-02] - Add model discovery skill and GPT-5.4 screens
 
