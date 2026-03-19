@@ -1182,6 +1182,10 @@ class TestCLIIntegration:
         assert len(navs) >= 1
         assert any("index.html" in str(n) for n in navs)
 
+        content_blocks = soup.find("article").find_all(["h1", "p", "figure"], recursive=False)
+        assert content_blocks
+        assert all(block.get("id", "").startswith("blk-chapter-001-") for block in content_blocks)
+
         # Image with figure/figcaption
         figure = soup.find("figure")
         assert figure is not None, "Expected <figure> wrapping for image"
@@ -1204,6 +1208,21 @@ class TestCLIIntegration:
         assert len(manifest) >= 1
         assert manifest[0]["kind"] == "chapter"
         assert manifest[0]["title"] == "Introduction"
+
+        bundle_manifest = json.loads((html_dir / "manifest.json").read_text())
+        assert bundle_manifest["schema_version"] == "doc_web_bundle_manifest_v1"
+        assert bundle_manifest["entries"][0]["entry_id"] == "chapter-001"
+        assert bundle_manifest["reading_order"] == ["chapter-001"]
+        assert bundle_manifest["provenance_path"] == "provenance/blocks.jsonl"
+
+        provenance_rows = [
+            json.loads(line)
+            for line in (html_dir / "provenance" / "blocks.jsonl").read_text().strip().split("\n")
+        ]
+        assert provenance_rows
+        assert provenance_rows[0]["entry_id"] == "chapter-001"
+        assert provenance_rows[0]["block_id"].startswith("blk-chapter-001-")
+        assert provenance_rows[0]["source_element_ids"]
 
     def test_overwrites_stale_published_image_on_rerun(self):
         pages_path = self.tmpdir / "pages.jsonl"
@@ -1349,6 +1368,97 @@ class TestCLIIntegration:
         assert "MARY PAULE'S FAMILY" in tables[0].get_text(" ", strip=True)
         assert "RONALD'S FAMILY" in tables[0].get_text(" ", strip=True)
 
+    def test_cli_keeps_caption_provenance_after_genealogy_merge(self):
+        pages_path = self.tmpdir / "pages.jsonl"
+        portions_path = self.tmpdir / "portions.jsonl"
+        out_path = self.tmpdir / "manifest.jsonl"
+        html_dir = self.tmpdir / "html"
+
+        self._write_jsonl(pages_path, [
+            {
+                "page_number": 20,
+                "printed_page_number": 20,
+                "html": (
+                    "<h1>L’HEUREUX VETERANS OF WORLD WAR I & II</h1>"
+                    "<table><thead><tr><th>Family</th><th>Name</th></tr></thead>"
+                    "<tbody><tr><td>Arthur</td><td>Alphonse L'Heureux</td></tr></tbody></table>"
+                ),
+            },
+            {
+                "page_number": 21,
+                "printed_page_number": 21,
+                "html": (
+                    "<img alt=\"Ranch buildings\">"
+                    "<p><em>Aerial photo of ranch buildings</em></p>"
+                    "<img alt=\"Ranch house and barn\">"
+                    "<p><em>Ranch house and barn</em></p>"
+                ),
+            },
+        ])
+        self._write_jsonl(portions_path, [
+            {"title": "Veterans", "page_start": 20, "page_end": 21},
+        ])
+
+        illust_dir = self.tmpdir / "illustrations"
+        illust_images_dir = illust_dir / "images"
+        illust_images_dir.mkdir(parents=True)
+        (illust_images_dir / "page-021-000.jpg").write_bytes(b"\xff\xd8\xff\xe0")
+        (illust_images_dir / "page-021-001.jpg").write_bytes(b"\xff\xd8\xff\xe0")
+        illust_path = illust_dir / "illustration_manifest.jsonl"
+        self._write_jsonl(illust_path, [
+            {
+                "source_page": 21,
+                "filename": "page-021-000.jpg",
+                "alt": "Ranch buildings",
+                "image_description": "Aerial view of ranch buildings and surrounding landscape",
+                "caption_text": None,
+                "bbox": {"x0": 0, "y0": 0, "x1": 100, "y1": 100},
+            },
+            {
+                "source_page": 21,
+                "filename": "page-021-001.jpg",
+                "alt": "Ranch house and barn",
+                "image_description": "Ranch house and barn with cattle in the foreground",
+                "caption_text": None,
+                "bbox": {"x0": 0, "y0": 0, "x1": 100, "y1": 100},
+            },
+        ])
+
+        cmd = [
+            sys.executable, "-m", "modules.build.build_chapter_html_v1.main",
+            "--pages", str(pages_path),
+            "--portions", str(portions_path),
+            "--out", str(out_path),
+            "--output-dir", str(html_dir),
+            "--illustration-manifest", str(illust_path),
+            "--book-title", "Test Book",
+            "--merge-contiguous-genealogy-tables",
+        ]
+        result = subprocess.run(cmd, capture_output=True, text=True, cwd=str(Path(__file__).resolve().parent.parent))
+        assert result.returncode == 0, f"STDERR: {result.stderr}"
+
+        chapter = (html_dir / "chapter-001.html").read_text()
+        soup = BeautifulSoup(chapter, "html.parser")
+        paragraphs = [
+            paragraph.get_text(" ", strip=True)
+            for paragraph in soup.find("article").find_all("p", recursive=False)
+        ]
+        assert "Aerial photo of ranch buildings" in paragraphs
+        assert "Ranch house and barn" in paragraphs
+
+        provenance_rows = [
+            json.loads(line)
+            for line in (html_dir / "provenance" / "blocks.jsonl").read_text().strip().split("\n")
+        ]
+        first_caption = next(
+            row for row in provenance_rows if row["text_quote"] == "Aerial photo of ranch buildings"
+        )
+        second_caption = next(
+            row for row in provenance_rows if row["text_quote"] == "Ranch house and barn"
+        )
+        assert first_caption["source_element_ids"] == ["p021-b2"]
+        assert second_caption["source_element_ids"] == ["p021-b4"]
+
     def test_merges_same_family_prefix_into_previous_chapter(self):
         pages_path = self.tmpdir / "pages.jsonl"
         portions_path = self.tmpdir / "portions.jsonl"
@@ -1388,3 +1498,43 @@ class TestCLIIntegration:
         assert chapters[1]["title"] == "JOE (JOSEPH) L'HEUREUX"
         assert chapters[1]["page_start"] == 5
         assert chapters[1]["page_end"] == 5
+
+    def test_provenance_sidecar_keeps_source_ids_when_paragraphs_stitch_across_pages(self):
+        pages_path = self.tmpdir / "pages.jsonl"
+        portions_path = self.tmpdir / "portions.jsonl"
+        out_path = self.tmpdir / "manifest.jsonl"
+        html_dir = self.tmpdir / "html"
+
+        self._write_jsonl(pages_path, [
+            {"page_number": 10, "printed_page_number": 1, "html": "<p>The story continues into</p>"},
+            {"page_number": 11, "printed_page_number": 2, "html": "<p>the next printed page.</p>"},
+        ])
+        self._write_jsonl(portions_path, [
+            {"title": "Introduction", "page_start": 1, "page_end": 2},
+        ])
+
+        cmd = [
+            sys.executable, "-m", "modules.build.build_chapter_html_v1.main",
+            "--pages", str(pages_path),
+            "--portions", str(portions_path),
+            "--out", str(out_path),
+            "--output-dir", str(html_dir),
+            "--book-title", "Test Book",
+        ]
+        result = subprocess.run(cmd, capture_output=True, text=True, cwd=str(Path(__file__).resolve().parent.parent))
+        assert result.returncode == 0, f"STDERR: {result.stderr}"
+
+        chapter = (html_dir / "chapter-001.html").read_text()
+        soup = BeautifulSoup(chapter, "html.parser")
+        paragraphs = soup.find("article").find_all("p", recursive=False)
+        assert len(paragraphs) == 1
+        assert paragraphs[0].get_text(" ", strip=True) == "The story continues into the next printed page."
+
+        provenance_rows = [
+            json.loads(line)
+            for line in (html_dir / "provenance" / "blocks.jsonl").read_text().strip().split("\n")
+        ]
+        paragraph_row = next(row for row in provenance_rows if row["block_kind"] == "paragraph")
+        assert paragraph_row["source_page_number"] == 10
+        assert paragraph_row["source_printed_page_number"] == 1
+        assert paragraph_row["source_element_ids"] == ["p010-b1", "p011-b1"]

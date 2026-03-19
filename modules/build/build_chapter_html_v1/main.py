@@ -12,16 +12,23 @@ from copy import deepcopy
 from datetime import datetime
 from difflib import SequenceMatcher
 from functools import lru_cache
-from html import escape as html_escape
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 
 from bs4 import BeautifulSoup
 
+from modules.common import doc_web_bundle_emitter as _doc_web_bundle_emitter
 from modules.common.onward_genealogy_html import (
     merge_contiguous_genealogy_tables as _merge_contiguous_genealogy_tables,
 )
-from modules.common.utils import read_jsonl, save_jsonl, ensure_dir, ProgressLogger
+from modules.common.utils import read_jsonl, ensure_dir, ProgressLogger
+
+annotate_source_blocks = _doc_web_bundle_emitter.annotate_source_blocks
+emit_doc_web_bundle = _doc_web_bundle_emitter.emit_doc_web_bundle
+merge_source_block_ids = _doc_web_bundle_emitter.merge_source_block_ids
+restore_top_level_source_block_ids = _doc_web_bundle_emitter.restore_top_level_source_block_ids
+_html5_wrap = _doc_web_bundle_emitter.html5_wrap
+_build_nav = _doc_web_bundle_emitter.build_nav
 
 
 def _utc() -> str:
@@ -36,185 +43,7 @@ def _resolve_run_dir(out_path: Path) -> Path:
     return cur
 
 
-# ---------------------------------------------------------------------------
-# CSS
-# ---------------------------------------------------------------------------
-
-_CSS = """
-/* Reset */
-*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
-
-/* Typography */
-:root {
-  --font-body: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
-  --font-serif: Georgia, "Times New Roman", serif;
-  --max-width: 52rem;
-  --color-bg: #fff;
-  --color-text: #222;
-  --color-muted: #666;
-  --color-border: #ddd;
-  --color-link: #1a5276;
-  --color-nav-bg: #f8f8f8;
-}
-
-html { font-size: 100%; }
-body {
-  font-family: var(--font-serif);
-  color: var(--color-text);
-  background: var(--color-bg);
-  line-height: 1.7;
-  max-width: var(--max-width);
-  margin: 0 auto;
-  padding: 1.5rem 1rem;
-}
-
-h1, h2, h3, h4, h5, h6 {
-  font-family: var(--font-body);
-  line-height: 1.3;
-  margin-top: 1.5em;
-  margin-bottom: 0.5em;
-}
-h1 { font-size: 1.8rem; }
-h2 { font-size: 1.4rem; }
-h3 { font-size: 1.2rem; }
-
-p { margin-bottom: 0.8em; }
-a { color: var(--color-link); }
-
-/* Navigation */
-nav.chapter-nav {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  padding: 0.6rem 0;
-  border-bottom: 1px solid var(--color-border);
-  margin-bottom: 1.5rem;
-  font-family: var(--font-body);
-  font-size: 0.9rem;
-}
-nav.chapter-nav.bottom {
-  border-bottom: none;
-  border-top: 1px solid var(--color-border);
-  margin-top: 2rem;
-  margin-bottom: 0;
-}
-nav.chapter-nav a { text-decoration: none; }
-nav.chapter-nav .nav-placeholder { min-width: 4rem; }
-
-/* Tables */
-table {
-  border-collapse: collapse;
-  width: 100%;
-  margin: 1em 0;
-  font-size: 0.95rem;
-  overflow-x: auto;
-  display: block;
-}
-th, td {
-  border: 1px solid var(--color-border);
-  padding: 0.4rem 0.6rem;
-  text-align: left;
-  vertical-align: top;
-}
-th {
-  background: var(--color-nav-bg);
-  font-weight: 600;
-  font-family: var(--font-body);
-}
-tr:nth-child(even) td { background: #fafafa; }
-
-/* Images / Figures */
-figure {
-  margin: 1.5em 0;
-  text-align: center;
-}
-figure img {
-  max-width: 100%;
-  height: auto;
-  display: inline-block;
-}
-figcaption {
-  font-family: var(--font-body);
-  font-size: 0.85rem;
-  color: var(--color-muted);
-  margin-top: 0.4em;
-  font-style: italic;
-}
-img {
-  max-width: 100%;
-  height: auto;
-}
-
-/* Index page */
-.book-header { margin-bottom: 2rem; }
-.book-header h1 { margin-top: 0; }
-.book-header .author { color: var(--color-muted); font-size: 1.1rem; }
-.toc-list { list-style: none; padding: 0; }
-.toc-list li {
-  padding: 0.4rem 0;
-  border-bottom: 1px solid var(--color-border);
-}
-.toc-list li:last-child { border-bottom: none; }
-.toc-list a { text-decoration: none; font-family: var(--font-body); }
-.toc-list .page-range {
-  color: var(--color-muted);
-  font-size: 0.85rem;
-  margin-left: 0.5em;
-}
-
-/* Article */
-article { margin-bottom: 2rem; }
-
-/* Print */
-@media print {
-  body { max-width: none; padding: 0; }
-  nav.chapter-nav { display: none; }
-  table { display: table; }
-  figure { break-inside: avoid; }
-}
-""".strip()
-
-
-# ---------------------------------------------------------------------------
-# HTML5 document wrapper
-# ---------------------------------------------------------------------------
-
-def _html5_wrap(body_html: str, title: str, nav_html_top: str = "",
-                nav_html_bottom: str = "") -> str:
-    """Wrap body content in a proper HTML5 document."""
-    title_esc = html_escape(title)
-    return f"""<!DOCTYPE html>
-<html lang="en">
-<head>
-<meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
-<title>{title_esc}</title>
-<style>
-{_CSS}
-</style>
-</head>
-<body>
-{nav_html_top}
-<article>
-{body_html}
-</article>
-{nav_html_bottom}
-</body>
-</html>
-"""
-
-
-# ---------------------------------------------------------------------------
-# Navigation
-# ---------------------------------------------------------------------------
-
-def _build_nav(prev_file: Optional[str], prev_title: Optional[str],
-               next_file: Optional[str], next_title: Optional[str],
-               is_bottom: bool = False) -> str:
-    cls = 'chapter-nav bottom' if is_bottom else 'chapter-nav'
-    prev_link = f'<a href="{prev_file}">&larr; {html_escape(prev_title or "Prev")}</a>' if prev_file else '<span class="nav-placeholder"></span>'
-    next_link = f'<a href="{next_file}">{html_escape(next_title or "Next")} &rarr;</a>' if next_file else '<span class="nav-placeholder"></span>'
-    return f'<nav class="{cls}">{prev_link}<a href="index.html">Index</a>{next_link}</nav>'
+# Shared bundle-emission helpers now live in modules/common/doc_web_bundle_emitter.py.
 
 
 # ---------------------------------------------------------------------------
@@ -394,6 +223,7 @@ def _should_stitch_page_break(prev_text: str, next_text: str) -> bool:
 
 
 def _append_paragraph_children(dst, src) -> None:
+    merge_source_block_ids(dst, src)
     dst.append(" ")
     while src.contents:
         dst.append(src.contents[0].extract())
@@ -1101,11 +931,11 @@ def main() -> None:
 
     pages_sorted = sorted(pages, key=_page_sort_key)
     pages_scan = sorted(pages, key=lambda r: int(r.get("page_number") or r.get("page") or 0))
-    manifest_rows = []
     toc_entries = []
     covered_pages = set()
     chapters_by_start = {}
     portion_titles = [p.get("title") or p.get("portion_id") or "" for p in portions]
+    source_block_index: Dict[str, Dict[str, Any]] = {}
 
     # ── Build chapters ──────────────────────────────────────────────────
     chapter_files: List[Dict[str, Any]] = []  # For navigation pass
@@ -1138,6 +968,13 @@ def main() -> None:
             html = _strip_headers_and_numbers(html)
             html = _add_table_scope(html)
             html = _normalize_heading_breaks(html)
+            source_page_number = page_num if isinstance(page_num, int) else page.get("page")
+            html, page_source_blocks = annotate_source_blocks(
+                html,
+                page_number=source_page_number if isinstance(source_page_number, int) else None,
+                printed_page_number=page.get("printed_page_number"),
+            )
+            source_block_index.update(page_source_blocks)
             prepared_pages.append({
                 "html": html,
                 "page_number": page_num,
@@ -1172,9 +1009,11 @@ def main() -> None:
 
             chapter_counter += 1
             filename = f"chapter-{chapter_counter:03d}.html"
-            body_html = segment["body_html"]
+            pre_merge_body_html = segment["body_html"]
+            body_html = pre_merge_body_html
             if args.merge_contiguous_genealogy_tables:
                 body_html = _merge_contiguous_genealogy_tables(body_html)
+                body_html = restore_top_level_source_block_ids(pre_merge_body_html, body_html)
             toc_entries.append({
                 "title": segment["title"],
                 "file": filename,
@@ -1231,8 +1070,17 @@ def main() -> None:
             html = _attach_images(html, crops, args.images_subdir.rstrip("/"))
         body_html = _strip_headers_and_numbers(html)
         body_html = _add_table_scope(body_html)
+        body_html = _normalize_heading_breaks(body_html)
+        source_page_number = page_num if isinstance(page_num, int) else page.get("page")
+        body_html, page_source_blocks = annotate_source_blocks(
+            body_html,
+            page_number=source_page_number if isinstance(source_page_number, int) else None,
+            printed_page_number=printed_num if isinstance(printed_num, int) else None,
+        )
+        source_block_index.update(page_source_blocks)
         if args.merge_contiguous_genealogy_tables:
-            body_html = _merge_contiguous_genealogy_tables(body_html)
+            merged_body_html = _merge_contiguous_genealogy_tables(body_html)
+            body_html = restore_top_level_source_block_ids(body_html, merged_body_html)
 
         fallback_entries.append({
             "title": title,
@@ -1254,44 +1102,6 @@ def main() -> None:
 
     # Front matter pages come before chapters in navigation order
     chapter_files = fallback_page_files + chapter_files
-
-    # ── Write all files with navigation ─────────────────────────────────
-    for i, entry in enumerate(chapter_files):
-        prev_file = chapter_files[i - 1]["filename"] if i > 0 else None
-        prev_title = chapter_files[i - 1]["title"] if i > 0 else None
-        next_file = chapter_files[i + 1]["filename"] if i < len(chapter_files) - 1 else None
-        next_title = chapter_files[i + 1]["title"] if i < len(chapter_files) - 1 else None
-
-        nav_top = _build_nav(prev_file, prev_title, next_file, next_title)
-        nav_bottom = _build_nav(prev_file, prev_title, next_file, next_title, is_bottom=True)
-        page_title = f"{entry['title']} — {book_title}" if book_title else entry["title"]
-        body_html = entry["body_html"]
-        if args.merge_contiguous_genealogy_tables:
-            body_html = _merge_contiguous_genealogy_tables(body_html)
-            entry["body_html"] = body_html
-
-        full_html = _html5_wrap(body_html, page_title, nav_top, nav_bottom)
-        file_path = html_dir / entry["filename"]
-        file_path.write_text(full_html, encoding="utf-8")
-
-        manifest_rows.append({
-            "schema_version": "chapter_html_manifest_v1",
-            "module_id": "build_chapter_html_v1",
-            "run_id": args.run_id,
-            "created_at": _utc(),
-            "chapter_index": entry["chapter_index"],
-            "title": entry["title"],
-            "page_start": entry["page_start"],
-            "page_end": entry["page_end"],
-            "file": str(file_path),
-            "kind": entry["kind"],
-            "source_pages": entry.get("source_pages"),
-            "source_printed_pages": entry.get("source_printed_pages"),
-            "source_portion_title": entry.get("source_portion_title"),
-            "source_portion_page_start": entry.get("source_portion_page_start"),
-            "source_portion_titles": entry.get("source_portion_titles"),
-            "source_portion_page_starts": entry.get("source_portion_page_starts"),
-        })
 
     # ── Build index page ────────────────────────────────────────────────
     index_entries = []
@@ -1316,26 +1126,26 @@ def main() -> None:
             if fe:
                 index_entries.append({"label": fe["title"], "file": fe["file"], "page_range": ""})
 
-    # Build index body
-    author_line = f'<p class="author">{html_escape(book_author)}</p>' if book_author else ""
-    toc_items = []
-    for entry in index_entries:
-        range_span = f' <span class="page-range">({entry["page_range"]})</span>' if entry.get("page_range") else ""
-        toc_items.append(f'  <li><a href="{entry["file"]}">{html_escape(entry["label"])}</a>{range_span}</li>')
-    index_body = f"""<div class="book-header">
-<h1>{html_escape(book_title)}</h1>
-{author_line}
-</div>
-<h2>Contents</h2>
-<ul class="toc-list">
-{chr(10).join(toc_items)}
-</ul>
-"""
-    index_html = _html5_wrap(index_body, book_title or "Index")
-    index_path = html_dir / "index.html"
-    index_path.write_text(index_html, encoding="utf-8")
+    source_artifact = args.pages
+    for page in pages_sorted:
+        source_values = page.get("source") or []
+        if source_values:
+            source_artifact = source_values[0]
+            break
 
-    save_jsonl(args.out, manifest_rows)
+    manifest_rows = emit_doc_web_bundle(
+        html_dir=html_dir,
+        manifest_path=out_path,
+        entries=chapter_files,
+        index_entries=index_entries,
+        book_title=book_title,
+        book_author=book_author,
+        source_artifact=source_artifact,
+        source_block_index=source_block_index,
+        images_subdir=args.images_subdir.rstrip("/") if args.illustration_manifest else None,
+        run_id=args.run_id,
+        module_id="build_chapter_html_v1",
+    )
     logger = ProgressLogger(state_path=args.state_file, progress_path=args.progress_file, run_id=args.run_id)
     logger.log("build", "done", current=len(manifest_rows), total=len(manifest_rows),
                message=f"Wrote {len(manifest_rows)} chapters to {html_dir}")

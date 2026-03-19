@@ -147,12 +147,16 @@ Non-Negotiable Design Principles (#1 Traceability, #2 Modular pipeline,
 
 ## spec:7 — Graduation & Dossier Handoff
 
-> Product need: migrate mature converters into Dossier so codex-forge stays lean.
-> Tech substrate: graduation criteria, Dossier intake surface readiness, fixture breadth.
+> Product need: graduate mature document-to-website conversion paths out of codex-forge so it stays lean and Dossier can consume them through a stable boundary.
+> Tech substrate: graduation criteria, `doc-web` runtime boundary, Dossier intake surface readiness, fixture breadth.
 
 This category carries no active product compromises. Its obligations flow from
 Non-Negotiable Design Principle #5 (Graduate to Dossier) and the Mission in
 `docs/ideal.md`.
+
+Current accepted direction: when a mature path is still cleaner as a standalone
+runtime than as a direct codex-forge dependency, graduate it first into
+`doc-web`, then let Dossier consume `doc-web` through a versioned contract.
 
 ---
 

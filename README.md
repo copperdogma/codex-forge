@@ -1,5 +1,12 @@
 # codex-forge
-AI-first, modular pipeline for turning scanned books into structured JSON with full traceability.
+AI-first, modular ingestion lab for turning scanned books, PDFs, and images into faithful semantic HTML and other structured artifacts with full traceability.
+
+## Current Role
+- Produce the trustworthy semantic HTML baseline for Onward so an external website project can publish it.
+- Mature the reusable structural-website runtime and graduate it into `doc-web`, which Dossier will consume through a stable, versioned boundary.
+- Continue upstream ingestion R&D for future books and documents until those capabilities are stable enough to move into `doc-web` and then into Dossier.
+
+Codex-forge intentionally stops at semantic HTML and structural-website R&D. `doc-web` owns the reusable runtime boundary. Presentation-layer website generation remains outside this repo's scope.
 
 ## 📚 Documentation
 - **[Runbook & Operations Guide](docs/RUNBOOK.md)**: **START HERE** for running the pipeline, resuming runs, and troubleshooting.

@@ -1,9 +1,11 @@
 # Story 130: Book Website Template Module
 
-**Status**: In Progress
+**Status**: Won't Do
 
 ---
 **Depends On**: story-129 (HTML output polish — needs clean, semantic base HTML as input)
+
+**Won't Do Reason**: Codex-forge now stops at semantic HTML. Website generation is presentation-layer work outside this repo's scope. The reusable ingestion path should move into Dossier with an HTML-only stop-point, and the polished website builder should live in a separate small project that consumes that HTML.
 
 ## Goal
 Create a pipeline module that transforms the polished chapter HTML (from Story 129) into an elegant, minimal **static website** — a "website form of a book" that can be opened locally or hosted anywhere.
@@ -257,3 +259,8 @@ Multi-pass browser evaluation using chrome automation tools. Each page type test
 - **Image lightbox**: No — JS progressive enhancement, not in scope for MVP
 
 ## Work Log
+
+### 20260318-0000 — Scope reclassified out of codex-forge
+- **Result:** Marked this story Won't Do in this repo. Codex-forge's endpoint is now semantic HTML, not a finished website.
+- **Notes:** The practical split is: codex-forge proves and maintains the book-to-HTML ingestion path; Dossier should gain an "ingest to HTML only" stop-point; a separate small project should consume that HTML and shape it into a polished website for publishing.
+- **Next:** If website generation is still desired, implement it outside codex-forge against the semantic HTML + manifest contract produced by `build_chapter_html_v1`.

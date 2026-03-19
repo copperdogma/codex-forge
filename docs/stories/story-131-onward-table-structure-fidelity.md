@@ -5,7 +5,7 @@
 **Ideal Refs**: Fidelity to Source (every table preserves its structure), Extract (layout preserved where it carries meaning — tables), Validate (prove output is correct)
 **Spec Refs**: spec:2.1 C1 (OCR accuracy), format-registry scanned-pdf-tables structure_preservation: 0.80
 **Depends On**: Story 128 (golden references and eval infrastructure)
-**Blocks**: Story 129 (HTML output polish), Story 130 (book website template)
+**Blocks**: Story 129 (HTML output polish)
 
 ## Goal
 
@@ -25,7 +25,7 @@ HTML is the output format because it preserves semantics, images, basic layout, 
 
 - Changing golden references — all 3 are hand-validated 100% correct (verified by human against scans)
 - Non-table content improvements (prose, illustrations)
-- Website/presentation layer (that's story-130)
+- Website/presentation layer (now outside codex-forge; semantic HTML is the handoff artifact)
 - Graduating the converter to Dossier
 
 ## Approach Evaluation

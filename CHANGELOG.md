@@ -1,3 +1,15 @@
+## [2026-03-19-01] - Extract doc-web bundle emitter seam (Story 153)
+
+### Added
+- Added `modules/common/doc_web_bundle_emitter.py`, focused `doc-web` contract regression coverage in `tests/test_doc_web_bundle_contract.py`, and runtime bundle artifacts for the maintained Onward regression lane
+
+### Changed
+- Narrowed `modules/build/build_chapter_html_v1/main.py` to chapter assembly plus build-local glue while the shared emitter now owns bundle/index/provenance writing
+- Formalized `chapter_html_manifest_v1`, `doc_web_bundle_manifest_v1`, and `doc_web_provenance_block_v1` at the live seam, and updated Story 153 bookkeeping so the closure claim matches the maintained no-emitter-regression proof that was actually achieved
+
+### Fixed
+- Preserved caption/source-block provenance through genealogy merge ordering so the `chapter-008.html` caption cases keep the correct `p021-b*` lineage
+
 ## [2026-03-18-05] - Reconcile fresh Onward audit lane with reviewed slice (Story 150)
 
 ### Added

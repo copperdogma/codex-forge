@@ -146,7 +146,7 @@ This index tracks stories in `/docs/stories/` for the codex-forge pipeline.
 |||| 127 | OCR Model Eval for Genealogy / Table-Heavy Books | High | Done | /docs/stories/story-127-ocr-model-eval-genealogy.md |
 |||| 128 | Onward Table Fidelity Verification | High | Done | /docs/stories/story-128-onward-table-fidelity-verification.md |
 |||| 129 | HTML Output Polish + Image Integration | Medium | Done | /docs/stories/story-129-onward-html-output-polish.md |
-|||| 130 | Book Website Template Module | Medium | In Progress | /docs/stories/story-130-onward-book-website-template.md |
+|||| 130 | Book Website Template Module | Medium | Won't Do | /docs/stories/story-130-onward-book-website-template.md |
 |||| 131 | Onward Table Structure Fidelity | High | Done | /docs/stories/story-131-onward-table-structure-fidelity.md |
 |||| 132 | Fix Provenance Envelope Gaps | High | Done | /docs/stories/story-132-provenance-envelope-fixes.md |
 |||| 133 | Gemini 3 Flash as Cost-Optimized Crop Detector | High | Done | /docs/stories/story-133-gemini-flash-crop-detector.md |
@@ -167,6 +167,10 @@ This index tracks stories in `/docs/stories/` for the codex-forge pipeline.
 |||| 148 | ADR-021 Migration: Dual-Ideal, Category Spec, Phase Governance | High | In Progress | /docs/stories/story-148-adr-021-migration-dual-ideal-category-spec-phase-governance.md |
 |||| 149 | Onward Scanned-Genealogy Collapse Implementation | High | Done | /docs/stories/story-149-onward-scanned-genealogy-collapse-implementation.md |
 |||| 150 | Onward Full-Run Audit Reconciliation | High | Done | /docs/stories/story-150-onward-full-run-audit-reconciliation.md |
+|||| 151 | Define `doc-web` as the Standalone Dossier Intake Runtime | High | Pending | /docs/stories/story-151-name-and-define-standalone-dossier-intake-runtime.md |
+|||| 152 | `doc-web` Bundle and Provenance Contract | High | Pending | /docs/stories/story-152-doc-web-bundle-and-provenance-contract.md |
+|||| 153 | Extract `doc-web` Bundle Emitter | High | Done | /docs/stories/story-153-extract-doc-web-bundle-emitter.md |
+|||| 154 | Dossier `doc-web` Semantic HTML Handoff | High | Pending | /docs/stories/story-154-dossier-doc-web-semantic-html-handoff.md |
 
 ## Notes
 - Status "Done" reflects current working state in codex-forge. "To Do" items are planned next steps aligned with `docs/requirements.md` and `snapshot.md`.

@@ -4,7 +4,7 @@
 
 ---
 **Depends On**: story-128 (table fidelity verification — tables must be correct before polishing)
-**Blocks**: story-130 (book website template)
+**Follow-On**: Semantic HTML is now the codex-forge endpoint. Website generation moved to a separate project outside this repo.
 
 ## Goal
 Two complementary goals in one story:
@@ -12,7 +12,7 @@ Two complementary goals in one story:
 1. **HTML polish** — Transform bare HTML fragments into proper, semantic HTML5 documents with embedded CSS, navigation, and accessibility features.
 2. **Image integration** — Close the image data gaps so the final HTML contains correctly placed images with rich alt text, `<figure>`/`<figcaption>` wrapping, and extracted caption text.
 
-The output should be **clean, semantic, self-contained, and image-complete** — something you can open in a browser and see a properly formatted book with illustrations in the right places, described correctly, with captions attached.
+The output should be **clean, semantic, self-contained, and image-complete** — the stable codex-forge endpoint and suitable input to Dossier or an external website builder.
 
 ## Current State
 
@@ -214,7 +214,7 @@ The output should be **clean, semantic, self-contained, and image-complete** —
 - **T13-T14**: Manual integration test + self-contained copy test.
 
 ### Impact Analysis
-- **Downstream**: Story 130 (book website template) depends on this. Our semantic HTML makes 130's job trivial.
+- **Downstream**: Semantic HTML is now the codex-forge endpoint. It is the handoff artifact for Dossier ingestion and any external website builder.
 - **Schema stamping**: The illustration manifest gains `caption_box` and `caption_text` fields. Since there's no formal schema in `schemas.py`, no schema change needed — the crop module writes its own JSONL directly.
 - **Existing tests**: No existing tests for build_chapter_html_v1, so no breakage risk.
 - **Recipe changes**: Add `book_title` and `book_author` params to build stage in recipes.
@@ -273,4 +273,4 @@ The output should be **clean, semantic, self-contained, and image-complete** —
 **Impact**:
 - Story-scope: All 14 tasks complete, all ACs met
 - Pipeline-scope: HTML output is now a readable, self-contained book with proper image integration
-- Unblocks: Story 130 (book website template) — semantic HTML is a solid foundation
+- Handoff: semantic HTML is now a solid foundation for Dossier ingestion and any external website builder

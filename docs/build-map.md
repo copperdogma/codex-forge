@@ -148,17 +148,20 @@ responsibilities.
 
 ## 7. Graduation & Dossier Handoff                                      `spec:7`
 
-**Product need:** Migrate mature converters into Dossier so codex-forge stays lean.
-**Tech need:** Graduation criteria, Dossier intake surface readiness, fixture breadth.
-**Substrate:** missing
+**Product need:** Graduate mature document-to-website conversion paths out of codex-forge so it stays lean and Dossier can consume them through a stable boundary.
+**Tech need:** Graduation criteria, `doc-web` runtime boundary, Dossier intake surface readiness, fixture breadth.
+**Substrate:** partial
 
-**Story coverage:** [ ] stories needed
+**Story coverage:** [x] active stories: 151-154
 **Spec:** spec:7
-**ADR Refs:** None yet
+**ADR Refs:** ADR-002 (`doc-web` runtime boundary)
 **Absorbs:** Graduation & Dossier Handoff (old 7)
 
 No active product compromises. Obligations flow from Non-Negotiable Design
-Principle #5 (Graduate to Dossier) and the Mission. `0` formats graduated today.
+Principle #5 (Graduate to Dossier) and the Mission. Accepted direction:
+graduate the reusable structural-website runtime into `doc-web`, then let
+Dossier consume `doc-web` via a versioned contract. `0` formats graduated
+today, and `doc-web` does not exist yet as an extracted runtime.
 
 ---
 

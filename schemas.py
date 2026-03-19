@@ -1,3 +1,4 @@
+import re
 from typing import Any, Dict, List, Optional, Literal, Union
 from pydantic import BaseModel, Field, field_validator, model_validator
 
@@ -370,6 +371,250 @@ class BoundingBox(BaseModel):
     x1: int
     y1: int
     section_id: Optional[str] = None
+
+
+_DOC_WEB_ENTRY_ID_RE = re.compile(r"^(?:chapter|page)-\d{3}$")
+_DOC_WEB_BLOCK_ID_RE = re.compile(r"^blk-(?:chapter|page)-\d{3}-\d{4}$")
+
+
+def _validate_doc_web_entry_id(value: str, field_name: str) -> str:
+    if not _DOC_WEB_ENTRY_ID_RE.fullmatch(value):
+        raise ValueError(
+            f"{field_name} must be lowercase kebab-case (example: chapter-010, page-002)"
+        )
+    return value
+
+
+class ChapterHtmlManifestEntry(BaseModel):
+    """
+    Transitional row schema for the current codex-forge chapter/page manifest.
+
+    Story 153 keeps this build-local surface for current pipeline compatibility
+    while the extracted seam also emits the first `doc-web` bundle contract.
+    """
+
+    schema_version: str = "chapter_html_manifest_v1"
+    module_id: Optional[str] = None
+    run_id: Optional[str] = None
+    created_at: Optional[str] = None
+
+    chapter_index: Optional[int] = None
+    title: str
+    page_start: Optional[int] = None
+    page_end: Optional[int] = None
+    file: str
+    kind: Literal["chapter", "page"]
+    source_pages: Optional[List[int]] = None
+    source_printed_pages: Optional[List[int]] = None
+    source_portion_title: Optional[str] = None
+    source_portion_page_start: Optional[int] = None
+    source_portion_titles: Optional[List[str]] = None
+    source_portion_page_starts: Optional[List[int]] = None
+
+    @model_validator(mode="after")
+    def validate_page_bounds(self):
+        if (
+            self.page_start is not None
+            and self.page_end is not None
+            and self.page_start > self.page_end
+        ):
+            raise ValueError("page_start cannot be greater than page_end")
+        return self
+
+
+class DocWebBundleEntry(BaseModel):
+    """Single content document in the first formal `doc-web` bundle contract."""
+
+    entry_id: str
+    kind: Literal["chapter", "page"]
+    title: str
+    path: str
+    order: int
+    prev_entry_id: Optional[str] = None
+    next_entry_id: Optional[str] = None
+    source_pages: List[int] = Field(default_factory=list)
+    printed_pages: List[int] = Field(default_factory=list)
+    printed_page_start: Optional[int] = None
+    printed_page_end: Optional[int] = None
+
+    @field_validator("entry_id")
+    @classmethod
+    def validate_entry_id(cls, value: str) -> str:
+        return _validate_doc_web_entry_id(value, "entry_id")
+
+    @field_validator("prev_entry_id", "next_entry_id")
+    @classmethod
+    def validate_neighbor_entry_id(cls, value: Optional[str]) -> Optional[str]:
+        if value is None:
+            return value
+        return _validate_doc_web_entry_id(value, "neighbor entry id")
+
+    @field_validator("path")
+    @classmethod
+    def validate_path(cls, value: str) -> str:
+        if not value.endswith(".html"):
+            raise ValueError("doc-web bundle entry paths must point to .html files")
+        return value
+
+    @field_validator("order")
+    @classmethod
+    def validate_order(cls, value: int) -> int:
+        if value < 1:
+            raise ValueError("order must be >= 1")
+        return value
+
+    @model_validator(mode="after")
+    def validate_entry_shape(self):
+        expected_path = f"{self.entry_id}.html"
+        if self.path != expected_path:
+            raise ValueError(
+                f"path must be the bundle-root HTML file '{expected_path}' for entry_id '{self.entry_id}'"
+            )
+        if self.printed_pages:
+            start = min(self.printed_pages)
+            end = max(self.printed_pages)
+            if self.printed_page_start is None:
+                self.printed_page_start = start
+            if self.printed_page_end is None:
+                self.printed_page_end = end
+        if (
+            self.printed_page_start is not None
+            and self.printed_page_end is not None
+            and self.printed_page_start > self.printed_page_end
+        ):
+            raise ValueError("printed_page_start cannot be greater than printed_page_end")
+        return self
+
+
+class DocWebBundleManifest(BaseModel):
+    """Document-level manifest for the first formal `doc-web` bundle contract."""
+
+    schema_version: str = "doc_web_bundle_manifest_v1"
+    module_id: Optional[str] = None
+    run_id: Optional[str] = None
+    created_at: Optional[str] = None
+
+    document_id: str
+    title: str
+    creator: Optional[str] = None
+    source_artifact: str
+    index_path: str = "index.html"
+    entries: List[DocWebBundleEntry]
+    reading_order: List[str]
+    asset_roots: List[str] = Field(default_factory=list)
+    provenance_path: str = "provenance/blocks.jsonl"
+
+    @model_validator(mode="after")
+    def validate_manifest(self):
+        if not self.entries:
+            raise ValueError("entries cannot be empty")
+        if self.index_path != "index.html":
+            raise ValueError("index_path must be the bundle-root file 'index.html'")
+        if self.provenance_path != "provenance/blocks.jsonl":
+            raise ValueError(
+                "provenance_path must be the bundle-local sidecar 'provenance/blocks.jsonl'"
+            )
+
+        entry_ids = [entry.entry_id for entry in self.entries]
+        if len(set(entry_ids)) != len(entry_ids):
+            raise ValueError("entry_ids must be unique")
+
+        expected_orders = list(range(1, len(self.entries) + 1))
+        actual_orders = [entry.order for entry in self.entries]
+        if actual_orders != expected_orders:
+            raise ValueError("entries must appear in contiguous reading order 1..N")
+
+        if self.reading_order != entry_ids:
+            raise ValueError("reading_order must list each entry exactly once in entry order")
+
+        id_set = set(entry_ids)
+        for index, entry in enumerate(self.entries):
+            if entry.prev_entry_id and entry.prev_entry_id not in id_set:
+                raise ValueError(f"prev_entry_id '{entry.prev_entry_id}' not found in entries")
+            if entry.next_entry_id and entry.next_entry_id not in id_set:
+                raise ValueError(f"next_entry_id '{entry.next_entry_id}' not found in entries")
+
+            expected_prev = entry_ids[index - 1] if index > 0 else None
+            expected_next = entry_ids[index + 1] if index + 1 < len(entry_ids) else None
+            if entry.prev_entry_id != expected_prev:
+                raise ValueError(
+                    f"prev_entry_id for '{entry.entry_id}' must match reading-order adjacency"
+                )
+            if entry.next_entry_id != expected_next:
+                raise ValueError(
+                    f"next_entry_id for '{entry.entry_id}' must match reading-order adjacency"
+                )
+        return self
+
+
+class DocWebProvenanceBlock(BaseModel):
+    """
+    Paragraph/block-level provenance sidecar row for the first `doc-web` contract.
+
+    The block_id doubles as the DOM anchor id placed directly on the emitted HTML block.
+    """
+
+    schema_version: str = "doc_web_provenance_block_v1"
+    module_id: Optional[str] = None
+    run_id: Optional[str] = None
+    created_at: Optional[str] = None
+
+    block_id: str
+    entry_id: str
+    block_kind: Literal[
+        "paragraph",
+        "heading",
+        "list_item",
+        "table",
+        "figure",
+        "caption",
+        "page_marker",
+        "other",
+    ]
+    source_page_number: int
+    source_element_ids: List[str]
+    source_printed_page_number: Optional[int] = None
+    source_printed_page_label: Optional[str] = None
+    source_bbox: Optional[BoundingBox] = None
+    confidence: Optional[float] = None
+    text_quote: Optional[str] = None
+
+    @field_validator("block_id")
+    @classmethod
+    def validate_block_id(cls, value: str) -> str:
+        if not _DOC_WEB_BLOCK_ID_RE.fullmatch(value):
+            raise ValueError(
+                "block_id must match blk-<entry-id>-<4-digit ordinal> (example: blk-chapter-010-0001)"
+            )
+        return value
+
+    @field_validator("entry_id")
+    @classmethod
+    def validate_entry_id(cls, value: str) -> str:
+        return _validate_doc_web_entry_id(value, "entry_id")
+
+    @field_validator("source_page_number")
+    @classmethod
+    def validate_source_page_number(cls, value: int) -> int:
+        if value < 1:
+            raise ValueError("source_page_number must be >= 1")
+        return value
+
+    @field_validator("source_element_ids")
+    @classmethod
+    def validate_source_element_ids(cls, value: List[str]) -> List[str]:
+        if not value:
+            raise ValueError("source_element_ids must contain at least one upstream element id")
+        return value
+
+    @field_validator("confidence")
+    @classmethod
+    def validate_confidence(cls, value: Optional[float]) -> Optional[float]:
+        if value is None:
+            return value
+        if not 0.0 <= value <= 1.0:
+            raise ValueError("confidence must be between 0.0 and 1.0")
+        return value
 
 
 class ImageCrop(BaseModel):

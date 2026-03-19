@@ -11,6 +11,7 @@ import re
 from typing import Any, List, Optional
 
 from bs4 import BeautifulSoup
+from modules.common.doc_web_bundle_emitter import merge_source_block_ids
 
 try:
     from modules.adapter.table_rescue_onward_tables_v1.main import (
@@ -418,9 +419,11 @@ def _append_genealogy_heading_and_rows(base_table: Any, heading_tags: List[Any],
 
     col_count = _genealogy_table_column_count(base_table)
     for tag in heading_tags:
+        merge_source_block_ids(base_table, tag)
         for line in _genealogy_heading_lines(tag):
             base_tbody.append(_build_genealogy_subgroup_row(line, col_count, soup))
 
+    merge_source_block_ids(base_table, source_table)
     source_tbody = source_table.find("tbody", recursive=False)
     rows = source_tbody.find_all("tr", recursive=False) if source_tbody is not None else source_table.find_all("tr", recursive=False)
     if source_table.find("thead", recursive=False) is None and _is_genealogy_table_header(source_table) and rows:
@@ -451,6 +454,14 @@ def _preserve_figure_and_image_attrs(original_html: str, merged_html: str) -> st
 
 def merge_contiguous_genealogy_tables(html: str, *, rescue_normalizer: Optional[Any] = None) -> str:
     if "<table" not in (html or "").lower():
+        return html or ""
+
+    original_soup = BeautifulSoup(html or "", "html.parser")
+    original_tables = original_soup.find_all("table")
+    if not any(
+        _is_genealogy_table_header(table) or _looks_like_genealogy_continuation_table(table)
+        for table in original_tables
+    ):
         return html or ""
 
     normalizer = rescue_normalizer
